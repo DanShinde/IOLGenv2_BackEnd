@@ -5,7 +5,7 @@ from rest_framework import authentication, permissions, status
 from django.contrib.auth.models import User
 from .serializers import RegisterSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
-
+from rest_framework.permissions import IsAuthenticated
 
 
 class RegisterView(APIView):
@@ -37,3 +37,10 @@ class LoginView(APIView):
         return Response({"message": "Invalid Credentials"}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+
+        user = request.user
+        serializer = RegisterSerializer(user)
+        return Response(serializer.data)
