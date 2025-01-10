@@ -25,7 +25,10 @@ SECRET_KEY = 'django-insecure-96qq^1*%x2c+er$!k-n(-dkqw8ghlf-#yzf@*cqu3-%mi&r!v-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["iolgen.onrender.com",]
+ALLOWED_HOSTS = ['0.0.0.0', 
+                 "localhost",
+                 '127.0.0.1',
+                 'iolgen.onrender.com',]
 
 
 # Application definition
@@ -39,7 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'accounts',
     'rest_framework',
-
+    'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
