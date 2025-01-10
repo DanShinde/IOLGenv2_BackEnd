@@ -7,6 +7,7 @@ from .serializers import RegisterSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 
+
 class RegisterView(APIView):
     def post(self, request):
         data = request.data
