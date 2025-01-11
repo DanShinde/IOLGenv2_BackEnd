@@ -187,6 +187,14 @@ SIMPLE_JWT = {
 
 
 CORS_ALLOW_ALL_ORIGINS = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://iolgen.onrender.com',
+]
+
+
+
+
+#Jazzmin settings for Admin panels
 
 JAZZMIN_SETTINGS = {
     'site_header': "Armstrong Dematic",
