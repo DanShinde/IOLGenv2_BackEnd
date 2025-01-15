@@ -1,8 +1,13 @@
-{
+  {
+    "builds": [{
+        "src": "IOLGenv2_BackEnd/wsgi.py",
+        "use": "@ardnt/vercel-python-wsgi",
+        "config": { "maxLambdaSize": "15mb" }
+    }],
     "routes": [
-      {
-        "src": "/(.*)",
-        "dest": "IOLGenv2_BackEnd/wsgi.py"
-      }
+        {
+            "src": "/(.*)",
+            "dest": "IOLGenv2_BackEnd/wsgi.py"
+        }
     ]
-  }
+}
