@@ -18,6 +18,12 @@ class UserProfile(models.Model):
     is_ac_cluster_create_allowed = models.BooleanField(default=False)
     is_ac_cluster_edit_allowed = models.BooleanField(default=False)
     is_ac_cluster_delete_allowed = models.BooleanField(default=False)
+    allowed_clusters = models.ManyToManyField(
+        'ACGen.ClusterTemplate',  # Reference using 'app_label.ModelName'
+        related_name='allowed_users',
+        blank=True,
+        help_text="Clusters allowed for this user."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
