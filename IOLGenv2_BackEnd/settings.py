@@ -28,12 +28,14 @@ DEBUG = True
 ALLOWED_HOSTS = ['0.0.0.0', 
                  "localhost",
                  '127.0.0.1',
-                 'iolgen.onrender.com',]
+                 'iolgen.onrender.com',
+                 '.vercel.app']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'whitenoise.runserver_nostatic',
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -141,6 +143,11 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATIC_DIRS = [os.path.join(BASE_DIR, 'accounts/static')]
+
+STATIC_ROOT = [os.path.join(BASE_DIR, 'staticfiles')]
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -156,7 +163,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
