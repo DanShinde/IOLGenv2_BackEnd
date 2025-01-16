@@ -35,7 +35,7 @@ ALLOWED_HOSTS = ['0.0.0.0',
 # Application definition
 
 INSTALLED_APPS = [
-    # 'whitenoise.runserver_nostatic',
+    'whitenoise.runserver_nostatic',
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -147,6 +147,7 @@ STATIC_DIRS = [os.path.join(BASE_DIR, 'accounts/static')]
 
 STATIC_ROOT = [os.path.join(BASE_DIR, 'staticfiles')]
 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
