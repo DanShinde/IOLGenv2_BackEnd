@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from IOLGen.models import Segment
 
 class UserTypeEnum(models.TextChoices):
     USER = "USER", "User"
@@ -14,6 +15,7 @@ class UserProfile(models.Model):
         choices=UserTypeEnum.choices,
         default=UserTypeEnum.USER,  # Default user type
     )
+    segments = models.ManyToManyField(Segment, blank=True)  # Many-to-Many for segments
     is_ac_approved = models.BooleanField(default=False)
     is_ac_cluster_create_allowed = models.BooleanField(default=False)
     is_ac_cluster_edit_allowed = models.BooleanField(default=False)

@@ -33,8 +33,22 @@ class ProjectReportViewSet(viewsets.ModelViewSet):
 
 class ModuleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
-    queryset = Module.objects.all()
     serializer_class = ModuleSerializer
+    queryset = Module.objects.none()  # Default queryset to satisfy DRF
+
+    def get_queryset(self):
+        """
+        Limit the queryset to modules associated with the user's assigned segments.
+        """
+        user = self.request.user
+
+        if hasattr(user, "profile"):
+            # Get the segments assigned to the user's profile
+            user_segments = user.profile.segments.all()
+            return Module.objects.filter(segment__in=user_segments)
+
+        # If the user doesn't have a profile, return an empty queryset
+        return Module.objects.none()
 
 class IOListViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
