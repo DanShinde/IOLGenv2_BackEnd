@@ -4,24 +4,13 @@
       {
         "src": "IOLGenv2_BackEnd/wsgi.py",
         "use": "@vercel/python",
-        "config": {
-          "maxLambdaSize": "15mb",
-          "runtime": "python3.12"
-        }
-      },
-      {
-        "src": "build_files.sh",
-        "use": "@vercel/static-build",
-        "config": {
-          "distDir": "staticfiles"
-        }
-      }
-    ],
+        "config": { "maxLambdaSize": "15mb", "runtime": "python3.12" }
+      }],
     "routes": [
       {
         "src": "/(.*)",
         "dest": "IOLGenv2_BackEnd/wsgi.py"
       }
-    ],
-    "outputDirectory": "staticfiles"
+    ]
   }
+  
