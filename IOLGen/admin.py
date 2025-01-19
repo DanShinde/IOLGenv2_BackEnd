@@ -38,9 +38,9 @@ class IOListAdmin(admin.ModelAdmin):
 
 @admin.register(Signal)
 class SignalAdmin(admin.ModelAdmin):
-    list_display = ('id', 'equipment_code', 'code', 'signal_type', 'location', 'created_by')
-    search_fields = ('equipment_code', 'code', 'signal_type', 'location')
-    list_filter = ('signal_type', 'location', 'created_at')
+    list_display = ('id', 'module', 'equipment_code', 'code', 'signal_type', 'segment', 'location', 'created_by', 'created_at', 'updated_at')
+    search_fields = ('equipment_code', 'code')
+    list_filter = ('signal_type', 'location', 'created_at' , 'module__module')
 
 @admin.register(ProjectReport)
 class ProjectReportAdmin(admin.ModelAdmin):

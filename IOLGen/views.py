@@ -26,10 +26,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
 
+class IOListViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]  # Require authentication
+    queryset = IOList.objects.all()
+    serializer_class = IOListSerializer
+    
+
 class ProjectReportViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
     queryset = ProjectReport.objects.all()
     serializer_class = ProjectReportSerializer
+from rest_framework.exceptions import PermissionDenied
 
 class ModuleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
@@ -50,13 +57,42 @@ class ModuleViewSet(viewsets.ModelViewSet):
         # If the user doesn't have a profile, return an empty queryset
         return Module.objects.none()
 
-class IOListViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]  # Require authentication
-    queryset = IOList.objects.all()
-    serializer_class = IOListSerializer
-    
+    def perform_create(self, serializer):
+        # Only allow users in 'Managers' or 'SegmentSMEs' group to add
+        if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
+            raise PermissionDenied("You do not have permission to add this module.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        # Only allow users in 'Managers' or 'SegmentSMEs' group to delete
+        if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
+            raise PermissionDenied("You do not have permission to delete this module.")
+        instance.delete()
+
 
 class SignalViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
-    queryset = Signal.objects.all()
     serializer_class = SignalSerializer
+    queryset = Module.objects.none()  # Default queryset to satisfy DRF
+
+    def get_queryset(self):
+        """
+        This view should return a list of all the signals
+        for the module specified by the `module_id` parameter.
+        """
+        module_id = self.request.query_params.get('module_id', None)
+        if module_id is not None:
+            return Signal.objects.filter(module_id=module_id)
+        return Signal.objects.all()
+    
+    def perform_create(self, serializer):
+        # Only allow users in 'Managers' or 'SegmentSMEs' group to add
+        if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
+            raise PermissionDenied("You do not have permission to add this signal.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        # Only allow users in 'Managers' or 'SegmentSMEs' group to delete
+        if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
+            raise PermissionDenied("You do not have permission to delete this signal.")
+        instance.delete()

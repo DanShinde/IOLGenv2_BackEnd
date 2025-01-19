@@ -111,7 +111,6 @@ class IOList(models.Model):
     class Meta:
         ordering = ['order']
 
-
 class Signal(models.Model):
     equipment_code = models.CharField(max_length=30)
     code = models.CharField(max_length=40)
@@ -120,14 +119,31 @@ class Signal(models.Model):
     device_type = models.TextField(max_length=100, blank=True)
     signal_type = models.CharField(max_length=10, default="DI", choices=(('DI', 'DI'), ('DO', 'DO'), ('Encoder', 'Encoder')))
     remarks = models.TextField(max_length=100, blank=True)
-    segment = models.ForeignKey(Segment, on_delete=models.SET_NULL, null=True, blank=True)
+    segment = models.CharField(max_length=100, blank=True, editable=False)  # segment as text field, not a foreign key
     initial_state = models.BooleanField(default=True)
     location = models.CharField(max_length=2, choices=(('FD', 'FD'), ('CP', 'CP')))
-    module = models.ForeignKey(Module, on_delete=models.CASCADE,default= 1, related_name = "modules")
+    module = models.ForeignKey(Module, on_delete=models.CASCADE, default=1, related_name="modules")
     created_by = models.CharField(max_length=30)
+    updated_by = models.CharField(max_length=30)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     Demo_3d_Property = models.CharField(max_length=200, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # Set the segment field based on the module's segment
+        if self.module:
+            self.segment = self.module.segment.name
+
+        # Set 'created_by' and 'updated_by' based on the current user if available
+        user = kwargs.get('user', None)  # Pass the current user when saving
+        if user:
+            user_full_name = f"{user.first_name} {user.last_name}"
+            if not self.created_by:
+                self.created_by = user_full_name
+            self.updated_by = user_full_name
+        
+        super(Signal, self).save(*args, **kwargs)
+
     def __str__(self):
         if self.equipment_code != '':
             return f'{self.equipment_code}_{self.code}'

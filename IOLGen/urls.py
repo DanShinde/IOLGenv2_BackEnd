@@ -12,6 +12,6 @@ router.register(r'projects', ProjectViewSet)
 router.register(r'project-reports', ProjectReportViewSet)
 router.register(r'modules', ModuleViewSet)
 router.register(r'iolists', IOListViewSet)
-router.register(r'signals', SignalViewSet)
+router.register(r'signals', SignalViewSet, basename='signals')
 
 urlpatterns = router.urls
