@@ -3,9 +3,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import authentication, permissions, status
 from django.contrib.auth.models import User
-from .serializers import RegisterSerializer
+from .serializers import RegisterSerializer, UserProfileSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
+from .models import UserProfile
 
 
 class RegisterView(APIView):
@@ -53,5 +54,6 @@ class ProfileView(APIView):
     def get(self, request):
 
         user = request.user
-        serializer = RegisterSerializer(user)
+        userProfile = UserProfile.objects.get(user=user)
+        serializer = UserProfileSerializer(userProfile)
         return Response(serializer.data)

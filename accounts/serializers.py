@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-
-
+from .models import UserProfile
+from IOLGen.models import Segment
 
 class RegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
@@ -23,3 +23,31 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name = validated_data['last_name']
         )
         return user
+    
+
+class SegmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Segment
+        fields = ["name"]  # Include only the name field or others as needed
+
+# Serializer for UserProfile
+class UserProfileSerializer(serializers.ModelSerializer):
+    segments = serializers.SerializerMethodField()  # Use the nested serializer for segments
+
+    class Meta:
+        model = UserProfile  # Correct model to serialize
+        fields = [
+            "usertype",
+            "segments",
+            "is_ac_approved",
+            "is_ac_cluster_create_allowed",
+            "is_ac_cluster_edit_allowed",
+            "is_ac_cluster_delete_allowed",
+            "allowed_clusters",
+            "created_at",
+            "updated_at",
+        ]  # Explicitly list fields to include
+
+    def get_segments(self, obj):
+        # Return a flat list of segment names
+        return list(obj.segments.values_list("name", flat=True))

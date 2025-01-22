@@ -15,7 +15,7 @@ class StandardString(models.Model):
 class ClusterTemplate(models.Model):
     cluster_id = models.AutoField(primary_key=True)
     cluster_name = models.CharField(max_length=255)
-    cluster_string = models.TextField(null=True)
+    cluster_string = models.TextField(null=True, blank=True)
     block_type = models.CharField(max_length=255)
     uploaded_by = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -43,7 +43,7 @@ class Parameter(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_by = models.CharField(max_length=255)
     updated_at = models.DateTimeField(auto_now=True)
-    sort_order = models.IntegerField()
+    sort_order = models.IntegerField(null=True, blank=True)
     drive_io_assignment_value = models.TextField(null=True, blank=True)
 
     def __str__(self):

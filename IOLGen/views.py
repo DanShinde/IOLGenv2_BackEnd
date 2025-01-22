@@ -1,5 +1,6 @@
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import viewsets
+from rest_framework.response import Response
 from .models import Segment, PLC, IODevice, Project, Module, IOList, Signal, ProjectReport
 from .serializers import (
     SegmentSerializer, PLCSerializer, IODeviceSerializer, ProjectSerializer,
@@ -7,9 +8,14 @@ from .serializers import (
 )
 
 class SegmentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]  # Require authentication
+    permission_classes = [IsAuthenticated]
     queryset = Segment.objects.all()
     serializer_class = SegmentSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        segment_names = queryset.values_list('name', flat=True)
+        return Response(segment_names)
 
 class PLCViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
