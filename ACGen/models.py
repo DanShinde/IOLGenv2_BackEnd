@@ -4,7 +4,7 @@ from django.dispatch import receiver
 
 # StandardString Model
 class StandardString(models.Model):
-    string_id = models.AutoField(primary_key=True)
+    id = models.AutoField(primary_key=True)
     string_name = models.CharField(max_length=255)
     string_content = models.TextField()
 
@@ -13,7 +13,7 @@ class StandardString(models.Model):
 
 # ClusterTemplate Model
 class ClusterTemplate(models.Model):
-    cluster_id = models.AutoField(primary_key=True)
+    id = models.AutoField(primary_key=True)
     cluster_name = models.CharField(max_length=255)
     cluster_string = models.TextField(null=True, blank=True)
     block_type = models.CharField(max_length=255)
@@ -22,7 +22,7 @@ class ClusterTemplate(models.Model):
     updated_by = models.CharField(max_length=255)
     updated_at = models.DateTimeField(auto_now=True)
     segment = models.CharField(max_length=255)
-    parameters_count = models.PositiveIntegerField(default=0, null=True)  # Field to store the count
+    parameters_count = models.PositiveIntegerField(default=0, null=True,blank=True)  # Field to store the count
 
     def __str__(self):
         return self.cluster_name
@@ -31,7 +31,7 @@ class ClusterTemplate(models.Model):
 
 # Parameter Model
 class Parameter(models.Model):
-    parameter_id = models.AutoField(primary_key=True)
+    id = models.AutoField(primary_key=True)
     parameter_name = models.CharField(max_length=255)
     section = models.CharField(max_length=255)
     data_type = models.CharField(max_length=255)
