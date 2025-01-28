@@ -29,7 +29,10 @@ ALLOWED_HOSTS = ['0.0.0.0',
                  "localhost",
                  '127.0.0.1',
                  'iolgen.onrender.com',
-                 '.vercel.app']
+                 '.vercel.app',
+                 'pleasant-zitella-automation-ad-ecb4aa37.koyeb.app',
+                 '.koyeb.app',
+                 ]
 
 
 # Application definition
