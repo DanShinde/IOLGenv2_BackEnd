@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.core.cache import cache
 
 # StandardString Model
 class StandardString(models.Model):
@@ -64,7 +65,37 @@ def update_parameters_count_on_delete(sender, instance, **kwargs):
     cluster.save()
 
 
+@receiver(post_save, sender=StandardString)
+def update_standard_string_cache(sender, instance, **kwargs):
+    """
+    Clear cache when StandardString instance is created or updated.
+    """
+    cache_key = "standard_string_queryset"
+    cache.delete(cache_key)
 
+@receiver(post_delete, sender=StandardString)
+def delete_standard_string_cache(sender, instance, **kwargs):
+    """
+    Clear cache when StandardString instance is deleted.
+    """
+    cache_key = "standard_string_queryset"
+    cache.delete(cache_key)
+
+@receiver(post_delete, sender=ClusterTemplate)
+def delete_cluster_template_cache(sender, instance, **kwargs):
+    """Delete all cache keys that start with 'cluster_template:'"""
+    cache_keys = cache.get('all_cache_keys', set())
+
+    # Filter and delete relevant keys
+    keys_to_delete = [key for key in cache_keys if key.startswith("cluster_template:")]
+    
+    for key in keys_to_delete:
+        cache.delete(key)
+    
+    # Remove the deleted keys from tracking
+    cache.set('all_cache_keys', cache_keys - set(keys_to_delete))
+
+    return f"Deleted {len(keys_to_delete)} cache entries."
 
 # # ViewParameter Model (for database view)
 # class ViewParameter(models.Model):

@@ -10,6 +10,7 @@ from .models import UserProfile, Info
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.core.cache import cache
 
 
 # ViewSets define the view behavior.
@@ -20,21 +21,33 @@ class InfoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Override to require `key` parameter and return only matching results.
+        Uses cache to store and retrieve data.
         """
         key = self.request.query_params.get('key', None)
 
         if not key:
-            #TODO: Remove access
             return super().get_queryset()
             raise ValidationError({"error": "Key parameter is required"})
 
+        # Try to fetch from cache
+        cache_key = f"info_{key}"
+        cached_data = cache.get(cache_key)
+
+        if cached_data:
+            print("Cache HIT")  # Debugging cache behavior
+            return cached_data  # Return cached queryset
+
+        # Query the database if cache miss
         queryset = Info.objects.filter(key=key)
 
         if not queryset.exists():
             raise ValidationError({"error": f"No value found for key '{key}'"})
 
+        # Store result in cache for future requests (timeout=300 sec)
+        cache.set(cache_key, queryset, timeout=300)  # Cache expires in 5 minutes
+
+        print("Cache MISS")  # Debugging cache behavior
         return queryset
-    
 
     @action(detail=False, methods=['get'])
     def get_by_key(self, request):
@@ -45,9 +58,16 @@ class InfoViewSet(viewsets.ModelViewSet):
         if not key:
             return Response({'error': 'Key parameter is required'}, status=400)
 
-        info = get_object_or_404(Info, key=key)
+        cache_key = f"info_{key}"
+        info = cache.get(cache_key)
+
+        if not info:
+            info = get_object_or_404(Info, key=key)
+            cache.set(cache_key, info, timeout=300)
+
         serializer = self.get_serializer(info)
         return Response(serializer.data)
+    
 
 
 class RegisterView(APIView):

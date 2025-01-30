@@ -12,6 +12,9 @@ from django.db.models import F
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
+from django.core.cache import cache
+
+_cache_timeout = 60 * 5  # Cache timeout (5 minutes)
 
 # StandardString ViewSet
 class StandardStringViewSet(viewsets.ModelViewSet):
@@ -19,21 +22,50 @@ class StandardStringViewSet(viewsets.ModelViewSet):
     serializer_class = StandardStringSerializer
     permission_classes = [IsAuthenticated]  # Enforce JWT authentication
 
+    def get_queryset(self):
+        """
+        Override to cache the StandardString queryset and fetch from cache if available.
+        """
+        cache_key = "standard_string_queryset"
+        cached_data = cache.get(cache_key)
+
+        if cached_data:
+            print("Cache HIT")  # Debugging cache behavior
+            return cached_data
+
+        queryset = StandardString.objects.all()
+
+        # Cache the result for 5 minutes
+        cache.set(cache_key, queryset, timeout=86400)
+        print("Cache MISS")  # Debugging cache behavior
+
+        return queryset
+    
 
 class ClusterTemplateViewSet(viewsets.ModelViewSet):
     queryset = ClusterTemplate.objects.all()
     serializer_class = ClusterTemplateSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_cache_key(self, segment=None):
+        """Generate a cache key based on the segment parameter."""
+        return f"cluster_templates:{segment if segment else 'all'}"
+    
     def perform_create(self, serializer):
         # Use the full name of the authenticated user
         full_name = self.request.user.get_full_name()
+        # Invalidate the cache for the list
+        cache.delete(self.get_cache_key())
         return serializer.save(uploaded_by=full_name, updated_by=full_name)
 
     def perform_update(self, serializer):
         # Use the full name of the authenticated user for updates
         full_name = self.request.user.get_full_name()
-        serializer.save(updated_by=full_name)
+        # Invalidate the cache for the list
+        # Invalidate cache for both list and specific instance
+        instance = serializer.save(updated_by=full_name)
+        cache.delete(self.get_cache_key())
+        cache.delete(f"cluster_template:{instance.id}")
 
     def create(self, request, *args, **kwargs):
         # Handle requests with or without an ID
@@ -41,69 +73,98 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         instance = self.perform_create(serializer)
+
         return Response({"id": instance.id}, status=status.HTTP_201_CREATED)
     
     def list(self, request, *args, **kwargs):
         # Retrieve a list of ClusterTemplates and return only their names
         segment = request.query_params.get('segment', None)
-
-        if segment:
-            # Filter by segment if provided in query params
-            queryset = self.queryset.filter(segment=segment)
-        else:
-            # If no segment is provided, return all ClusterTemplates
-            queryset = self.queryset.all()
-
-        # Extract only the cluster names
-        # names = queryset.values_list('cluster_name', flat=True)
-        # return Response(queryset)
-        # Serialize the queryset to return all ClusterTemplate details
+        cache_key = self.get_cache_key(segment)
+        # Try to get the cached data
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+        
+        # If not cached, fetch from database
+        queryset = self.queryset.filter(segment=segment) if segment else self.queryset.all()
         serializer = self.get_serializer(queryset, many=True)
+
+        # Store in cache for 5 minutes (300 seconds)
+        cache.set(cache_key, serializer.data, timeout=300)
+
         return Response(serializer.data)
 
 # Parameter ViewSet
 
+def deleteCachewithkeyStartPattern(key):
+    """Delete all cache keys that start with 'cluster_template:'"""
+    cache_keys = cache.get('all_cache_keys', set())
+
+    # Filter and delete relevant keys
+    keys_to_delete = [key for key in cache_keys if key.startswith(key)]
+    
+    for key in keys_to_delete:
+        cache.delete(key)
+    
+    # Remove the deleted keys from tracking
+    cache.set('all_cache_keys', cache_keys - set(keys_to_delete))
+
+    return f"Deleted {len(keys_to_delete)} cache entries."
+
+
+
 class ParameterViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.all()
     serializer_class = ParameterSerializer
-    # permission_classes = [IsAuthenticated]  # Enforce JWT authentication
+    cache_timeout = _cache_timeout
+
+    def get_cache_key(self, id=None):
+        """Generate a cache key based on the segment parameter."""
+        return f"parameters:{id if id else 'all'}"
+
 
     def get_queryset(self):
-        # Get the cluster_id from the query parameters
         cluster_id = self.request.query_params.get('id', None)
+        cache_key = self.get_cache_key(id)
+
+        # Check if cached result exists
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return cached_data  # Return cached queryset
+
+        # Compute queryset if not cached
+        queryset = self.queryset.annotate(cluster_name=F("cluster__cluster_name"))
         if cluster_id:
-            # Filter parameters by the cluster_id
-            # return self.queryset.filter(cluster__cluster_id=cluster_id)
-            return self.queryset.filter(cluster__id=cluster_id).annotate(cluster_name=F("cluster__cluster_name"))
-        return self.queryset.annotate(cluster_name=F("cluster__cluster_name"))
-        # return self.queryset
+            queryset = queryset.filter(cluster__id=cluster_id)
+
+        # Cache the result
+        cache.set(cache_key, queryset, self.cache_timeout)
+        print('Cache-', cache.get(cache_key))
+        return queryset
 
     def perform_create(self, serializer):
-        # Use the full name of the authenticated user
         full_name = self.request.user.get_full_name()
         serializer.save(uploaded_by=full_name, updated_by=full_name)
+        self.invalidate_cache()
 
     def perform_update(self, serializer):
-        # Use the full name of the authenticated user for updates
         full_name = self.request.user.get_full_name()
         serializer.save(updated_by=full_name)
+        self.invalidate_cache()
+
+    def destroy(self, request, *args, **kwargs):
+        response = super().destroy(request, *args, **kwargs)
+        self.invalidate_cache()
+        return response
 
     def list(self, request, *args, **kwargs):
-        """
-        Optionally add a custom response for empty results.
-        """
+        
         queryset = self.get_queryset()
         if not queryset.exists():
-            return Response(
-                {"detail": "No parameters found for the specified cluster name."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"detail": "No parameters found for the specified cluster name."}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.get_serializer(queryset, many=True)
-        # Include cluster name in the response
-        cluster_name = None
-        cluster_id = self.request.query_params.get("id", None)
-        if cluster_id:
-            cluster_name = queryset.first().cluster.cluster_name  # Assuming all rows share the same cluster
+        cluster_name = queryset.first().cluster.cluster_name if queryset else None
 
         response_data = {
             "cluster_name": cluster_name,
@@ -111,7 +172,10 @@ class ParameterViewSet(viewsets.ModelViewSet):
         }
         return Response(response_data)
 
-
+    def invalidate_cache(self):
+        """Delete all cache keys related to ParameterViewSet."""
+        deleteCachewithkeyStartPattern("parameters:")
+        
 
 class ParameterBulkViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.all()

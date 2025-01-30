@@ -1,6 +1,10 @@
 from django.contrib.auth.models import User
 from django.db import models
 from IOLGen.models import Segment
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.core.cache import cache
+
 
 class UserTypeEnum(models.TextChoices):
     USER = "USER", "User"
@@ -38,3 +42,22 @@ class UserProfile(models.Model):
 class Info(models.Model):
     key = models.CharField(max_length=255)
     value = models.TextField()
+
+    def __str__(self):
+        return f"{self.key}: {self.value}"
+
+
+# Function to clear cache when an Info object is created, updated, or deleted
+def clear_info_cache(key):
+    cache_key = f"info_{key}"
+    cache.delete(cache_key)
+
+# Signal: Clear cache when an Info instance is created or updated
+@receiver(post_save, sender=Info)
+def update_info_cache(sender, instance, **kwargs):
+    clear_info_cache(instance.key)
+
+# Signal: Clear cache when an Info instance is deleted
+@receiver(post_delete, sender=Info)
+def delete_info_cache(sender, instance, **kwargs):
+    clear_info_cache(instance.key)
