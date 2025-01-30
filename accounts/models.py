@@ -31,3 +31,10 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Profile - {self.get_usertype_display()}"
+
+
+
+
+class Info(models.Model):
+    key = models.CharField(max_length=255)
+    value = models.TextField()

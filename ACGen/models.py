@@ -65,6 +65,7 @@ def update_parameters_count_on_delete(sender, instance, **kwargs):
 
 
 
+
 # # ViewParameter Model (for database view)
 # class ViewParameter(models.Model):
 #     cluster_name = models.CharField(max_length=255)

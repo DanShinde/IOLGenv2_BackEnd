@@ -1,7 +1,15 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile
+from .models import UserProfile, Info
 from IOLGen.models import Segment
+
+
+# Serializers define the API representation.
+class InfoSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = Info
+        fields = ['key', 'value']
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)

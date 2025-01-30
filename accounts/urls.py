@@ -16,8 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from .views import RegisterView, LoginView,ProfileView, LogoutView
+from rest_framework.routers import DefaultRouter
+from .views import RegisterView, LoginView,ProfileView, LogoutView, InfoViewSet
 from rest_framework_simplejwt.views import TokenRefreshView
+
+
+# Create a router and register the InfoViewSet
+router = DefaultRouter()
+router.register(r'info', InfoViewSet, basename='info')
+
 
 urlpatterns = [
     path('register/', RegisterView.as_view()),
@@ -25,4 +32,5 @@ urlpatterns = [
     path('profile/', ProfileView.as_view()),
     path('logout/', LogoutView.as_view(), name ='logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  
+    path('', include(router.urls)),
 ]

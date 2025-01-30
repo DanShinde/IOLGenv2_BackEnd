@@ -121,9 +121,13 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Get the cluster_id from the query parameters
         cluster_id = self.request.query_params.get('id', None)
+        cluster_name = self.request.query_params.get('cluster_name', None)
         if cluster_id:
             # Filter parameters by the cluster_id
             return self.queryset.filter(cluster__id=cluster_id)
+        if cluster_name:
+            # Filter parameters by the cluster_name
+            return self.queryset.filter(cluster__cluster_name=cluster_name)
         return self.queryset
 
     def perform_create(self, serializer):
@@ -238,6 +242,13 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
                 {"detail": "No parameters found for the specified cluster name."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        # If cluster_name is provided, modify the response format
+        cluster_name = self.request.query_params.get('cluster_name', None)
+        if cluster_name:
+            return Response({
+                "cluster_name": cluster_name,
+                "parameters": serializer.data
+            })
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
