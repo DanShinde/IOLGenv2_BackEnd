@@ -26,8 +26,7 @@ class InfoViewSet(viewsets.ModelViewSet):
         key = self.request.query_params.get('key', None)
 
         if not key:
-            return super().get_queryset()
-            raise ValidationError({"error": "Key parameter is required"})
+            return self.queryset  # No key provided, return all
 
         # Try to fetch from cache
         cache_key = f"info_{key}"
@@ -35,16 +34,16 @@ class InfoViewSet(viewsets.ModelViewSet):
 
         if cached_data:
             print("Cache HIT")  # Debugging cache behavior
-            return cached_data  # Return cached queryset
+            return Info.objects.filter(pk__in=[obj.pk for obj in cached_data])  
 
         # Query the database if cache miss
-        queryset = Info.objects.filter(key=key)
+        queryset = self.queryset.filter(key=key)
 
         if not queryset.exists():
             raise ValidationError({"error": f"No value found for key '{key}'"})
 
         # Store result in cache for future requests (timeout=300 sec)
-        cache.set(cache_key, queryset, timeout=300)  # Cache expires in 5 minutes
+        cache.set(cache_key, list(queryset), timeout=300)  # Cache expires in 5 minutes
 
         print("Cache MISS")  # Debugging cache behavior
         return queryset
@@ -56,7 +55,7 @@ class InfoViewSet(viewsets.ModelViewSet):
         """
         key = request.query_params.get('key', None)
         if not key:
-            return Response({'error': 'Key parameter is required'}, status=400)
+            return Response({'error': 'Key parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         cache_key = f"info_{key}"
         info = cache.get(cache_key)
@@ -67,7 +66,7 @@ class InfoViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(info)
         return Response(serializer.data)
-    
+
 
 
 class RegisterView(APIView):

@@ -10,89 +10,128 @@ from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.decorators import action
 from django.core.cache import cache
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+from rest_framework import viewsets, status
+
+
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
 
-# StandardString ViewSet
 class StandardStringViewSet(viewsets.ModelViewSet):
     queryset = StandardString.objects.all()
     serializer_class = StandardStringSerializer
-    permission_classes = [IsAuthenticated]  # Enforce JWT authentication
+    permission_classes = [IsAuthenticated]
+    cache_timeout = 86400  # 24 hours cache timeout
+
+    def get_cache_key(self):
+        return "standard_string_queryset"
 
     def get_queryset(self):
-        """
-        Override to cache the StandardString queryset and fetch from cache if available.
-        """
-        cache_key = "standard_string_queryset"
+        cache_key = self.get_cache_key()
         cached_data = cache.get(cache_key)
 
         if cached_data:
-            print("Cache HIT")  # Debugging cache behavior
-            return cached_data
+            print("Cache HIT")
+            return StandardString.objects.filter(pk__in=[obj.pk for obj in cached_data])
 
-        queryset = StandardString.objects.all()
-
-        # Cache the result for 5 minutes
-        cache.set(cache_key, queryset, timeout=86400)
-        print("Cache MISS")  # Debugging cache behavior
-
+        queryset = self.queryset
+        cache.set(cache_key, list(queryset), self.cache_timeout)
+        print("Cache MISS")
         return queryset
-    
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self.invalidate_cache()
+        return instance
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self.invalidate_cache()
+        return instance
+
+    def destroy(self, request, *args, **kwargs):
+        response = super().destroy(request, *args, **kwargs)
+        self.invalidate_cache()
+        return response
+
+    def invalidate_cache(self):
+        """Invalidate the StandardString cache."""
+        cache.delete(self.get_cache_key())
+
 
 class ClusterTemplateViewSet(viewsets.ModelViewSet):
     queryset = ClusterTemplate.objects.all()
     serializer_class = ClusterTemplateSerializer
     permission_classes = [IsAuthenticated]
+    cache_timeout = 300  # 5 minutes cache timeout
 
     def get_cache_key(self, segment=None):
-        """Generate a cache key based on the segment parameter."""
         return f"cluster_templates:{segment if segment else 'all'}"
-    
+
+    def get_instance_cache_key(self, instance_id):
+        return f"cluster_template:{instance_id}"
+
+    def get_queryset(self):
+        segment = self.request.query_params.get('segment', None)
+        cache_key = self.get_cache_key(segment)
+        cached_ids = cache.get(cache_key)  # Expecting a list of IDs
+
+        if cached_ids:
+            print("Cache HIT")
+            return ClusterTemplate.objects.filter(pk__in=cached_ids)
+
+        queryset = self.queryset.filter(segment=segment) if segment else self.queryset
+        queryset_ids = list(queryset.values_list('id', flat=True))  # Store only IDs in cache
+
+        cache.set(cache_key, queryset_ids, self.cache_timeout)
+        print("Cache MISS")
+        return queryset
+
     def perform_create(self, serializer):
-        # Use the full name of the authenticated user
         full_name = self.request.user.get_full_name()
-        # Invalidate the cache for the list
-        cache.delete(self.get_cache_key())
-        return serializer.save(uploaded_by=full_name, updated_by=full_name)
+        instance = serializer.save(uploaded_by=full_name, updated_by=full_name)
+        self.invalidate_cache()
+        return instance
 
     def perform_update(self, serializer):
-        # Use the full name of the authenticated user for updates
         full_name = self.request.user.get_full_name()
-        # Invalidate the cache for the list
-        # Invalidate cache for both list and specific instance
         instance = serializer.save(updated_by=full_name)
-        cache.delete(self.get_cache_key())
-        cache.delete(f"cluster_template:{instance.id}")
+        self.invalidate_cache(instance.id)
+        return instance
 
-    def create(self, request, *args, **kwargs):
-        # Handle requests with or without an ID
-        data = request.data
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        instance = self.perform_create(serializer)
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        response = super().destroy(request, *args, **kwargs)
+        self.invalidate_cache(instance.id)
+        return response
 
-        return Response({"id": instance.id}, status=status.HTTP_201_CREATED)
-    
     def list(self, request, *args, **kwargs):
-        # Retrieve a list of ClusterTemplates and return only their names
         segment = request.query_params.get('segment', None)
         cache_key = self.get_cache_key(segment)
-        # Try to get the cached data
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            return Response(cached_data)
-        
-        # If not cached, fetch from database
-        queryset = self.queryset.filter(segment=segment) if segment else self.queryset.all()
+        cached_ids = cache.get(cache_key)
+
+        if cached_ids:
+            queryset = ClusterTemplate.objects.filter(pk__in=cached_ids)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
 
-        # Store in cache for 5 minutes (300 seconds)
-        cache.set(cache_key, serializer.data, timeout=300)
+        # Cache the list of IDs instead of full objects
+        cache.set(cache_key, list(queryset.values_list('id', flat=True)), self.cache_timeout)
 
         return Response(serializer.data)
+
+    def invalidate_cache(self, instance_id=None):
+        """Invalidate cache for all ClusterTemplate lists and specific instances."""
+        cache.delete(self.get_cache_key())
+        if instance_id:
+            cache.delete(self.get_instance_cache_key(instance_id))
+
 
 # Parameter ViewSet
 
@@ -113,52 +152,39 @@ def deleteCachewithkeyStartPattern(key):
 
 
 
+
 class ParameterViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.all()
     serializer_class = ParameterSerializer
-    cache_timeout = _cache_timeout
+    cache_timeout = 60 * 15  # 15 minutes for cache
+    permission_classes = [IsAuthenticated]
 
     def get_cache_key(self, id=None):
         """Generate a cache key based on the segment parameter."""
         return f"parameters:{id if id else 'all'}"
 
-
     def get_queryset(self):
-        cluster_id = self.request.query_params.get('id', None)
-        cache_key = self.get_cache_key(id)
+        """Retrieve queryset with caching applied."""
+        cluster_id = self.request.query_params.get("id", None)
+        cache_key = self.get_cache_key(cluster_id)
 
-        # Check if cached result exists
+        # Check if result exists in cache
         cached_data = cache.get(cache_key)
         if cached_data:
+            print(f"Cache HIT: {cache_key}")
             return cached_data  # Return cached queryset
 
-        # Compute queryset if not cached
+        print(f"Cache MISS: {cache_key}")
         queryset = self.queryset.annotate(cluster_name=F("cluster__cluster_name"))
         if cluster_id:
             queryset = queryset.filter(cluster__id=cluster_id)
 
-        # Cache the result
+        # Store queryset in cache
         cache.set(cache_key, queryset, self.cache_timeout)
-        print('Cache-', cache.get(cache_key))
         return queryset
 
-    def perform_create(self, serializer):
-        full_name = self.request.user.get_full_name()
-        serializer.save(uploaded_by=full_name, updated_by=full_name)
-        self.invalidate_cache()
-
-    def perform_update(self, serializer):
-        full_name = self.request.user.get_full_name()
-        serializer.save(updated_by=full_name)
-        self.invalidate_cache()
-
-    def destroy(self, request, *args, **kwargs):
-        response = super().destroy(request, *args, **kwargs)
-        self.invalidate_cache()
-        return response
-
+    @method_decorator(cache_page(60 * 15))  # Cache only GET requests
     def list(self, request, *args, **kwargs):
-        
         queryset = self.get_queryset()
         if not queryset.exists():
             return Response({"detail": "No parameters found for the specified cluster name."}, status=status.HTTP_404_NOT_FOUND)
@@ -172,149 +198,183 @@ class ParameterViewSet(viewsets.ModelViewSet):
         }
         return Response(response_data)
 
+    def perform_create(self, serializer):
+        """Handle creation of a Parameter and invalidate cache."""
+        full_name = self.request.user.get_full_name()
+        serializer.save(uploaded_by=full_name, updated_by=full_name)
+        self.invalidate_cache()
+
+    def perform_update(self, serializer):
+        """Handle update of a Parameter and invalidate cache."""
+        full_name = self.request.user.get_full_name()
+        serializer.save(updated_by=full_name)
+        self.invalidate_cache()
+
+    def destroy(self, request, *args, **kwargs):
+        """Handle deletion of a Parameter and invalidate cache."""
+        response = super().destroy(request, *args, **kwargs)
+        self.invalidate_cache()
+        return response
+
     def invalidate_cache(self):
         """Delete all cache keys related to ParameterViewSet."""
-        deleteCachewithkeyStartPattern("parameters:")
-        
+        print("Invalidating cache...")
+        for key in cache._cache.keys():  # Works for LocMemCache
+            if key.startswith("parameters:"):
+                cache.delete(key)
+        print("Cache invalidated successfully!")
+
 
 class ParameterBulkViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.all()
     serializer_class = ParameterSerializer
-    # permission_classes = [IsAuthenticated]  # Enforce JWT authentication
+    cache_timeout = 60 * 15  # 15 minutes
+    permission_classes = [IsAuthenticated]
+
+    def get_cache_key(self, cluster_id=None, cluster_name=None):
+        """Generate a cache key based on query parameters."""
+        if cluster_id:
+            return f"parameters:cluster_id:{cluster_id}"
+        elif cluster_name:
+            return f"parameters:cluster_name:{cluster_name}"
+        return "parameters:all"
 
     def get_queryset(self):
-        # Get the cluster_id from the query parameters
-        cluster_id = self.request.query_params.get('id', None)
-        cluster_name = self.request.query_params.get('cluster_name', None)
+        """Retrieve queryset with caching."""
+        cluster_id = self.request.query_params.get("id", None)
+        cluster_name = self.request.query_params.get("cluster_name", None)
+        cache_key = self.get_cache_key(cluster_id, cluster_name)
+
+        # Check cache
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            print(f"Cache HIT: {cache_key}")
+            return cached_data  # Return cached queryset
+
+        print(f"Cache MISS: {cache_key}")
+        queryset = self.queryset.annotate(cluster_name=F("cluster__cluster_name"))
         if cluster_id:
-            # Filter parameters by the cluster_id
-            return self.queryset.filter(cluster__id=cluster_id)
-        if cluster_name:
-            # Filter parameters by the cluster_name
-            return self.queryset.filter(cluster__cluster_name=cluster_name)
-        return self.queryset
+            queryset = queryset.filter(cluster__id=cluster_id)
+        elif cluster_name:
+            queryset = queryset.filter(cluster__cluster_name=cluster_name)
 
-    def perform_create(self, serializer):
-        # Use the full name of the authenticated user
-        full_name = self.request.user.get_full_name()
-        serializer.save(uploaded_by=full_name, updated_by=full_name)
+        # Cache queryset
+        cache.set(cache_key, queryset, self.cache_timeout)
+        return queryset
 
-    def perform_update(self, serializer):
-        # Use the full name of the authenticated user for updates
-        full_name = self.request.user.get_full_name()
-        serializer.save(updated_by=full_name)
-
-    def create(self, request, *args, **kwargs):
-        """
-        Overriding the create method to handle bulk creation.
-        Ensures all entries are validated and commits only if all are valid.
-        """
-        data = request.data
-
-        # Check if it's a list of entries
-        if not isinstance(data, list):
-            return Response(
-                {"error": "Expected a list of entries."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        full_name = request.user.get_full_name()
-        serializers = []
-        
-        # Start a database transaction
-        with transaction.atomic():
-            try:
-                for entry in data:
-                    # Add user-specific fields to each entry
-                    entry["uploaded_by"] = full_name
-                    entry["updated_by"] = full_name
-
-                    # Validate each entry
-                    serializer = self.get_serializer(data=entry)
-                    serializer.is_valid(raise_exception=True)
-                    serializers.append(serializer)
-
-                # Save all entries only if they are all valid
-                for serializer in serializers:
-                    serializer.save()
-
-                # Return the created entries
-                return Response(
-                    [serializer.data for serializer in serializers],
-                    status=status.HTTP_201_CREATED,
-                )
-            except ValidationError as e:
-                # Return validation errors if any entry is invalid
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
-    def put(self, request, *args, **kwargs):
-        """
-        Handle PUT request for bulk update of 'assignment_value' with atomic transactions.
-        """
-        data = request.data
-        # Check if it's a list of entries
-        if not isinstance(data, list):
-            return Response(
-                {"error": "Expected a list of entries."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        full_name = request.user.get_full_name()
-        serializers = []
-        
-        # Start a database transaction
-        with transaction.atomic():
-            try:
-                for entry in data:
-                    # Ensure that each entry has an 'id' field for update
-                    if "id" not in entry or "assignment_value" not in entry:
-                        raise ValidationError("Each entry must include 'id' and 'assignment_value'.")
-
-                    # Get the existing parameter instance to update
-                    instance = self.get_queryset().filter(id=entry["id"]).first()
-                    if not instance:
-                        raise ValidationError(f"Parameter with id {entry['id']} not found.")
-
-                    # Only update the 'assignment_value' field
-                    entry["updated_by"] = full_name
-
-                    # Validate each entry
-                    serializer = self.get_serializer(instance, data=entry, partial=True)
-                    serializer.is_valid(raise_exception=True)
-                    serializers.append(serializer)
-
-                # Save all entries only if they are all valid
-                for serializer in serializers:
-                    serializer.save()
-
-                # Return the updated entries
-                return Response(
-                    {'id': 'True'},
-                    status=status.HTTP_200_OK,
-                )
-            except ValidationError as e:
-                # Return validation errors if any entry is invalid
-                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
-
+    @method_decorator(cache_page(60 * 15))  # Cache only GET requests
     def list(self, request, *args, **kwargs):
-        """
-        Optionally add a custom response for empty results.
-        """
+        """List all parameters with caching."""
         queryset = self.get_queryset()
         if not queryset.exists():
             return Response(
-                {"detail": "No parameters found for the specified cluster name."},
+                {"detail": "No parameters found for the specified criteria."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        # If cluster_name is provided, modify the response format
-        cluster_name = self.request.query_params.get('cluster_name', None)
+
+        cluster_name = self.request.query_params.get("cluster_name", None)
+        serializer = self.get_serializer(queryset, many=True)
+
         if cluster_name:
             return Response({
                 "cluster_name": cluster_name,
                 "parameters": serializer.data
             })
-        serializer = self.get_serializer(queryset, many=True)
+
         return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        """Create a parameter and invalidate cache."""
+        full_name = self.request.user.get_full_name()
+        serializer.save(uploaded_by=full_name, updated_by=full_name)
+        self.invalidate_cache()
+
+    def perform_update(self, serializer):
+        """Update a parameter and invalidate cache."""
+        full_name = self.request.user.get_full_name()
+        serializer.save(updated_by=full_name)
+        self.invalidate_cache()
+
+    def create(self, request, *args, **kwargs):
+        """Handle bulk creation with atomic transactions."""
+        data = request.data
+
+        if not isinstance(data, list):
+            return Response(
+                {"error": "Expected a list of entries."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        full_name = request.user.get_full_name()
+        serializers = []
+
+        with transaction.atomic():
+            try:
+                for entry in data:
+                    entry["uploaded_by"] = full_name
+                    entry["updated_by"] = full_name
+
+                    serializer = self.get_serializer(data=entry)
+                    serializer.is_valid(raise_exception=True)
+                    serializers.append(serializer)
+
+                for serializer in serializers:
+                    serializer.save()
+
+                self.invalidate_cache()  # Invalidate cache after bulk creation
+
+                return Response(
+                    [serializer.data for serializer in serializers],
+                    status=status.HTTP_201_CREATED,
+                )
+            except ValidationError as e:
+                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, *args, **kwargs):
+        """Handle bulk update of `assignment_value` with atomic transactions."""
+        data = request.data
+
+        if not isinstance(data, list):
+            return Response(
+                {"error": "Expected a list of entries."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        full_name = request.user.get_full_name()
+        serializers = []
+
+        with transaction.atomic():
+            try:
+                for entry in data:
+                    if "id" not in entry or "assignment_value" not in entry:
+                        raise ValidationError("Each entry must include 'id' and 'assignment_value'.")
+
+                    instance = self.get_queryset().filter(id=entry["id"]).first()
+                    if not instance:
+                        raise ValidationError(f"Parameter with id {entry['id']} not found.")
+
+                    entry["updated_by"] = full_name
+
+                    serializer = self.get_serializer(instance, data=entry, partial=True)
+                    serializer.is_valid(raise_exception=True)
+                    serializers.append(serializer)
+
+                for serializer in serializers:
+                    serializer.save()
+
+                self.invalidate_cache()  # Invalidate cache after bulk update
+
+                return Response({'id': 'True'}, status=status.HTTP_200_OK)
+            except ValidationError as e:
+                return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+    def invalidate_cache(self):
+        """Invalidate all cache keys related to ParameterBulkViewSet."""
+        print("Invalidating cache...")
+        for key in cache._cache.keys():  # Works for LocMemCache
+            if key.startswith("parameters:"):
+                cache.delete(key)
+        print("Cache invalidated successfully!")
 
 
 
