@@ -3,6 +3,8 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
 
+from accounts.models import clear_info_cache
+
 # StandardString Model
 class StandardString(models.Model):
     id = models.AutoField(primary_key=True)
@@ -97,20 +99,19 @@ def delete_cluster_template_cache(sender, instance, **kwargs):
 
     return f"Deleted {len(keys_to_delete)} cache entries."
 
-# # ViewParameter Model (for database view)
-# class ViewParameter(models.Model):
-#     cluster_name = models.CharField(max_length=255)
-#     parameter_id = models.IntegerField()
-#     section = models.CharField(max_length=255)
-#     parameter_name = models.CharField(max_length=255)
-#     data_type = models.CharField(max_length=255)
-#     assignment_value = models.TextField(null=True, blank=True)
-#     uploaded_by = models.CharField(max_length=255)
-#     uploaded_at = models.DateTimeField()
-#     block_type = models.CharField(max_length=255)
-#     drive_io_assignment_value = models.TextField(null=True, blank=True)
-#     segment = models.CharField(max_length=255)
 
-#     class Meta:
-#         managed = False  # Indicates it's a view, not a table
-#         db_table = "viewParameters"
+
+# Signal: Clear cache when an instance is deleted or updated
+@receiver(post_save, sender=Parameter)
+@receiver(post_delete, sender=Parameter)
+def delete_info_cache(sender, instance, **kwargs):
+    clear_info_cache("Parameter",instance.id)
+    clear_info_cache("Parameter",instance.parameter_name)
+
+# Signal: Clear cache when an Info instance is created or updated
+@receiver(post_delete, sender=ClusterTemplate)
+@receiver(post_save, sender=ClusterTemplate)
+def update_info_cache(sender, instance, **kwargs):
+    clear_info_cache("ClusterTemplate",instance.id)
+    clear_info_cache("ClusterTemplate",instance.cluster_name)
+

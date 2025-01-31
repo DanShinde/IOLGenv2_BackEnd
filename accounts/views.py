@@ -43,7 +43,7 @@ class InfoViewSet(viewsets.ModelViewSet):
             raise ValidationError({"error": f"No value found for key '{key}'"})
 
         # Store result in cache for future requests (timeout=300 sec)
-        cache.set(cache_key, list(queryset), timeout=300)  # Cache expires in 5 minutes
+        cache.set(cache_key, list(queryset), timeout=3600)  # Cache expires in 5 minutes
 
         print("Cache MISS")  # Debugging cache behavior
         return queryset

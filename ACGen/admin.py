@@ -14,6 +14,7 @@ class ClusterTemplateAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
         'updated_by', 'updated_at', 'segment', 'parameters_count'
     )  # Display all fields
     search_fields = ('cluster_name',)  # Optional: Allows searching by cluster_name
+    list_filter = ('segment', 'uploaded_by')
 
 admin.site.register(ClusterTemplate, ClusterTemplateAdmin)
 
