@@ -8,7 +8,7 @@ from accounts.models import clear_info_cache
 # StandardString Model
 class StandardString(models.Model):
     id = models.AutoField(primary_key=True)
-    string_name = models.CharField(max_length=255)
+    string_name = models.CharField(max_length=255, unique=True)
     string_content = models.TextField()
 
     def __str__(self):
@@ -17,7 +17,7 @@ class StandardString(models.Model):
 # ClusterTemplate Model
 class ClusterTemplate(models.Model):
     id = models.AutoField(primary_key=True)
-    cluster_name = models.CharField(max_length=255)
+    cluster_name = models.CharField(max_length=255, unique=True)
     cluster_string = models.TextField(null=True, blank=True)
     block_type = models.CharField(max_length=255)
     uploaded_by = models.CharField(max_length=255)
