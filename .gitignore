@@ -8,6 +8,7 @@ __pycache__/
 migrations/
 */migrations/
 # Distribution / packaging
+static/
 .Python
 build/
 develop-eggs/

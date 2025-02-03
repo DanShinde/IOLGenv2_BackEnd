@@ -8,7 +8,7 @@ from IOLGen.models import Segment
 class InfoSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Info
-        fields = ['key', 'value']
+        fields = ['id','key', 'value']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
