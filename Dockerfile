@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the entire application to the container
 COPY . .
 
+# Create static directory
+RUN mkdir -p /app/static
+
+# Collect static files
+RUN python manage.py collectstatic --noinput
+
 # Expose the port your application will run on
 EXPOSE 8000
 
