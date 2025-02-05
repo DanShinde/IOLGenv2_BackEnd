@@ -172,8 +172,10 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-STATIC_ROOT =  "static_temp"
+# STATIC_ROOT is for `collectstatic` and should be separate from STATICFILES_DIRS
+STATIC_ROOT = BASE_DIR / "staticfiles"  # Change this to a different directory
 
+# STATICFILES_DIRS should contain directories where static files are collected from
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
@@ -250,18 +252,7 @@ JAZZMIN_SETTINGS = {
         {"name": "Home",  "url": "admin:index", "permissions": ["auth.view_user"]},
         {"name": "Company", "url": "/admin/addons/company/"},
     ],
-    # ✅ Injecting Logo at the Top Center
-    "custom_links": {
-        "auth": [
-            {
-                "name": "",
-                "url": "#",
-                "icon": "fas fa-image",
-                "permissions": ["auth.view_user"],
-                "custom_html": '<img src="/static/assets/imgs/logo.png" style="height:40px; display:block; margin:auto;" />'
-            }
-        ]
-    },
+
 
     "order_with_respect_to": [
         # replace with your own models

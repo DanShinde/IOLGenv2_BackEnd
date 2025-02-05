@@ -11,3 +11,4 @@ django-jazzmin
 whitenoise==6.8.2
 django-import-export
 django-debug-toolbar
+apscheduler
