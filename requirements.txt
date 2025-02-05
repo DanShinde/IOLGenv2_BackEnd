@@ -8,7 +8,8 @@ dj_database_url
 # psycopg2==2.9.10
 psycopg2-binary==2.9.10
 django-jazzmin
-whitenoise==6.8.2
+# whitenoise==6.8.2
 django-import-export
 django-debug-toolbar
 apscheduler
+requests
