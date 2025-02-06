@@ -83,7 +83,7 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
             print("Cache HIT")
             return ClusterTemplate.objects.filter(pk__in=cached_ids)
 
-        queryset = self.queryset.filter(segment=segment) if segment else self.queryset
+        queryset = self.queryset.filter(segment=segment).order_by('cluster_name') if segment else self.queryset.order_by('cluster_name')
         queryset_ids = list(queryset.values_list('id', flat=True))  # Store only IDs in cache
 
         cache.set(cache_key, queryset_ids, self.cache_timeout)
@@ -372,7 +372,7 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
         """Invalidate all cache keys related to ParameterBulkViewSet."""
         print("Invalidating cache...")
         for key in cache._cache.keys():  # Works for LocMemCache
-            if key.startswith("parameters:"):
+            if "parameters:" in key:
                 cache.delete(key)
         print("Cache invalidated successfully!")
 
