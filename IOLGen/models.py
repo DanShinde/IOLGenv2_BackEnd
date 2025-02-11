@@ -149,3 +149,7 @@ class Signal(models.Model):
             return f'{self.equipment_code}_{self.code}'
         else:
             return self.code
+
+
+
+

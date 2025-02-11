@@ -13,10 +13,10 @@ def fetch_info():
     base_url = "https://iolgen.onrender.com"  # Change this to your actual domain
     endpoints = [
         "/accounts/info/get_by_key/?key=ACGenCurrentVersion",
-        "/accounts/info/get_by_key/?key=UpdateUrl",
-        "/ACGen/standard-strings/",
-        "/ACGen/cluster-templates/",
-        "/IOLGen/segments/",
+        # "/accounts/info/get_by_key/?key=UpdateUrl",
+        # "/ACGen/standard-strings/",
+        # "/ACGen/cluster-templates/",
+        # "/IOLGen/segments/",
     ]
 
     for endpoint in endpoints:

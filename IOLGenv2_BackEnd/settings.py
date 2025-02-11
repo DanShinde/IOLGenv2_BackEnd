@@ -99,7 +99,12 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "unique-snowflake",
+        
     }
+    # "default": {
+    #     "BACKEND": "django.core.cache.backends.redis.RedisCache",
+    #     "LOCATION": "rediss://red-culj875ds78s73bsort0:3pyBria9p20IWCe80zkypabZu9EeZIwj@singapore-redis.render.com:6379",
+    # }
 }
 
 # Database

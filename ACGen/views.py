@@ -1,3 +1,4 @@
+from django.dispatch import receiver
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import StandardString, ClusterTemplate, Parameter
@@ -154,7 +155,7 @@ def deleteCachewithkeyStartPattern(key):
 
 
 class ParameterViewSet(viewsets.ModelViewSet):
-    queryset = Parameter.objects.all()
+    queryset = Parameter.objects.select_related('cluster').all()
     serializer_class = ParameterSerializer
     cache_timeout = 60 * 15  # 15 minutes for cache
     permission_classes = [IsAuthenticated]
@@ -226,7 +227,7 @@ class ParameterViewSet(viewsets.ModelViewSet):
 
 
 class ParameterBulkViewSet(viewsets.ModelViewSet):
-    queryset = Parameter.objects.all()
+    queryset = Parameter.objects.select_related('cluster').all()
     serializer_class = ParameterSerializer
     cache_timeout = 60 * 15  # 15 minutes
     permission_classes = [IsAuthenticated]

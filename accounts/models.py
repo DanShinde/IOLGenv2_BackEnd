@@ -49,16 +49,15 @@ class Info(models.Model):
 
 
 # Function to clear cache when an Info object is created, updated, or deleted
-def clear_info_cache(prefix,key):
-    cache_key = f"{prefix}_{key}"
+def clear_info_cache(prefix,id):
+    cache_key = f"{prefix}_{id}"
     cache.delete(cache_key)
 
-# Signal: Clear cache when an Info instance is created or updated
-@receiver(post_save, sender=Info)
+# Signal: Clear cache when an Info instance is created or updated or deleted
+@receiver([post_save,post_delete], sender=Info)
 def update_info_cache(sender, instance, **kwargs):
-    clear_info_cache("info",instance.key)
+    clear_info_cache("info",instance.id)
 
-# Signal: Clear cache when an Info instance is deleted
-@receiver(post_delete, sender=Info)
-def delete_info_cache(sender, instance, **kwargs):
-    clear_info_cache("info",instance.key)
+
+
+

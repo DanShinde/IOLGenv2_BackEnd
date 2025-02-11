@@ -6,8 +6,9 @@ from .serializers import (
     SegmentSerializer, PLCSerializer, IODeviceSerializer, ProjectSerializer,
     ModuleSerializer, IOListSerializer, SignalSerializer, ProjectReportSerializer
 )
+from rest_framework.exceptions import PermissionDenied
 
-class SegmentViewSet(viewsets.ModelViewSet):
+class SegmentViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Segment.objects.all()
     serializer_class = SegmentSerializer
@@ -17,12 +18,12 @@ class SegmentViewSet(viewsets.ModelViewSet):
         segment_names = queryset.values_list('name', flat=True)
         return Response(segment_names)
 
-class PLCViewSet(viewsets.ModelViewSet):
+class PLCViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
     queryset = PLC.objects.all()
     serializer_class = PLCSerializer
 
-class IODeviceViewSet(viewsets.ModelViewSet):
+class IODeviceViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
     queryset = IODevice.objects.all()
     serializer_class = IODeviceSerializer
@@ -34,7 +35,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
 class IOListViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
-    queryset = IOList.objects.all()
+    queryset = IOList.objects.select_related('project').all()
     serializer_class = IOListSerializer
     
 
@@ -42,7 +43,6 @@ class ProjectReportViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
     queryset = ProjectReport.objects.all()
     serializer_class = ProjectReportSerializer
-from rest_framework.exceptions import PermissionDenied
 
 class ModuleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
@@ -88,8 +88,8 @@ class SignalViewSet(viewsets.ModelViewSet):
         """
         module_id = self.request.query_params.get('module_id', None)
         if module_id is not None:
-            return Signal.objects.filter(module_id=module_id)
-        return Signal.objects.all()
+            return Signal.objects.filter(module_id=module_id).select_related('module')
+        return Signal.objects.select_related('module').all()
     
     def perform_create(self, serializer):
         # Only allow users in 'Managers' or 'SegmentSMEs' group to add
@@ -102,3 +102,7 @@ class SignalViewSet(viewsets.ModelViewSet):
         if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
             raise PermissionDenied("You do not have permission to delete this signal.")
         instance.delete()
+
+
+
+

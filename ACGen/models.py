@@ -18,6 +18,7 @@ class StandardString(models.Model):
 class ClusterTemplate(models.Model):
     id = models.AutoField(primary_key=True)
     cluster_name = models.CharField(max_length=255, unique=True)
+    cluster_config = models.TextField(null=True,blank=True)
     cluster_string = models.TextField(null=True, blank=True)
     block_type = models.CharField(max_length=255)
     uploaded_by = models.CharField(max_length=255)
@@ -67,23 +68,17 @@ def update_parameters_count_on_delete(sender, instance, **kwargs):
     cluster.save()
 
 
-@receiver(post_save, sender=StandardString)
+@receiver([post_save, post_delete], sender=StandardString)
 def update_standard_string_cache(sender, instance, **kwargs):
     """
-    Clear cache when StandardString instance is created or updated.
+    Clear cache when StandardString instance is created or updated or deleted.
     """
     cache_key = "standard_string_queryset"
     cache.delete(cache_key)
 
-@receiver(post_delete, sender=StandardString)
-def delete_standard_string_cache(sender, instance, **kwargs):
-    """
-    Clear cache when StandardString instance is deleted.
-    """
-    cache_key = "standard_string_queryset"
-    cache.delete(cache_key)
 
-@receiver(post_delete, sender=ClusterTemplate)
+
+@receiver([post_save, post_delete], sender=ClusterTemplate)
 def delete_cluster_template_cache(sender, instance, **kwargs):
     """Delete all cache keys that start with 'cluster_template:'"""
     cache_keys = cache.get('all_cache_keys', set())
@@ -102,15 +97,13 @@ def delete_cluster_template_cache(sender, instance, **kwargs):
 
 
 # Signal: Clear cache when an instance is deleted or updated
-@receiver(post_save, sender=Parameter)
-@receiver(post_delete, sender=Parameter)
+@receiver([post_save, post_delete], sender=Parameter)
 def delete_info_cache(sender, instance, **kwargs):
     clear_info_cache("Parameter",instance.id)
     clear_info_cache("Parameter",instance.parameter_name)
 
 # Signal: Clear cache when an Info instance is created or updated
-@receiver(post_delete, sender=ClusterTemplate)
-@receiver(post_save, sender=ClusterTemplate)
+@receiver([post_save, post_delete], sender=ClusterTemplate)
 def update_info_cache(sender, instance, **kwargs):
     clear_info_cache("ClusterTemplate",instance.id)
     clear_info_cache("ClusterTemplate",instance.cluster_name)

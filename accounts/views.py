@@ -14,7 +14,7 @@ from django.core.cache import cache
 
 
 # ViewSets define the view behavior.
-class InfoViewSet(viewsets.ModelViewSet):
+class InfoViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Info.objects.all()
     serializer_class = InfoSerializer
 
@@ -24,12 +24,12 @@ class InfoViewSet(viewsets.ModelViewSet):
         Uses cache to store and retrieve data.
         """
         key = self.request.query_params.get('key', None)
-
+        info_id = get_object_or_404(Info,key=key).id
         if not key:
             return self.queryset  # No key provided, return all
 
         # Try to fetch from cache
-        cache_key = f"info_{key}"
+        cache_key = f"info_{info_id}"
         cached_data = cache.get(cache_key)
 
         if cached_data:
@@ -56,8 +56,8 @@ class InfoViewSet(viewsets.ModelViewSet):
         key = request.query_params.get('key', None)
         if not key:
             return Response({'error': 'Key parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        cache_key = f"info_{key}"
+        info_id = get_object_or_404(Info,key=key).id
+        cache_key = f"info_{info_id}"
         info = cache.get(cache_key)
 
         if not info:
