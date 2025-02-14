@@ -10,7 +10,7 @@ admin.site.register(StandardString)
 # Register ClusterTemplate model
 class ClusterTemplateAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     list_display = (
-        'id', 'cluster_name', 'cluster_string', 'block_type', 'uploaded_by', 'uploaded_at',
+        'id', 'cluster_name', 'block_type', 'uploaded_by', 'uploaded_at',
         'updated_by', 'updated_at', 'segment', 'parameters_count'
     )  # Display all fields
     search_fields = ('cluster_name',)  # Optional: Allows searching by cluster_name
