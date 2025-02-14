@@ -236,10 +236,14 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = True
 CSRF_TRUSTED_ORIGINS = [
     'https://iolgen.onrender.com',
-    "*",
+    r"^http://localhost:\d+$",  # Allow localhost on any port
 ]
 
-
+CORS_ALLOWED_ORIGINS = [
+    "https://iolgen.onrender.com",
+    r"^http://localhost:\d+$",  # Allow localhost on any port
+    "http://localhost:3000",
+]
 
 
 #Jazzmin settings for Admin panels
