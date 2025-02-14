@@ -234,6 +234,7 @@ SIMPLE_JWT = {
 
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True  # If dealing with authentication
 CSRF_TRUSTED_ORIGINS = [
     'https://iolgen.onrender.com',
     r"^http://localhost:\d+$",  # Allow localhost on any port
