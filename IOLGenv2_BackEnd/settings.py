@@ -32,6 +32,7 @@ ALLOWED_HOSTS = ['0.0.0.0',
                  '.vercel.app',
                  'pleasant-zitella-automation-ad-ecb4aa37.koyeb.app',
                  '.koyeb.app',
+                 '*',
                  ]
 
 
