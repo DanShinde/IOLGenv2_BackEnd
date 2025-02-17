@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="""stylesheet" href="""{{ url_for('static', filename=""'css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Dashboard</h1>
+    </header>
+    <main>
+        <section>
+            <h2>Module Count Segment Wise</h2>
+            {% for segment in segments %}
+            <div class="""segment"></div>
+                <h3>{{ segment.name }}</h3>
+                <p>Module Count: {{ segment.count }}</p>
+            </div>
+            {% endfor %}
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2023 Your App Name</p>
+    </footer>
+</body>
+</html>

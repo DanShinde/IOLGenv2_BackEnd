@@ -1,4 +1,5 @@
 from django.dispatch import receiver
+from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import StandardString, ClusterTemplate, Parameter
@@ -16,8 +17,8 @@ from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, status
-
-
+from django.db.models import Count
+from rest_framework.decorators import api_view
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
 
@@ -378,4 +379,12 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
         print("Cache invalidated successfully!")
 
 
+@api_view(["GET"])
+def DashboardView(request):
+    # Query: Count of clusters per segment
+    segment_counts = ClusterTemplate.objects.values("segment").annotate(segment_count=Count("segment")).order_by("-segment_count")
 
+    # Formatting data for JSON response
+    data = [{"segment": item["segment"], "count": item["segment_count"]} for item in segment_counts]
+
+    return Response(data)

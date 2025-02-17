@@ -45,7 +45,7 @@ class ProjectReportViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectReportSerializer
 
 class ModuleViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]  # Require authentication
+    # permission_classes = [IsAuthenticated]  # Require authentication
     serializer_class = ModuleSerializer
     queryset = Module.objects.none()  # Default queryset to satisfy DRF
 
