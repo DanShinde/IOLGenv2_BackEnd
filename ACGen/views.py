@@ -231,7 +231,7 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.select_related('cluster').all()
     serializer_class = ParameterSerializer
     cache_timeout = 60 * 15  # 15 minutes
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_cache_key(self, cluster_id=None, cluster_name=None):
         """Generate a cache key based on query parameters."""
