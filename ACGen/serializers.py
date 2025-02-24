@@ -23,3 +23,13 @@ class ParameterSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['uploaded_by', 'uploaded_at', 'updated_by', 'updated_at', 'block_type',]
 
+    def create(self, validated_data):
+        request = self.context['request']
+        validated_data['uploaded_by'] = request.user.get_full_name()
+        validated_data['updated_by'] = request.user.get_full_name()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        request = self.context['request']
+        validated_data['updated_by'] = request.user.get_full_name()
+        return super().update(instance, validated_data)

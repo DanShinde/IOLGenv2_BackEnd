@@ -13,3 +13,4 @@ django-import-export
 django-debug-toolbar
 apscheduler
 requests
+django-redis

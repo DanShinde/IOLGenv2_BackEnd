@@ -10,7 +10,7 @@ from accounts.models import clear_info_cache
 class StandardString(models.Model):
     id = models.AutoField(primary_key=True)
     string_name = models.CharField(max_length=255, unique=True)
-    string_content = models.TextField()
+    string_content = models.CharField()
 
     def __str__(self):
         return self.string_name
@@ -20,7 +20,7 @@ class ClusterTemplate(models.Model):
     id = models.AutoField(primary_key=True)
     cluster_name = models.CharField(max_length=255, unique=True)
     cluster_config = models.TextField(null=True,blank=True)
-    cluster_string = models.TextField(null=True, blank=True)
+    cluster_string = models.CharField(null=True, blank=True)
     block_type = models.CharField(max_length=255)
     uploaded_by = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -37,7 +37,7 @@ class ClusterTemplate(models.Model):
     def save(self, *args, **kwargs):
     # Store the name of the DeviceType before saving
         if self.segment_con:
-            self.segment = self.segment.name
+            self.segment = self.segment_con.name
         super(ClusterTemplate, self).save(*args, **kwargs)
     def __str__(self):
         return self.cluster_name
@@ -53,13 +53,13 @@ class Parameter(models.Model):
     cluster = models.ForeignKey(
         ClusterTemplate, on_delete=models.CASCADE, related_name="parameters"
     )
-    assignment_value = models.TextField(null=True, blank=True)
+    assignment_value = models.CharField(null=True, blank=True)
     uploaded_by = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_by = models.CharField(max_length=255)
     updated_at = models.DateTimeField(auto_now=True)
     sort_order = models.IntegerField(null=True, blank=True)
-    drive_io_assignment_value = models.TextField(null=True, blank=True)
+    drive_io_assignment_value = models.CharField(null=True, blank=True)
 
     def __str__(self):
         return self.parameter_name

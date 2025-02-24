@@ -54,7 +54,8 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'accounts',
     'ACGen',
-    'IOLGen'
+    'IOLGen',
+
 ]
 
 MIDDLEWARE = [
@@ -107,6 +108,9 @@ CACHES = {
     #     "LOCATION": "rediss://red-culj875ds78s73bsort0:3pyBria9p20IWCe80zkypabZu9EeZIwj@singapore-redis.render.com:6379",
     # }
 }
+
+# Cache time to live is 15 minutes.
+CACHE_TTL = 60 * 15
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
@@ -201,7 +205,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,

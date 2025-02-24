@@ -19,6 +19,7 @@ from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, status
 from django.db.models import Count
 from rest_framework.decorators import api_view
+from accounts.models import clear_info_cache
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
 
@@ -168,25 +169,25 @@ class ParameterViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Retrieve queryset with caching applied."""
         cluster_id = self.request.query_params.get("id", None)
-        cache_key = self.get_cache_key(cluster_id)
 
-        # Check if result exists in cache
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            print(f"Cache HIT: {cache_key}")
-            return cached_data  # Return cached queryset
-
-        print(f"Cache MISS: {cache_key}")
         queryset = self.queryset.annotate(cluster_name=F("cluster__cluster_name"))
         if cluster_id:
             queryset = queryset.filter(cluster__id=cluster_id)
 
         # Store queryset in cache
-        cache.set(cache_key, queryset, self.cache_timeout)
+        # cache.set(cache_key, queryset, self.cache_timeout)
         return queryset
 
-    @method_decorator(cache_page(60 * 15))  # Cache only GET requests
+    # @method_decorator(cache_page(60 * 15))  # Cache only GET requests
     def list(self, request, *args, **kwargs):
+        cacheKey = self.get_cache_key(request.query_params.get("id"))
+        data1 = cache.get(cacheKey)
+        if data1:
+            print(f"Cache HIT: {cacheKey}")
+            return Response(data1)
+        
+        print(f"Cache MISS: {cacheKey}")
+        
         queryset = self.get_queryset()
         if not queryset.exists():
             return Response({"detail": "No parameters found for the specified cluster name."}, status=status.HTTP_404_NOT_FOUND)
@@ -198,6 +199,7 @@ class ParameterViewSet(viewsets.ModelViewSet):
             "cluster_name": cluster_name,
             "parameters": serializer.data,
         }
+        cache.set(cacheKey, response_data, self.cache_timeout)
         return Response(response_data)
 
     def perform_create(self, serializer):
@@ -246,7 +248,7 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
         cluster_id = self.request.query_params.get("id", None)
         cluster_name = self.request.query_params.get("cluster_name", None)
         cache_key = self.get_cache_key(cluster_id, cluster_name)
-
+        
         # Check cache
         cached_data = cache.get(cache_key)
         if cached_data:
@@ -290,13 +292,11 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
         """Create a parameter and invalidate cache."""
         full_name = self.request.user.get_full_name()
         serializer.save(uploaded_by=full_name, updated_by=full_name)
-        self.invalidate_cache()
 
     def perform_update(self, serializer):
         """Update a parameter and invalidate cache."""
         full_name = self.request.user.get_full_name()
         serializer.save(updated_by=full_name)
-        self.invalidate_cache()
 
     def create(self, request, *args, **kwargs):
         """Handle bulk creation with atomic transactions."""
@@ -324,7 +324,6 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
                 for serializer in serializers:
                     serializer.save()
 
-                self.invalidate_cache()  # Invalidate cache after bulk creation
 
                 return Response(
                     [serializer.data for serializer in serializers],
@@ -365,19 +364,12 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
                 for serializer in serializers:
                     serializer.save()
 
-                self.invalidate_cache()  # Invalidate cache after bulk update
-
+                clear_info_cache("parameters",instance.cluster.id)
                 return Response({'id': 'True'}, status=status.HTTP_200_OK)
             except ValidationError as e:
                 return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-    def invalidate_cache(self):
-        """Invalidate all cache keys related to ParameterBulkViewSet."""
-        print("Invalidating cache...")
-        for key in cache._cache.keys():  # Works for LocMemCache
-            if "parameters:" in key:
-                cache.delete(key)
-        print("Cache invalidated successfully!")
+
 
 
 @api_view(["GET"])

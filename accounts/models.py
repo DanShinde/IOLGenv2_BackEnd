@@ -52,6 +52,7 @@ class Info(models.Model):
 def clear_info_cache(prefix,id):
     cache_key = f"{prefix}_{id}"
     cache.delete(cache_key)
+    cache.delete(f"{prefix}:{id}")
 
 # Signal: Clear cache when an Info instance is created or updated or deleted
 @receiver([post_save,post_delete], sender=Info)
