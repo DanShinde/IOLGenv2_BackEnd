@@ -23,10 +23,17 @@ class IODevice(models.Model):
     def __str__(self):
         return self.name
     
+# Define the Segment model
+class DeviceType(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+    
 # Updated Project model
 class Project(models.Model):
     name = models.CharField(max_length=50)
-    description = models.TextField(max_length=500, blank=True)
+    description = models.CharField(max_length=500, blank=True)
     segments = models.ManyToManyField(Segment, blank=True)  # Many-to-Many for segments
     PLC = models.ForeignKey(PLC, on_delete=models.SET_NULL, null=True, blank=True)  # Single selection with dynamic options
     created_by = models.CharField(max_length=30)
@@ -49,7 +56,7 @@ class ProjectReport(models.Model):
     updated_by = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField()
     created_by = models.CharField(max_length=50, blank=True, null=True)
-    segment = models.TextField(blank=True)  # Updated to handle multiple segments
+    segment = models.CharField(blank=True)  # Updated to handle multiple segments
     PLC = models.CharField(max_length=50, blank=True)  # Store the PLC name as a string
 
     def __str__(self):
@@ -71,7 +78,7 @@ def create_project_report(sender, instance, created, **kwargs):
 
 class Module(models.Model):
     module = models.CharField(max_length=50)
-    description = models.TextField(max_length=500, blank=True)
+    description = models.CharField(max_length=500, blank=True)
     created_by = models.CharField(max_length=30)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -86,8 +93,8 @@ class IOList(models.Model):
     code = models.CharField(max_length=40)
     tag = models.CharField(max_length=100, editable=True)
     signal_type = models.CharField(max_length=10)
-    device_type = models.TextField(max_length=100, blank=True)
-    actual_description = models.TextField(max_length=200)
+    device_type = models.CharField(max_length=100, blank=True)
+    actual_description = models.CharField(max_length=200)
     panel_number = models.CharField(max_length=10, blank=True, null=True, default='CP01') #models.CharField(max_length=30, choices=[(k, k) for k in project.panel_keys]) 
     node = models.CharField(max_length=10, blank=True, null=True)
     rack = models.IntegerField(blank=True, null=True)
@@ -114,11 +121,17 @@ class IOList(models.Model):
 class Signal(models.Model):
     equipment_code = models.CharField(max_length=30)
     code = models.CharField(max_length=40)
-    component_description = models.TextField(max_length=100, blank=True)
-    function_purpose = models.TextField(max_length=100, blank=True)
-    device_type = models.TextField(max_length=100, blank=True)
+    component_description = models.CharField(max_length=100, blank=True)
+    function_purpose = models.CharField(max_length=100, blank=True)
+    device_type = models.ForeignKey(
+        DeviceType, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+    )
+    device_type_name = models.CharField(max_length=50, blank=True, null=True)
     signal_type = models.CharField(max_length=10, default="DI", choices=(('DI', 'DI'), ('DO', 'DO'), ('Encoder', 'Encoder')))
-    remarks = models.TextField(max_length=100, blank=True)
+    remarks = models.CharField(max_length=100, blank=True)
     segment = models.CharField(max_length=100, blank=True, editable=False)  # segment as text field, not a foreign key
     initial_state = models.BooleanField(default=True)
     location = models.CharField(max_length=2, choices=(('FD', 'FD'), ('CP', 'CP')))
@@ -141,7 +154,10 @@ class Signal(models.Model):
             if not self.created_by:
                 self.created_by = user_full_name
             self.updated_by = user_full_name
-        
+
+        # Store the name of the DeviceType before saving
+        if self.device_type:
+            self.device_type_name = self.device_type.name
         super(Signal, self).save(*args, **kwargs)
 
     def __str__(self):

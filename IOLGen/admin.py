@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Segment, PLC, IODevice, Project, Module, IOList, Signal, ProjectReport
+from .models import Segment, PLC, IODevice, Project, Module, IOList, Signal, ProjectReport, DeviceType
 from import_export.admin import ImportExportModelAdmin
 
 # Register models to the admin site
@@ -15,6 +15,11 @@ class PLCAdmin(admin.ModelAdmin):
 
 @admin.register(IODevice)
 class IODeviceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+@admin.register(DeviceType)
+class DeviceTypeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
 

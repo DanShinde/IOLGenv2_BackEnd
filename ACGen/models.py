@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
+from IOLGen.models import Segment
 
 from accounts.models import clear_info_cache
 
@@ -26,8 +27,18 @@ class ClusterTemplate(models.Model):
     updated_by = models.CharField(max_length=255)
     updated_at = models.DateTimeField(auto_now=True)
     segment = models.CharField(max_length=255)
+    segment_con = models.ForeignKey(
+        Segment, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+    )
     parameters_count = models.PositiveIntegerField(default=0, null=True,blank=True)  # Field to store the count
-
+    def save(self, *args, **kwargs):
+    # Store the name of the DeviceType before saving
+        if self.segment_con:
+            self.segment = self.segment.name
+        super(ClusterTemplate, self).save(*args, **kwargs)
     def __str__(self):
         return self.cluster_name
 

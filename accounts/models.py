@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 from IOLGen.models import Segment
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, post_init
 from django.dispatch import receiver
 from django.core.cache import cache
 
@@ -58,6 +58,18 @@ def clear_info_cache(prefix,id):
 def update_info_cache(sender, instance, **kwargs):
     clear_info_cache("info",instance.id)
 
+
+@receiver(post_save, sender=User)
+def create_new_user_profile(sender, instance, created, **kwargs):
+    if created:  # This ensures the signal runs only when a new User is created
+        UserProfile.objects.create(
+            user=instance, 
+            usertype=UserTypeEnum.USER, 
+            is_ac_approved=False, 
+            is_ac_cluster_create_allowed=False, 
+            is_ac_cluster_edit_allowed=False, 
+            is_ac_cluster_delete_allowed=False
+        )
 
 
 
