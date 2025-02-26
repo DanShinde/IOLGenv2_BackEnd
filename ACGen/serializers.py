@@ -27,6 +27,8 @@ class ParameterSerializer(serializers.ModelSerializer):
         request = self.context['request']
         validated_data['uploaded_by'] = request.user.get_full_name()
         validated_data['updated_by'] = request.user.get_full_name()
+        print(validated_data)
+        # print(validated_data['uploaded_by'])
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
