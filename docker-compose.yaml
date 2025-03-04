@@ -1,14 +1,23 @@
-
+version: '3'
 services:
   api:
     build:
-      context: ./
+      context: ./  # Builds the image from the current directory
       dockerfile: Dockerfile
+    container_name: acg-api
     ports:
       - "8000:8000"
     env_file:
       - ./.env
     volumes:
       - .:/app  # Maps the current directory to /app in the container
-    # command: bash -c "python manage.py runserver 0.0.0.0:8000"
     command: bash -c "python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"
+    restart: always  # Ensures the container restarts on failure
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["acg-api", "--interval", "60"]  # Checks for updates every 60 seconds
