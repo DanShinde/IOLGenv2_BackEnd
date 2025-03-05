@@ -18,6 +18,8 @@ COPY . .
 # Create static directory
 RUN mkdir -p /app/static
 
+# Collect static files during image build
+RUN python manage.py collectstatic --noinput
 
 
 # Expose the port your application will run on
