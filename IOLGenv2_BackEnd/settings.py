@@ -120,11 +120,29 @@ import dj_database_url
 
 load_dotenv()
 
-DATABASES = {
-    "default": dj_database_url.parse(
-        url=os.getenv("DATABASE_URL", ""),
-        conn_max_age=600, conn_health_checks=True
-    )}
+DATABASE_URL = os.getenv("DATABASE_URL")  # Get the env variable
+
+if DATABASE_URL:  # Only parse if DATABASE_URL is set
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True)
+    }
+    print("DATABASE_URL is set. Using the database URL.")
+else:
+    print("Warning: DATABASE_URL is not set. Using SQLite as fallback.")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.path.join(os.path.dirname(__file__), "db.sqlite3"),
+        }
+    }
+
+# DATABASES = {
+#     "default": dj_database_url.parse(
+#         url=os.getenv("DATABASE_URL", ""),
+#         conn_max_age=600, conn_health_checks=True
+#     )}
+
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
