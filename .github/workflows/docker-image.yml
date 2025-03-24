@@ -45,11 +45,11 @@ jobs:
     # Step 6: Retag the Docker image for Second Account (Armstrong)
     - name: Tag Docker image for Second Account
       run: |
-        docker tag danshinde/iolgendr-api:latest pravinshinde01/iolgendr-api:latest
-        docker tag danshinde/iolgendr-api:${{ github.ref_name }} pravinshinde01/iolgendr-api:${{ github.ref_name }}
+        docker tag danshinde/iolgendr-api:latest armstrongtech/iolgendr-api:latest
+        docker tag danshinde/iolgendr-api:${{ github.ref_name }} armstrongtech/iolgendr-api:${{ github.ref_name }}
 
     # Step 7: Push Docker image to Second Account (Armstrong)
     - name: Push Docker image to Second Account
       run: |
-        docker push pravinshinde01/iolgendr-api:latest
-        docker push pravinshinde01/iolgendr-api:${{ github.ref_name }}
+        docker push armstrongtech/iolgendr-api:latest
+        docker push armstrongtech/iolgendr-api:${{ github.ref_name }}
