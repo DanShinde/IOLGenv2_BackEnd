@@ -11,7 +11,7 @@ services:
       - ./.env
     volumes:
       - .:/app  # Maps the current directory to /app in the container
-    command: bash -c "python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"
+    command: bash -c "python manage.py runserver 0.0.0.0:8000"
     restart: always  # Ensures the container restarts on failure
 
   watchtower:

@@ -34,3 +34,22 @@ jobs:
       run: |
         docker push danshinde/iolgendr-api:latest
         docker push danshinde/iolgendr-api:${{ github.ref_name }}
+
+      # Step 5: Log in to Docker Hub (Second Account: Armstrong)
+    - name: Log in to Docker Hub (Armstrong)
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME_ARMSTRONG }}
+        password: ${{ secrets.DOCKER_PASSWORD_ARMSTRONG }}
+
+    # Step 6: Retag the Docker image for Second Account (Armstrong)
+    - name: Tag Docker image for Second Account
+      run: |
+        docker tag danshinde/iolgendr-api:latest pravinshinde01/iolgendr-api:latest
+        docker tag danshinde/iolgendr-api:${{ github.ref_name }} pravinshinde01/iolgendr-api:${{ github.ref_name }}
+
+    # Step 7: Push Docker image to Second Account (Armstrong)
+    - name: Push Docker image to Second Account
+      run: |
+        docker push pravinshinde01/iolgendr-api:latest
+        docker push pravinshinde01/iolgendr-api:${{ github.ref_name }}

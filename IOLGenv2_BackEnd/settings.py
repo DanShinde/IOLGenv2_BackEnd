@@ -30,8 +30,6 @@ ALLOWED_HOSTS = ['0.0.0.0',
                  '127.0.0.1',
                  'iolgen.onrender.com',
                  '.vercel.app',
-                 'pleasant-zitella-automation-ad-ecb4aa37.koyeb.app',
-                 '.koyeb.app',
                  '*',
                  ]
 
