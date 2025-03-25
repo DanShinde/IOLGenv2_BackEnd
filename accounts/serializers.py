@@ -41,6 +41,7 @@ class SegmentSerializer(serializers.ModelSerializer):
 # Serializer for UserProfile
 class UserProfileSerializer(serializers.ModelSerializer):
     segments = serializers.SerializerMethodField()  # Use the nested serializer for segments
+    allowed_clusters = serializers.SerializerMethodField()  # Custom field for allowed clusters
 
     class Meta:
         model = UserProfile  # Correct model to serialize
@@ -59,3 +60,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_segments(self, obj):
         # Return a flat list of segment names
         return list(obj.segments.values_list("name", flat=True))
+    
+    def get_allowed_clusters(self, obj):
+        # Return a flat list of allowed cluster names (or IDs, if needed)
+        return list(obj.allowed_clusters.values_list("cluster_name", flat=True))  

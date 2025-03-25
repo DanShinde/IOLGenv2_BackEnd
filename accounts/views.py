@@ -110,7 +110,7 @@ class LogoutView(APIView):
                return Response(status=status.HTTP_400_BAD_REQUEST)
           
 class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
 
         user = request.user
