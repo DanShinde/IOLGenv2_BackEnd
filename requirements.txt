@@ -14,3 +14,4 @@ django-debug-toolbar
 apscheduler
 requests
 django-redis
+pandas
