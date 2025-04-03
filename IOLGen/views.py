@@ -258,7 +258,7 @@ class ExportIOListfromV1(APIView):
         output.seek(0)
 
 
-        update_io_Module(request, Sheets, field_data, f"http://iol.pythonanywhere.com/apiio/update/")
+        update_io_Module(request, Sheets, field_data, f"https://iol.pythonanywhere.com/apiio/update/")
         # Return the file as an HTTP response for download
         response = HttpResponse(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename={project_name}_IOList.xlsx'
@@ -296,7 +296,7 @@ def update_io_Module(request, panel_data_dict, field_data,db_update_url):
         }
 
         session = requests.Session()
-        session.get("http://iol.pythonanywhere.com")  # Get CSRF cookie first
+        session.get("https://iol.pythonanywhere.com")  # Get CSRF cookie first
         csrf_token = session.cookies.get("csrftoken")
         headers = {
             "Content-Type": "application/json",
