@@ -23,4 +23,6 @@ urlpatterns = [
     path('ACGen/', include('ACGen.urls')),
     path('IOLGen/', include('IOLGen.urls')),
     path('__debug__/', include('debug_toolbar.urls')),
+    path('', include('home.urls')),
+
 ]

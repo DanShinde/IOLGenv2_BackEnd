@@ -1,0 +1,38 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Home{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{% static 'base/base.css' %}">
+    
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <ul>
+        <li><a href="#Home" class="active nav">Home</a></li>
+        <li><a href="#About" class="nav">About</a></li>
+        <li><a href="#Contact" class="nav">Contact</a></li>
+        <li><a href="#Services" class="nav">Services</a></li>
+        <li><a href="#Portfolio" class="nav">Portfolio</a></li>
+        <li class="logo-item"><img class="logo" src="{% static 'base/ADLogo.png' %}" alt="Logo"></li>
+
+    </ul>
+
+    <header>
+        {% block header %}{% endblock %}
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        {% block footer %}{% endblock %}
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

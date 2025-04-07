@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'accounts',
     'ACGen',
     'IOLGen',
+    'home',
 
 ]
 
@@ -73,7 +74,7 @@ ROOT_URLCONF = 'IOLGenv2_BackEnd.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

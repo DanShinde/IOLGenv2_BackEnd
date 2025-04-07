@@ -1,0 +1,46 @@
+ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #333;
+}
+
+li {
+    float: left;
+}
+
+li a {
+    display: block;
+    color: white;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    margin-top: 6px;
+}
+
+li a:hover:not(.active) {
+    background-color: #111;
+}
+
+li a.active {
+    background-color: #4CAF50;
+    color: white;
+}
+
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: burlywood;
+}
+
+li.logo-item {
+    float: right;
+    padding: 8px 16px; /* Adjust to match other li padding */
+}
+
+.logo {
+    height: 40px; /* Or whatever size works best */
+}

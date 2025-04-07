@@ -7,8 +7,17 @@ __pycache__/
 *.so
 migrations/
 */migrations/
+# Statics
+static/admin/
+static/assets/
+static/debug_toolbar/
+static/import_export/
+static/jazzmin/
+static/rest_framework/
+static/vendor/
+staticfiles/
+
 # Distribution / packaging
-static/
 .Python
 build/
 develop-eggs/

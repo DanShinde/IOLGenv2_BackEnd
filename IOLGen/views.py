@@ -1,5 +1,6 @@
 from io import BytesIO
 from django.http import HttpResponse
+from django.shortcuts import render
 import numpy as np
 import requests
 import pandas as pd
@@ -109,8 +110,6 @@ class SignalViewSet(viewsets.ModelViewSet):
         if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
             raise PermissionDenied("You do not have permission to delete this signal.")
         instance.delete()
-
-
 
 
 
@@ -313,3 +312,5 @@ def update_io_Module(request, panel_data_dict, field_data,db_update_url):
 
     except requests.exceptions.RequestException as e:
         print(f"Error connecting to database API: {str(e)}")
+
+
