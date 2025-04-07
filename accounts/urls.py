@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RegisterViewA, LoginViewA,ProfileView, LogoutViewA, InfoViewSet, registerw
+from .views import RegisterViewA, LoginViewA,ProfileView, LogoutViewA, InfoViewSet, registerw, LoginViewW
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.contrib.auth.views import LoginView, LogoutView
 
@@ -34,7 +34,7 @@ urlpatterns = [
     path('logout/', LogoutViewA.as_view(), name ='logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  
     path('', include(router.urls)),
-    path('loginw/', LoginView.as_view(template_name='accounts/login.html'), name='loginw'),
+    path('loginw/', LoginViewW.as_view(), name='loginw'),
     path('logoutw/', LogoutView.as_view(next_page='loginw'), name='logoutw'),
     path('registerw/', registerw, name='registerw'),
     # path('registerw/', RegisterView.as_view(template_name='accounts/register.html'), name='registerw'),

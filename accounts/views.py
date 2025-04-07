@@ -12,6 +12,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404, redirect
 from django.core.cache import cache
 from .forms import CustomUserForm
+from django.contrib.auth.views import LoginView
 
 # ViewSets define the view behavior.
 class InfoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -118,6 +119,9 @@ class ProfileView(APIView):
         serializer = UserProfileSerializer(userProfile)
         return Response(serializer.data)
     
+class LoginViewW(LoginView):
+    redirect_authenticated_user = True
+    template_name='accounts/login.html'
 
 
 def registerw(request):

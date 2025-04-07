@@ -27,6 +27,15 @@ li a {
     margin-top: 6px;
     padding-left: 10px;
 }
+li button{
+    display: block;
+    color: white;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    margin-top: 6px;
+    padding-left: 10px;
+}
 
 li a:hover:not(.active) {
     background-color: #111;

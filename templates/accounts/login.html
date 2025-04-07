@@ -8,97 +8,85 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    {% if is_register %}
-<div class="box" >
-    <span class="borderLine"></span>
-    
-    <form id ="registerform" method="post" action="{% url 'loginw' %}">
-      {% csrf_token %}
-      <img src="{% static 'base/ADLogo.png' %}"  class="mt-0 ms-5" style="margin-bottom: 30px;" alt="Logo">
 
-      <h2>Register</h2>
+    <div class="container" id="container">
+        <div class="form-container sign-up">
+          <form method="post" action="{% url 'registerw' %}">
+            {% csrf_token %}
 
-        <!-- First Name -->
-        <div class="inputBox">
-            {{ form.first_name }}
-            <span>First Name</span>
-            <i></i>
+            <h1>Create Account</h1>
+
+            <input type="text" placeholder="First Name" name="first_name" />
+            <input type="text" placeholder="Last Name" name="last_name" />
+            <input type="username" placeholder="Username" name="username" />
+            <input type="email" placeholder="Email" name="email"/>
+            <input type="password" placeholder="Password" name="password1" />
+            <input type="password" placeholder="Confirm Password" name="password2"/>
+            <button type="submit">Sign Up</button>
+            {% if form.errors   %}
+            <div id="error-message" style="color: red; margin-top: 10px;">
+              {% for field in form %}
+                {% for error in field.errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              {% endfor %}
+              {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </form>
         </div>
+        <div class="form-container sign-in">
+          <form method="post" action="{% url 'loginw' %}">
+            {% csrf_token %}
 
-        <!-- Last Name -->
-        <div class="inputBox">
-            {{ form.last_name }}
-            <span>Last Name</span>
-            <i></i>
+            <h1>Sign In</h1>
+            <input type="username" placeholder="Username" name = "username"/>
+            <input type="password" placeholder="Password" name="password"/>
+            <a style="pointer-events: none;" href="#">Forget Your Password?</a>
+            <button type="submit">Sign In</button>
+            {% if form.errors and  not is_register %}
+            <div id="error-message" style="color: red; margin-top: 10px;">
+              {% for field in form %}
+                {% for error in field.errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              {% endfor %}
+              {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </form>
         </div>
+        <div class="toggle-container">
+          <div class="toggle">
+            <div class="toggle-panel toggle-left">
+        <img src="{% static 'base/ADLogo.png' %}"  class="mt-0 ms-5" style="margin-bottom: 30px;" alt="Logo">
+        <h1>Welcome Back!</h1>
+              <p>Enter your personal details to use all of site features</p>
+              <button class="hidden" id="login">Sign In</button>
+            </div>
 
-        <!-- Email -->
-        <div class="inputBox">
-            {{ form.email }}
-            <span>Email</span>
-            <i></i>
+            <div class="toggle-panel toggle-right">
+        <img src="{% static 'base/ADLogo.png' %}"  class="mt-0 ms-5" style="margin-bottom: 30px;" alt="Logo">
+        <h1>Hello, Friend!</h1>
+              <p>
+                Register with your personal details to use all of site features
+              </p>
+              <button class="hidden" id="register">Sign Up</button>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <!-- Username -->
-        <div class="inputBox">
-            {{ form.username }}
-            <span>Username</span>
-            <i></i>
-        </div>
-
-        <!-- Password -->
-        <div class="inputBox">
-            {{ form.password1 }}
-            <span>Password</span>
-            <i></i>
-        </div>
-
-        <!-- Confirm Password -->
-        <div class="inputBox">
-            {{ form.password2 }}
-            <span>Confirm Password</span>
-            <i></i>
-        </div>
-
-        <!-- Links -->
-        <div class="links">
-            <a href="{% url 'loginw' %}">Already have an account?</a>
-        </div>
-
-        <!-- Submit Button -->
-        <input type="submit" id="submit" value="Register">
-  </form>
-</div>
-    {% else %}
-    <div class="box" >
-        <span class="borderLine"></span>
-    <form id ="loginform" method="post" action="{% url 'loginw' %}">
-        {% csrf_token %}
-        <img src="{% static 'base/ADLogo.png' %}"  class="mt-5 ms-5" style="margin-bottom: 30px;" alt="Logo">
-
-        <h2>Sign in</h2>
-
-        <div class="inputBox">
-            {{ form.username }}
-            <span>Username</span>
-            <i></i>
-        </div>
-
-        <div class="inputBox">
-            {{ form.password }}
-            <span>Password</span>
-            <i></i>
-        </div>
-
-        <div class="links">
-            <a href="#">Forgot Password</a>
-            <a href="{% url 'registerw' %}">Signup</a>
-        </div>
-
-        <input type="submit" id="submit" value="Login">
-    </form>
-    {% endif %}
 </div>
 
+<script>
+    const is_register = {{ is_register|yesno:"true,false" }};
+</script>
+  
+<script src="{% static 'accounts/login.js' %}"></script>
 </body>
 </html>
