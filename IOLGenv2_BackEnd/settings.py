@@ -50,11 +50,11 @@ INSTALLED_APPS = [
     "corsheaders",
     'import_export',
     'debug_toolbar',
+    'widget_tweaks',
     'accounts',
     'ACGen',
     'IOLGen',
     'home',
-
 ]
 
 MIDDLEWARE = [
@@ -205,8 +205,9 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-
-
+LOGIN_URL = '/accounts/loginw/'
+LOGIN_REDIRECT_URL = '/'  # or wherever you want to land after login
+LOGOUT_REDIRECT_URL = '/accounts/loginw/'  # or wherever you want to land after logout
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 

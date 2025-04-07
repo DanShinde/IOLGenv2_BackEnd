@@ -9,9 +9,9 @@ from rest_framework.permissions import IsAuthenticated
 from .models import UserProfile, Info
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.core.cache import cache
-
+from .forms import CustomUserForm
 
 # ViewSets define the view behavior.
 class InfoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -69,7 +69,7 @@ class InfoViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 
-class RegisterView(APIView):
+class RegisterViewA(APIView):
     def post(self, request):
         data = request.data
         serializer = RegisterSerializer(data = data)
@@ -83,7 +83,7 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
-class LoginView(APIView):
+class LoginViewA(APIView):
     def post(self, request):
         data = request.data
         username = data.get('username')
@@ -97,7 +97,7 @@ class LoginView(APIView):
             })
         return Response({"message": "Invalid Credentials"}, status=status.HTTP_400_BAD_REQUEST)
 
-class LogoutView(APIView):
+class LogoutViewA(APIView):
      permission_classes = [IsAuthenticated]
      def post(self, request):
           
@@ -117,3 +117,12 @@ class ProfileView(APIView):
         userProfile = UserProfile.objects.get(user=user)
         serializer = UserProfileSerializer(userProfile)
         return Response(serializer.data)
+    
+
+
+def registerw(request):
+    form = CustomUserForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+        return redirect('loginw')
+    return render(request, 'accounts/login.html',  {'form': form, 'is_register': True})

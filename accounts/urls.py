@@ -17,8 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RegisterView, LoginView,ProfileView, LogoutView, InfoViewSet
+from .views import RegisterViewA, LoginViewA,ProfileView, LogoutViewA, InfoViewSet, registerw
 from rest_framework_simplejwt.views import TokenRefreshView
+from django.contrib.auth.views import LoginView, LogoutView
 
 
 # Create a router and register the InfoViewSet
@@ -27,10 +28,15 @@ router.register(r'info', InfoViewSet, basename='info')
 
 
 urlpatterns = [
-    path('register/', RegisterView.as_view()),
-    path('login/', LoginView.as_view()),
+    path('register/', RegisterViewA.as_view()),
+    path('login/', LoginViewA.as_view()),
     path('profile/', ProfileView.as_view()),
-    path('logout/', LogoutView.as_view(), name ='logout'),
+    path('logout/', LogoutViewA.as_view(), name ='logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  
     path('', include(router.urls)),
+    path('loginw/', LoginView.as_view(template_name='accounts/login.html'), name='loginw'),
+    path('logoutw/', LogoutView.as_view(next_page='loginw'), name='logoutw'),
+    path('registerw/', registerw, name='registerw'),
+    # path('registerw/', RegisterView.as_view(template_name='accounts/register.html'), name='registerw'),
 ]
+

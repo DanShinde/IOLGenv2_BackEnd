@@ -4,12 +4,20 @@ ul {
     padding: 0;
     overflow: hidden;
     background-color: #333;
+    display: flex; /* Enable flexbox layout */
+    align-items: center;
 }
 
 li {
-    float: left;
+    text-align: center;
 }
 
+/* Standard nav items (left) */
+li:not(.logo-item) {
+    float: none;
+}
+
+/* Link styling */
 li a {
     display: block;
     color: white;
@@ -17,6 +25,7 @@ li a {
     padding: 14px 16px;
     text-decoration: none;
     margin-top: 6px;
+    padding-left: 10px;
 }
 
 li a:hover:not(.active) {
@@ -28,19 +37,21 @@ li a.active {
     color: white;
 }
 
-
-body {
-    font-family: Arial, Helvetica, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: burlywood;
+/* Push logo/logout to the right */
+li.logo-item:first-of-type {
+    margin-left: auto;
 }
 
-li.logo-item {
-    float: right;
-    padding: 8px 16px; /* Adjust to match other li padding */
-}
-
+/* Logo styling */
 .logo {
-    height: 40px; /* Or whatever size works best */
+    height: 40px;
+    vertical-align: middle;
+}
+
+/* Ensure logout button aligns properly */
+li.logo-item form .nav {
+    padding: 14px 16px;
+    display: block;
+    color: white;
+    text-align: center;
 }
