@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ClusterTemplate, Parameter, StandardString
+from .models import ClusterTemplate, Parameter, StandardString, GenerationLog
 from import_export.admin import ImportExportModelAdmin
 
 # Register your models here.
@@ -19,6 +19,7 @@ class ClusterTemplateAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
 admin.site.register(ClusterTemplate, ClusterTemplateAdmin)
 
 
+
 # Register Parameter model
 class ParameterAdmin(ImportExportModelAdmin,admin.ModelAdmin):
     list_display = (
@@ -29,3 +30,14 @@ class ParameterAdmin(ImportExportModelAdmin,admin.ModelAdmin):
     list_filter = ('cluster', 'data_type', 'section' )  # Optional: Allows filtering by cluster and data_type
 
 admin.site.register(Parameter, ParameterAdmin)
+
+
+class GenerationLogAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
+    list_display = (
+        'id', 'user', 'generation_time', 'project_name', 'project_file_name'
+    )  
+    # Display all fields
+    search_fields = ('user','project_name','project_file_name')  # Optional: Allows searching by cluster_name
+    list_filter = ('user', 'project_name')
+
+admin.site.register(GenerationLog, GenerationLogAdmin)
