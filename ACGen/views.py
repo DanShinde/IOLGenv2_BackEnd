@@ -1,12 +1,13 @@
 from django.dispatch import receiver
 from django.shortcuts import render
-from rest_framework import viewsets
+from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated
-from .models import StandardString, ClusterTemplate, Parameter
+from .models import StandardString, ClusterTemplate, Parameter, GenerationLog
 from .serializers import (
     StandardStringSerializer,
     ClusterTemplateSerializer,
     ParameterSerializer,
+    GenerationLogSerializer,
 )
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
@@ -16,10 +17,13 @@ from rest_framework.decorators import action
 from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from rest_framework import viewsets, status
 from django.db.models import Count
 from rest_framework.decorators import api_view
 from accounts.models import clear_info_cache
+
+
+
+
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
 
@@ -369,6 +373,16 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
             except ValidationError as e:
                 return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
+
+
+class GenerationLogCreateView(generics.CreateAPIView):
+    queryset = GenerationLog.objects.all()
+    serializer_class = GenerationLogSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        full_name = self.request.user.get_full_name() or self.request.user.username
+        serializer.save(user=full_name)
 
 
 

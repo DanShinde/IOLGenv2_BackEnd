@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from .views import (
     SegmentViewSet, PLCViewSet, IODeviceViewSet, ProjectViewSet,
-    ModuleViewSet, IOListViewSet, SignalViewSet, ProjectReportViewSet, ExportIOListfromV1
+    ModuleViewSet, IOListViewSet, SignalViewSet, ProjectReportViewSet, ExportIOListfromV1, get_project_list, ProjectsView
 )
 from django.urls import path
 
@@ -19,5 +19,6 @@ router.register(r'signals', SignalViewSet, basename='signals')
 urlpatterns = router.urls
 
 urlpatterns += [
-    path('ExportIOListfromV1/<str:project_name>/', ExportIOListfromV1.as_view(), name='ExportIOListfromV1'),
+    path('IOprojects/get_project_list/', get_project_list, name='get_project_list'),
+    path('IOprojects/', ProjectsView.as_view(), name='project_list'),
 ]

@@ -4,6 +4,7 @@ from django.dispatch import receiver
 
 # Define the Segment model
 class Segment(models.Model):
+    id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
@@ -39,7 +40,7 @@ class Project(models.Model):
     created_by = models.CharField(max_length=30)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField()
-    io_device = models.BooleanField(default=False)
+    io_device = models.CharField(max_length=30, blank=True, null=True)
     isFreeze = models.BooleanField(default=False)
     panels = models.JSONField(blank=True, null=True)
     panel_numbers = models.CharField(max_length=1000, blank=True, null=True)
@@ -77,6 +78,7 @@ def create_project_report(sender, instance, created, **kwargs):
 
 
 class Module(models.Model):
+    id = models.IntegerField(primary_key=True)
     module = models.CharField(max_length=50)
     description = models.CharField(max_length=500, blank=True)
     created_by = models.CharField(max_length=30)
@@ -96,11 +98,7 @@ class IOList(models.Model):
     device_type = models.CharField(max_length=100, blank=True)
     actual_description = models.CharField(max_length=200)
     panel_number = models.CharField(max_length=10, blank=True, null=True, default='CP01') #models.CharField(max_length=30, choices=[(k, k) for k in project.panel_keys]) 
-    node = models.CharField(max_length=10, blank=True, null=True)
-    rack = models.IntegerField(blank=True, null=True)
     module_position = models.IntegerField(blank=True, null=True)
-    terminal_block = models.CharField(max_length=5, blank=True, null=True)
-    terminal_number = models.IntegerField(blank=True, null=True)
     channel = models.IntegerField( blank=True, null=True)
     location = models.CharField(max_length=2, choices=(('FD', 'FD'), ('CP', 'CP')), default='CP')
     io_address = models.CharField(max_length=20, blank=True, null=True)
@@ -110,6 +108,7 @@ class IOList(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     order = models.PositiveIntegerField(null=True)
     cluster_number = models.PositiveIntegerField(null=True)
+    iomodule_name = models.CharField(max_length=10, blank=True, null=True)
     Demo_3d_Property = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
@@ -119,9 +118,9 @@ class IOList(models.Model):
         ordering = ['order']
 
 class Signal(models.Model):
+    id = models.AutoField(primary_key=True)
     equipment_code = models.CharField(max_length=30)
     code = models.CharField(max_length=40)
-    component_description = models.CharField(max_length=100, blank=True)
     function_purpose = models.CharField(max_length=100, blank=True)
     device_type = models.ForeignKey(
         DeviceType, 

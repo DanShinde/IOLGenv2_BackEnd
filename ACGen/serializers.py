@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import StandardString, ClusterTemplate, Parameter
+from .models import StandardString, ClusterTemplate, Parameter, GenerationLog
+import re
 
 # StandardString Serializer
 class StandardStringSerializer(serializers.ModelSerializer):
@@ -35,3 +36,19 @@ class ParameterSerializer(serializers.ModelSerializer):
         request = self.context['request']
         validated_data['updated_by'] = request.user.get_full_name()
         return super().update(instance, validated_data)
+    
+
+
+class GenerationLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GenerationLog
+        fields = ['id', 'user', 'generation_time', 'project_name', 'project_file_name']
+        read_only_fields = ['id', 'user', 'generation_time']
+
+    def validate_project_file_name(self, value):
+        # Match A followed by 4 digits or I followed by 3 digits
+        if not re.search(r'\bA\d{4}\b|\bI\d{3}\b', value):
+            raise serializers.ValidationError(
+                "project_file_name must contain a project code in the format AXXXX (4 digits) or IXXX (3 digits)."
+            )
+        return value

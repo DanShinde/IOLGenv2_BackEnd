@@ -37,7 +37,7 @@ class ModuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Module
         # fields = '__all__'
-        fields = ['id', 'module', 'description', 'segment']
+        fields = ['id', 'module', 'description', 'segment', 'created_by', 'created_at',  'updated_at']
 
 class IOListSerializer(serializers.ModelSerializer):
     project = ProjectSerializer(read_only=True)

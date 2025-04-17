@@ -15,9 +15,14 @@ from .serializers import (
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import TemplateView
+from django.contrib.auth.decorators import login_required
+
+
+
 
 class SegmentViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     queryset = Segment.objects.all()
     serializer_class = SegmentSerializer
 
@@ -37,9 +42,20 @@ class IODeviceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = IODeviceSerializer
 
 class ProjectViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]  # Require authentication
+    # permission_classes = [IsAuthenticated]  # Require authentication
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
+    
+class ProjectsView(TemplateView):
+    template_name = "IOLGen/project_list.html"
+
+@login_required
+def get_project_list(request):
+    projects = Project.objects.all()
+    context = {}
+    context['projects'] = projects # type: ignore
+    return render(request, 'IOLGen/partials/projectTable.html', {'projects': projects})
+    
 
 class IOListViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
@@ -53,7 +69,7 @@ class ProjectReportViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectReportSerializer
 
 class ModuleViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]  # Require authentication
+    # permission_classes = [IsAuthenticated]  # Require authentication
     serializer_class = ModuleSerializer
     queryset = Module.objects.none()  # Default queryset to satisfy DRF
 
@@ -73,8 +89,8 @@ class ModuleViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # Only allow users in 'Managers' or 'SegmentSMEs' group to add
-        if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
-            raise PermissionDenied("You do not have permission to add this module.")
+        # if not self.request.user.groups.filter(name__in=['Managers', 'SegmentSMEs']).exists():
+        #     raise PermissionDenied("You do not have permission to add this module.")
         serializer.save()
 
     def perform_destroy(self, instance):
@@ -85,7 +101,7 @@ class ModuleViewSet(viewsets.ModelViewSet):
 
 
 class SignalViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]  # Require authentication
+    # permission_classes = [IsAuthenticated]  # Require authentication
     serializer_class = SignalSerializer
     queryset = Module.objects.none()  # Default queryset to satisfy DRF
 

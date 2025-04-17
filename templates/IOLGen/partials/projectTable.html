@@ -1,0 +1,22 @@
+<table class="table table-striped w-100 d-block d-md-table">
+    <thead>
+        <th>Project Code</th>
+        <th>Description</th>
+        <th>Segment</th>
+        <th>Created By</th>
+        <th>Created At</th>
+    </thead>
+    <tbody>
+        {% for project in projects %}
+            <tr>
+                <td>{{ project.name }}</td>
+                <td>{{ project.description }}</td>
+                <td>{{ project.segments }}</td>
+                <td>{{ project.created_by }}</td>
+                <td>{{ project.created_at }}</td>
+                <td><button class='btn'><svg class="bi bi-pencil" width="32" height="32"><use xlink:href="#pencil"></svg></button></td>
+                <td><button class='btn'><svg class="bi bi-trash3" width="32" height="32"><use xlink:href="#trash3"></svg></button></td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>

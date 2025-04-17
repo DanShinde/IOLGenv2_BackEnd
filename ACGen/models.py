@@ -65,6 +65,17 @@ class Parameter(models.Model):
         return self.parameter_name
 
 
+
+class GenerationLog(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.CharField(max_length=255)
+    generation_time = models.DateTimeField(auto_now_add=True)
+    project_name = models.CharField(max_length=500)
+    project_file_name = models.CharField(max_length=500)
+
+    def __str__(self):
+        return f"Log for {self.project_name} at {self.generation_time}"
+
 @receiver(post_save, sender=Parameter)
 def update_parameters_count_on_save(sender, instance, created, **kwargs):
     if created:
