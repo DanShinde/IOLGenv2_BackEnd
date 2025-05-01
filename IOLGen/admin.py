@@ -33,9 +33,9 @@ class ProjectAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
 @admin.register(Module)
 class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
-    list_display = ('id', 'module', 'created_by', 'created_at')
-    search_fields = ('module', 'created_by')
-    list_filter = ('created_at',)
+    list_display = ('id', 'module', 'segment', 'created_by', 'created_at')
+    search_fields = ('module', 'created_by', 'segment')
+    list_filter = ('segment','module')
 
 @admin.register(IOList)
 class IOListAdmin(ImportExportModelAdmin, admin.ModelAdmin):

@@ -51,7 +51,7 @@ class ProjectsView(TemplateView):
 
 @login_required
 def get_project_list(request):
-    projects = Project.objects.all()
+    projects = Project.objects.all().order_by('created_at').reverse()
     context = {}
     context['projects'] = projects # type: ignore
     return render(request, 'IOLGen/partials/projectTable.html', {'projects': projects})
