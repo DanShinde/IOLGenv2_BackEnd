@@ -37,6 +37,7 @@ ALLOWED_HOSTS = ['0.0.0.0',
 # Application definition
 
 INSTALLED_APPS = [
+    'whitenoise.runserver_nostatic',
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -58,6 +59,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     "corsheaders.middleware.CorsMiddleware",
@@ -195,7 +197,7 @@ USE_TZ = True
 # STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 # STATIC_ROOT is for `collectstatic` and should be separate from STATICFILES_DIRS
 STATIC_ROOT = BASE_DIR / "staticfiles"  # Change this to a different directory
