@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col lg:flex-row h-full">
+  
+  <!-- Left Panel (60%) -->
+  <div class="lg:w-3/5 bg-gray-50 p-6 overflow-auto">
+    <h2 class="text-2xl font-semibold mb-4">Configuration</h2>
+
+    <!-- 1. Panel Selection -->
+    <div class="mb-5">
+    <!-- Panel selector: no hx-get needed -->
+        <label class="block font-medium mb-1">Select Panel</label>
+        <select id="panel-select" name="panel_number"
+                class="w-full border rounded p-2">
+        <option value="">-- Choose Panel --</option>
+        {% for panel in panels %}
+            <option value="{{ panel }}">{{ panel }}</option>
+        {% endfor %}
+        </select>
+
+    </div>
+
+    <!-- 2. Module Config -->
+    <div class="mb-5">
+      <label class="block font-medium mb-1">Module Name</label>
+      <input type="text" name="module_name" placeholder="Enter module name"
+             class="w-full border rounded p-2 mb-3">
+      <label class="block font-medium mb-1">Select Module</label>
+      <select name="module_id" id="module-select"
+              hx-get="/api/signals/?module_id=" hx-target="#signal-selection"
+              hx-trigger="change"
+              class="w-full border rounded p-2">
+        <option value="">-- Choose Module --</option>
+        {% for mod in modules %}
+          <option value="{{ mod.id }}">{{ mod.module }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- 3. Signal Selection -->
+    <div id="signal-selection" class="grid grid-cols-2 gap-6">
+      <div>
+        <h3 class="font-medium mb-2">DI (Digital Inputs)</h3>
+        <!-- Initially empty; HTMX will fill -->
+      </div>
+      <div>
+        <h3 class="font-medium mb-2">DO (Digital Outputs)</h3>
+        <!-- Initially empty; HTMX will fill -->
+      </div>
+    </div>
+
+    <!-- Add Selected Signals: post to add_signals, then refresh full list -->
+    <button
+        hx-post="{% url 'iolgen:add_signals' project.id %}"
+        hx-include="#panel-select, #module-select, [name=signals]"
+        hx-target="#io-list"
+        class="mt-6 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        Add Selected Signals
+    </button>
+
+  </div>
+
+  <!-- Right Panel (40%) -->
+  <div id="io-list" class="lg:w-2/5 p-6 overflow-auto bg-white border-l">
+    <h2 class="text-2xl font-semibold mb-4">Current IO List</h2>
+    {% include "IOLGen/partials/iolist_table.html" %}
+  </div>
+  <!-- Right panel: initialize by including the same partial -->
+    <div id="io-list" class="lg:w-2/5 p-6 overflow-auto bg-white border-l">
+        <h2 class="text-2xl font-semibold mb-4">Current IO List</h2>
+        {% include "IOLGen/partials/iolist_table.html" with iolists=project.iolist_set.all|dictsortreversed:"id" %}
+    </div>
+  
+
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+<table class="w-full text-left">
+    <thead class="border-b">
+      <tr>
+        <th class="px-2 py-1">Signal</th>
+        <th class="px-2 py-1">Type</th>
+        <th class="px-2 py-1">Module</th>
+        <th class="px-2 py-1">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for io in iolists %}
+      <tr class="border-t">
+        <td class="px-2 py-1">{{ io.tag }}</td>
+        <td class="px-2 py-1">{{ io.signal_type }}</td>
+        <td class="px-2 py-1">{{ io.iomodule_name }}</td>
+        <td class="px-2 py-1">
+          <button hx-delete="{% url 'iolgen:delete_iolist' io.id %}"
+                  hx-target="this.closest('tr')"
+                  class="text-red-600 hover:underline">
+            Remove
+          </button>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="py-4 text-center text-gray-500">No IO configured yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  

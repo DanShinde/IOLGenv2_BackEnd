@@ -1,36 +1,117 @@
-<table class="table table-striped w-100 d-block d-md-table">
-    <thead>
-        <th>Project Code</th>
-        <th>Description</th>
-        <th>Segment</th>
-        <th>Created By</th>
-        <th>Created At</th>
-    </thead>
-    <tbody>
-        {% for project in projects %}
-            <tr>
-                <td>{{ project.name }}</td>
-                <td>{{ project.description }}</td>
-                <td>
-                    {% for segment in project.segments.all %}
-                      {{ segment.name }}{% if not forloop.last %}, {% endif %}
-                    {% empty %}
-                      <em>No segments</em>
-                    {% endfor %}
-                  </td>
-                <td>{{ project.created_by }}</td>
-                <td>{{ project.created_at }}</td>
-                <td>
-                    <button class='btn'>
-                        <i class="bi bi-pencil" style="font-size: 32px;"></i>
-                    </button>
-                </td>
-                <td>
-                    <button class='btn'>
-                        <i class="bi bi-trash3" style="font-size: 32px;"></i>
-                    </button>
-                </td>
-            </tr>
+{% extends "base.html" %}
+{% block content %}
+<div class="container mx-auto p-6">
+  <h1 class="text-3xl font-bold mb-6">Projects</h1>
+
+  <!-- Filter Bar -->
+  <div id="filter-bar" class="flex flex-wrap items-center mb-6 gap-4">
+    <div class="flex-grow">
+      <input
+        id="searchInput"
+        type="text"
+        placeholder="Search by name, description or creator…"
+        class="w-full border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+    <div>
+      <select id="segmentFilter" class="border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="">All segments</option>
+        {% for seg in segments %}
+          <option value="{{ seg.name }}">{{ seg.name }}</option>
         {% endfor %}
-    </tbody>
-</table>
+      </select>
+    </div>
+  </div>
+
+  <!-- Projects Grid -->
+  <div id="projectsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+    {% for project in projects %}
+    <div
+      class="project-card 
+             bg-white shadow rounded-lg p-4 flex flex-col
+             transition-all duration-300 hover:shadow-md"
+      data-name="{{ project.name|lower }}"
+      data-description="{{ project.description|lower }}"
+      data-creator="{{ project.created_by.username|lower }}"
+      data-segments="{% for s in project.segments.all %}{{ s.name|lower }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+    >
+      <div class="flex justify-between items-start">
+        <div>
+          <h2 class="text-lg font-semibold">{{ project.name }}</h2>
+          <p class="text-gray-600 text-sm truncate">{{ project.description }}</p>
+        </div>
+        <a
+          href="{% url 'iolist_edit' project.id %}"
+          class="text-blue-600 hover:text-blue-800 hover:underline ml-2 text-sm transition-colors"
+        >Edit</a>
+      </div>
+
+      <div class="mt-2 text-gray-500 text-xs space-y-1 flex-grow">
+        {% if project.PLC %}
+          <div>PLC: {{ project.PLC.name }}</div>
+        {% endif %}
+        {% if project.segments.all %}
+          <div>
+            Segments:
+            {% for seg in project.segments.all %}
+              {{ seg.name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="pt-2 text-gray-400 text-xs border-t text-right mt-auto">
+        <div>By {{ project.created_by.username }}</div>
+        <div>{{ project.created_at|date:"M j, Y" }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  (function(){
+    const searchInput = document.getElementById('searchInput');
+    const segmentFilter = document.getElementById('segmentFilter');
+    const grid = document.getElementById('projectsGrid');
+    const cards = Array.from(grid.getElementsByClassName('project-card'));
+
+    function normalize(str) {
+      return (str || '').toLowerCase();
+    }
+
+    function filterCards() {
+      const text = normalize(searchInput.value).trim();
+      const selectedSegment = normalize(segmentFilter.value).trim();
+
+      cards.forEach(card => {
+        const name = normalize(card.dataset.name);
+        const desc = normalize(card.dataset.description);
+        const creator = normalize(card.dataset.creator);
+        const segments = normalize(card.dataset.segments).split(',').map(s => s.trim());
+
+        const matchesText = 
+          !text || 
+          name.includes(text) || 
+          desc.includes(text) || 
+          creator.includes(text);
+
+        const matchesSegment = 
+          !selectedSegment || 
+          segments.includes(selectedSegment);
+
+        card.style.display = (matchesText && matchesSegment) ? '' : 'none';
+      });
+    }
+
+    // Debounce search input for better performance
+    let debounceTimer;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(filterCards, 300);
+    });
+    
+    segmentFilter.addEventListener('change', filterCards);
+  })();
+</script>
+{% endblock %}

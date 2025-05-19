@@ -1,6 +1,6 @@
 from io import BytesIO
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 import numpy as np
 import requests
 import pandas as pd
@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
-
+from django.views import View
 
 
 
@@ -46,8 +46,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     
+    
+
 class ProjectsView(TemplateView):
     template_name = "IOLGen/project_list.html"
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['projects'] = Project.objects.all().order_by('-created_at')
+        ctx['segments'] = Segment.objects.all().distinct()
+        return ctx
 
 @login_required
 def get_project_list(request):
@@ -62,6 +70,7 @@ class IOListViewSet(viewsets.ModelViewSet):
     queryset = IOList.objects.select_related('project').all()
     serializer_class = IOListSerializer
     
+
 
 class ProjectReportViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]  # Require authentication
@@ -329,4 +338,53 @@ def update_io_Module(request, panel_data_dict, field_data,db_update_url):
     except requests.exceptions.RequestException as e:
         print(f"Error connecting to database API: {str(e)}")
 
+class IOListEditView(TemplateView):
+    template_name = "IOLGen/iolist_edit.html"
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        project = get_object_or_404(Project, id=kwargs['project_id'])
+        ctx.update({
+            'project': project,
+            'panels': (project.panel_numbers or 'CP01').split(','),
+            # 'panels': project.panel_numbers.split(","),           # ["CP01","CP02",…]
+            'modules': Module.objects.filter(segment__in=project.segments.all()),
+        })
+        return ctx
+    
+class IOListView(View):
+    """
+    HTMX endpoint & initial include:
+    returns ALL IOList rows for this project, newest first.
+    """
+    def get(self, request, project_id):
+        project = get_object_or_404(Project, id=project_id)
+        # order by descending PK (or created_at) to get reverse order
+        iolists = IOList.objects.filter(project=project).order_by('-id')
+        return render(request, "IOLGen/partials/iolist_table.html", {
+            'iolists': iolists
+        })
+    
+
+class AddSignalsView(View):
+    """
+    When HTMX posts new signals, create them then
+    hand off to IOListView.get() to re-render the full table.
+    """
+    def post(self, request, project_id):
+        panel       = request.POST['panel_number']
+        module      = Module.objects.get(pk=request.POST['module_id'])
+        sig_ids     = request.POST.getlist('signals')
+        project     = get_object_or_404(Project, id=project_id)
+        for sig_id in sig_ids:
+            sig = Signal.objects.get(pk=sig_id)
+            IOList.objects.create(
+                project       = project,
+                tag           = sig.code,
+                signal_type   = sig.signal_type,
+                panel_number  = panel,
+                iomodule_name = module.module,
+                # …set any other required fields…
+            )
+        # now re-use IOListView to render updated list
+        return IOListView().get(request, project_id)

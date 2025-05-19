@@ -1,0 +1,125 @@
+/* theme.css */
+
+/* ========================
+   Color Definitions
+   ======================== */
+   :root {
+    /* Primary Gradient */
+    --color-primary-start: #4178BA;
+    --color-primary-end:   #2AA69A;
+  
+    /* Buttons & Links */
+    --color-button:       #318D88;
+  
+    /* Accent Lines / Highlights */
+    --color-accent:       #F6C32B;
+  
+    /* Backgrounds */
+    --color-bg-page:      #E3E5F2;
+    --color-bg-card:      #FFFFFF;
+    --color-input-bg:     #F0F0F0;
+  
+    /* Text Colors */
+    --color-text-primary:   #222222;
+    --color-text-secondary: #555555;
+    --color-text-muted:     #A0A0A0;
+  }
+  
+  /* ========================
+     Base Styles
+     ======================== */
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    background-color: var(--color-bg-page);
+    color: var(--color-text-primary);
+  }
+  
+  a {
+    color: var(--color-button);
+    text-decoration: none;
+  }
+  
+  /* ========================
+     Card / Panel
+     ======================== */
+  .card {
+    background-color: var(--color-bg-card);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+  .card.right-panel {
+    background: linear-gradient(
+      90deg,
+      var(--color-primary-start) 0%,
+      var(--color-primary-end)   100%
+    );
+    color: #fff;
+  }
+  
+  /* ========================
+     Buttons
+     ======================== */
+  .btn-primary {
+    display: inline-block;
+    padding: 0.75em 1.5em;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background-color: var(--color-button);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+  }
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+  
+  /* ========================
+     Accent Line
+     ======================== */
+  .accent-line {
+    width: 4px;
+    height: 24px;
+    background-color: var(--color-accent);
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 0.5em;
+  }
+  
+  /* ========================
+     Form Inputs
+     ======================== */
+  input,
+  textarea {
+    width: 100%;
+    padding: 0.75em 1em;
+    margin: 0.5em 0;
+    border: none;
+    border-radius: 6px;
+    background-color: var(--color-input-bg);
+    color: var(--color-text-primary);
+    font-size: 1em;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-text-muted);
+    font-weight: 300;
+  }
+  
+  /* ========================
+     Headings & Text
+     ======================== */
+  h1, h2, h3, h4, h5, h6 {
+    margin: 0 0 0.5em 0;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+  p {
+    margin: 0 0 1em 0;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+  
