@@ -17,3 +17,4 @@ pandas
 django-widget-tweaks
 whitenoise
 waitress
+ioview-firebase-adminsdk

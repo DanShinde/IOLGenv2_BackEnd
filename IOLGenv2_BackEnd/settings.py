@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'ACGen',
     'IOLGen',
     'home',
+    'ioview',
 ]
 
 MIDDLEWARE = [
