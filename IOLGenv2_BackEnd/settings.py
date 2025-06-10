@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     "corsheaders",
     'import_export',
-    'debug_toolbar',
     'widget_tweaks',
     'accounts',
     'ACGen',
@@ -69,7 +68,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'IOLGenv2_BackEnd.urls'
@@ -123,6 +121,12 @@ from urllib.parse import urlparse
 import dj_database_url
 
 load_dotenv()
+
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+
+if DEBUG:
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 
 DATABASE_URL = os.getenv("DATABASE_URL")  # Get the env variable
 

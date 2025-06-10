@@ -18,3 +18,4 @@ django-widget-tweaks
 whitenoise
 waitress
 ioview-firebase-adminsdk
+gunicorn==21.2.0
