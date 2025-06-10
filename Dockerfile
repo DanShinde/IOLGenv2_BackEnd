@@ -65,4 +65,4 @@ USER appuser
 EXPOSE 8000
 
 # Start Gunicorn (production-ready WSGI server)
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "IOLGenv2_BackEnd.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "IOLGenv2_BackEnd.wsgi:application"]
