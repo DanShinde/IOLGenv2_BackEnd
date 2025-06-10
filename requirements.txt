@@ -17,5 +17,5 @@ pandas
 django-widget-tweaks
 whitenoise
 waitress
-ioview-firebase-adminsdk
+firebase-admin==6.2.0 
 gunicorn==21.2.0
