@@ -9,7 +9,7 @@ migrations/
 */migrations/
 # Statics
 static/admin/
-static/assets/
+# static/assets/
 static/debug_toolbar/
 static/import_export/
 static/jazzmin/
