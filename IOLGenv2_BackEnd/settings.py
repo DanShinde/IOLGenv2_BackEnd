@@ -31,6 +31,7 @@ ALLOWED_HOSTS = ['0.0.0.0',
                  'iolgen.onrender.com',
                  '.vercel.app',
                  '*',
+                '115.245.5.130',
                  ]
 
 
@@ -268,12 +269,14 @@ CORS_ALLOW_CREDENTIALS = True  # If dealing with authentication
 CSRF_TRUSTED_ORIGINS = [
     'https://iolgen.onrender.com',
     r"^http://localhost:\d+$",  # Allow localhost on any port
+    "http://115.245.5.130",
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "https://iolgen.onrender.com",
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://115.245.5.130:8005",
 ]
 
 
