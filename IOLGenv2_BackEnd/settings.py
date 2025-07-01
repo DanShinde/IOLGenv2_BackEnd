@@ -56,7 +56,6 @@ INSTALLED_APPS = [
     'ACGen',
     'IOLGen',
     'home',
-    'ioview',
 ]
 
 MIDDLEWARE = [
@@ -270,6 +269,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://iolgen.onrender.com',
     r"^http://localhost:\d+$",  # Allow localhost on any port
     "http://115.245.5.130",
+    'http://115.245.5.130:8005',
 ]
 
 CORS_ALLOWED_ORIGINS = [

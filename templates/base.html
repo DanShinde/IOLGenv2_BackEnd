@@ -71,12 +71,16 @@
           style="height: 40px;"
         >
 
-        <ul class="navbar-nav mb-0 d-flex flex-row align-items-center">
+        <ul class="navbar-nav mb-0 d-flex flex-row align-items-center" 
+        style="background-color: dimgray;">
           {% if user.is_staff %}
-          <li class="nav-item">
+          <li class="nav-item" 
+          style="background-color: dimgray; margin: 2px 8px 2px 1px; padding: 5px 5px 5px 5px; "
+          >
             <a 
-              class="nav-link text-white" 
+              class="btn btn-primary ms-2" 
               href="{% url 'admin:index' %}"
+                style="margin: 2px 5px 2px 5px; padding: 5px 8px 5px 8px; background-color: rgb(49, 141, 136);"
             >
               Admin
             </a>
@@ -89,6 +93,7 @@
               <button 
                 type="submit" 
                 class="btn btn-primary ms-2"
+                style="margin: 2px 8px 2px 1px; padding: 5px 5px 5px 5px; background-color: rgb(49, 141, 136);"
               >
                 Logout
               </button>
