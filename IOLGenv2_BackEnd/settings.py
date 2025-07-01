@@ -192,16 +192,6 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-# STATIC_URL = '/static/'
-
-# STATICFILES_DIRS = (
-#     os.path.join(BASE_DIR, 'static'),
-# )
-
-# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 
 STATIC_URL = '/static/'
@@ -281,6 +271,39 @@ CORS_ALLOWED_ORIGINS = [
     "http://115.245.5.130:8005",
 ]
 
+
+# Logging configuration
+
+LOGGING = {
+  'version': 1,
+  'handlers': {
+    'out_file': {
+      'class': 'logging.handlers.TimedRotatingFileHandler',
+      'when': 'midnight',
+      'backupCount': 30,
+      'filename': BASE_DIR / 'logs' / 'out.log',
+      'formatter': 'simple',
+    },
+    'err_file': {
+      'class': 'logging.handlers.TimedRotatingFileHandler',
+      'when': 'midnight',
+      'backupCount': 30,
+      'filename': BASE_DIR / 'logs' / 'err.log',
+      'formatter': 'simple',
+    },
+  },
+  'loggers': {
+    '': {
+      'handlers': ['out_file', 'err_file'],
+      'level': 'INFO',
+    },
+  },
+  'formatters': {
+    'simple': {
+      'format': '%(asctime)s %(levelname)s %(message)s',
+    },
+  },
+}
 
 #Jazzmin settings for Admin panels
 
@@ -363,5 +386,6 @@ JAZZMIN_UI_TWEAKS = {
         "success": "btn-success",
     },
 }
+
 
 #----
