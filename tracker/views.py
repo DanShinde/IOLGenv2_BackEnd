@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory
+from .models import Project, Stage, StageHistory, Segment
 from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import render
@@ -13,6 +13,7 @@ from .models import Stage
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from .models import StageRemark
+from IOLGen.models import Segment
 
 
 
@@ -53,18 +54,26 @@ def new_project(request):
         code = request.POST['code']
         if Project.objects.filter(code=code).exists():
             messages.error(request, "Project code already exists. Please use a different code.")
-            return render(request, 'tracker/project_form.html')
+            return render(request, 'tracker/project_form.html', {
+                'segments': Segment.objects.all()
+            })
+        segment_id = request.POST.get('segment')
+        segment_con = Segment.objects.get(id=segment_id) if segment_id else None
         project = Project.objects.create(
             code=code,
             customer_name=request.POST['customer_name'],
             value=request.POST['value'],
-            so_punch_date=parse_date(request.POST['so_punch_date'])
+            so_punch_date=parse_date(request.POST['so_punch_date']),
+            segment_con=segment_con
         )
         for stage_name, _ in Stage.STAGE_NAMES:
             Stage.objects.create(project=project, name=stage_name)
         messages.success(request, "Project created successfully!")
         return redirect('project_detail', project_id=project.id)
-    return render(request, 'tracker/project_form.html')
+    return render(request, 'tracker/project_form.html', {
+        'segments': Segment.objects.all()
+    })
+
 
 @login_required
 def project_detail(request, project_id):

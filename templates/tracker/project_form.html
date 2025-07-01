@@ -35,6 +35,18 @@
                         <input type="date" name="so_punch_date" class="form-control" 
                                value="{{ project.so_punch_date|date:'Y-m-d' }}" required>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Segment</label>
+                        <select name="segment" class="form-select" required>
+                            <option value="">Select Segment</option>
+                            {% for seg in segments %}
+                                <option value="{{ seg.id }}"
+                                    {% if project and project.segment_con and project.segment_con.id == seg.id %}selected{% endif %}>
+                                    {{ seg.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <button type="submit" class="btn btn-success w-100">
                         <i class="fas fa-save me-2"></i>Save Project
                     </button>
