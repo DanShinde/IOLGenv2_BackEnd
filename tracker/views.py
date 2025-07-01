@@ -23,7 +23,7 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            return redirect('index')
+            return redirect('tracker_index')
     else:
         form = AuthenticationForm()
     return render(request, 'tracker/login.html', {'form': form})
@@ -38,7 +38,7 @@ def signup_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, "User registered successfully! Please log in.")
-            return redirect('login')
+            return redirect('loginw')
     else:
         form = UserCreationForm()
     return render(request, 'tracker/signup.html', {'form': form})
@@ -69,7 +69,7 @@ def new_project(request):
         for stage_name, _ in Stage.STAGE_NAMES:
             Stage.objects.create(project=project, name=stage_name)
         messages.success(request, "Project created successfully!")
-        return redirect('project_detail', project_id=project.id)
+        return redirect('tracker_project_detail', project_id=project.id)
     return render(request, 'tracker/project_form.html', {
         'segments': Segment.objects.all()
     })
@@ -107,7 +107,7 @@ def project_detail(request, project_id):
                 stage.save()
 
             messages.success(request, "Changes saved successfully!")
-            return redirect(reverse('project_detail', args=[project.id]))
+            return redirect(reverse('tracker_project_detail', args=[project.id]))
 
 
         else:
@@ -137,7 +137,7 @@ def project_detail(request, project_id):
             stage.save()
 
             messages.success(request, "Stage updated successfully!")
-            return redirect(reverse('project_detail', args=[project.id]))
+            return redirect(reverse('tracker_project_detail', args=[project.id]))
 
     recent_activity = StageHistory.objects.filter(stage__project=project).order_by('-changed_at')[:2]
     return render(request, 'tracker/project_detail.html', {
@@ -150,7 +150,7 @@ def delete_project(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     project.delete()
     messages.success(request, "Project deleted successfully.")
-    return redirect('index')
+    return redirect('tracker_index')
 
 @login_required
 def dashboard(request):
@@ -409,7 +409,7 @@ def add_remark(request, stage_id):
         if text:
             StageRemark.objects.create(stage=stage, text=text, added_by=request.user)
             messages.success(request, "Remark added.")
-    return redirect('project_detail', project_id=stage.project.id)
+    return redirect('tracker_project_detail', project_id=stage.project.id)
 
 @login_required
 def get_remarks(request, stage_id):
