@@ -1,0 +1,131 @@
+{% extends 'tracker/base.html' %}
+{% load custom_tags %}
+
+{% block title %}Stage Filter | Project Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="page-title"><i class="fas fa-filter me-2"></i>Stage Filter Dashboard</h1>
+            <p class="page-subtitle">Filter projects by stage status</p>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="fas fa-sliders me-2"></i>Filter Options
+    </div>
+    <div class="card-body">
+        <form method="get">
+            <div class="row">
+                {% for stage in stage_names %}
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">{{ stage }}</label>
+                        <select name="{{ stage }}" class="form-select">
+                            <option value="">-- Any --</option>
+                            {% for status in status_choices %}
+                                <option value="{{ status }}" 
+                                    {% if filters|get_item:stage == status %}selected{% endif %}>
+                                    {{ status }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter me-2"></i>Apply Filters
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if matched_projects %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-check-circle me-2 text-success"></i>
+                {{ matched_projects|length }} project(s) matched
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-custom">
+                    <thead>
+                        <tr>
+                            <th>Project Code</th>
+                            <th>Customer</th>
+                            <th>SO Date</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for project in matched_projects %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'tracker_project_detail' project.id %}">
+                                        {{ project.code }}
+                                    </a>
+                                </td>
+                                <td>{{ project.customer_name }}</td>
+                                <td>{{ project.so_punch_date|date:"M d, Y" }}</td>
+                                <td>${{ project.value|floatformat:2 }}</td>
+                                <td>
+                                    <span class="status-badge bg-{{ project.status|slugify }}">
+                                        {{ project.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <i class="fas fa-chart-bar me-2"></i>Matching Projects per Stage
+        </div>
+        <div class="card-body">
+            <canvas id="matchChart" height="100"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('matchChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: {{ labels|safe }},
+                    datasets: [{
+                        label: '# of Projects Matching',
+                        data: {{ counts|safe }},
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Projects' }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+{% elif filters %}
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        No projects matched your criteria.
+    </div>
+{% endif %}
+{% endblock %}

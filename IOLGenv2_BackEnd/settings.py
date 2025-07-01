@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'ACGen',
     'IOLGen',
     'home',
+    'tracker',
 ]
 
 MIDDLEWARE = [
@@ -66,6 +67,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'IOLGenv2_BackEnd.middleware.TrackerGroupRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -290,7 +292,7 @@ JAZZMIN_SETTINGS = {
     "welcome_sign": "Welcome to Armstrong Aurtomation All-In-One tool, Login Now.",
     
     "topmenu_links": [
-        {"name": "Home",  "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "Home",  "url": "home", "permissions": ["auth.view_user"]},
         {"name": "Company", "url": "/admin/addons/company/"},
     ],
 

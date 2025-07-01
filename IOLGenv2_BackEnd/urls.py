@@ -24,5 +24,6 @@ urlpatterns = [
     path('IOLGen/', include('IOLGen.urls')),
     path('__debug__/', include('debug_toolbar.urls')),
     path('', include('home.urls')),
+    path('tracker/', include('tracker.urls')),
 
 ]

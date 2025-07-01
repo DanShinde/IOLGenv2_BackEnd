@@ -1,0 +1,57 @@
+{% extends 'tracker/base.html' %}
+{% block title %}{{ project.code }} | Full Activity History{% endblock %}
+{% block content %}
+
+<div class="page-header mb-3">
+    <h2 class="page-title"><i class="fas fa-history me-2"></i>Activity History for {{ project.code }}</h2>
+    <p class="page-subtitle">All recorded changes to project stages</p>
+</div>
+
+<!-- ✅ Back to Project Button -->
+<div class="mb-3">
+    <a href="{% url 'tracker_project_detail' project.id %}" class="btn btn-primary btn-sm rounded">
+        <i class="fas fa-arrow-left me-2"></i>Back to Project Details
+    </a>
+
+</div>
+
+
+<div class="card">
+    <div class="card-body">
+        {% if history_logs %}
+        <div class="timeline">
+            {% for log in history_logs %}
+            <div class="timeline-item mb-3">
+                <div class="d-flex">
+                    <div class="timeline-badge bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                         style="width: 32px; height: 32px;">
+                        <i class="fas fa-{% if log.field_name == 'status' %}exchange-alt{% else %}calendar-alt{% endif %}"></i>
+                    </div>
+                    <div class="ms-3">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ log.stage.name }} - {{ log.field_name|title }}</strong>
+                            <small class="text-muted">{{ log.changed_at|date:"M d, Y H:i" }}</small>
+                        </div>
+                        <div class="d-flex align-items-center mt-1">
+                            <span class="text-muted me-2">From:</span>
+                            <span class="badge bg-light text-dark">{{ log.old_value|default:"-" }}</span>
+                            <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                            <span class="text-muted me-2">To:</span>
+                            <span class="badge bg-primary">{{ log.new_value|default:"-" }}</span>
+                        </div>
+                        <small class="text-muted">Changed by {{ log.changed_by|default:"System" }}</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+            <p class="text-muted">No activity recorded yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

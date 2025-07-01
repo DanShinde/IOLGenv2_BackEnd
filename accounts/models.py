@@ -32,7 +32,7 @@ class UserProfile(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    is_tracker = models.BooleanField(default=False, help_text="Is this user a tracker?")
     def __str__(self):
         return f"{self.user.username}'s Profile - {self.get_usertype_display()}"
 

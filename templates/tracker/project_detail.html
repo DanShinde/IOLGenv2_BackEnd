@@ -1,0 +1,515 @@
+{% extends 'tracker/base.html' %}
+{% load custom_tags %}
+
+{% block title %}{{ project.code }} | Project Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+            <h1 class="page-title">{{ project.code }} - {{ project.customer_name }}</h1>
+            <p class="page-subtitle">Project details and progress tracking</p>
+        </div>
+        <span class="badge bg-primary fs-6 py-2 px-3">Project</span>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Project Value</h6>
+                            <h4 class="card-title">₹{{ project.value|floatformat:2 }}</h4>
+                        </div>
+                        <div class="text-end">
+                            <h6 class="text-muted">SO Punch Date</h6>
+                            <h4 class="card-title">{{ project.so_punch_date|date:"M d, Y" }}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <div class="progress-wrapper">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Completion</span>
+                            <span class="text-primary fw-bold">{{ project.get_completion_percentage }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-primary" role="progressbar"
+                                 style="width: {{ project.get_completion_percentage }}%;"
+                                 aria-valuenow="{{ project.get_completion_percentage }}"
+                                 aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Timeline -->
+<div class="roadmap-container mb-4">
+    <style>
+        .roadmap-container {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 25px;
+        }
+        .roadmap {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            padding: 0 15px;
+            margin-top: 30px;
+        }
+        .roadmap-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            flex: 1;
+        }
+        .roadmap-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 0 0 4px white;
+            position: relative;
+            z-index: 2;
+        }
+        .roadmap-label {
+            margin-top: 12px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            color: #1b263b;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .roadmap-line {
+            position: absolute;
+            top: 22px;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background-color: #dee2e6;
+            z-index: 1;
+        }
+        .roadmap-progress {
+            position: absolute;
+            top: 22px;
+            left: 0;
+            height: 4px;
+            background-color: #28a745;
+            z-index: 2;
+            transition: width 0.4s ease;
+        }
+        .status-Completed { background-color: #28a745; color: white; }
+        .status-InProgress { background-color: #ffc107; color: black; }
+        .status-Notstarted { background-color: #adb5bd; color: white; }
+        .status-Hold { background-color: #dc3545; color: white; }
+        .status-NotApplicable { background-color: #6c757d; color: white; }
+
+        @media (max-width: 768px) {
+            .roadmap { overflow-x: auto; padding-bottom: 20px; justify-content: flex-start; }
+            .roadmap-step { min-width: 100px; }
+            .roadmap-label { font-size: 0.75rem; }
+        }
+
+        .table td, .table th {
+            vertical-align: middle;
+            padding: 0.75rem;
+        }
+        .card-body .table {
+            margin: 0;
+        }
+
+    </style>
+
+    <h5 class="mb-3"><i class="fas fa-road me-2"></i>Project Timeline</h5>
+    <div class="roadmap">
+        <div class="roadmap-line"></div>
+        <div class="roadmap-progress" style="width: {{ project.get_completion_percentage }}%;"></div>
+
+        {% for stage in project.stages.all %}
+            {% with status=stage.status|default:"Not started" %}
+            <div class="roadmap-step">
+                <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}"
+                     data-bs-toggle="tooltip"
+                     data-bs-placement="top"
+                     title="<strong>{{ stage.name }}</strong><br>
+                            Status: {{ status }}<br>
+                            {% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>
+                            {% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
+                    {% if status == "Completed" %}
+                        <i class="fas fa-check"></i>
+                    {% elif status == "In Progress" %}
+                        <i class="fas fa-spinner"></i>
+                    {% elif status == "Hold" %}
+                        <i class="fas fa-pause"></i>
+                    {% elif status == "Not Applicable" %}
+                        <i class="fas fa-ban"></i>
+                    {% else %}
+                        <i class="far fa-circle"></i>
+                    {% endif %}
+                </div>
+                <div class="roadmap-label">{{ stage.name }}</div>
+            </div>
+            {% endwith %}
+        {% endfor %}
+    </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            html: true,
+            sanitize: false
+        });
+    });
+});
+</script>
+
+<!-- Project Stages Table -->
+<div class="card mb-4">
+  <form method="POST" id="stagesForm">{% csrf_token %}
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h4 class="mb-0"><i class="fas fa-tasks me-2"></i>Project Stages</h4>
+      <button type="submit" name="save_all" value="1" class="btn btn-primary">
+        <i class="fas fa-save me-1"></i> Save All Changes
+      </button>
+    </div>
+
+    <div class="card-body p-0">
+      <div class="table-responsive mb-0">
+        <table class="table table-bordered table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Stage</th>
+              <th>Planned Date</th>
+              <th>Status</th>
+              <th>Actual Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for stage in project.stages.all %}
+              <tr>
+                <td><strong>{{ stage.name }}</strong></td>
+                <td>
+                  <input type="date" name="planned_date_{{ stage.id }}"
+                         class="form-control form-control-sm planned-date"
+                         value="{{ stage.planned_date|date:'Y-m-d' }}">
+                </td>
+                <td>
+                  <select name="status_{{ stage.id }}" class="form-select form-select-sm status-select">
+                    {% for val, label in stage.STATUS_CHOICES %}
+                      <option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td>
+                  <input type="date" name="actual_date_{{ stage.id }}"
+                         class="form-control form-control-sm actual-date"
+                         value="{{ stage.actual_date|date:'Y-m-d' }}">
+                </td>
+                <td>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-sm btn-success" name="stage_id" value="{{ stage.id }}">
+                      <i class="fas fa-check me-1"></i> Save
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}">
+                      <i class="fas fa-history me-1"></i> History
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-info"
+                            data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}">
+                      <i class="fas fa-plus"></i> Add Remark
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-dark"
+                            data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}">
+                      <i class="fas fa-eye"></i> View Remarks
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Stage Modals: OUTSIDE form -->
+{% for stage in project.stages.all %}
+  <!-- Add Remark Modal -->
+  <div class="modal fade" id="addRemarkModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="post" action="{% url 'tracker_add_remark' stage.id %}">
+          {% csrf_token %}
+          <div class="modal-header">
+            <h5 class="modal-title">Add Remark - {{ stage.name }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <textarea name="remark" class="form-control" rows="4" required placeholder="Enter your remark..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Save Remark</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Remarks Modal -->
+  <div class="modal fade" id="viewRemarkModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Remarks - {{ stage.name }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% if stage.remarks.all %}
+            <ul class="list-group">
+              {% for remark in stage.remarks.all %}
+                <li class="list-group-item">
+                  <strong>{{ remark.added_by|default:"System" }}</strong> on {{ remark.created_at|date:"M d, Y H:i" }}<br>
+                  {{ remark.text }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted">No remarks yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+
+
+
+<!-- Project Summary + Activity -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-info-circle me-2"></i>Project Summary</div>
+            <div class="card-body">
+                <h6 class="text-muted">Current Status</h6>
+                <div class="d-flex align-items-center mt-2">
+                    <span class="badge 
+                        {% if project.get_overall_status == 'Completed' %}bg-success
+                        {% elif project.get_overall_status == 'In Progress' %}bg-warning text-dark
+                        {% elif project.get_overall_status == 'Hold' %}bg-danger
+                        {% else %}bg-secondary
+                        {% endif %}
+                        me-3">
+                        {{ project.get_overall_status }}
+                    </span>
+                    <small class="text-muted">Last updated: {{ project.updated_at|date:"M d, Y" }}</small>
+                </div>
+
+                <hr class="my-3">
+                <h6 class="text-muted">Next Milestone</h6>
+                    {% if project.next_milestone %}
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div>
+                        <strong>{{ project.next_milestone.name }}</strong>
+                        <div class="text-muted small mt-1">
+                            Planned on {{ project.next_milestone.planned_date|date:"M d, Y" }}
+                        </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No upcoming milestones</p>
+                    {% endif %}
+
+                <hr class="my-3">
+                <h6 class="text-muted">Schedule Status</h6>
+                    {% with delta=project.get_schedule_status %}
+                        {% if delta != None %}
+                            {% if delta > 0 %}
+                                <span class="badge bg-danger">Delayed by {{ delta }} day{{ delta|pluralize }}</span>
+                            {% elif delta < 0 %}
+                                <span class="badge bg-success">Ahead by {{ delta|abs_value }} day{{ delta|abs_value|pluralize }}</span>
+                            {% else %}
+                                <span class="badge bg-primary">On Time</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">Not enough data to determine</span>
+                        {% endif %}
+                    {% endwith %}
+                <hr class="my-3">
+                <h6 class="text-muted">Overall OTIF Performance</h6>
+                    {% with otif=project.get_otif_percentage %}
+                        {% if otif != None %}
+                            <span class="badge bg-info text-white">
+                                {{ otif }}% On Time In Full
+                            </span>
+                        {% else %}
+                            <p class="text-muted">No completed stages to evaluate</p>
+                        {% endif %}
+                    {% endwith %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Activity</h5>
+                <a href="{% url 'tracker_project_activity' project.id %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_activity %}
+                <div class="activity-feed">
+                    {% for log in recent_activity %}
+                    <div class="activity-item mb-3">
+                    <div class="d-flex">
+                        <div class="activity-icon bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3"
+                            style="width: 32px; height: 32px;">
+                        <i class="fas fa-{% if log.field_name == 'status' %}exchange-alt{% else %}calendar-alt{% endif %}"></i>
+                        </div>
+                        <div>
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ log.stage.name }} - {{ log.field_name|title }}</strong>
+                            <small class="text-muted">{{ log.changed_at|timesince }} ago</small>
+                        </div>
+                        <div class="d-flex align-items-center mt-1">
+                            <span class="text-muted me-2">From:</span>
+                            <span class="badge bg-light text-dark">{{ log.old_value|default:"-" }}</span>
+                            <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                            <span class="text-muted me-2">To:</span>
+                            <span class="badge bg-primary">{{ log.new_value|default:"-" }}</span>
+                        </div>
+                        <small class="text-muted">Changed by {{ log.changed_by|default:"System" }}</small>
+                        </div>
+                    </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+                    <p class="text-muted">No recent activity</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stage History Modals -->
+{% for stage in project.stages.all %}
+    <div class="modal fade" id="historyModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title">Change History - {{ stage.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% if stage.history.all %}
+                        <div class="timeline">
+                            {% for log in stage.history.all %}
+                            <div class="timeline-item mb-3">
+                                <div class="d-flex">
+                                    <div class="timeline-badge bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                                        style="width: 32px; height: 32px;">
+                                        <i class="fas fa-{% if log.field_name == 'status' %}exchange-alt{% else %}calendar-alt{% endif %}"></i>
+                                    </div>
+                                    <div class="ms-3">
+                                        <div class="d-flex justify-content-between">
+                                            <strong class="text-primary">{{ log.field_name|title }}</strong>
+                                            <small class="text-muted">{{ log.changed_at|date:"M d, Y H:i" }}</small>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted me-2">From:</span>
+                                            <span class="badge bg-light text-dark">{{ log.old_value|default:"-" }}</span>
+                                            <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                                            <span class="text-muted me-2">To:</span>
+                                            <span class="badge bg-primary">{{ log.new_value|default:"-" }}</span>
+                                        </div>
+                                        <small class="text-muted">Changed by {{ log.changed_by|default:"System" }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+                            <p class="text-muted">No history available for this stage.</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const rows = document.querySelectorAll('tbody tr');
+    const today = new Date().toISOString().split('T')[0];
+
+    rows.forEach(row => {
+        const plannedDateInput = row.querySelector('.planned-date');
+        const statusSelect = row.querySelector('.status-select');
+        const actualDateInput = row.querySelector('.actual-date');
+
+        if (!plannedDateInput || !statusSelect || !actualDateInput) return;
+
+        const toggleFields = () => {
+            const planned = plannedDateInput.value;
+            const isCompleted = statusSelect.value === 'Completed';
+
+            if (planned) {
+                statusSelect.disabled = false;
+                actualDateInput.disabled = !isCompleted;
+                if (!isCompleted) actualDateInput.value = '';
+            } else {
+                statusSelect.disabled = true;
+                actualDateInput.disabled = true;
+                actualDateInput.value = '';
+            }
+        };
+
+        const validateActualDate = () => {
+            if (actualDateInput.value > today) {
+                alert("Actual date cannot be in the future.");
+                actualDateInput.value = '';
+            }
+        };
+
+        toggleFields();
+        plannedDateInput.addEventListener('input', toggleFields);
+        statusSelect.addEventListener('change', toggleFields);
+        actualDateInput.addEventListener('change', validateActualDate);
+    });
+});
+</script>
+
+
+{% endblock %}
+

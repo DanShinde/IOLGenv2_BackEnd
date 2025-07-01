@@ -1,0 +1,46 @@
+{% extends 'tracker/base.html' %}
+
+{% block title %}{% if project %}Edit{% else %}Add New{% endif %} Project | Project Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-{% if project %}edit{% else %}plus-circle{% endif %} me-2"></i>
+                    {% if project %}Edit Project{% else %}Add New Project{% endif %}
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Project Code</label>
+                        <input type="text" name="code" class="form-control" 
+                               value="{{ project.code }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Customer Name</label>
+                        <input type="text" name="customer_name" class="form-control" 
+                               value="{{ project.customer_name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Project Value</label>
+                        <input type="number" name="value" step="0.01" class="form-control" 
+                               value="{{ project.value }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">SO Punch Date</label>
+                        <input type="date" name="so_punch_date" class="form-control" 
+                               value="{{ project.so_punch_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-save me-2"></i>Save Project
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
