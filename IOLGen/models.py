@@ -137,8 +137,8 @@ class Signal(models.Model):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, default=1, related_name="modules")
     created_by = models.CharField(max_length=30)
     updated_by = models.CharField(max_length=30)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     Demo_3d_Property = models.CharField(max_length=200, blank=True, null=True)
 
     def save(self, *args, **kwargs):

@@ -26,6 +26,6 @@ class TrackerGroupRequiredMiddleware:
                     return HttpResponseForbidden("Access denied. User Not a Tracker.")
             except UserProfile.DoesNotExist:
                 return HttpResponseForbidden("Access denied. User Profile Not Found.")
-            if not request.user.groups.filter(name='Trackers').exists():
-                return HttpResponseForbidden("Access denied. User Not in Trackers group.")
+            # if not request.user.groups.filter(name='Trackers').exists():
+            #     return HttpResponseForbidden("Access denied. User Not in Trackers group.")
         return self.get_response(request)
