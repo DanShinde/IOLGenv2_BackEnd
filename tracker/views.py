@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory, Segment
+from .models import Project, Stage, StageHistory, trackerSegment
 from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import render

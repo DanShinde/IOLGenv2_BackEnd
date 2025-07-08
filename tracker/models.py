@@ -22,7 +22,7 @@ class Project(models.Model):
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True,
-        related_name="tracker_projects"
+        related_name="tracker_projects1"
     )
     def save(self, *args, **kwargs):
     # Store the name of the DeviceType before saving
