@@ -1,8 +1,15 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import F
-from IOLGen.models import Segment
 
+
+# Define the Segment model
+class trackerSegment(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
 
 class Project(models.Model):
     code = models.CharField(max_length=50, unique=True)
@@ -11,7 +18,7 @@ class Project(models.Model):
     so_punch_date = models.DateField()
     segment = models.CharField(max_length=255, blank=True, null=True)
     segment_con = models.ForeignKey(
-        Segment, 
+        trackerSegment, 
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True,

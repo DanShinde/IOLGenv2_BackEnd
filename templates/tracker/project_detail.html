@@ -36,12 +36,12 @@
                     <div class="progress-wrapper">
                         <div class="d-flex justify-content-between mb-1">
                             <span class="text-muted">Completion</span>
-                            <span class="text-primary fw-bold">{{ project.get_completion_percentage }}%</span>
+                            <span class="text-primary fw-bold">{{ completion_percentage }}%</span>
                         </div>
                         <div class="progress" style="height: 8px;">
                             <div class="progress-bar bg-primary" role="progressbar"
-                                 style="width: {{ project.get_completion_percentage }}%;"
-                                 aria-valuenow="{{ project.get_completion_percentage }}"
+                                 style="width: {{ completion_percentage }}%;"
+                                 aria-valuenow="{{ completion_percentage }}"
                                  aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
@@ -139,9 +139,9 @@
     <h5 class="mb-3"><i class="fas fa-road me-2"></i>Project Timeline</h5>
     <div class="roadmap">
         <div class="roadmap-line"></div>
-        <div class="roadmap-progress" style="width: {{ project.get_completion_percentage }}%;"></div>
+        <div class="roadmap-progress" style="width: {{ completion_percentage }}%;"></div>
 
-        {% for stage in project.stages.all %}
+        {% for stage in stages %}
             {% with status=stage.status|default:"Not started" %}
             <div class="roadmap-step">
                 <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}"
@@ -185,7 +185,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <!-- Project Stages Table -->
 <div class="card mb-4">
-  <form method="POST" id="stagesForm">{% csrf_token %}
+  <form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="stagesForm">
+    {% csrf_token %}
     <div class="card-header d-flex justify-content-between align-items-center">
       <h4 class="mb-0"><i class="fas fa-tasks me-2"></i>Project Stages</h4>
       <button type="submit" name="save_all" value="1" class="btn btn-primary">
@@ -206,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </tr>
           </thead>
           <tbody>
-            {% for stage in project.stages.all %}
+            {% for stage in stages %}
               <tr>
                 <td><strong>{{ stage.name }}</strong></td>
                 <td>
@@ -255,7 +256,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <!-- Stage Modals: OUTSIDE form -->
-{% for stage in project.stages.all %}
+{% for stage in stages %}
   <!-- Add Remark Modal -->
   <div class="modal fade" id="addRemarkModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -315,9 +316,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 <h6 class="text-muted">Current Status</h6>
                 <div class="d-flex align-items-center mt-2">
                     <span class="badge 
-                        {% if project.get_overall_status == 'Completed' %}bg-success
-                        {% elif project.get_overall_status == 'In Progress' %}bg-warning text-dark
-                        {% elif project.get_overall_status == 'Hold' %}bg-danger
+                        {% if overall_status == 'Completed' %}bg-success
+                        {% elif overall_status == 'In Progress' %}bg-warning text-dark
+                        {% elif overall_status == 'Hold' %}bg-danger
                         {% else %}bg-secondary
                         {% endif %}
                         me-3">
@@ -343,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 <hr class="my-3">
                 <h6 class="text-muted">Schedule Status</h6>
-                    {% with delta=project.get_schedule_status %}
+                    {% with schedule_status as delta %}
                         {% if delta != None %}
                             {% if delta > 0 %}
                                 <span class="badge bg-danger">Delayed by {{ delta }} day{{ delta|pluralize }}</span>
@@ -358,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     {% endwith %}
                 <hr class="my-3">
                 <h6 class="text-muted">Overall OTIF Performance</h6>
-                    {% with otif=project.get_otif_percentage %}
+                    {% with otif=otif_percentage %}
                         {% if otif != None %}
                             <span class="badge bg-info text-white">
                                 {{ otif }}% On Time In Full
@@ -417,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <!-- Stage History Modals -->
-{% for stage in project.stages.all %}
+{% for stage in stages %}
     <div class="modal fade" id="historyModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
