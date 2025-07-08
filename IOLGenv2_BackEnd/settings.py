@@ -274,36 +274,36 @@ CORS_ALLOWED_ORIGINS = [
 
 # Logging configuration
 
-LOGGING = {
-  'version': 1,
-  'handlers': {
-    'out_file': {
-      'class': 'logging.handlers.TimedRotatingFileHandler',
-      'when': 'midnight',
-      'backupCount': 30,
-      'filename': BASE_DIR / 'logs' / 'out.log',
-      'formatter': 'simple',
-    },
-    'err_file': {
-      'class': 'logging.handlers.TimedRotatingFileHandler',
-      'when': 'midnight',
-      'backupCount': 30,
-      'filename': BASE_DIR / 'logs' / 'err.log',
-      'formatter': 'simple',
-    },
-  },
-  'loggers': {
-    '': {
-      'handlers': ['out_file', 'err_file'],
-      'level': 'INFO',
-    },
-  },
-  'formatters': {
-    'simple': {
-      'format': '%(asctime)s %(levelname)s %(message)s',
-    },
-  },
-}
+# LOGGING = {
+#   'version': 1,
+#   'handlers': {
+#     'out_file': {
+#       'class': 'logging.handlers.TimedRotatingFileHandler',
+#       'when': 'midnight',
+#       'backupCount': 30,
+#       'filename': BASE_DIR / 'logs' / 'out.log',
+#       'formatter': 'simple',
+#     },
+#     'err_file': {
+#       'class': 'logging.handlers.TimedRotatingFileHandler',
+#       'when': 'midnight',
+#       'backupCount': 30,
+#       'filename': BASE_DIR / 'logs' / 'err.log',
+#       'formatter': 'simple',
+#     },
+#   },
+#   'loggers': {
+#     '': {
+#       'handlers': ['out_file', 'err_file'],
+#       'level': 'INFO',
+#     },
+#   },
+#   'formatters': {
+#     'simple': {
+#       'format': '%(asctime)s %(levelname)s %(message)s',
+#     },
+#   },
+# }
 
 #Jazzmin settings for Admin panels
 

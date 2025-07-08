@@ -77,7 +77,10 @@ def new_project(request):
 
 @login_required
 def project_detail(request, project_id):
-    project = get_object_or_404(Project, pk=project_id)
+    project = Project.objects.prefetch_related(
+        'stages__remarks',
+        'stages__history'
+    ).get(pk=project_id)
 
     if request.method == 'POST':
         if 'save_all' in request.POST:
@@ -87,7 +90,6 @@ def project_detail(request, project_id):
                 actual_date_val = request.POST.get(f'actual_date_{stage.id}')
                 new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
 
-                # Save history only if changed
                 if stage.planned_date != new_planned:
                     StageHistory.objects.create(stage=stage, changed_by=request.user,
                         field_name="Planned Date", old_value=str(stage.planned_date), new_value=str(new_planned))
@@ -100,7 +102,6 @@ def project_detail(request, project_id):
                     StageHistory.objects.create(stage=stage, changed_by=request.user,
                         field_name="Actual Date", old_value=str(stage.actual_date), new_value=str(new_actual))
 
-                # Save updates
                 stage.planned_date = new_planned
                 stage.status = new_status
                 stage.actual_date = new_actual
@@ -108,7 +109,6 @@ def project_detail(request, project_id):
 
             messages.success(request, "Changes saved successfully!")
             return redirect(reverse('tracker_project_detail', args=[project.id]))
-
 
         else:
             stage_id = request.POST.get('stage_id')
@@ -139,11 +139,16 @@ def project_detail(request, project_id):
             messages.success(request, "Stage updated successfully!")
             return redirect(reverse('tracker_project_detail', args=[project.id]))
 
-    recent_activity = StageHistory.objects.filter(stage__project=project).order_by('-changed_at')[:2]
+    # Optimization: also use select_related to reduce user and stage.project joins
+    recent_activity = StageHistory.objects.select_related(
+        'stage__project', 'changed_by'
+    ).filter(stage__project=project).order_by('-changed_at')[:2]
+
     return render(request, 'tracker/project_detail.html', {
-    'project': project,
-    'recent_activity': recent_activity
- })
+        'project': project,
+        'recent_activity': recent_activity
+    })
+
 
 @login_required
 def delete_project(request, project_id):
