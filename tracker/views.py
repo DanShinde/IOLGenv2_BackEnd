@@ -14,7 +14,15 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from .models import StageRemark
 from IOLGen.models import Segment
-
+from tracker.utils import (
+    get_completion_percentage,
+    get_otif_percentage,
+    get_overall_status,
+    get_schedule_status,
+    get_next_milestone
+)
+from django.db.models import Prefetch
+from django.core.cache import cache
 
 
 def login_view(request):
@@ -75,10 +83,12 @@ def new_project(request):
     })
 
 
+
 @login_required
 def project_detail(request, project_id):
-    project = get_object_or_404(Project, pk=project_id)
+    project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
 
+    # Save updates if form submitted
     if request.method == 'POST':
         if 'save_all' in request.POST:
             for stage in project.stages.all():
@@ -87,7 +97,6 @@ def project_detail(request, project_id):
                 actual_date_val = request.POST.get(f'actual_date_{stage.id}')
                 new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
 
-                # Save history only if changed
                 if stage.planned_date != new_planned:
                     StageHistory.objects.create(stage=stage, changed_by=request.user,
                         field_name="Planned Date", old_value=str(stage.planned_date), new_value=str(new_planned))
@@ -100,15 +109,15 @@ def project_detail(request, project_id):
                     StageHistory.objects.create(stage=stage, changed_by=request.user,
                         field_name="Actual Date", old_value=str(stage.actual_date), new_value=str(new_actual))
 
-                # Save updates
                 stage.planned_date = new_planned
                 stage.status = new_status
                 stage.actual_date = new_actual
                 stage.save()
 
+            # Clear cache after saving
+            cache.delete(f'project_detail_{project_id}')
             messages.success(request, "Changes saved successfully!")
             return redirect(reverse('tracker_project_detail', args=[project.id]))
-
 
         else:
             stage_id = request.POST.get('stage_id')
@@ -136,14 +145,42 @@ def project_detail(request, project_id):
             stage.actual_date = new_actual
             stage.save()
 
+            cache.delete(f'project_detail_{project_id}')
             messages.success(request, "Stage updated successfully!")
             return redirect(reverse('tracker_project_detail', args=[project.id]))
 
-    recent_activity = StageHistory.objects.filter(stage__project=project).order_by('-changed_at')[:2]
-    return render(request, 'tracker/project_detail.html', {
-    'project': project,
-    'recent_activity': recent_activity
- })
+    # Cache section (only GET requests use cache)
+    cache_key = f'project_detail_{project_id}'
+    context = cache.get(cache_key)
+
+    if not context:
+        stages = list(
+            Stage.objects.filter(project=project)
+            .prefetch_related('remarks', 'history')
+            .order_by('id')
+        )
+
+        recent_activity = StageHistory.objects.select_related(
+            'stage', 'changed_by'
+        ).filter(stage__project=project).order_by('-changed_at')[:2]
+
+        context = {
+            'project': project,
+            'stages': stages,
+            'recent_activity': recent_activity,
+            'completion_percentage': get_completion_percentage(stages),
+            'otif_percentage': get_otif_percentage(stages),
+            'overall_status': get_overall_status(stages),
+            'schedule_status': get_schedule_status(stages),
+            'next_milestone': get_next_milestone(stages),
+        }
+
+        # Cache for 20 minutes
+        cache.set(cache_key, context, timeout=1200)
+
+    return render(request, 'tracker/project_detail.html', context)
+
+
 
 @login_required
 def delete_project(request, project_id):
