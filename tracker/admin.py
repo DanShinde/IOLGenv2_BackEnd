@@ -18,6 +18,9 @@ class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     # list_filter = ('status')
 
 
-admin.register(trackerSegment)
+@admin.register(trackerSegment)
+class SegmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')  # Display ID and name in the admin list view
+    search_fields = ('name',)  # Add search functionality for the name field
     
 
