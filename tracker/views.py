@@ -13,7 +13,7 @@ from .models import Stage
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from .models import StageRemark
-from IOLGen.models import Segment
+
 from tracker.utils import (
     get_completion_percentage,
     get_otif_percentage,
@@ -63,10 +63,10 @@ def new_project(request):
         if Project.objects.filter(code=code).exists():
             messages.error(request, "Project code already exists. Please use a different code.")
             return render(request, 'tracker/project_form.html', {
-                'segments': Segment.objects.all()
+                'segments': trackerSegment.objects.all()
             })
         segment_id = request.POST.get('segment')
-        segment_con = Segment.objects.get(id=segment_id) if segment_id else None
+        segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
         project = Project.objects.create(
             code=code,
             customer_name=request.POST['customer_name'],
@@ -79,7 +79,7 @@ def new_project(request):
         messages.success(request, "Project created successfully!")
         return redirect('tracker_project_detail', project_id=project.id)
     return render(request, 'tracker/project_form.html', {
-        'segments': Segment.objects.all()
+        'segments': trackerSegment.objects.all()
     })
 
 

@@ -5,8 +5,8 @@ djangorestframework-simplejwt
 PyJWT
 python-dotenv
 dj_database_url
-# psycopg2==2.9.10
-psycopg2-binary==2.9.10
+psycopg2
+psycopg2-binary
 django-jazzmin
 django-import-export
 django-debug-toolbar
@@ -17,6 +17,6 @@ pandas
 django-widget-tweaks
 whitenoise
 waitress
-firebase-admin==6.2.0 
-gunicorn==21.2.0
+firebase-admin
+gunicorn
 reportlab
