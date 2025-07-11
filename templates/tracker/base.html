@@ -349,9 +349,9 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'stage_filter_dashboard' %}active{% endif %}" 
-                               href="{% url 'tracker_stage_filter_dashboard' %}">
-                                <i class="fas fa-filter"></i>Stage Filter
+                            <a class="nav-link {% if request.resolver_match.url_name == 'project_rports' %}active{% endif %}" 
+                            href="{% url 'project_reports' %}">
+                                <i class="fas fa-chart-bar"></i>Reports
                             </a>
                         </li>
                         <li class="nav-item">

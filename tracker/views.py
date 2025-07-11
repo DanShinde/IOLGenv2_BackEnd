@@ -228,7 +228,7 @@ def dashboard(request):
     })
 
 @login_required
-def stage_filter_dashboard(request):
+def project_reports(request):
     stage_names = [name for name, _ in Stage.STAGE_NAMES]
     status_choices = [status for status, _ in Stage.STATUS_CHOICES]
 
@@ -275,7 +275,7 @@ def stage_filter_dashboard(request):
         'labels': labels,
         'counts': counts
     }
-    return render(request, 'tracker/stage_filter_dashboard.html', context)
+    return render(request, 'tracker/project_report.html', context)
 
 @login_required
 def project_activity(request, project_id):
@@ -348,14 +348,19 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
+from datetime import datetime
+
 
 @login_required
 def export_milestones_excel(request):
-    filter_type = request.GET.get('filter', 'all')
+    filter_type = request.GET.get('filter', 'all').capitalize()
     stages = get_filtered_stages(filter_type)
 
+    timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
+    filename = f'Upcoming Milestones {filter_type} {timestamp}.csv'
+
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="milestones_{filter_type}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     writer = csv.writer(response)
     writer.writerow(['Project Code', 'Customer', 'Milestone', 'Status', 'Planned Date'])
@@ -370,10 +375,17 @@ def export_milestones_excel(request):
         ])
     return response
 
+
+
 @login_required
 def export_milestones_pdf(request):
-    filter_type = request.GET.get('filter', 'all')
+    raw_filter = request.GET.get('filter', 'all')
+    filter_type = raw_filter.lower()
     stages = get_filtered_stages(filter_type)
+
+    # Format filename as "Upcoming Milestones [Filter] [dd-mm-yyyy HH-MM].pdf"
+    timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
+    filename = f'Upcoming Milestones {filter_type.capitalize()} {timestamp}.pdf'
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -403,7 +415,9 @@ def export_milestones_pdf(request):
     doc.build(elements)
 
     buffer.seek(0)
-    return HttpResponse(buffer, content_type='application/pdf')
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 def get_filtered_stages(filter_type):
@@ -428,14 +442,23 @@ def get_filtered_stages(filter_type):
     }
 
     if filter_type == 'overdue':
-        return Stage.objects.filter(status__in=["Not started", "In Progress"], planned_date__lt=today).order_by('planned_date')
+        return Stage.objects.filter(
+            status__in=["Not started", "In Progress"],
+            planned_date__lt=today
+        ).order_by('planned_date')
     elif filter_type in date_ranges:
         start, end = date_ranges[filter_type]
-        return Stage.objects.filter(status__in=["Not started", "In Progress"], planned_date__range=(start, end)).order_by('planned_date')
+        return Stage.objects.filter(
+            status__in=["Not started", "In Progress"],
+            planned_date__range=(start, end)
+        ).order_by('planned_date')
     elif filter_type == 'all':
         return Stage.objects.exclude(status="Completed").order_by('planned_date')
     else:
-        return Stage.objects.filter(status__in=["Not started", "In Progress"], planned_date__gte=today).order_by('planned_date')
+        return Stage.objects.filter(
+            status__in=["Not started", "In Progress"],
+            planned_date__gte=today
+        ).order_by('planned_date')
 
 
 @login_required
