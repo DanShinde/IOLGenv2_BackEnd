@@ -6,6 +6,16 @@ from IOLGen.models import Segment
 
 from accounts.models import clear_info_cache
 
+
+# ControlLibrary Model
+class ControlLibrary(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+    
+
 # StandardString Model
 class StandardString(models.Model):
     id = models.AutoField(primary_key=True)
@@ -35,6 +45,10 @@ class ClusterTemplate(models.Model):
         null=True, 
         blank=True,
     )
+    control_library = models.ForeignKey(
+        ControlLibrary, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    
     parameters_count = models.PositiveIntegerField(default=0, null=True,blank=True)  # Field to store the count
     def save(self, *args, **kwargs):
     # Store the name of the DeviceType before saving
