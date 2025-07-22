@@ -8,6 +8,8 @@ from .serializers import (
     ClusterTemplateSerializer,
     ParameterSerializer,
     GenerationLogSerializer,
+    ControlLibrarySerializer
+
 )
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
@@ -20,12 +22,23 @@ from django.views.decorators.cache import cache_page
 from django.db.models import Count
 from rest_framework.decorators import api_view
 from accounts.models import clear_info_cache
-
+from .models import ControlLibrary
 
 
 
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
+
+class ControlLibraryViewSet(viewsets.ReadOnlyModelViewSet):
+    # permission_classes = [IsAuthenticated]
+    queryset = ControlLibrary.objects.all()
+    serializer_class = ControlLibrarySerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        control_libraries = queryset.values_list('name', flat=True)
+        return Response(control_libraries)
+
 
 class StandardStringViewSet(viewsets.ModelViewSet):
     queryset = StandardString.objects.all()

@@ -1,6 +1,13 @@
 from rest_framework import serializers
-from .models import StandardString, ClusterTemplate, Parameter, GenerationLog
+from .models import StandardString, ClusterTemplate, Parameter, GenerationLog, ControlLibrary
 import re
+
+
+class ControlLibrarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ControlLibrary
+        fields = '__all__'
+
 
 # StandardString Serializer
 class StandardStringSerializer(serializers.ModelSerializer):
