@@ -13,7 +13,7 @@ router = DefaultRouter()
 router.register(r'standard-strings', StandardStringViewSet, basename='standardstring')
 router.register(r'cluster-templates', ClusterTemplateViewSet, basename='clustertemplate')
 router.register(r'parameters', ParameterViewSet, basename='parameter')
-router.register(r'parametersbulk', ParameterBulkViewSet, basename='parameterbulk')
+# router.register(r'parametersbulk', ParameterBulkViewSet, basename='parameterbulk')
 router.register(r'control-libraries',ControlLibraryViewSet, basename='controllibrary')
 
 
@@ -22,4 +22,9 @@ urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/', DashboardView, name='dashboard'),
     path('generation-logs/', GenerationLogCreateView.as_view(), name='create-generation-log'),
+    path('parametersbulk/', ParameterBulkViewSet.as_view({
+        'get': 'list',
+        'post': 'create', 
+        'put': 'bulk_update'  # Maps PUT to your bulk_update method
+    })),
 ]

@@ -30,14 +30,14 @@ from .models import ControlLibrary
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
 
 class ControlLibraryViewSet(viewsets.ReadOnlyModelViewSet):
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     queryset = ControlLibrary.objects.all()
     serializer_class = ControlLibrarySerializer
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        control_libraries = queryset.values_list('name', flat=True)
-        return Response(control_libraries)
+    # def list(self, request, *args, **kwargs):
+    #     queryset = self.get_queryset()
+    #     control_libraries = queryset.values_list('name', flat=True)
+    #     return Response(control_libraries)
 
 
 class StandardStringViewSet(viewsets.ModelViewSet):
@@ -250,7 +250,7 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.select_related('cluster').all()
     serializer_class = ParameterSerializer
     cache_timeout = 60 * 15  # 15 minutes
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get_cache_key(self, cluster_id=None, cluster_name=None):
         """Generate a cache key based on query parameters."""
@@ -349,7 +349,8 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
             except ValidationError as e:
                 return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request, *args, **kwargs):
+    # @action(detail=False, methods=['put'])
+    def bulk_update(self, request, *args, **kwargs):
         """Handle bulk update of `assignment_value` with atomic transactions."""
         data = request.data
 
@@ -381,12 +382,12 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
                 for serializer in serializers:
                     serializer.save()
 
-                clear_info_cache("parameters",instance.cluster.id)
+                clear_info_cache("parameters", instance.cluster.id)
                 return Response({'id': 'True'}, status=status.HTTP_200_OK)
             except ValidationError as e:
                 return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-
+    
 
 class GenerationLogCreateView(generics.CreateAPIView):
     queryset = GenerationLog.objects.all()
