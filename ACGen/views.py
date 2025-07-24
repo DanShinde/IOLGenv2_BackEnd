@@ -1,4 +1,5 @@
 from django.dispatch import receiver
+from django.http import JsonResponse
 from django.shortcuts import render
 from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated
@@ -23,7 +24,10 @@ from django.db.models import Count
 from rest_framework.decorators import api_view
 from accounts.models import clear_info_cache
 from .models import ControlLibrary
-
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
+import json
 
 
 
@@ -250,7 +254,7 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
     queryset = Parameter.objects.select_related('cluster').all()
     serializer_class = ParameterSerializer
     cache_timeout = 60 * 15  # 15 minutes
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_cache_key(self, cluster_id=None, cluster_name=None):
         """Generate a cache key based on query parameters."""
@@ -409,3 +413,65 @@ def DashboardView(request):
     data = [{"segment": item["segment"], "count": item["segment_count"]} for item in segment_counts]
 
     return Response(data)
+
+
+
+
+
+@csrf_exempt  # Remove this if you want CSRF protection
+@require_http_methods(["POST"])
+@login_required  # Uncomment if you want authentication
+def bulk_update_parameters(request):
+    """Handle bulk update of assignment_value with atomic transactions."""
+    
+    try:
+        # Parse JSON data
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": "Invalid JSON data"}, 
+            status=400
+        )
+
+    if not isinstance(data, list):
+        return JsonResponse(
+            {"error": "Expected a list of entries."}, 
+            status=400
+        )
+
+    # Get user info (adjust based on your auth setup)
+    full_name = request.user.get_full_name() if request.user.is_authenticated else "Anonymous"
+    
+    with transaction.atomic():
+        try:
+            for entry in data:
+                if "id" not in entry or "assignment_value" not in entry:
+                    return JsonResponse(
+                        {"error": "Each entry must include 'id' and 'assignment_value'."}, 
+                        status=400
+                    )
+
+                # Get the parameter instance
+                try:
+                    instance = Parameter.objects.select_related('cluster').get(id=entry["id"])
+                except Parameter.DoesNotExist:
+                    return JsonResponse(
+                        {"error": f"Parameter with id {entry['id']} not found."}, 
+                        status=400
+                    )
+
+                # Update the instance
+                instance.assignment_value = entry["assignment_value"]
+                instance.updated_by = full_name
+                instance.save()
+
+                # Clear cache (adjust based on your cache setup)
+                clear_info_cache("parameters", instance.cluster.id)
+
+            return JsonResponse({'success': True}, status=200)
+
+        except Exception as e:
+            return JsonResponse(
+                {"error": str(e)}, 
+                status=400
+            )

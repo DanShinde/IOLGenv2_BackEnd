@@ -7,7 +7,8 @@ from .views import (
     ParameterBulkViewSet, 
     DashboardView, 
     GenerationLogCreateView,
-    ControlLibraryViewSet
+    ControlLibraryViewSet,
+    bulk_update_parameters
 )
 router = DefaultRouter()
 router.register(r'standard-strings', StandardStringViewSet, basename='standardstring')
@@ -27,4 +28,5 @@ urlpatterns = [
         'post': 'create', 
         'put': 'bulk_update'  # Maps PUT to your bulk_update method
     })),
+    path('bulk_update_parameters/', bulk_update_parameters, name='bulk-update-parameters'),
 ]
