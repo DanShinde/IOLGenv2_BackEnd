@@ -8,7 +8,8 @@ from .views import (
     DashboardView, 
     GenerationLogCreateView,
     ControlLibraryViewSet,
-    bulk_update_parameters
+    bulk_update_parameters,
+    set_cluster_dependencies,
 )
 router = DefaultRouter()
 router.register(r'standard-strings', StandardStringViewSet, basename='standardstring')
@@ -29,4 +30,5 @@ urlpatterns = [
         'put': 'bulk_update'  # Maps PUT to your bulk_update method
     })),
     path('bulk_update_parameters/', bulk_update_parameters, name='bulk-update-parameters'),
+    path('set_cluster_dependencies/', set_cluster_dependencies, name='set-cluster-dependencies'),
 ]

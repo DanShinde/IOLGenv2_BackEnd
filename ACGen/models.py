@@ -39,6 +39,12 @@ class ClusterTemplate(models.Model):
     updated_by = models.CharField(max_length=255)
     updated_at = models.DateTimeField(auto_now=True)
     segment = models.CharField(max_length=255)
+    dependencies = models.ManyToManyField(
+        'self', 
+        symmetrical=False, 
+        related_name='dependent_clusters',
+        help_text="Clusters that this cluster depends on.", blank=True
+    )
     segment_con = models.ForeignKey(
         Segment, 
         on_delete=models.SET_NULL, 

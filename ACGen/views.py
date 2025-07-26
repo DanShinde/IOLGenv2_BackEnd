@@ -1,6 +1,6 @@
 from django.dispatch import receiver
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated
 from .models import StandardString, ClusterTemplate, Parameter, GenerationLog
@@ -475,3 +475,76 @@ def bulk_update_parameters(request):
                 {"error": str(e)}, 
                 status=400
             )
+
+
+
+
+
+def check_circular_dependency(cluster, new_dependency):
+    """Check if adding new_dependency would create a circular dependency"""
+    def has_path_to(from_cluster, to_cluster, visited=None):
+        if visited is None:
+            visited = set()
+        
+        if from_cluster.id in visited or from_cluster.id == to_cluster.id:
+            return from_cluster.id == to_cluster.id
+            
+        visited.add(from_cluster.id)
+        
+        for dep in from_cluster.dependencies.all():
+            if has_path_to(dep, to_cluster, visited.copy()):
+                return True
+                
+        return False
+    
+    return has_path_to(new_dependency, cluster)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_cluster_dependencies(request):
+    """
+    Set dependencies for a cluster
+    POST /api/set-dependencies/
+    Body: {
+        "cluster_id": 1,
+        "dependency_ids": [2, 3, 4]
+    }
+    """
+    cluster_id = request.data.get('cluster_id')
+    dependency_ids = request.data.get('dependency_ids', [])
+    
+    if not cluster_id:
+        return Response({'error': 'cluster_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        cluster = get_object_or_404(ClusterTemplate, id=cluster_id)
+        
+        # Remove self-reference if present
+        dependency_ids = [dep_id for dep_id in dependency_ids if dep_id != cluster_id]
+        
+        # Get dependencies
+        dependencies = ClusterTemplate.objects.filter(id__in=dependency_ids)
+        
+        # Check for circular dependencies
+        for dependency in dependencies:
+            if check_circular_dependency(cluster, dependency):
+                return Response(
+                    {'error': f'Circular dependency detected with {dependency.cluster_name}'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Set dependencies
+        cluster.dependencies.set(dependencies)
+        
+        # Clear cache
+        cache.delete("cluster_templates:all")
+        cache.delete(f"cluster_template:{cluster_id}")
+        
+        return Response({
+            'message': 'Dependencies updated successfully',
+            'cluster_id': cluster_id,
+            'dependency_count': len(dependencies)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
