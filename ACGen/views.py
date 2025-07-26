@@ -16,7 +16,7 @@ from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -420,7 +420,7 @@ def DashboardView(request):
 
 @csrf_exempt  # Remove this if you want CSRF protection
 @require_http_methods(["POST"])
-@login_required  # Uncomment if you want authentication
+@permission_classes([IsAuthenticated])
 def bulk_update_parameters(request):
     """Handle bulk update of assignment_value with atomic transactions."""
     
