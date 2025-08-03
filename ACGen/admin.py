@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ClusterTemplate, Parameter, StandardString, GenerationLog
+from .models import ClusterTemplate, Parameter, StandardString, GenerationLog, ControlLibrary
 from import_export.admin import ImportExportModelAdmin
 
 # Register your models here.
@@ -17,6 +17,14 @@ class ClusterTemplateAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     list_filter = ('segment', 'uploaded_by')
 
 admin.site.register(ClusterTemplate, ClusterTemplateAdmin)
+
+
+
+@admin.register(ControlLibrary)
+class SegmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')  # Display ID and name in the admin list view
+    search_fields = ('name',)  # Add search functionality for the name field
+    
 
 
 
@@ -41,3 +49,4 @@ class GenerationLogAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     list_filter = ('user', 'project_name')
 
 admin.site.register(GenerationLog, GenerationLogAdmin)
+

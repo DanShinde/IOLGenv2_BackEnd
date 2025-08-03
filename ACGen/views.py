@@ -1,5 +1,6 @@
 from django.dispatch import receiver
-from django.shortcuts import render
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
 from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated
 from .models import StandardString, ClusterTemplate, Parameter, GenerationLog
@@ -8,24 +9,40 @@ from .serializers import (
     ClusterTemplateSerializer,
     ParameterSerializer,
     GenerationLogSerializer,
+    ControlLibrarySerializer
+
 )
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.db.models import Count
 from rest_framework.decorators import api_view
 from accounts.models import clear_info_cache
-
-
+from .models import ControlLibrary
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
+import json
 
 
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
+
+class ControlLibraryViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = ControlLibrary.objects.all()
+    serializer_class = ControlLibrarySerializer
+
+    # def list(self, request, *args, **kwargs):
+    #     queryset = self.get_queryset()
+    #     control_libraries = queryset.values_list('name', flat=True)
+    #     return Response(control_libraries)
+
 
 class StandardStringViewSet(viewsets.ModelViewSet):
     queryset = StandardString.objects.all()
@@ -336,7 +353,8 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
             except ValidationError as e:
                 return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request, *args, **kwargs):
+    # @action(detail=False, methods=['put'])
+    def bulk_update(self, request, *args, **kwargs):
         """Handle bulk update of `assignment_value` with atomic transactions."""
         data = request.data
 
@@ -368,12 +386,12 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
                 for serializer in serializers:
                     serializer.save()
 
-                clear_info_cache("parameters",instance.cluster.id)
+                clear_info_cache("parameters", instance.cluster.id)
                 return Response({'id': 'True'}, status=status.HTTP_200_OK)
             except ValidationError as e:
                 return Response({"error": e.detail}, status=status.HTTP_400_BAD_REQUEST)
 
-
+    
 
 class GenerationLogCreateView(generics.CreateAPIView):
     queryset = GenerationLog.objects.all()
@@ -395,3 +413,138 @@ def DashboardView(request):
     data = [{"segment": item["segment"], "count": item["segment_count"]} for item in segment_counts]
 
     return Response(data)
+
+
+
+
+
+@csrf_exempt  # Remove this if you want CSRF protection
+@require_http_methods(["POST"])
+@permission_classes([IsAuthenticated])
+def bulk_update_parameters(request):
+    """Handle bulk update of assignment_value with atomic transactions."""
+    
+    try:
+        # Parse JSON data
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": "Invalid JSON data"}, 
+            status=400
+        )
+
+    if not isinstance(data, list):
+        return JsonResponse(
+            {"error": "Expected a list of entries."}, 
+            status=400
+        )
+
+    # Get user info (adjust based on your auth setup)
+    full_name = request.user.get_full_name() if request.user.is_authenticated else "Anonymous"
+    
+    with transaction.atomic():
+        try:
+            for entry in data:
+                if "id" not in entry or "assignment_value" not in entry:
+                    return JsonResponse(
+                        {"error": "Each entry must include 'id' and 'assignment_value'."}, 
+                        status=400
+                    )
+
+                # Get the parameter instance
+                try:
+                    instance = Parameter.objects.select_related('cluster').get(id=entry["id"])
+                except Parameter.DoesNotExist:
+                    return JsonResponse(
+                        {"error": f"Parameter with id {entry['id']} not found."}, 
+                        status=400
+                    )
+
+                # Update the instance
+                instance.assignment_value = entry["assignment_value"]
+                instance.updated_by = full_name
+                instance.save()
+
+                # Clear cache (adjust based on your cache setup)
+                clear_info_cache("parameters", instance.cluster.id)
+
+            return JsonResponse({'success': True}, status=200)
+
+        except Exception as e:
+            return JsonResponse(
+                {"error": str(e)}, 
+                status=400
+            )
+
+
+
+
+
+def check_circular_dependency(cluster, new_dependency):
+    """Check if adding new_dependency would create a circular dependency"""
+    def has_path_to(from_cluster, to_cluster, visited=None):
+        if visited is None:
+            visited = set()
+        
+        if from_cluster.id in visited or from_cluster.id == to_cluster.id:
+            return from_cluster.id == to_cluster.id
+            
+        visited.add(from_cluster.id)
+        
+        for dep in from_cluster.dependencies.all():
+            if has_path_to(dep, to_cluster, visited.copy()):
+                return True
+                
+        return False
+    
+    return has_path_to(new_dependency, cluster)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_cluster_dependencies(request):
+    """
+    Set dependencies for a cluster
+    POST /api/set-dependencies/
+    Body: {
+        "cluster_id": 1,
+        "dependency_ids": [2, 3, 4]
+    }
+    """
+    cluster_id = request.data.get('cluster_id')
+    dependency_ids = request.data.get('dependency_ids', [])
+    
+    if not cluster_id:
+        return Response({'error': 'cluster_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        cluster = get_object_or_404(ClusterTemplate, id=cluster_id)
+        
+        # Remove self-reference if present
+        dependency_ids = [dep_id for dep_id in dependency_ids if dep_id != cluster_id]
+        
+        # Get dependencies
+        dependencies = ClusterTemplate.objects.filter(id__in=dependency_ids)
+        
+        # Check for circular dependencies
+        for dependency in dependencies:
+            if check_circular_dependency(cluster, dependency):
+                return Response(
+                    {'error': f'Circular dependency detected with {dependency.cluster_name}'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Set dependencies
+        cluster.dependencies.set(dependencies)
+        
+        # Clear cache
+        cache.delete("cluster_templates:all")
+        cache.delete(f"cluster_template:{cluster_id}")
+        
+        return Response({
+            'message': 'Dependencies updated successfully',
+            'cluster_id': cluster_id,
+            'dependency_count': len(dependencies)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

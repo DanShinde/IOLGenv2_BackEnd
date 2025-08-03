@@ -5,7 +5,27 @@ from django.db.models.signals import post_save, post_delete, post_init
 from django.dispatch import receiver
 from django.core.cache import cache
 
-
+def print_all_cache():
+    try:
+        # Get Redis client
+        redis_client = cache._cache.get_client(1)
+        
+        # Get all keys
+        all_keys = redis_client.keys('*')
+        
+        print(f"Found {len(all_keys)} cache entries:")
+        for key in all_keys:
+            if isinstance(key, bytes):
+                key = key.decode('utf-8')
+            
+            value = cache.get(key)
+            print(f"Key: {key}")
+            print(f"Value: {value}")
+            print("-" * 50)
+            
+    except Exception as e:
+        print(f"Error accessing Redis cache: {e}")
+        
 class UserTypeEnum(models.TextChoices):
     USER = "USER", "User"
     ADMIN = "ADMIN", "Admin"
