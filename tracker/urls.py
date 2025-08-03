@@ -18,4 +18,5 @@ urlpatterns = [
     path('upcoming-milestones/export/pdf/', views.export_milestones_pdf, name='tracker_export_milestones_pdf'),
     path('remark/add/<int:stage_id>/', views.add_remark, name='tracker_add_remark'),
     path('remark/view/<int:stage_id>/', views.get_remarks, name='tracker_view_remarks'),
+    path('project-reports/export/pdf/', views.export_report_pdf, name='export_report_pdf'),
 ]

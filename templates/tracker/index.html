@@ -17,7 +17,7 @@
 
 <div class="card">
     <div class="card-header">
-        <i class="fas fa-table me-2"></i>Project List
+        <h5 class="card-header-title"><i class="fas fa-table"></i>Project List</h5>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -26,9 +26,11 @@
                     <tr>
                         <th>Code</th>
                         <th>Customer</th>
+                        <th>Segment</th>
                         <th>Value</th>
                         <th>SO Punch Date</th>
                         <th>Status</th>
+                        <th>Progress</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -37,10 +39,22 @@
                     <tr>
                         <td><strong>{{ project.code }}</strong></td>
                         <td>{{ project.customer_name }}</td>
+                        <td>{{ project.segment_con.name|default:'N/A' }}</td>
                         <td>₹{{ project.value|floatformat:2 }}</td>
                         <td>{{ project.so_punch_date|date:"M d, Y" }}</td>
                         <td>
-                            <span class="status-badge bg-{{ project.status|slugify }}">{{ project.status }}</span>
+                            <span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                    <div class="progress-bar" role="progressbar" 
+                                         style="width: {{ project.get_completion_percentage }}%" 
+                                         aria-valuenow="{{ project.get_completion_percentage }}" 
+                                         aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small>{{ project.get_completion_percentage }}%</small>
+                            </div>
                         </td>
                         <td>
                             <a href="{% url 'tracker_project_detail' project.id %}" class="btn btn-sm btn-outline-primary me-1">

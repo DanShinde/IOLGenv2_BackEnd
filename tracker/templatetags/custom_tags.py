@@ -1,4 +1,5 @@
 from django import template
+
 register = template.Library()
 
 
@@ -15,22 +16,17 @@ def get_item(dictionary, key):
 
 @register.filter
 def get_next(lst, index):
+    """Gets the next item in a list."""
     try:
         return lst[index + 1]
-    except:
+    except IndexError:
         return None
 
-from django import template
 
-register = template.Library()
-
-@register.filter
-def abs_value(value):
+@register.filter(name='abs')
+def absolute_value(value):
+    """Returns the absolute value of a number."""
     try:
         return abs(int(value))
-    except:
+    except (ValueError, TypeError):
         return value
-
-@register.filter
-def get_item(dictionary, key):
-    return dictionary.get(key)
