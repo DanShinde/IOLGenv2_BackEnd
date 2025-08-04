@@ -5,25 +5,23 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory, trackerSegment
-from django.db.models import Q
+from .models import Project, Stage, StageHistory, trackerSegment, StageRemark
+from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
-from django.shortcuts import render
-from .models import Stage
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
-from .models import StageRemark
-
+from collections import Counter
 from tracker.utils import (
-    get_completion_percentage,
-    get_otif_percentage,
-    get_overall_status,
-    get_schedule_status,
-    get_next_milestone
+    get_completion_percentage, get_otif_percentage, get_overall_status,
+    get_schedule_status, get_next_milestone
 )
-from django.db.models import Prefetch
 from django.core.cache import cache
-
+from io import BytesIO
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.pagesizes import letter, landscape, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from datetime import datetime
 
 def login_view(request):
     if request.method == 'POST':
@@ -38,7 +36,7 @@ def login_view(request):
 
 def logout_view(request):
     logout(request)
-    return redirect('loginw')
+    return redirect('tracker_login')
 
 def signup_view(request):
     if request.method == 'POST':
@@ -46,7 +44,7 @@ def signup_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, "User registered successfully! Please log in.")
-            return redirect('loginw')
+            return redirect('tracker_login')
     else:
         form = UserCreationForm()
     return render(request, 'tracker/signup.html', {'form': form})
@@ -61,81 +59,97 @@ def new_project(request):
     if request.method == 'POST':
         code = request.POST['code']
         if Project.objects.filter(code=code).exists():
-            messages.error(request, "Project code already exists. Please use a different code.")
-            return render(request, 'tracker/project_form.html', {
-                'segments': trackerSegment.objects.all()
-            })
+            messages.error(request, "Project code already exists.")
+            return render(request, 'tracker/project_form.html', {'segments': trackerSegment.objects.all()})
+        
         segment_id = request.POST.get('segment')
         segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
+        
         project = Project.objects.create(
-            code=code,
-            customer_name=request.POST['customer_name'],
-            value=request.POST['value'],
-            so_punch_date=parse_date(request.POST['so_punch_date']),
+            code=code, customer_name=request.POST['customer_name'],
+            value=request.POST['value'], so_punch_date=parse_date(request.POST['so_punch_date']),
             segment_con=segment_con
         )
-        for stage_name, _ in Stage.STAGE_NAMES:
-            Stage.objects.create(project=project, name=stage_name)
+        
+        # Create Automation Stages
+        for stage_name, _ in Stage.AUTOMATION_STAGES:
+            Stage.objects.create(project=project, name=stage_name, stage_type='Automation')
+            
+        # Create Emulation Stages
+        for stage_name, _ in Stage.EMULATION_STAGES:
+            Stage.objects.create(project=project, name=stage_name, stage_type='Emulation')
+
         messages.success(request, "Project created successfully!")
         return redirect('tracker_project_detail', project_id=project.id)
-    return render(request, 'tracker/project_form.html', {
-        'segments': trackerSegment.objects.all()
-    })
+    
+    return render(request, 'tracker/project_form.html', {'segments': trackerSegment.objects.all()})
 
-
-
-# tracker/views.py
+from django.http import HttpResponseRedirect # Make sure this is imported
 
 @login_required
 def project_detail(request, project_id):
     project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
 
     if request.method == 'POST':
-        # ... all the existing POST handling logic remains the same ...
-        if 'save_all' in request.POST:
-            for stage in project.stages.all():
-                # ... (no changes needed here) ...
-                stage.save()
-            cache.delete(f'project_detail_{project_id}')
-            messages.success(request, "Changes saved successfully!")
-            return redirect(reverse('tracker_project_detail', args=[project.id]))
-        else:
-            # ... (no changes needed in the single stage save logic either) ...
-            stage.save()
-            cache.delete(f'project_detail_{project_id}')
-            messages.success(request, "Stage updated successfully!")
-            return redirect(reverse('tracker_project_detail', args=[project.id]))
+        stages_to_save = []
+        success_message = "Changes saved successfully!"
+        active_tab = request.POST.get('active_tab', 'automation') # Get the active tab from the form
 
+        if 'save_all_automation' in request.POST:
+            stages_to_save = project.stages.filter(stage_type='Automation')
+            success_message = "Automation Stages saved successfully!"
+        elif 'save_all_emulation' in request.POST:
+            stages_to_save = project.stages.filter(stage_type='Emulation')
+            success_message = "Emulation Stages saved successfully!"
+        elif 'stage_id' in request.POST:
+            stage_id = request.POST.get('stage_id')
+            stages_to_save = project.stages.filter(id=stage_id)
+            stage_name = stages_to_save.first().name if stages_to_save else ''
+            success_message = f"Stage '{stage_name}' updated successfully!"
+
+        for stage in stages_to_save:
+            # ... (all of your existing logic for saving a stage) ...
+            new_planned = parse_date(request.POST.get(f'planned_date_{stage.id}'))
+            new_status = request.POST.get(f'status_{stage.id}') or "Not started"
+            actual_date_val = request.POST.get(f'actual_date_{stage.id}')
+            new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
+            # History creation logic...
+            stage.planned_date, stage.status, stage.actual_date = new_planned, new_status, new_actual
+            stage.save()
+        
+        cache.delete(f'project_detail_{project_id}')
+        messages.success(request, success_message)
+        
+        # ✅ Create a redirect URL that includes the active tab
+        base_url = reverse('tracker_project_detail', args=[project.id])
+        redirect_url = f'{base_url}?active_tab={active_tab}'
+        return HttpResponseRedirect(redirect_url)
+
+    # GET Request Logic
     cache_key = f'project_detail_{project_id}'
     context = cache.get(cache_key)
-
     if not context:
-        stages = list(
-            Stage.objects.filter(project=project)
-            .prefetch_related('remarks', 'history')
-            .order_by('id')
-        )
-        recent_activity = StageHistory.objects.select_related(
-            'stage', 'changed_by'
-        ).filter(stage__project=project).order_by('-changed_at')[:2]
+        automation_stages = list(Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history').order_by('id'))
+        emulation_stages = list(Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history').order_by('id'))
+        all_stages = automation_stages + emulation_stages
         
-        # ✅ ADD THIS LOGIC to safely get the last update time
+        recent_activity = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')[:5]
         last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
         last_update_time = last_update_obj.changed_at if last_update_obj else project.so_punch_date
-
+        
         context = {
             'project': project,
-            'stages': stages,
+            'automation_stages': automation_stages,
+            'emulation_stages': emulation_stages,
+            'completion_percentage': get_completion_percentage(all_stages),
+            'otif_percentage': get_otif_percentage(all_stages),
+            'overall_status': get_overall_status(all_stages),
+            'schedule_status': get_schedule_status(all_stages),
+            'next_milestone': get_next_milestone(all_stages),
+            'last_update_time': last_update_time,
             'recent_activity': recent_activity,
-            'completion_percentage': get_completion_percentage(stages),
-            'otif_percentage': get_otif_percentage(stages),
-            'overall_status': get_overall_status(stages),
-            'schedule_status': get_schedule_status(stages),
-            'next_milestone': get_next_milestone(stages),
-            'last_update_time': last_update_time, # ✅ PASS it to the template
         }
         cache.set(cache_key, context, timeout=1200)
-
     return render(request, 'tracker/project_detail.html', context)
 
 @login_required
@@ -144,7 +158,6 @@ def delete_project(request, project_id):
     project.delete()
     messages.success(request, "Project deleted successfully.")
     return redirect('tracker_index')
-
 
 
 from django.db.models import F, Sum, Count

@@ -89,9 +89,10 @@ class Project(models.Model):
         else:
             return all_stages[0] if all_stages else None
 
+# tracker/models.py
 
 class Stage(models.Model):
-    STAGE_NAMES = [
+    AUTOMATION_STAGES = [
         ("DAP", "DAP"),
         ("IO List & BOM Release", "IO List & BOM Release"),
         ("Offline Development", "Offline Development"),
@@ -101,6 +102,18 @@ class Stage(models.Model):
         ("Handover", "Handover"),
     ]
 
+    EMULATION_STAGES = [
+        ("Emulation layout design", "Emulation layout design"),
+        ("IO Configuration", "IO Configuration"),
+        ("HMI/ SCADA Design", "HMI/ SCADA Design"),
+        ("HMI/ SCADA Tagging", "HMI/ SCADA Tagging"),
+        ("Audit Of Emulation Layout", "Audit Of Emulation Layout"),
+        ("Audit Of HMI/SCADA", "Audit Of HMI/SCADA"),
+    ]
+    
+    # Combine all stage names for the database choices
+    STAGE_NAMES = AUTOMATION_STAGES + EMULATION_STAGES
+
     STATUS_CHOICES = [
         ("Not started", "Not started"),
         ("In Progress", "In Progress"),
@@ -108,9 +121,15 @@ class Stage(models.Model):
         ("Hold", "Hold"),
         ("Not Applicable", "Not Applicable"),
     ]
+    
+    STAGE_TYPE_CHOICES = [
+        ("Automation", "Automation"),
+        ("Emulation", "Emulation"),
+    ]
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='stages')
     name = models.CharField(max_length=100, choices=STAGE_NAMES)
+    stage_type = models.CharField(max_length=20, choices=STAGE_TYPE_CHOICES, default='Automation')
     planned_date = models.DateField(null=True, blank=True)
     actual_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="Not started")

@@ -1,0 +1,92 @@
+<div class="modal fade" id="addRemarkModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'tracker_add_remark' stage.id %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Remark - {{ stage.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <textarea name="remark" class="form-control" rows="4" required placeholder="Enter your remark..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save Remark</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewRemarkModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Remarks - {{ stage.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if stage.remarks.all %}
+                <ul class="list-group">
+                    {% for remark in stage.remarks.all %}
+                    <li class="list-group-item">
+                        <strong>{{ remark.added_by|default:"System" }}</strong> on {{ remark.created_at|date:"M d, Y H:i" }}<br>
+                        {{ remark.text }}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No remarks yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title">Change History - {{ stage.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if stage.history.all %}
+                <div class="timeline">
+                    {% for log in stage.history.all %}
+                    <div class="timeline-item mb-3">
+                        <div class="d-flex">
+                            <div class="timeline-badge bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="fas fa-{% if log.field_name == 'status' %}exchange-alt{% else %}calendar-alt{% endif %}"></i>
+                            </div>
+                            <div class="ms-3">
+                                <div class="d-flex justify-content-between">
+                                    <strong class="text-primary">{{ log.field_name|title }}</strong>
+                                    <small class="text-muted">{{ log.changed_at|date:"M d, Y H:i" }}</small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <span class="text-muted me-2">From:</span>
+                                    <span class="badge bg-light text-dark">{{ log.old_value|default:"-" }}</span>
+                                    <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                                    <span class="text-muted me-2">To:</span>
+                                    <span class="badge bg-primary">{{ log.new_value|default:"-" }}</span>
+                                </div>
+                                <small class="text-muted">Changed by {{ log.changed_by|default:"System" }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+                    <p class="text-muted">No history available for this stage.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
