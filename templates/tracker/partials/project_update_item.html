@@ -1,0 +1,58 @@
+{% load humanize %}
+<div class="d-flex mb-4 pb-3 border-bottom">
+    <div class="me-3">
+        <span class="user-avatar" style="width: 40px; height: 40px;">
+            {{ update.author.username|slice:":1"|upper|default:"S" }}
+        </span>
+    </div>
+    <div class="w-100">
+        <div class="d-flex justify-content-between">
+            <div>
+                <span class="fw-bold">{{ update.author.get_full_name|default:update.author.username|default:"System" }}</span>
+                <small class="text-muted ms-2">{{ update.created_at|naturaltime }}</small>
+            </div>
+            {% if update.author == user %}
+            <div class="dropdown">
+                <a href="#" class="text-muted" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-h"></i></a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editUpdateModal{{ update.id }}">Edit</a></li>
+                    <li>
+                        <form action="{% url 'delete_project_update' update.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this update?');">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item text-danger">Delete</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        <div>
+            <span class="badge {% if update.category == 'Risk' %}bg-danger{% elif update.category == 'Action' %}bg-warning text-dark{% else %}bg-info{% endif %}">{{ update.category }}</span>
+            {% if update.needs_review %}<span class="badge bg-danger ms-2"><i class="fas fa-flag me-1"></i>Review Needed</span>{% endif %}
+            {% if update.category == 'Action' or update.category == 'Risk' %}<span class="badge {% if update.status == 'Open' %}bg-success{% else %}bg-secondary{% endif %} ms-2">{{ update.status }}</span>{% endif %}
+        </div>
+        <div class="mt-2 text-secondary">
+            {{ update.text|linebreaksbr }}
+        </div>
+        {% if update.mitigation_plan %}
+        <div class="mt-2 p-2 bg-light border rounded small">
+            <strong>Mitigation:</strong> {{ update.mitigation_plan|linebreaksbr }}
+        </div>
+        {% endif %}
+        {% if update.category == 'Action' or update.category == 'Risk' %}
+        <div class="mt-2">
+            <form action="{% url 'toggle_update_status' update.id %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm {% if update.status == 'Open' %}btn-outline-success{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fas fa-{% if update.status == 'Open' %}check-circle{% else %}redo{% endif %} me-1"></i> Mark as {{ update.status|yesno:"Closed,Open" }}
+                </button>
+            </form>
+            {% if update.category == 'Risk' %}
+            <button class="btn btn-sm btn-outline-dark ms-2" data-bs-toggle="modal" data-bs-target="#mitigationModal{{ update.id }}">
+                <i class="fas fa-shield-alt me-1"></i> Mitigation
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>

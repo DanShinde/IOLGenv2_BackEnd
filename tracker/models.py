@@ -157,3 +157,32 @@ class StageRemark(models.Model):
     def __str__(self):
         return f"Remark for {self.stage.name} at {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
+
+class ProjectUpdate(models.Model):
+    CATEGORY_CHOICES = [
+        ('Information', 'Information'),
+        ('Action', 'Action'),
+        ('Risk', 'Risk'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('Open', 'Open'),
+        ('Closed', 'Closed'),
+    ]
+    
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='updates')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    text = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='Information')
+    needs_review = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # ✅ NEW FIELDS
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Open', null=True, blank=True)
+    mitigation_plan = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Update for {self.project.code} at {self.created_at.strftime('%Y-%m-%d')}"
