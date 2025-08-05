@@ -335,58 +335,41 @@ def project_activity(request, project_id):
         'history_logs': history_logs,
     })
 
+
+from itertools import groupby
+from operator import attrgetter
+
 @login_required
 def upcoming_milestones(request):
     filter_type = request.GET.get('filter', 'all')
-    today = date.today()
-    tomorrow = today + timedelta(days=1)
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
-    start_of_next_week = end_of_week + timedelta(days=1)
-    end_of_next_week = start_of_next_week + timedelta(days=6)
-    start_of_month = today.replace(day=1)
-    start_of_next_month = (start_of_month + relativedelta(months=1)).replace(day=1)
-    end_of_month = start_of_next_month - timedelta(days=1)
-    end_of_next_month = (start_of_next_month + relativedelta(months=1)) - timedelta(days=1)
+    today = timezone.now().date()
+    
+    # Use the existing helper function to get the initial filtered list of stages
+    stages = get_filtered_stages(filter_type)
+    
+    # Add select_related for performance and order by project for grouping
+    stages = stages.select_related('project').order_by('project__code', 'planned_date')
 
-    date_ranges = {
-        "today": (today, today),
-        "tomorrow": (tomorrow, tomorrow),
-        "this_week": (start_of_week, end_of_week),
-        "next_week": (start_of_next_week, end_of_next_week),
-        "this_month": (start_of_month, end_of_month),
-        "next_month": (start_of_next_month, end_of_next_month),
-    }
-
-    if filter_type == 'overdue':
-        stages = Stage.objects.filter(status__in=["Not started", "In Progress"], planned_date__lt=today)
-    elif filter_type in date_ranges:
-        start, end = date_ranges[filter_type]
-        stages = Stage.objects.filter(status__in=["Not started", "In Progress"], planned_date__range=(start, end))
-    elif filter_type == 'all':
-        stages = Stage.objects.filter(status__in=["Not started", "In Progress", "Hold"])
-
-    else:
-        stages = Stage.objects.filter(status__in=["Not started", "In Progress"], planned_date__gte=today)
-        
-
-    stages = stages.order_by('planned_date')
+    # Group the stages by project
+    stages_list = list(stages)
+    grouped_stages = []
+    for project, group in groupby(stages_list, key=attrgetter('project')):
+        grouped_stages.append({
+            'project': project,
+            'stages': list(group)
+        })
 
     return render(request, 'tracker/upcoming_milestones.html', {
-        'upcoming': stages,
+        'grouped_stages': grouped_stages,
         'filter_type': filter_type,
         'filter_options': [
-            ('All', 'all'),
-            ('Overdue', 'overdue'),
-            ('Today', 'today'),
-            ('Tomorrow', 'tomorrow'),
-            ('This Week', 'this_week'),
-            ('Next Week', 'next_week'),
-            ('This Month', 'this_month'),
+            ('All', 'all'), ('Overdue', 'overdue'), ('Today', 'today'),
+            ('Tomorrow', 'tomorrow'), ('This Week', 'this_week'),
+            ('Next Week', 'next_week'), ('This Month', 'this_month'),
             ('Next Month', 'next_month'),
         ],
-        'today': today,  # ✅ add this line
-        })
+        'today': today,
+    })
 
 
 

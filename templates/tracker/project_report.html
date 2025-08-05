@@ -41,7 +41,7 @@
             <i class="fas fa-chevron-down"></i>
         </a>
 
-        <div class="collapse show" id="filterCollapse">
+        <div class="collapse" id="filterCollapse">
             <div class="card-body">
                 <form method="get">
                     <div class="row">
@@ -116,7 +116,9 @@
     </div>
 
     <div class="card">
-        <div class="card-header"><span><i class="fas fa-table me-2"></i>Filtered Results</span></div>
+        <div class="card-header">
+            <h5 class="card-header-title"><i class="fas fa-table"></i>Filtered Results</h5>
+        </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-custom">
@@ -161,7 +163,9 @@
     <div class="row mt-4">
         <div class="col-md-5">
             <div class="card h-100">
-                <div class="card-header"><span><i class="fas fa-chart-pie me-2"></i>Status Distribution</span></div>
+                <div class="card-header">
+                    <h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution</h5>
+                </div>
                 <div class="card-body">
                     <canvas id="statusPieChart"></canvas>
                 </div>
@@ -169,7 +173,9 @@
         </div>
         <div class="col-md-7">
             <div class="card h-100">
-                <div class="card-header"><span><i class="fas fa-chart-bar me-2"></i>Projects by Segment</span></div>
+                <div class="card-header">
+                    <h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Projects by Segment</h5>
+                </div>
                 <div class="card-body">
                     <canvas id="segmentBarChart"></canvas>
                 </div>
@@ -183,7 +189,6 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Pie Chart for Status Distribution
     const statusCtx = document.getElementById('statusPieChart');
     if (statusCtx && {{ status_data|safe }}.length > 0) {
         new Chart(statusCtx, {
@@ -193,7 +198,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Bar Chart for Projects by Segment
     const segmentCtx = document.getElementById('segmentBarChart');
     if (segmentCtx && {{ segment_data|safe }}.length > 0) {
         new Chart(segmentCtx, {
