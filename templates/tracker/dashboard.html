@@ -18,28 +18,31 @@
 </div>
 
 <div class="card mb-4">
-    <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div class="dropdown">
-            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                <i class="fas fa-calendar-alt me-2"></i> {{ selected_period_display }}
-            </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=all">All Time</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_month">Current Month</a></li>
-                <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_year">Current Year</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=7d">Last 7 Days</a></li>
-                <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=30d">Last 30 Days</a></li>
-            </ul>
-        </div>
-        
-        <form class="d-flex align-items-center gap-2" method="get">
-            <input type="date" name="start_date_custom" class="form-control" value="{{ custom_start_date|default:'' }}">
-            <span class="text-muted">to</span>
-            <input type="date" name="end_date_custom" class="form-control" value="{{ custom_end_date|default:'' }}">
-            <input type="hidden" name="chronic_period" value="{{ selected_chronic_period|default:'1y' }}">
-            <button type="submit" class="btn btn-secondary">Go</button>
+    <div class="card-body">
+        <form method="get" class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="dropdown">
+                <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-calendar-alt me-2"></i> {{ selected_period_display }}
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=all">All Time</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_month">Current Month</a></li>
+                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_year">Current Year</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=7d">Last 7 Days</a></li>
+                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=30d">Last 30 Days</a></li>
+                </ul>
+            </div>
+            
+            <div class="d-flex align-items-center gap-2">
+                <label class="text-muted small">Custom Range:</label>
+                <input type="date" name="start_date_custom" class="form-control form-control-sm" value="{{ custom_start_date|default:'' }}">
+                <span class="text-muted">to</span>
+                <input type="date" name="end_date_custom" class="form-control form-control-sm" value="{{ custom_end_date|default:'' }}">
+                <input type="hidden" name="chronic_period" value="{{ selected_chronic_period|default:'1y' }}">
+                <button type="submit" class="btn btn-sm btn-secondary">Go</button>
+            </div>
         </form>
     </div>
 </div>
@@ -56,27 +59,23 @@
         <div class="metric-card"><div class="metric-icon" style="color: #28a745; background: rgba(40, 167, 69, 0.1);"><i class="fas fa-check-double"></i></div><div class="metric-value">{{ department_otif }}%</div><div class="metric-label">Department OTIF %</div></div>
     </div>
     <div class="col-lg col-md-6 mb-3">
-        <div class="metric-card"><div class="metric-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="metric-value">{{ delayed_projects }}</div><div class="metric-label">Delayed Projects</div></div>
+        <div class="metric-card"><div class="metric-icon" style="color: #dc3545; background: rgba(220, 53, 69, 0.1);"><i class="fas fa-exclamation-triangle"></i></div><div class="metric-value">{{ delayed_projects }}</div><div class="metric-label">Delayed Projects</div></div>
     </div>
     <div class="col-lg col-md-6 mb-3">
-        <div class="metric-card"><div class="metric-icon"><i class="fas fa-indian-rupee-sign"></i></div><div class="metric-value">₹{{ total_value|floatformat:0 }}</div><div class="metric-label">Value of Live Projects</div></div>
+        <div class="metric-card"><div class="metric-icon"><i class="fas fa-indian-rupee-sign"></i></div><div class="metric-value">₹{{ total_value|intcomma }}</div><div class="metric-label">Value of Live Projects</div></div>
     </div>
 </div>
 
 <div class="row">
     <div class="col-lg-8">
         <div class="card h-100">
-            <div class="card-header">
-                <h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Project Completion (Live in Period)</h5>
-            </div>
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Project Completion (Live in Period)</h5></div>
             <div class="card-body"><canvas id="progressChart" height="120"></canvas></div>
         </div>
     </div>
     <div class="col-lg-4">
         <div class="card h-100">
-            <div class="card-header">
-                <h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution (Live in Period)</h5>
-            </div>
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution (Live in Period)</h5></div>
             <div class="card-body"><canvas id="statusChart" height="200"></canvas></div>
         </div>
     </div>
@@ -87,20 +86,22 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="card-header-title"><i class="fas fa-history"></i>Chronic Projects (Open for >)</h5>
-                <div class="btn-group btn-group-sm">
-                    <a href="?{{ request.GET.urlencode|cut:'chronic_period' }}&chronic_period=6m" class="btn {% if selected_chronic_period == '6m' %}btn-primary{% else %}btn-outline-primary{% endif %}">6+ Months</a>
-                    <a href="?{{ request.GET.urlencode|cut:'chronic_period' }}&chronic_period=1y" class="btn {% if selected_chronic_period == '1y' %}btn-primary{% else %}btn-outline-primary{% endif %}">1+ Year</a>
-                    <a href="?{{ request.GET.urlencode|cut:'chronic_period' }}&chronic_period=2y" class="btn {% if selected_chronic_period == '2y' %}btn-primary{% else %}btn-outline-primary{% endif %}">2+ Years</a>
+                <div class="card-header-actions">
+                    <div class="btn-group btn-group-sm">
+                        <a href="?{{ request.GET.urlencode|cut:'chronic_period' }}&chronic_period=6m" class="btn {% if selected_chronic_period == '6m' %}btn-primary{% else %}btn-outline-primary{% endif %}">6+ Months</a>
+                        <a href="?{{ request.GET.urlencode|cut:'chronic_period' }}&chronic_period=1y" class="btn {% if selected_chronic_period == '1y' %}btn-primary{% else %}btn-outline-primary{% endif %}">1+ Year</a>
+                        <a href="?{{ request.GET.urlencode|cut:'chronic_period' }}&chronic_period=2y" class="btn {% if selected_chronic_period == '2y' %}btn-primary{% else %}btn-outline-primary{% endif %}">2+ Years</a>
+                    </div>
                 </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-custom">
+                    <table class="table table-custom table-striped">
                         <thead><tr><th>Project Code</th><th>Customer</th><th>Age</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
                         <tbody>
                             {% for project in chronic_projects %}
                             <tr>
-                                <td><strong>{{ project.code }}</strong></td><td>{{ project.customer_name }}</td><td>{{ project.so_punch_date|timesince }}</td><td><span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span></td>
+                                <td><strong><a href="{% url 'tracker_project_detail' project.id %}">{{ project.code }}</a></strong></td><td>{{ project.customer_name }}</td><td>{{ project.so_punch_date|timesince }}</td><td><span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span></td>
                                 <td><div class="d-flex align-items-center"><div class="progress flex-grow-1 me-2" style="height: 8px;"><div class="progress-bar bg-danger" role="progressbar" style="width: {{ project.get_completion_percentage }}%"></div></div><small>{{ project.get_completion_percentage }}%</small></div></td>
                                 <td><a href="{% url 'tracker_project_detail' project.id %}" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i></a></td>
                             </tr>
@@ -124,12 +125,12 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-custom">
+                    <table class="table table-custom table-striped">
                         <thead><tr><th>Project Code</th><th>Customer</th><th>Segment</th><th>Value</th><th>SO Punch Date</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
                         <tbody>
                             {% for project in recent_projects %}
                             <tr>
-                                <td><strong>{{ project.code }}</strong></td><td>{{ project.customer_name }}</td><td>{{ project.segment_con.name|default:'N/A' }}</td><td>₹{{ project.value|floatformat:2 }}</td><td>{{ project.so_punch_date|date:"M d, Y" }}</td><td><span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span></td>
+                                <td><strong>{{ project.code }}</strong></td><td>{{ project.customer_name }}</td><td>{{ project.segment_con.name|default:'N/A' }}</td><td>₹{{ project.value|floatformat:2|intcomma }}</td><td>{{ project.so_punch_date|date:"M d, Y" }}</td><td><span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span></td>
                                 <td><div class="d-flex align-items-center"><div class="progress flex-grow-1 me-2" style="height: 6px;"><div class="progress-bar" role="progressbar" style="width: {{ project.get_completion_percentage }}%" ></div></div><small>{{ project.get_completion_percentage }}%</small></div></td>
                                 <td><a href="{% url 'tracker_project_detail' project.id %}" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i></a><a href="{% url 'tracker_delete_project' project.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');"><i class="fas fa-trash"></i></a></td>
                             </tr>
@@ -147,6 +148,7 @@
 
 
 {% block scripts %}
+{{ block.super }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     Chart.register(ChartDataLabels);

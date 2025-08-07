@@ -13,10 +13,24 @@
         --primary: #4361ee; --primary-dark: #3a56d4; --secondary: #3f37c9; --accent: #4895ef; --success: #28a745; --warning: #ffc107; --danger: #dc3545; --dark: #1b263b; --light: #f8f9fa; --gray: #8d99ae; --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); --transition: all 0.3s ease;
     }
     body {
-        background-color: #f5f7fb; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; min-height: 100vh; display: flex; flex-direction: column; padding-top: 80px; visibility: hidden;
+        /* IMPROVEMENT: Added a subtle gradient for a more modern background */
+        background: linear-gradient(180deg, #f5f7fb 0%, #ffffff 100%);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding-top: 80px;
+        visibility: hidden;
     }
     .navbar-custom {
-        background: linear-gradient(135deg, var(--dark) 0%, #2a3a5c 100%); box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1); padding: 0.8rem 1rem; position: fixed; top: 0; width: 100%; z-index: 1030;
+        background: linear-gradient(135deg, var(--dark) 0%, #2a3a5c 100%);
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+        padding: 0.8rem 1rem;
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 1030;
     }
     .navbar-brand {
         font-weight: 700; font-size: 1.5rem; color: white !important; display: flex; align-items: center;
@@ -25,7 +39,9 @@
         height: 32px; width: auto; margin-right: 10px;
     }
     .navbar-custom .nav-link {
-        color: rgba(255, 255, 255, 0.85) !important; font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 8px; margin: 0 3px; transition: var(--transition);
+        color: rgba(255, 255, 255, 0.85) !important; font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 8px; margin: 0 3px;
+        /* IMPROVEMENT: Added transition for smoother hover effects */
+        transition: var(--transition);
     }
     .navbar-custom .nav-link:hover, .navbar-custom .nav-link.active {
         color: white !important; background: rgba(255, 255, 255, 0.15);
@@ -43,7 +59,11 @@
         margin-top: 20px; margin-bottom: 40px; flex: 1;
     }
     .page-header {
-        background: white; border-radius: 12px; padding: 25px; box-shadow: var(--card-shadow); margin-bottom: 25px;
+        background: white; border-radius: 12px;
+        /* IMPROVEMENT: Increased padding and margin for better spacing */
+        padding: 30px;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 30px;
     }
     .page-title {
         color: var(--dark); font-weight: 700; margin-bottom: 5px;
@@ -53,12 +73,21 @@
     }
     .card {
         border: none; border-radius: 12px; box-shadow: var(--card-shadow); transition: var(--transition); margin-bottom: 25px;
+        /* IMPROVEMENT: Added a top border for a subtle accent */
+        border-top: 3px solid transparent;
     }
     .card:hover {
         transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0, 0, 0, 0.12);
+        /* IMPROVEMENT: Show border on hover */
+        border-top-color: var(--primary);
     }
     .card-header {
         background: white; border-bottom: 1px solid rgba(0, 0, 0, 0.05); padding: 18px 25px; font-weight: 600; color: var(--dark); display: flex; align-items: center; justify-content: space-between;
+    }
+    /* IMPROVEMENT: New utility class for actions in card headers */
+    .card-header-actions {
+        display: flex;
+        gap: 0.5rem;
     }
     .card-body {
         padding: 25px;
@@ -70,7 +99,9 @@
         font-size: 1.1rem; width: 28px; text-align: center; margin-right: 8px; color: var(--primary);
     }
     .metric-card {
-        background: white; border-radius: 12px; padding: 20px; box-shadow: var(--card-shadow); height: 100%; transition: var(--transition); border-left: 4px solid var(--primary);
+        background: white; border-radius: 12px; padding: 20px; box-shadow: var(--card-shadow); height: 100%; transition: var(--transition);
+        /* IMPROVEMENT: Changed from border-left to a more subtle border-top */
+        border-top: 4px solid var(--primary);
     }
     .metric-card:hover {
         transform: translateY(-3px);
@@ -86,6 +117,10 @@
     }
     .table-custom {
         border-collapse: separate; border-spacing: 0; width: 100%;
+    }
+    /* IMPROVEMENT: Added hover effect for table rows */
+    .table-custom tbody tr:hover {
+        background-color: #f5f7fb;
     }
     .table-custom thead th {
         background-color: #f8fafd; color: var(--dark); font-weight: 600; border-top: 1px solid #eaeff5; border-bottom: 2px solid #eaeff5; padding: 12px 15px;
@@ -124,10 +159,10 @@
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
                         <li class="nav-item dropdown user-dropdown">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown"><div class="user-avatar me-2">{{ user.username|slice:":1"|upper }}</div><span>{{ user.get_full_name  }}</span></a>
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown"><div class="user-avatar me-2">{{ user.username|slice:":1"|upper }}</div><span>{{ user.get_full_name|default:user.username }}</span></a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
-                                {% if user.is_staff %}<li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="fas fa-user me-2"></i>Admin</a></li>{% endif %}
+                                {% if user.is_staff %}<li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="fas fa-user-shield me-2"></i>Admin</a></li>{% endif %}
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Settings</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><form action="{% url 'logoutw' %}" method="post" style="display: inline;">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt me-2"></i>Logout</button></form></li>
@@ -143,13 +178,46 @@
     </nav>
     
     <div class="container-fluid main-container">
-        {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endif %}
+        {% if messages %}
+                <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            {% for message in messages %}
+                                {% if forloop.first %}
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="messageModalLabel">
+                                        {% if 'success' in message.tags %}
+                                            <i class="fas fa-check-circle text-success me-2"></i>Success
+                                        {% elif 'error' in message.tags %}
+                                            <i class="fas fa-times-circle text-danger me-2"></i>Error
+                                        {% else %}
+                                            <i class="fas fa-info-circle text-info me-2"></i>Notification
+                                        {% endif %}
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <ul class="list-unstyled mb-0">
+                                {% endif %}
+                                        <li class="mb-2">{{ message }}</li>
+                                {% if forloop.last %}
+                                    </ul>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
         {% block content %}{% endblock %}
     </div>
 
-    <footer class="footer">
+    <footer class="footer mt-auto py-3 bg-light">
         <div class="container-fluid text-center">
-            <p class="mb-0">Project Tracker &copy; {% now "Y" %} | A comprehensive project management solution</p>
+            <span class="text-muted">Project Tracker &copy; {% now "Y" %} | A comprehensive project management solution</span>
         </div>
     </footer>
 
@@ -174,6 +242,14 @@
             sessionStorage.setItem('scrollpos', window.scrollY);
             sessionStorage.setItem('scrollpath', window.location.pathname);
         });
+    </script>
+    <script>
+        // Script to automatically trigger the message modal
+        var messageModalElement = document.getElementById('messageModal');
+        if (messageModalElement) {
+            var messageModal = new bootstrap.Modal(messageModalElement);
+            messageModal.show();
+        }
     </script>
 </body>
 </html>

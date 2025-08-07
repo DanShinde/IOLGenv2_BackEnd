@@ -11,6 +11,7 @@ from django.utils import timezone
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from collections import Counter
+from collections import Counter, defaultdict 
 from tracker.utils import (
     get_completion_percentage, get_otif_percentage, get_overall_status,
     get_schedule_status, get_next_milestone
@@ -94,43 +95,72 @@ def project_detail(request, project_id):
     project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
 
     if request.method == 'POST':
-        # ... (Your POST handling logic remains unchanged) ...
         stages_to_save = []
-        success_message = "Changes saved successfully!"
         active_tab = request.POST.get('active_tab', 'automation')
+        
+        # Determine which stages to process based on the button pressed
         if 'save_all_automation' in request.POST:
             stages_to_save = project.stages.filter(stage_type='Automation')
-            success_message = "Automation Stages saved successfully!"
         elif 'save_all_emulation' in request.POST:
             stages_to_save = project.stages.filter(stage_type='Emulation')
-            success_message = "Emulation Stages saved successfully!"
         elif 'stage_id' in request.POST:
             stage_id = request.POST.get('stage_id')
             stages_to_save = project.stages.filter(id=stage_id)
-            stage_name = stages_to_save.first().name if stages_to_save else ''
-            success_message = f"Stage '{stage_name}' updated successfully!"
+
+        # --- NEW VALIDATION LOGIC ---
+        validation_passed = True
+        for stage in stages_to_save:
+            new_status = request.POST.get(f'status_{stage.id}') or "Not started"
+            actual_date_val = request.POST.get(f'actual_date_{stage.id}')
+            
+            # Check if status is 'Completed' but the date is missing
+            if new_status == 'Completed' and not actual_date_val:
+                messages.error(request, f"Please add a completion date for stage '{stage.name}' to save it as 'Completed'.")
+                validation_passed = False
+        
+        # If any validation failed, stop and redirect back immediately
+        if not validation_passed:
+            base_url = reverse('tracker_project_detail', args=[project.id])
+            redirect_url = f'{base_url}?active_tab={active_tab}'
+            return HttpResponseRedirect(redirect_url)
+        # --- END OF NEW VALIDATION LOGIC ---
+
+        # If validation passed, proceed with saving changes
+        success_message = "Changes saved successfully!" # Default message
         for stage in stages_to_save:
             new_planned = parse_date(request.POST.get(f'planned_date_{stage.id}'))
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
+            
             if stage.planned_date != new_planned:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Date", old_value=str(stage.planned_date), new_value=str(new_planned))
             if stage.status != new_status:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Status", old_value=stage.status, new_value=new_status)
             if stage.actual_date != new_actual:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Date", old_value=str(stage.actual_date), new_value=str(new_actual))
+            
             stage.planned_date = new_planned
             stage.status = new_status
             stage.actual_date = new_actual
             stage.save()
+
+        # Update success message based on action
+        if 'save_all_automation' in request.POST:
+            success_message = "Automation Stages saved successfully!"
+        elif 'save_all_emulation' in request.POST:
+            success_message = "Emulation Stages saved successfully!"
+        elif 'stage_id' in request.POST:
+            stage_name = stages_to_save.first().name if stages_to_save else ''
+            success_message = f"Stage '{stage_name}' updated successfully!"
+
         cache.delete(f'project_detail_{project_id}')
         messages.success(request, success_message)
         base_url = reverse('tracker_project_detail', args=[project.id])
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
-    # --- GET Request Logic (NO CACHING) ---
+    # --- GET Request Logic (This part is unchanged) ---
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
     
@@ -158,7 +188,7 @@ def project_detail(request, project_id):
     if last_completed_auto_index >= 0 and total_auto_segments > 0:
         timeline_progress_auto = round((last_completed_auto_index / total_auto_segments) * 100)
 
-    # ✅ Timeline Calculation for Emulation
+    # Timeline Calculation for Emulation
     applicable_emu_stages = [s for s in emulation_stages if s.status != "Not Applicable"]
     last_completed_emu_index = -1
     for i, stage in enumerate(applicable_emu_stages):
@@ -182,7 +212,6 @@ def project_detail(request, project_id):
     
     return render(request, 'tracker/project_detail.html', context)
 
-
 @login_required
 def delete_project(request, project_id):
     project = get_object_or_404(Project, id=project_id)
@@ -190,6 +219,8 @@ def delete_project(request, project_id):
     messages.success(request, "Project deleted successfully.")
     return redirect('tracker_index')
 
+
+# In tracker/views.py
 
 @login_required
 def dashboard(request):
@@ -214,12 +245,29 @@ def dashboard(request):
     else:
         completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
         live_projects = Project.objects.filter(so_punch_date__lte=end_date).exclude(id__in=completed_early_ids).distinct()
+
+    # --- CHRONIC PROJECTS LOGIC CORRECTION ---
     chronic_period = request.GET.get('chronic_period', '1y')
     chronic_cutoff_date = today
     if chronic_period == '6m': chronic_cutoff_date = today - relativedelta(months=6)
     elif chronic_period == '1y': chronic_cutoff_date = today - relativedelta(years=1)
     elif chronic_period == '2y': chronic_cutoff_date = today - relativedelta(years=2)
-    chronic_projects = Project.objects.exclude(stages__name='Handover', stages__status='Completed').filter(so_punch_date__lt=chronic_cutoff_date).select_related('segment_con').order_by('so_punch_date')
+
+    # NEW, ROBUST QUERY
+    # 1. First, get the IDs of all projects that are genuinely completed.
+    completed_project_ids = Project.objects.filter(
+        stages__name='Handover', 
+        stages__status='Completed'
+    ).values_list('id', flat=True)
+
+    # 2. Then, find projects that are older than the cutoff AND are NOT in the completed list.
+    chronic_projects = Project.objects.exclude(
+        id__in=completed_project_ids
+    ).filter(
+        so_punch_date__lt=chronic_cutoff_date
+    ).select_related('segment_con').order_by('so_punch_date')
+    # --- END OF CORRECTION ---
+
     completed_stages = Stage.objects.filter(project__in=live_projects, status='Completed')
     if period != 'all' or (custom_start and custom_end):
         completed_stages = completed_stages.filter(actual_date__range=[start_date, end_date])
@@ -264,7 +312,7 @@ def project_reports(request):
     if start_date and end_date:
         projects = projects.filter(so_punch_date__range=[start_date, end_date])
 
-    # --- NEW: Process Stage-Specific Filters ---
+    # --- Process Stage-Specific Filters ---
     stage_filters_from_request = {}
     for stage_key, stage_display in Stage.STAGE_NAMES:
         status = request.GET.get(f'stage_{stage_key}_status')
@@ -272,34 +320,66 @@ def project_reports(request):
         end = request.GET.get(f'stage_{stage_key}_end')
 
         if status or (start and end):
-            # Store the user's selections to send back to the template
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
-            
-            # Prepare the query for this specific stage
             stage_query_filters = {'stages__name': stage_key}
-            if status:
-                stage_query_filters['stages__status'] = status
-            if start and end:
-                stage_query_filters['stages__actual_date__range'] = [start, end]
-            
-            # Apply the filter for this stage
+            if status: stage_query_filters['stages__status'] = status
+            if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
             projects = projects.filter(**stage_query_filters)
             
-
-    # --- Calculate KPIs (no changes here) ---
-    total_projects_found = projects.distinct().count()
-    total_portfolio_value = projects.distinct().aggregate(total_value=Sum('value'))['total_value'] or 0
-    
-    # We use distinct projects for calculations
+    # We use distinct projects for all calculations
     distinct_projects = projects.distinct()
+    total_projects_found = distinct_projects.count()
+
+    # --- Calculate Standard KPIs ---
+    total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
     completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
     average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
 
-    # --- Prepare chart data (no changes here) ---
+    # --- NEW INSIGHT 1: ON-TIME COMPLETION RATE ---
+    completed_stages = Stage.objects.filter(project__in=distinct_projects, status='Completed')
+    total_completed = completed_stages.count()
+    on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
+    on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
+
+    # --- NEW INSIGHT 2: VALUE BY STATUS ---
+    value_by_status = Counter()
+    for p in distinct_projects:
+        value_by_status[p.get_overall_status()] += p.value
+    value_by_status_labels = list(value_by_status.keys())
+    value_by_status_data = list(value_by_status.values())
+
+    # --- NEW INSIGHT 3: AVERAGE STAGE DURATION ---
+    stage_durations = defaultdict(list)
+    stage_order = [s[0] for s in Stage.STAGE_NAMES]
+
+    for project in distinct_projects:
+        project_stages = sorted(
+            project.stages.filter(status='Completed', actual_date__isnull=False),
+            key=lambda s: stage_order.index(s.name) if s.name in stage_order else 999
+        )
+        
+        for i in range(1, len(project_stages)):
+            prev_stage = project_stages[i-1]
+            curr_stage = project_stages[i]
+            
+            if prev_stage.actual_date and curr_stage.actual_date:
+                duration = (curr_stage.actual_date - prev_stage.actual_date).days
+                if duration >= 0:
+                    stage_durations[curr_stage.name].append(duration)
+
+    avg_stage_durations = {}
+    for stage_name in stage_order:
+        durations = stage_durations.get(stage_name)
+        if durations:
+            avg_stage_durations[stage_name] = sum(durations) / len(durations)
+            
+    stage_duration_labels = list(avg_stage_durations.keys())
+    stage_duration_data = list(avg_stage_durations.values())
+    
+    # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
     status_labels = list(status_counts.keys())
     status_data = list(status_counts.values())
-
     segment_counts = distinct_projects.values('segment_con__name').annotate(count=Count('id')).order_by('-count')
     segment_labels = [item['segment_con__name'] for item in segment_counts if item['segment_con__name']]
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
@@ -311,16 +391,17 @@ def project_reports(request):
         'average_completion': average_completion,
         'all_segments': trackerSegment.objects.all(),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
-        'start_date': start_date,
-        'end_date': end_date,
-        'status_labels': status_labels,
-        'status_data': status_data,
-        'segment_labels': segment_labels,
-        'segment_data': segment_data,
-        # NEW: Pass stage info and selected filters to the template
-        'stage_names': Stage.STAGE_NAMES,
-        'status_choices': Stage.STATUS_CHOICES,
+        'start_date': start_date, 'end_date': end_date,
+        'status_labels': status_labels, 'status_data': status_data,
+        'segment_labels': segment_labels, 'segment_data': segment_data,
+        'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'stage_filters': stage_filters_from_request,
+        # --- ADDING NEW DATA TO CONTEXT ---
+        'on_time_completion_rate': on_time_completion_rate,
+        'value_by_status_labels': value_by_status_labels,
+        'value_by_status_data': value_by_status_data,
+        'stage_duration_labels': stage_duration_labels,
+        'stage_duration_data': stage_duration_data,
     }
     return render(request, 'tracker/project_report.html', context)
 

@@ -4,14 +4,18 @@
             <form method="post" action="{% url 'tracker_add_remark' stage.id %}">
                 {% csrf_token %}
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Remark - {{ stage.name }}</h5>
+                    <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Add Remark for {{ stage.name }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <textarea name="remark" class="form-control" rows="4" required placeholder="Enter your remark..."></textarea>
+                    <div class="mb-3">
+                        <label for="remark-text-{{ stage.id }}" class="form-label">Remark Details</label>
+                        <textarea name="remark" id="remark-text-{{ stage.id }}" class="form-control" rows="4" required placeholder="Enter your remark here..."></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Save Remark</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save Remark</button>
                 </div>
             </form>
         </div>
@@ -19,25 +23,39 @@
 </div>
 
 <div class="modal fade" id="viewRemarkModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Remarks - {{ stage.name }}</h5>
+                <h5 class="modal-title"><i class="fas fa-comments me-2"></i>Remarks for {{ stage.name }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body bg-light">
                 {% if stage.remarks.all %}
-                <ul class="list-group">
                     {% for remark in stage.remarks.all %}
-                    <li class="list-group-item">
-                        <strong>{{ remark.added_by|default:"System" }}</strong> on {{ remark.created_at|date:"M d, Y H:i" }}<br>
-                        {{ remark.text }}
-                    </li>
+                    <div class="remark-item">
+                        <div class="remark-avatar">
+                            {{ remark.added_by.username|slice:":1"|upper|default:"S" }}
+                        </div>
+                        <div class="remark-content">
+                            <div class="remark-header">
+                                <strong class="remark-author">{{ remark.added_by.get_full_name|default:remark.added_by.username|default:"System" }}</strong>
+                                <small class="remark-timestamp">{{ remark.created_at|date:"M d, Y, H:i" }}</small>
+                            </div>
+                            <div class="remark-text">
+                                {{ remark.text|linebreaksbr }}
+                            </div>
+                        </div>
+                    </div>
                     {% endfor %}
-                </ul>
                 {% else %}
-                <p class="text-muted">No remarks yet.</p>
+                <div class="text-center py-5">
+                    <i class="fas fa-comment-slash fa-2x text-muted mb-3"></i>
+                    <p class="text-muted">No remarks have been added for this stage yet.</p>
+                </div>
                 {% endif %}
+            </div>
+             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

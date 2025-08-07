@@ -4,41 +4,49 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-8">
+    <div class="col-lg-8 col-md-10">
         <div class="card">
             <div class="card-header">
-                <h3 class="mb-0">
+                <h4 class="card-header-title mb-0">
                     <i class="fas fa-{% if project %}edit{% else %}plus-circle{% endif %} me-2"></i>
-                    {% if project %}Edit Project{% else %}Add New Project{% endif %}
-                </h3>
+                    {% if project %}Edit Project '{{ project.code }}'{% else %}Add New Project{% endif %}
+                </h4>
             </div>
             <div class="card-body">
                 <form method="POST" class="needs-validation" novalidate>
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Project Code</label>
-                        <input type="text" name="code" class="form-control" 
-                               value="{{ project.code }}" required>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-barcode me-2 text-muted"></i>Project Code</label>
+                            <input type="text" name="code" class="form-control" 
+                                   value="{{ project.code|default:'' }}" required {% if project %}readonly{% endif %}>
+                            {% if project %}<small class="text-muted">Project code cannot be changed after creation.</small>{% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-user-tie me-2 text-muted"></i>Customer Name</label>
+                            <input type="text" name="customer_name" class="form-control" 
+                                   value="{{ project.customer_name|default:'' }}" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Customer Name</label>
-                        <input type="text" name="customer_name" class="form-control" 
-                               value="{{ project.customer_name }}" required>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-indian-rupee-sign me-2 text-muted"></i>Project Value</label>
+                            <input type="number" name="value" step="0.01" class="form-control" 
+                                   value="{{ project.value|default:'' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-calendar-alt me-2 text-muted"></i>SO Punch Date</label>
+                            <input type="date" name="so_punch_date" class="form-control" 
+                                   value="{{ project.so_punch_date|date:'Y-m-d' }}" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Project Value</label>
-                        <input type="number" name="value" step="0.01" class="form-control" 
-                               value="{{ project.value }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">SO Punch Date</label>
-                        <input type="date" name="so_punch_date" class="form-control" 
-                               value="{{ project.so_punch_date|date:'Y-m-d' }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Segment</label>
+
+                    <div class="mb-4">
+                        <label class="form-label"><i class="fas fa-puzzle-piece me-2 text-muted"></i>Segment</label>
                         <select name="segment" class="form-select" required>
-                            <option value="">Select Segment</option>
+                            <option value="">-- Select a Segment --</option>
                             {% for seg in segments %}
                                 <option value="{{ seg.id }}"
                                     {% if project and project.segment_con and project.segment_con.id == seg.id %}selected{% endif %}>
@@ -47,9 +55,17 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-success w-100">
-                        <i class="fas fa-save me-2"></i>Save Project
-                    </button>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ request.META.HTTP_REFERER|default_if_none:request.build_absolute_uri|urlencode }}" class="btn btn-outline-secondary me-2">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>{% if project %}Save Changes{% else %}Create Project{% endif %}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
