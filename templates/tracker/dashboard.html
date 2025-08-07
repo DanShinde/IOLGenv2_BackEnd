@@ -62,7 +62,7 @@
         <div class="metric-card"><div class="metric-icon" style="color: #dc3545; background: rgba(220, 53, 69, 0.1);"><i class="fas fa-exclamation-triangle"></i></div><div class="metric-value">{{ delayed_projects }}</div><div class="metric-label">Delayed Projects</div></div>
     </div>
     <div class="col-lg col-md-6 mb-3">
-        <div class="metric-card"><div class="metric-icon"><i class="fas fa-indian-rupee-sign"></i></div><div class="metric-value">₹{{ total_value|intcomma }}</div><div class="metric-label">Value of Live Projects</div></div>
+        <div class="metric-card"><div class="metric-icon"><i class="fas fa-indian-rupee-sign"></i></div><div class="metric-value">₹{{ total_value|intcomma }}</div><div class="metric-label">Value of Live Projects in Cr.</div></div>
     </div>
 </div>
 
@@ -126,7 +126,7 @@
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-custom table-striped">
-                        <thead><tr><th>Project Code</th><th>Customer</th><th>Segment</th><th>Value</th><th>SO Punch Date</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Project Code</th><th>Customer</th><th>Segment</th><th>Value in Cr.</th><th>SO Punch Date</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
                         <tbody>
                             {% for project in recent_projects %}
                             <tr>

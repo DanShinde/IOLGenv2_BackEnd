@@ -24,7 +24,7 @@
             <div class="metric-card h-100 w-100">
                 <div class="metric-icon"><i class="fas fa-indian-rupee-sign"></i></div>
                 <div class="metric-value">₹{{ total_portfolio_value|intcomma }}</div>
-                <div class="metric-label">Total Value of Found Projects</div>
+                <div class="metric-label">Total Value of Found Projects in Cr.</div>
             </div>
         </div>
         <div class="col-lg-3 col-md-6 mb-3 d-flex">
@@ -71,6 +71,17 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Value Range (in Cr.)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Min</span>
+                                    <input type="number" name="min_value" class="form-control" value="{{ min_value|default:'' }}" placeholder="e.g., 10" step="any">
+                                    <span class="input-group-text">Max</span>
+                                    <input type="number" name="max_value" class="form-control" value="{{ max_value|default:'' }}" placeholder="e.g., 50" step="any">
+                                </div>
+                            </div>
+                        </div>
                     </fieldset>
                     <fieldset>
                         <legend class="h6">Stage Specific Filters</legend>
@@ -97,7 +108,7 @@
             <div class="table-responsive">
                 <table class="table table-custom table-striped table-hover mb-0">
                     <thead class="table-light">
-                        <tr><th>Code</th><th>Customer</th><th>Segment</th><th>Value</th><th>Completion</th><th>Status</th></tr>
+                        <tr><th>Code</th><th>Customer</th><th>Segment</th><th>Value in Cr.</th><th>Completion</th><th>Status</th></tr>
                     </thead>
                     <tbody>
                         {% for project in projects %}<tr>
@@ -118,10 +129,6 @@
         <div class="col-md-7"><div class="card h-100"><div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Projects by Segment</h5></div><div class="card-body"><canvas id="segmentBarChart"></canvas></div></div></div>
     </div>
     
-    <div class="row mt-4">
-        <div class="col-lg-6 mb-4"><div class="card h-100"><div class="card-header"><h5 class="card-header-title"><i class="fas fa-piggy-bank me-2"></i>Portfolio Value by Status</h5></div><div class="card-body"><canvas id="valueByStatusChart"></canvas></div></div></div>
-        <div class="col-lg-6 mb-4"><div class="card h-100"><div class="card-header"><h5 class="card-header-title"><i class="fas fa-hourglass-half me-2"></i>Average Stage Duration (in Days)</h5></div><div class="card-body"><canvas id="stageDurationChart"></canvas></div></div></div>
-    </div>
 </div>
 {% endblock %}
 
@@ -138,16 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentCtx = document.getElementById('segmentBarChart');
     if (segmentCtx && {{ segment_data|safe }}.length > 0) {
         new Chart(segmentCtx, { type: 'bar', data: { labels: {{ segment_labels|safe }}, datasets: [{ label: '# of Projects', data: {{ segment_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)' }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
-    }
-    // Value by Status Chart
-    const valueByStatusCtx = document.getElementById('valueByStatusChart');
-    if (valueByStatusCtx && {{ value_by_status_data|safe }}.length > 0) {
-        new Chart(valueByStatusCtx, { type: 'bar', data: { labels: {{ value_by_status_labels|safe }}, datasets: [{ label: 'Total Value', data: {{ value_by_status_data|safe }}, backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d'] }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return '₹' + new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(value); } } } } } });
-    }
-    // Stage Duration Chart
-    const stageDurationCtx = document.getElementById('stageDurationChart');
-    if (stageDurationCtx && {{ stage_duration_data|safe }}.length > 0) {
-        new Chart(stageDurationCtx, { type: 'bar', data: { labels: {{ stage_duration_labels|safe }}, datasets: [{ label: 'Average Duration (Days)', data: {{ stage_duration_data|safe }}, backgroundColor: 'rgba(255, 159, 64, 0.7)' }] }, options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: 'Days' } } } } });
     }
 });
 </script>

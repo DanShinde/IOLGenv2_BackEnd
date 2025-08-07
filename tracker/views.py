@@ -305,12 +305,29 @@ def project_reports(request):
     selected_segment_ids = request.GET.getlist('segments')
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
+    min_value = request.GET.get('min_value')
+    max_value = request.GET.get('max_value')
 
     if selected_segment_ids:
         projects = projects.filter(segment_con__id__in=selected_segment_ids)
     
     if start_date and end_date:
         projects = projects.filter(so_punch_date__range=[start_date, end_date])
+
+    # --- NEW: Filter by Project Value ---
+    if min_value:
+        try:
+            projects = projects.filter(value__gte=float(min_value))
+        except (ValueError, TypeError):
+            # Silently ignore if the value is not a valid number
+            pass
+    if max_value:
+        try:
+            projects = projects.filter(value__lte=float(max_value))
+        except (ValueError, TypeError):
+            # Silently ignore if the value is not a valid number
+            pass
+    # --- END OF NEW FILTER ---
 
     # --- Process Stage-Specific Filters ---
     stage_filters_from_request = {}
@@ -334,47 +351,10 @@ def project_reports(request):
     total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
     completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
     average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
-
-    # --- NEW INSIGHT 1: ON-TIME COMPLETION RATE ---
     completed_stages = Stage.objects.filter(project__in=distinct_projects, status='Completed')
     total_completed = completed_stages.count()
     on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
     on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
-
-    # --- NEW INSIGHT 2: VALUE BY STATUS ---
-    value_by_status = Counter()
-    for p in distinct_projects:
-        value_by_status[p.get_overall_status()] += p.value
-    value_by_status_labels = list(value_by_status.keys())
-    value_by_status_data = list(value_by_status.values())
-
-    # --- NEW INSIGHT 3: AVERAGE STAGE DURATION ---
-    stage_durations = defaultdict(list)
-    stage_order = [s[0] for s in Stage.STAGE_NAMES]
-
-    for project in distinct_projects:
-        project_stages = sorted(
-            project.stages.filter(status='Completed', actual_date__isnull=False),
-            key=lambda s: stage_order.index(s.name) if s.name in stage_order else 999
-        )
-        
-        for i in range(1, len(project_stages)):
-            prev_stage = project_stages[i-1]
-            curr_stage = project_stages[i]
-            
-            if prev_stage.actual_date and curr_stage.actual_date:
-                duration = (curr_stage.actual_date - prev_stage.actual_date).days
-                if duration >= 0:
-                    stage_durations[curr_stage.name].append(duration)
-
-    avg_stage_durations = {}
-    for stage_name in stage_order:
-        durations = stage_durations.get(stage_name)
-        if durations:
-            avg_stage_durations[stage_name] = sum(durations) / len(durations)
-            
-    stage_duration_labels = list(avg_stage_durations.keys())
-    stage_duration_data = list(avg_stage_durations.values())
     
     # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
@@ -392,16 +372,13 @@ def project_reports(request):
         'all_segments': trackerSegment.objects.all(),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
         'start_date': start_date, 'end_date': end_date,
+        'min_value': min_value, # Pass min_value to template
+        'max_value': max_value, # Pass max_value to template
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'stage_filters': stage_filters_from_request,
-        # --- ADDING NEW DATA TO CONTEXT ---
         'on_time_completion_rate': on_time_completion_rate,
-        'value_by_status_labels': value_by_status_labels,
-        'value_by_status_data': value_by_status_data,
-        'stage_duration_labels': stage_duration_labels,
-        'stage_duration_data': stage_duration_data,
     }
     return render(request, 'tracker/project_report.html', context)
 
