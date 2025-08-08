@@ -1,68 +1,134 @@
 {% extends 'tracker/base.html' %}
+{% load custom_tags %}
+{% load humanize %}
 
 {% block title %}Upcoming Milestones{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Style for the project group header row in the table */
+    .project-group-header td {
+        background-color: #f8fafd;
+        font-weight: 600;
+        border-top: 2px solid #dee2e6 !important;
+    }
+</style>
+{% endblock %}
+
+
 {% block content %}
 <div class="page-header mb-4">
-    <h2 class="page-title"><i class="fas fa-calendar-alt me-2"></i>Upcoming Milestones</h2>
-    <p class="page-subtitle">List of project milestones planned in the future</p>
+    <h1 class="page-title"><i class="fas fa-calendar-alt me-2"></i>Upcoming Milestones</h1>
+    <p class="page-subtitle">A centralized list of all future project milestones.</p>
 </div>
 
-<!-- Filter Buttons -->
-<form method="get" class="mb-3 d-flex gap-2 flex-wrap">
-    {% for label, value in filter_options %}
-        <button type="submit" name="filter" value="{{ value }}"
-            class="btn {% if filter_type == value %}btn-primary{% else %}btn-outline-primary{% endif %}">
-            {{ label }}
-        </button>
-    {% endfor %}
-</form>
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-header-title"><i class="fas fa-filter me-2"></i>Filter & Export</h5>
+    </div>
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+             <ul class="nav nav-pills">
+                {% for label, value in filter_options %}
+                <li class="nav-item">
+                    <a href="?filter={{ value }}" class="nav-link {% if filter_type == value %}active{% endif %}">{{ label }}</a>
+                </li>
+                {% endfor %}
+            </ul>
 
-<!-- Export Buttons -->
-<div class="d-flex justify-content-end mb-3 gap-2">
-    <a href="{% url 'tracker_export_milestones_excel' %}?filter={{ filter_type }}" class="btn btn-outline-success">
-        <i class="fas fa-file-excel me-1"></i> Export Excel
-    </a>
-    <a href="{% url 'tracker_export_milestones_pdf' %}?filter={{ filter_type }}" class="btn btn-outline-danger">
-        <i class="fas fa-file-pdf me-1"></i> Export PDF
-    </a>
+            <div class="d-flex align-items-center gap-2">
+                <form method="get" class="d-flex gap-2">
+                    <input type="text" name="q" class="form-control form-control-sm" placeholder="Search Project/Customer..." value="{{ request.GET.q }}">
+                    <button type="submit" class="btn btn-sm btn-secondary">Search</button>
+                </form>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-download me-1"></i> Export
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a href="{% url 'tracker_export_milestones_excel' %}?{{ request.GET.urlencode }}" class="dropdown-item">
+                                <i class="fas fa-file-excel me-2"></i> As Excel (.xlsx)
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{% url 'tracker_export_milestones_pdf' %}?{{ request.GET.urlencode }}" class="dropdown-item">
+                                <i class="fas fa-file-pdf me-2"></i> As PDF
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-
 
 <div class="card">
     <div class="card-body p-0">
-        {% if upcoming %}
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-custom table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Project</th>
-                        <th>Milestone</th>
+                        <th style="width: 40%;">Milestone</th>
                         <th>Status</th>
                         <th>Planned Date</th>
+                        <th>Urgency</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for stage in upcoming %}
-                   
-                    <tr class="{% if stage.planned_date < today and stage.status != 'Completed' %}table-danger{% endif %}">    
-                        <td>{{ stage.project.code }} - {{ stage.project.customer_name }}</td>
-                        <td>{{ stage.name }}</td>
-                        <td>
-                            <span class="badge bg-secondary">{{ stage.status }}</span>
-                        </td>
-                        <td>{{ stage.planned_date|date:"M d, Y" }}</td>
-                    </tr>
+                {% if grouped_stages %}
+                    {% for group in grouped_stages %}
+                    <tbody class="project-group">
+                        <tr class="project-group-header">
+                            <td colspan="4">
+                                <a href="{% url 'tracker_project_detail' group.project.id %}" class="text-decoration-none">
+                                    <i class="fas fa-folder me-2"></i>{{ group.project.code }}
+                                </a>
+                                <span class="text-muted fw-normal ms-2">- {{ group.project.customer_name }}</span>
+                            </td>
+                        </tr>
+                        {% for stage in group.stages %}
+                        <tr>    
+                            <td><i class="fa fa-angle-right me-2 text-muted"></i>{{ stage.name }}</td>
+                            <td><span class="status-badge bg-{{ stage.status|slugify }}">{{ stage.status }}</span></td>
+                            <td>{{ stage.planned_date|date:"M d, Y" }}</td>
+                            <td>
+                                {% with urgency=stage.planned_date|days_until %}
+                                    {% if 'overdue' in urgency %}
+                                        <span class="badge rounded-pill bg-danger-soft text-danger">{{ urgency }}</span>
+                                    {% elif 'today' in urgency %}
+                                        <span class="badge rounded-pill bg-warning-soft text-warning">{{ urgency }}</span>
+                                    {% elif 'tomorrow' in urgency %}
+                                        <span class="badge rounded-pill bg-info-soft text-info">{{ urgency }}</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-light text-dark">{{ urgency }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
                     {% endfor %}
-                </tbody>
+                {% else %}
+                    <tbody>
+                        <tr>
+                            <td colspan="4">
+                                <div class="text-center py-5">
+                                    <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+                                    <p class="text-muted">No upcoming milestones match your filter criteria.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                {% endif %}
             </table>
         </div>
-        {% else %}
-        <div class="text-center py-4">
-            <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
-            <p class="text-muted">No upcoming milestones.</p>
-        </div>
-        {% endif %}
     </div>
 </div>
+
+<style>
+.bg-danger-soft { background-color: rgba(220, 53, 69, 0.1); }
+.bg-warning-soft { background-color: rgba(255, 193, 7, 0.1); }
+.bg-info-soft { background-color: rgba(13, 202, 240, 0.1); }
+</style>
+
 {% endblock %}
