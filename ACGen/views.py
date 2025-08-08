@@ -541,10 +541,12 @@ def set_cluster_dependencies(request):
         cache.delete(f"cluster_template:{cluster_id}")
         
         return Response({
+            'success': True,
             'message': 'Dependencies updated successfully',
             'cluster_id': cluster_id,
             'dependency_count': len(dependencies)
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
+        print(f"Error setting dependencies: {e}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
