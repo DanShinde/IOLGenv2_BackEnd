@@ -1,3 +1,6 @@
+from django.utils import timezone
+import datetime
+
 def get_completion_percentage(stages):
     stages = [s for s in stages if s.status != "Not Applicable"]
     total = len(stages)
@@ -14,30 +17,27 @@ def get_otif_percentage(stages):
 def get_overall_status(stages):
     if any(s.status == 'Hold' for s in stages):
         return 'Hold'
-    if any(s.name == 'Handover' and s.status == 'Completed' for s in stages):
+    # Check if the *last* stage in the list is Completed. Assumes handover is last.
+    if stages and stages[-1].name == 'Handover' and stages[-1].status == 'Completed':
         return 'Completed'
-    if any(s.status not in ['Not started', 'Hold'] for s in stages):
+    if any(s.status not in ['Not started', 'Hold', 'Not Applicable'] for s in stages):
         return 'In Progress'
-    if all(s.status == 'Not started' for s in stages):
-        return 'Not started'
     return 'Not started'
 
 def get_schedule_status(stages):
-    completed = [s for s in stages if s.status == 'Completed']
+    completed = [s for s in stages if s.status == 'Completed' and s.actual_date and s.planned_date]
     if not completed:
         return None
-    last = completed[-1]
-    if last.actual_date and last.planned_date:
-        return (last.actual_date - last.planned_date).days
-    return None
+    # Sort by ID to ensure we get the last chronological stage
+    last = sorted(completed, key=lambda s: s.id)[-1]
+    return (last.actual_date - last.planned_date).days
 
 def get_next_milestone(stages):
-    completed = [s for s in stages if s.status == 'Completed']
-    if not stages:
-        return None
-    if not completed:
-        return stages[0]
-    if completed[-1] in stages:
-        idx = stages.index(completed[-1])
-        return stages[idx + 1] if idx + 1 < len(stages) else None
+    """
+    Finds the first stage in a given list that is not 'Completed' or 'Not Applicable'.
+    Assumes the list of stages is already sorted by ID.
+    """
+    for stage in stages:
+        if stage.status not in ['Completed', 'Not Applicable']:
+            return stage
     return None

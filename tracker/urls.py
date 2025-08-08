@@ -18,4 +18,11 @@ urlpatterns = [
     path('upcoming-milestones/export/pdf/', views.export_milestones_pdf, name='tracker_export_milestones_pdf'),
     path('remark/add/<int:stage_id>/', views.add_remark, name='tracker_add_remark'),
     path('remark/view/<int:stage_id>/', views.get_remarks, name='tracker_view_remarks'),
+    path('project-reports/export/pdf/', views.export_report_pdf, name='export_report_pdf'),
+    path('project/<int:project_id>/add_update/', views.add_project_update, name='add_project_update'),
+    path('update/<int:update_id>/edit/', views.edit_project_update, name='edit_project_update'),
+    path('update/<int:update_id>/delete/', views.delete_project_update, name='delete_project_update'),
+    path('update/<int:update_id>/toggle_status/', views.toggle_update_status, name='toggle_update_status'),
+    path('project/<int:project_id>/updates/', views.all_project_updates, name='all_project_updates'),
+    path('update/<int:update_id>/mitigation/', views.save_mitigation_plan, name='save_mitigation_plan'),
 ]

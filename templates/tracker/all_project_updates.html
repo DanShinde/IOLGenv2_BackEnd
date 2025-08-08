@@ -1,0 +1,35 @@
+{% extends 'tracker/base.html' %}
+{% load humanize %}
+{% load custom_tags %}
+
+{% block title %}All Updates for {{ project.code }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="page-title"><i class="fas fa-bullhorn me-2"></i>All Updates for {{ project.code }}</h1>
+            <p class="page-subtitle">The complete update history for this project</p>
+        </div>
+        <a href="{% url 'tracker_project_detail' project.id %}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Project
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% for update in updates %}
+            {% include 'tracker/partials/project_update_item.html' with update=update user=user %}
+        {% empty %}
+            <div class="text-center py-5">
+                <i class="fas fa-comment-slash fa-2x text-muted mb-3"></i>
+                <p class="text-muted">No project updates have been added yet.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% include 'tracker/partials/project_update_modals.html' with updates=updates %}
+
+{% endblock %}
