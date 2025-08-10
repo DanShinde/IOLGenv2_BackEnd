@@ -57,7 +57,8 @@ INSTALLED_APPS = [
     'IOLGen',
     'home',
     'tracker',
-    'django.contrib.humanize'
+    'django.contrib.humanize',
+    'inventory',
 ]
 
 MIDDLEWARE = [
