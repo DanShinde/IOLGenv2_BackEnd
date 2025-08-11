@@ -52,11 +52,11 @@
     </div>
 
     <div class="flex space-x-4">
-        <a href="{% url 'item-update' item.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+        <a href="{% url 'inventory-item-update' item.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-edit mr-2"></i>Edit
         </a>
         {% if item.status == 'AVAILABLE' %}
-        <a href="{% url 'transfer-item' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
+        <a href="{% url 'inventory-transfer-item' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-plus mr-2"></i>Assign/Dispatch
         </a>
         {% endif %}

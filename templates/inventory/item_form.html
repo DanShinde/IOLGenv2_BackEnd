@@ -390,7 +390,7 @@
                 </div>
                 
                 <div class="form-actions">
-                    <a href="{% if form.instance.pk %}{% url 'item-detail' form.instance.pk %}{% else %}{% url 'item-list' %}{% endif %}" 
+                    <a href="{% if form.instance.pk %}{% url 'inventory-item-detail' form.instance.pk %}{% else %}{% url 'inventory-item-list' %}{% endif %}" 
                        class="btn btn-secondary">
                         <i class="fas fa-times" style="margin-right: 8px;"></i>Cancel
                     </a>

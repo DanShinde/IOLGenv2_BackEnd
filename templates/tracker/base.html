@@ -156,6 +156,11 @@
                         <li class="nav-item"><a class="nav-link" href="{% url 'tracker_upcoming_milestones' %}"><i class="fas fa-calendar-alt me-2"></i> Upcoming Milestones</a></li>
                     {% endif %}
                 </ul>
+                <div class="hidden md:flex items-center space-x-2">
+                    <a href="{% url 'home' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors" title="Home">
+                        <i class="fas fa-home"></i>
+                    </a>
+                </div>
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
                         <li class="nav-item dropdown user-dropdown">

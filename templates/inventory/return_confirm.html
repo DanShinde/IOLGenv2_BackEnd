@@ -55,7 +55,7 @@
         <form method="post">
             {% csrf_token %}
             <div class="flex justify-end space-x-4">
-                <a href="{% url 'transfer-item' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
+                <a href="{% url 'inventory-transfer-item' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
                     <i class="fas fa-times mr-2"></i>Cancel
                 </a>
                 <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">

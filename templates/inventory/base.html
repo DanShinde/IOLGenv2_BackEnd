@@ -95,14 +95,14 @@
             <nav class="p-4">
                 <ul class="space-y-1">
                     <li>
-                        <a href="{% url 'dashboard' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                        <a href="{% url 'inventory-dashboard' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-dashboard' %}active{% endif %}">
                             <i class="fas fa-tachometer-alt mr-3 text-blue-500"></i>
                             <span>Dashboard</span>
                         </a>
                     </li>
                     
                     <li>
-                        <a href="{% url 'item-list' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'item-list' or request.resolver_match.url_name == 'item-detail' or request.resolver_match.url_name == 'item-create' or request.resolver_match.url_name == 'item-update' %}active{% endif %}">
+                        <a href="{% url 'inventory-item-list' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-item-list' or request.resolver_match.url_name == 'inventory-item-detail' or request.resolver_match.url_name == 'inventory-item-create' or request.resolver_match.url_name == 'inventory-item-update' %}active{% endif %}">
                             <i class="fas fa-boxes mr-3 text-green-500"></i>
                             <span>Inventory</span>
                         </a>
@@ -111,21 +111,21 @@
                     
                     
                     <li>
-                        <a href="{% url 'transfer-item' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if 'transfer' in request.resolver_match.url_name %}active{% endif %}">
+                        <a href="{% url 'inventory-transfer-item' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if 'transfer' in request.resolver_match.url_name %}active{% endif %}">
                             <i class="fas fa-exchange-alt mr-3 text-purple-500"></i>
                             <span>Transfers</span>
                         </a>
                     </li>
                     
                     <li>
-                        <a href="{% url 'history-list' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'history-list' %}active{% endif %}">
+                        <a href="{% url 'inventory-history-list' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-history-list' %}active{% endif %}">
                             <i class="fas fa-history mr-3 text-indigo-500"></i>
                             <span>History</span>
                         </a>
                     </li>
                     
                     <li>
-                        <a href="{% url 'reports' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+                        <a href="{% url 'inventory-reports' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-reports' %}active{% endif %}">
                             <i class="fas fa-chart-bar mr-3 text-teal-500"></i>
                             <span>Reports</span>
                         </a>
@@ -165,35 +165,39 @@
                     <div class="flex items-center">
                         <h2 class="text-xl font-semibold text-gray-800">
                             {% block page_title %}
-                                {% if request.resolver_match.url_name == 'dashboard' %}Dashboard
-                                {% elif request.resolver_match.url_name == 'item-list' %}Inventory Items
+                                {% if request.resolver_match.url_name == 'inventory-dashboard' %}Dashboard
+                                {% elif request.resolver_match.url_name == 'inventory-item-list' %}Inventory Items
                                 {% elif 'transfer' in request.resolver_match.url_name %}Transfers
-                                {% elif request.resolver_match.url_name == 'history-list' %}History
-                                {% elif request.resolver_match.url_name == 'reports' %}Reports
+                                {% elif request.resolver_match.url_name == 'inventory-history-list' %}History
+                                {% elif request.resolver_match.url_name == 'inventory-reports' %}Reports
                                 {% else %}Inventory System
                                 {% endif %}
                             {% endblock %}
                         </h2>
                         
                         <!-- Breadcrumb for specific pages -->
-                        {% if request.resolver_match.url_name == 'item-detail' or request.resolver_match.url_name == 'item-update' or request.resolver_match.url_name == 'item-create' %}
+                        {% if request.resolver_match.url_name == 'inventory-item-detail' or request.resolver_match.url_name == 'inventory-item-update' or request.resolver_match.url_name == 'inventory-item-create' %}
                         <div class="ml-2 text-sm text-gray-500">
                             <i class="fas fa-chevron-right mx-2"></i>
-                            {% if request.resolver_match.url_name == 'item-create' %}Add New Item
-                            {% elif request.resolver_match.url_name == 'item-update' %}Edit Item
-                            {% elif request.resolver_match.url_name == 'item-detail' %}Item Details
+                            {% if request.resolver_match.url_name == 'inventory-item-create' %}Add New Item
+                            {% elif request.resolver_match.url_name == 'inventory-item-update' %}Edit Item
+                            {% elif request.resolver_match.url_name == 'inventory-item-detail' %}Item Details
                             {% endif %}
                         </div>
                         {% endif %}
                     </div>
                     
                     <div class="flex items-center space-x-4">
+
                         <!-- Quick Actions -->
                         <div class="hidden md:flex items-center space-x-2">
-                            <a href="{% url 'item-create' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors" title="Add Item">
+                            <a href="{% url 'home' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors" title="Home">
+                                <i class="fas fa-home"></i>
+                            </a>
+                            <a href="{% url 'inventory-item-create' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors" title="Add Item">
                                 <i class="fas fa-plus"></i>
                             </a>
-                            <a href="{% url 'transfer-item' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-purple-600 transition-colors" title="Transfer Items">
+                            <a href="{% url 'inventory-transfer-item' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-purple-600 transition-colors" title="Transfer Items">
                                 <i class="fas fa-exchange-alt"></i>
                             </a>
                         </div>
