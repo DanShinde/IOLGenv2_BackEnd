@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block styles %}
+<link rel="stylesheet" href="{% static 'dashboard/project-cards.css' %}">
+{% endblock styles %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Downloads</h2>
+    
+    {% if infos %}
+        <table class="table table-borderless table-hover">
+            <tbody>
+                {% for info in infos %}
+                    <tr>
+                        <td class="fw-bold text-primary align-top" style="width: 200px;">{{ info.key }}</td>
+                        <td>
+                            {% if 'Url' in info.key %}
+                                <a href="{{ info.value }}" target="_blank" class="text-decoration-none">
+                                    {{ info.value }}
+                                    <i class="fas fa-external-link-alt ms-1 small"></i>
+                                </a>
+                            {% else %}
+                                {{ info.value }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            No download information available at the moment.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
