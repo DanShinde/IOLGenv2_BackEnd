@@ -189,6 +189,7 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         if compact:
             # Option 1: Use values() for efficiency (database level filtering)
             compact_data = queryset.values(
+                'id',
                 'cluster_name', 
                 'cluster_path', 
                 'block_type', 
