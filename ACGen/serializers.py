@@ -17,6 +17,8 @@ class StandardStringSerializer(serializers.ModelSerializer):
 
 # ClusterTemplate Serializer
 class ClusterTemplateSerializer(serializers.ModelSerializer):
+    dependencies = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    
     class Meta:
         model = ClusterTemplate
         fields = '__all__'

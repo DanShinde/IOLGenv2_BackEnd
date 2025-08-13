@@ -28,7 +28,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 import json
-
+# from django.db.models import ArrayAgg
+from django.contrib.postgres.aggregates import ArrayAgg
 
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
@@ -124,7 +125,7 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
 
         if cached_ids:
             print("Cache HIT")
-            return ClusterTemplate.objects.filter(pk__in=cached_ids).order_by('cluster_name')
+            return ClusterTemplate.objects.filter(pk__in=cached_ids).distinct().order_by('cluster_name')
 
         # Build queryset with filters
         queryset = self.queryset.all()
@@ -135,9 +136,11 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(**{param: value})
         
         queryset = queryset.order_by('cluster_name')
-        queryset_ids = list(queryset.values_list('id', flat=True))
+        # queryset_ids = list(queryset.values_list('id', flat=True))
 
+        queryset_ids = list(queryset.values_list('id', flat=True).distinct())
         cache.set(cache_key, queryset_ids, self.cache_timeout)
+        # cache.set(cache_key, queryset_ids, self.cache_timeout)
         print("Cache MISS")
         return queryset
 
@@ -179,7 +182,7 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         cached_ids = cache.get(cache_key)
 
         if cached_ids:
-            queryset = ClusterTemplate.objects.filter(pk__in=cached_ids).order_by('cluster_name')
+            queryset = ClusterTemplate.objects.filter(pk__in=cached_ids).distinct().order_by('cluster_name')
         else:
             queryset = self.get_queryset()
             # Cache the list of IDs
@@ -188,15 +191,16 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         # Handle compact response
         if compact:
             # Option 1: Use values() for efficiency (database level filtering)
-            compact_data = queryset.values(
+            compact_data = queryset.distinct().values(
                 'id',
                 'cluster_name', 
                 'cluster_path', 
                 'block_type', 
                 'cluster_config',
-                'control_library',
-                'dependencies'
-            )
+                'control_library'
+                ).annotate(
+                    dependencies=ArrayAgg('dependencies', distinct=True)
+                )
             return Response(list(compact_data))
         else:
             # Standard serialization
