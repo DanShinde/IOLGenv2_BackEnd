@@ -92,70 +92,146 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     cache_timeout = 300  # 5 minutes cache timeout
 
-    def get_cache_key(self, segment=None):
-        return f"cluster_templates:{segment if segment else 'all'}"
+    def get_cache_key(self, **filters):
+        """Generate cache key based on all filter parameters with versioning"""
+        filter_parts = []
+        for key, value in sorted(filters.items()):
+            if value is not None:
+                filter_parts.append(f"{key}:{value}")
+        
+        filter_string = "_".join(filter_parts) if filter_parts else "all"
+        
+        # Include version for automatic invalidation
+        version = cache.get("cluster_templates_version", 0)
+        return f"cluster_templates:v{version}:{filter_string}"
 
     def get_instance_cache_key(self, instance_id):
         return f"cluster_template:{instance_id}"
 
+    def get_filter_params(self):
+        """Extract and return all supported filter parameters"""
+        return {
+            'segment': self.request.query_params.get('segment'),
+            'control_library': self.request.query_params.get('control_library'),
+            'block_type': self.request.query_params.get('block_type'),
+            # Add more filter parameters as needed
+        }
+
     def get_queryset(self):
-        segment = self.request.query_params.get('segment', None)
-        cache_key = self.get_cache_key(segment)
-        cached_ids = cache.get(cache_key)  # Expecting a list of IDs
+        filter_params = self.get_filter_params()
+        cache_key = self.get_cache_key(**filter_params)
+        cached_ids = cache.get(cache_key)
 
         if cached_ids:
             print("Cache HIT")
-            return ClusterTemplate.objects.filter(pk__in=cached_ids)
+            return ClusterTemplate.objects.filter(pk__in=cached_ids).order_by('cluster_name')
 
-        queryset = self.queryset.filter(segment=segment).order_by('cluster_name') if segment else self.queryset.order_by('cluster_name')
-        queryset_ids = list(queryset.values_list('id', flat=True))  # Store only IDs in cache
+        # Build queryset with filters
+        queryset = self.queryset.all()
+        
+        # Apply filters dynamically
+        for param, value in filter_params.items():
+            if value is not None:
+                queryset = queryset.filter(**{param: value})
+        
+        queryset = queryset.order_by('cluster_name')
+        queryset_ids = list(queryset.values_list('id', flat=True))
 
         cache.set(cache_key, queryset_ids, self.cache_timeout)
         print("Cache MISS")
         return queryset
 
+    def get_serializer(self, *args, **kwargs):
+        """Override to handle compact parameter"""
+        compact = self.request.query_params.get('compact', '').lower() == 'true'
+        
+        if compact:
+            # Use a custom serializer for compact response or limit fields
+            kwargs['fields'] = ['id','cluster_name', 'cluster_path', 'block_type', 'cluster_config', 'dependencies']
+            
+        return super().get_serializer(*args, **kwargs)
+
     def perform_create(self, serializer):
         full_name = self.request.user.get_full_name()
         instance = serializer.save(uploaded_by=full_name, updated_by=full_name)
-        self.invalidate_cache()
+        self.invalidate_all_cache()
         return instance
 
     def perform_update(self, serializer):
         full_name = self.request.user.get_full_name()
         instance = serializer.save(updated_by=full_name)
-        self.invalidate_cache(instance.id)
+        self.invalidate_all_cache()
+        self.invalidate_instance_cache(instance.id)
         return instance
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         response = super().destroy(request, *args, **kwargs)
-        self.invalidate_cache(instance.id)
+        self.invalidate_all_cache()
+        self.invalidate_instance_cache(instance.id)
         return response
 
     def list(self, request, *args, **kwargs):
-        segment = request.query_params.get('segment', None)
-        cache_key = self.get_cache_key(segment)
+        filter_params = self.get_filter_params()
+        compact = request.query_params.get('compact', '').lower() == 'true'
+        
+        cache_key = self.get_cache_key(**filter_params)
         cached_ids = cache.get(cache_key)
 
         if cached_ids:
-            queryset = ClusterTemplate.objects.filter(pk__in=cached_ids)
+            queryset = ClusterTemplate.objects.filter(pk__in=cached_ids).order_by('cluster_name')
+        else:
+            queryset = self.get_queryset()
+            # Cache the list of IDs
+            cache.set(cache_key, list(queryset.values_list('id', flat=True)), self.cache_timeout)
+
+        # Handle compact response
+        if compact:
+            # Option 1: Use values() for efficiency (database level filtering)
+            compact_data = queryset.values(
+                'cluster_name', 
+                'cluster_path', 
+                'block_type', 
+                'cluster_config',
+                'control_library',
+                'dependencies'
+            )
+            return Response(list(compact_data))
+        else:
+            # Standard serialization
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data)
 
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
+    def invalidate_all_cache(self):
+        """Efficiently invalidate cache using pattern matching or cache versioning"""
+        # Option 1: Simple approach - clear all cluster template caches
+        # This is much faster than querying for all possible combinations
+        
+        # If using Redis, you could use pattern-based deletion:
+        # cache.delete_pattern("cluster_templates:*")
+        
+        # For Django's default cache, use a simple version-based approach:
+        cache_version_key = "cluster_templates_version"
+        current_version = cache.get(cache_version_key, 0)
+        cache.set(cache_version_key, current_version + 1, None)  # Never expires
+        
+        # Alternative: Delete only the most common cache keys without DB queries
+        common_cache_keys = [
+            self.get_cache_key(),  # all items
+            # Add more specific keys if you know common patterns
+        ]
+        cache.delete_many(common_cache_keys)
 
-        # Cache the list of IDs instead of full objects
-        cache.set(cache_key, list(queryset.values_list('id', flat=True)), self.cache_timeout)
+    def invalidate_instance_cache(self, instance_id):
+        """Invalidate cache for specific instance"""
+        cache.delete(self.get_instance_cache_key(instance_id))
 
-        return Response(serializer.data)
-
+    # Legacy method for backward compatibility
     def invalidate_cache(self, instance_id=None):
-        """Invalidate cache for all ClusterTemplate lists and specific instances."""
-        cache.delete(self.get_cache_key())
+        """Legacy method - redirects to new methods"""
+        self.invalidate_all_cache()
         if instance_id:
-            cache.delete(self.get_instance_cache_key(instance_id))
-
+            self.invalidate_instance_cache(instance_id)
 
 # Parameter ViewSet
 
