@@ -704,3 +704,10 @@ def all_project_updates(request, project_id):
         'updates': updates
     }
     return render(request, 'tracker/all_project_updates.html', context)
+
+@login_required
+def help_page(request):
+    """
+    Renders the help and documentation page.
+    """
+    return render(request, 'tracker/help_page.html')

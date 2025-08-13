@@ -25,4 +25,5 @@ urlpatterns = [
     path('update/<int:update_id>/toggle_status/', views.toggle_update_status, name='toggle_update_status'),
     path('project/<int:project_id>/updates/', views.all_project_updates, name='all_project_updates'),
     path('update/<int:update_id>/mitigation/', views.save_mitigation_plan, name='save_mitigation_plan'),
+    path('help/', views.help_page, name='help_page'),
 ]
