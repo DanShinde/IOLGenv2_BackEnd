@@ -14,7 +14,7 @@ from collections import Counter
 from collections import Counter, defaultdict 
 from tracker.utils import (
     get_completion_percentage, get_otif_percentage, get_overall_status,
-    get_schedule_status, get_next_milestone
+    get_schedule_status, get_next_milestone,get_final_project_otif
 )
 from django.core.cache import cache
 from io import BytesIO
@@ -203,10 +203,14 @@ def project_detail(request, project_id):
         'updates': updates, 'updates_count': updates_count,
         'completion_percentage': get_completion_percentage(all_stages),
         'timeline_progress_auto': timeline_progress_auto,
-        'timeline_progress_emu': timeline_progress_emu, # ✅ Pass new variable
-        'otif_percentage': get_otif_percentage(all_stages), 'overall_status': get_overall_status(all_stages),
-        'automation_schedule_status': get_schedule_status(automation_stages), 'emulation_schedule_status': get_schedule_status(emulation_stages),
-        'next_automation_milestone': get_next_milestone(automation_stages), 'next_emulation_milestone': get_next_milestone(emulation_stages),
+        'timeline_progress_emu': timeline_progress_emu,
+        'overall_otif_percentage': get_otif_percentage(all_stages), # Renamed for clarity
+        'project_otif': get_final_project_otif(all_stages), # Added new calculation
+        'overall_status': get_overall_status(all_stages),
+        'automation_schedule_status': get_schedule_status(automation_stages), 
+        'emulation_schedule_status': get_schedule_status(emulation_stages),
+        'next_automation_milestone': get_next_milestone(automation_stages), 
+        'next_emulation_milestone': get_next_milestone(emulation_stages),
         'last_update_time': last_update_time, 'recent_activity': recent_activity,
     }
     
@@ -299,9 +303,9 @@ def dashboard(request):
 
 @login_required
 def project_reports(request):
-    projects = Project.objects.select_related('segment_con').prefetch_related('stages').all()
+    projects_qs = Project.objects.select_related('segment_con').prefetch_related('stages').all()
 
-    # --- Get standard filter values ---
+    # --- Get standard filter values (This part is unchanged) ---
     selected_segment_ids = request.GET.getlist('segments')
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
@@ -309,45 +313,56 @@ def project_reports(request):
     max_value = request.GET.get('max_value')
 
     if selected_segment_ids:
-        projects = projects.filter(segment_con__id__in=selected_segment_ids)
-    
+        projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
     if start_date and end_date:
-        projects = projects.filter(so_punch_date__range=[start_date, end_date])
-
-    # --- NEW: Filter by Project Value ---
+        projects_qs = projects_qs.filter(so_punch_date__range=[start_date, end_date])
     if min_value:
         try:
-            projects = projects.filter(value__gte=float(min_value))
-        except (ValueError, TypeError):
-            # Silently ignore if the value is not a valid number
-            pass
+            projects_qs = projects_qs.filter(value__gte=float(min_value))
+        except (ValueError, TypeError): pass
     if max_value:
         try:
-            projects = projects.filter(value__lte=float(max_value))
-        except (ValueError, TypeError):
-            # Silently ignore if the value is not a valid number
-            pass
-    # --- END OF NEW FILTER ---
+            projects_qs = projects_qs.filter(value__lte=float(max_value))
+        except (ValueError, TypeError): pass
 
-    # --- Process Stage-Specific Filters ---
+    # --- Process Stage-Specific Filters (This part is unchanged) ---
     stage_filters_from_request = {}
     for stage_key, stage_display in Stage.STAGE_NAMES:
         status = request.GET.get(f'stage_{stage_key}_status')
         start = request.GET.get(f'stage_{stage_key}_start')
         end = request.GET.get(f'stage_{stage_key}_end')
-
         if status or (start and end):
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
             stage_query_filters = {'stages__name': stage_key}
             if status: stage_query_filters['stages__status'] = status
             if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
-            projects = projects.filter(**stage_query_filters)
+            projects_qs = projects_qs.filter(**stage_query_filters)
             
-    # We use distinct projects for all calculations
-    distinct_projects = projects.distinct()
-    total_projects_found = distinct_projects.count()
+    distinct_projects = projects_qs.distinct()
 
-    # --- Calculate Standard KPIs ---
+    # --- NEW: Prepare projects with their detailed summaries ---
+    projects_with_details = []
+    automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
+    emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
+
+    for project in distinct_projects:
+        all_stages = list(project.stages.all())
+        
+        auto_stages = sorted([s for s in all_stages if s.stage_type == 'Automation'], key=lambda s: automation_order.get(s.name, 99))
+        emu_stages = sorted([s for s in all_stages if s.stage_type == 'Emulation'], key=lambda s: emulation_order.get(s.name, 99))
+        
+        projects_with_details.append({
+            'project': project,
+            'otif': project.get_otif_percentage(),
+            'next_auto_milestone': get_next_milestone(auto_stages),
+            'next_emu_milestone': get_next_milestone(emu_stages),
+            'auto_schedule': get_schedule_status(auto_stages),
+            'emu_schedule': get_schedule_status(emu_stages),
+        })
+    # --- END OF NEW LOGIC ---
+
+    # --- Calculate Standard KPIs (This part is unchanged) ---
+    total_projects_found = distinct_projects.count()
     total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
     completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
     average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
@@ -356,7 +371,7 @@ def project_reports(request):
     on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
     on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
     
-    # --- Prepare standard chart data ---
+    # --- Prepare standard chart data (This part is unchanged) ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
     status_labels = list(status_counts.keys())
     status_data = list(status_counts.values())
@@ -365,15 +380,14 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
-        'projects': distinct_projects,
+        'projects_with_details': projects_with_details, # Pass the new list to the template
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
         'all_segments': trackerSegment.objects.all(),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
         'start_date': start_date, 'end_date': end_date,
-        'min_value': min_value, # Pass min_value to template
-        'max_value': max_value, # Pass max_value to template
+        'min_value': min_value, 'max_value': max_value,
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,

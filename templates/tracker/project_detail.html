@@ -232,6 +232,33 @@
                 <hr>
                 <div class="row">
                     <div class="col-6 border-end">
+                         <h6 class="text-muted">Overall OTIF % (All Stages)</h6>
+                         <p class="h5 mb-0">
+                            {% if overall_otif_percentage is not None %}
+                                {{ overall_otif_percentage|floatformat:1 }}%
+                            {% else %}
+                                <span class="text-muted small">No completed stages yet</span>
+                            {% endif %}
+                         </p>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Project Delivery Status (Handover)</h6>
+                        <p class="mb-0">
+                            {% if project_otif == 101 %}
+                                <span class="badge bg-success fs-6">Before Time In Full</span>
+                            {% elif project_otif == 100 %}
+                                <span class="badge bg-primary fs-6">On Time In Full</span>
+                            {% elif project_otif == 0 %}
+                                <span class="badge bg-danger fs-6">Delayed</span>
+                            {% else %}
+                                <span class="text-muted small">Pending Completion</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6 border-end">
                          <h6 class="text-muted">Automation Schedule</h6>
                          {% with schedule_status=automation_schedule_status %}
                             {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}

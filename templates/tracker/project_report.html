@@ -4,6 +4,40 @@
 
 {% block title %}Project Reports | Project Tracker{% endblock %}
 
+{% block extra_css %}
+<style>
+    .expandable-row {
+        cursor: pointer;
+    }
+    .expandable-row:hover {
+        background-color: #f5f7fb;
+    }
+    .details-row td {
+        background-color: #f8fafd;
+        border-top: none !important;
+        padding: 0 !important;
+    }
+    .details-content {
+        padding: 1rem 1.5rem;
+    }
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+    .detail-item h6 {
+        color: var(--gray);
+        font-size: 0.85rem;
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+    }
+    .detail-item p {
+        font-weight: 500;
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h1 class="page-title"><i class="fas fa-chart-bar me-2"></i>Project Reports</h1>
@@ -106,18 +140,102 @@
         <div class="card-header"><h5 class="card-header-title"><i class="fas fa-table me-2"></i>Filtered Results</h5></div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-custom table-striped table-hover mb-0">
+                <table class="table table-custom table-hover mb-0">
                     <thead class="table-light">
-                        <tr><th>Code</th><th>Customer</th><th>Segment</th><th>Value in Cr.</th><th>Completion</th><th>Status</th></tr>
+                        <tr>
+                            <th>Code</th>
+                            <th>Customer</th>
+                            <th>Segment</th>
+                            <th>Value in Cr.</th>
+                            <th>Completion</th>
+                            <th>Status</th>
+                            <th class="text-center">Actions</th> {# New Column Header #}
+                        </tr>
                     </thead>
                     <tbody>
-                        {% for project in projects %}<tr>
-                            <td><strong><a href="{% url 'tracker_project_detail' project.id %}">{{ project.code }}</a></strong></td>
-                            <td>{{ project.customer_name }}</td><td>{{ project.segment_con.name|default:'N/A' }}</td>
-                            <td>₹{{ project.value|floatformat:2|intcomma }}</td>
-                            <td><div class="progress" style="height: 8px;"><div class="progress-bar" style="width: {{ project.get_completion_percentage }}%;"></div></div><small>{{ project.get_completion_percentage }}%</small></td>
-                            <td><span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span></td>
-                        </tr>{% empty %}<tr><td colspan="6" class="text-center py-5"><i class="fas fa-info-circle fa-2x text-muted mb-3"></i><p class="text-muted">No projects match your filter criteria.</p></td></tr>{% endfor %}
+                        {% for item in projects_with_details %}
+                        {% with project=item.project %}
+                        <tr>
+                            {# This cell contains a normal link that WILL navigate #}
+                            <td>
+                                <strong><a href="{% url 'tracker_project_detail' project.id %}">{{ project.code }}</a></strong>
+                            </td>
+
+                            {# These cells WILL trigger the collapse #}
+                            <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
+                                {{ project.customer_name }}
+                            </td>
+                            <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
+                                {{ project.segment_con.name|default:'N/A' }}
+                            </td>
+                            <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
+                                ₹{{ project.value|floatformat:2|intcomma }}
+                            </td>
+                            <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
+                                <div class="progress" style="height: 8px;"><div class="progress-bar" style="width: {{ project.get_completion_percentage }}%;"></div></div><small>{{ project.get_completion_percentage }}%</small>
+                            </td>
+                            <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
+                                <span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span>
+                            </td>
+
+                            {# This cell contains the View button that WILL navigate #}
+                            <td class="text-center">
+                                <a href="{% url 'tracker_project_detail' project.id %}" class="btn btn-sm btn-outline-primary" title="View Project Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr class="details-row">
+                            <td colspan="7">
+                                <div class="collapse" id="details-{{ project.id }}">
+                                    <div class="details-content">
+                                        {# The details grid remains the same #}
+                                        <div class="details-grid">
+                                            <div class="detail-item">
+                                                <h6>SO Punch Date</h6>
+                                                <p>{{ project.so_punch_date|date:"M d, Y" }}</p>
+                                            </div>
+                                            <div class="detail-item">
+                                                <h6>Project OTIF</h6>
+                                                <p>{{ item.otif|floatformat:1|default:"N/A" }}{% if item.otif %} %{% endif %}</p>
+                                            </div>
+                                            <div class="detail-item">
+                                                <h6>Automation Schedule</h6>
+                                                <p>
+                                                    {% if item.auto_schedule is not None %}
+                                                        {% if item.auto_schedule > 0 %}<span class="badge bg-danger">Delayed by {{ item.auto_schedule }} day{{ item.auto_schedule|pluralize }}</span>
+                                                        {% elif item.auto_schedule < 0 %}<span class="badge bg-success">Ahead by {{ item.auto_schedule|abs }} day{{ item.auto_schedule|abs|pluralize }}</span>
+                                                        {% else %}<span class="badge bg-primary">On Time</span>{% endif %}
+                                                    {% else %}<span class="text-muted small">Not enough data</span>{% endif %}
+                                                </p>
+                                            </div>
+                                            <div class="detail-item">
+                                                <h6>Emulation Schedule</h6>
+                                                <p>
+                                                    {% if item.emu_schedule is not None %}
+                                                        {% if item.emu_schedule > 0 %}<span class="badge bg-danger">Delayed by {{ item.emu_schedule }} day{{ item.emu_schedule|pluralize }}</span>
+                                                        {% elif item.emu_schedule < 0 %}<span class="badge bg-success">Ahead by {{ item.emu_schedule|abs }} day{{ item.emu_schedule|abs|pluralize }}</span>
+                                                        {% else %}<span class="badge bg-primary">On Time</span>{% endif %}
+                                                    {% else %}<span class="text-muted small">Not enough data</span>{% endif %}
+                                                </p>
+                                            </div>
+                                            <div class="detail-item">
+                                                <h6>Next Automation Milestone</h6>
+                                                <p>{{ item.next_auto_milestone.name|default:"All stages complete." }}</p>
+                                            </div>
+                                            <div class="detail-item">
+                                                <h6>Next Emulation Milestone</h6>
+                                                <p>{{ item.next_emu_milestone.name|default:"All stages complete." }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endwith %}
+                        {% empty %}
+                        <tr><td colspan="7" class="text-center py-5"><i class="fas fa-info-circle fa-2x text-muted mb-3"></i><p class="text-muted">No projects match your filter criteria.</p></td></tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
@@ -136,6 +254,7 @@
 {{ block.super }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- Chart Initialization Code ---
     // Status Pie Chart
     const statusCtx = document.getElementById('statusPieChart');
     if (statusCtx && {{ status_data|safe }}.length > 0) {
@@ -146,6 +265,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (segmentCtx && {{ segment_data|safe }}.length > 0) {
         new Chart(segmentCtx, { type: 'bar', data: { labels: {{ segment_labels|safe }}, datasets: [{ label: '# of Projects', data: {{ segment_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)' }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
     }
+
+    // --- Click Handler for Project Links ---
+    // Select all links that are inside an expandable row
+    const projectLinks = document.querySelectorAll('.expandable-row a');
+
+    projectLinks.forEach(function(link) {
+        // Add a click event listener to each of those links
+        link.addEventListener('click', function(event) {
+            // Stop the click from propagating to the parent <tr>
+            // This allows the link to navigate normally without triggering the collapse.
+            event.stopPropagation();
+        });
+    });
 });
 </script>
 {% endblock %}
