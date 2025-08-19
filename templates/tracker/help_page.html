@@ -109,10 +109,9 @@
                 <img src="{% static 'tracker_static/project_KPIs.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project KPI Screenshot">
                 
                 <h5>Chronic Projects & Recently Created Projects</h5>
-                <p>These tables automatically highlight important projects. The "Chronic Projects" table is particularly useful for identifying projects that may be stalled or forgotten.</p>
+                <p>These tables automatically highlight important projects. The "Chronic Projects" table is particularly useful for identifying projects that may be stalled or forgotten, while the "Recently Created Projects" table shows the latest additions to the portfolio. Both tables feature live column filtering to help you find information quickly.</p>
                 <img src="{% static 'tracker_static/chronic_projects.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Chronic Projects Screenshot">
-                <img src="{% static 'tracker_static/recent_projects.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Recent Project Screenshot">
-                <p> Both tables feature live column filtering to help you find information quickly.</p>
+                
                 <ul>
                     <li><strong>How it Works:</strong> To quickly find an item in either table, simply type into an input field located directly below a column header (e.g., "Filter Code..."). The table will instantly update as you type to show only matching rows, without needing to reload the page.</li>
                 </ul>
@@ -136,25 +135,21 @@
                 <p>This is the central hub where all detailed work on a single project is managed and tracked.</p>
                 
                 <h5>Project Timelines & Stages</h5>
-                <p>The graphical roadmaps provide a quick visual summary of a project's progress. The solid green progress line is a key indicator, as it only advances to the last <strong>consecutively completed</strong> stage, giving you a true picture of committed progress rather than a simple count of completed tasks. Below the timeline, the tabs for <strong>Automation</strong> and <strong>Emulation</strong> are where you perform the actual updates.</p>
+                <p>The graphical roadmaps provide a quick visual summary of a project's progress. The solid green progress line is a key indicator, as it only advances to the last <strong>consecutively completed</strong> stage, giving you a true picture of committed progress. Below the timeline, the tabs for <strong>Automation</strong> and <strong>Emulation</strong> are where you perform the actual updates.</p>
                  <img src="{% static 'tracker_static/project_stages_timeline.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project Stages Screenshot">
+
                 <h5>Project Summary & Key Metrics</h5>
                 <p>This card gives you a vital snapshot of the project's health. It includes schedule variance and two distinct OTIF (On-Time In-Full) metrics:</p>
                 <ul>
-                    <li><code>Overall OTIF % (All Stages)</code>: Think of this as the project's "term grade." It looks at every stage completed so far and calculates the percentage that met their planned deadline. This reveals how well the project is adhering to its internal schedule throughout its lifecycle.</li>
-                    <li><code>Project OTIF (Handover)</code>: Think of this as the project's "final exam." This metric ignores all intermediate stages and focuses only on the final delivery. It answers one question: was the project handed over to the client on or before the promised date?</li>
+                    <li><code>Overall OTIF % (All Stages)</code>: Think of this as the project's "term grade." It looks at every stage completed so far and calculates the percentage that met their planned deadline.</li>
+                    <li><code>Project OTIF (Handover)</code>: Think of this as the project's "final exam." This metric focuses only on the final delivery and answers one question: was the project handed over on or before the promised date?</li>
                 </ul>
-                <img src="{% static 'tracker_static/project_summary.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project List Screenshot">
+                <img src="{% static 'tracker_static/project_summary.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project Summary Screenshot">
 
                 <h5>Recent Activity</h5>
-                <p>This card gives you a recent 5 updates made in the projects, with the name of person who did the changes & the time of change done. If you want to see all changes then simply click on the View All button at the upper right corner of the card, you will get all updates made in this project:</p>
-                <ul>
-                    <li><strong> Recent Activity:</strong> </li>
-                </ul>
+                <p>This card provides a real-time feed of the last five changes made to any stage within this project. It shows what was changed, the old and new values, who made the change, and when it happened. For a complete audit trail, click the "View All" button in the corner to navigate to a page with the full, unabridged history for the project.</p>
                 <img src="{% static 'tracker_static/recent_activity.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Recent Activity Screenshot">
-                <ul>
-                    <li><strong>All Activities After Clicking View All Button:</strong> </li>
-                </ul>
+                <p>The full activity history page displays a detailed timeline of every change, as shown below.</p>
                 <img src="{% static 'tracker_static/all_activities.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="All Activities Screenshot">
 
             </div>
@@ -169,8 +164,8 @@
                 <p>Imagine a manager asks: "Show me all high-value 'AMR' projects started this year that are currently on hold." Here’s how you would use the tools:</p>
                 <ol>
                     <li>First, use the main <strong>"Filter Options"</strong> panel. You would select "AMR" from the Segments list, set the "SO Punch Date Range" for the current year, and set the "Value Range" Min field to "10".</li>
-                    <li>Then, in the "Stage Specific Filters", find the row for "Go Live" (or another relevant stage) and select "Hold" from the status dropdown. Click "Apply Filters".</li>
-                    <li>The table now shows your specific dataset. If the list is still long, you can use the <strong>Live Column Filters</strong> (e.g., type a customer name) to narrow it down further.</li>
+                    <li>Then, in the "Stage Specific Filters", find the row for a relevant stage and select "Hold" from the status dropdown. Click "Apply Filters".</li>
+                    <li>The table now shows your specific dataset. If the list is still long, you can use the <strong>Live Column Filters</strong> to narrow it down further.</li>
                     <li>Finally, you can click on any project row to expand its <strong>Collapsible Summary</strong> and view its key stats without leaving the page.</li>
                 </ol>
                  <img src="{% static 'tracker_static/report_filter.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Filter In Reports Screenshot">
