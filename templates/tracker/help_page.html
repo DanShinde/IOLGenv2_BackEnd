@@ -9,26 +9,20 @@
     .help-nav {
         position: -webkit-sticky;
         position: sticky;
-        top: 100px; /* Adjust this value based on your navbar height */
-        align-self: flex-start; /* Prevents the nav from stretching */
+        top: 100px;
+        align-self: flex-start;
     }
-
-    /* Hide sections by default */
     .help-section {
         display: none;
     }
-
-    /* Show the active section */
     .help-section.active {
         display: block;
         animation: fadeIn 0.5s;
     }
-    
     @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
     }
-
     .help-section h3 {
         border-bottom: 2px solid #e9ecef;
         padding-bottom: 10px;
@@ -43,9 +37,6 @@
     }
     .help-section .card-body {
         line-height: 1.7;
-    }
-    .help-nav .list-group-item {
-        font-weight: 500;
     }
     .help-nav .list-group-item.active {
         font-weight: 600;
@@ -65,6 +56,9 @@
         border-radius: 3px;
         font-size: 0.9em;
     }
+    .img-placeholder {
+        border: 1px solid #dee2e6;
+    }
 </style>
 
 <div class="page-header">
@@ -73,18 +67,14 @@
 </div>
 
 <div class="row">
-    <!-- Left Column: Navigation Index -->
     <div class="col-md-3">
         <div class="help-nav">
             <div class="card">
-                <div class="card-header fw-bold">
-                    On This Page
-                </div>
+                <div class="card-header fw-bold">On This Page</div>
                 <div class="list-group list-group-flush">
                     <a href="#getting-started" class="list-group-item list-group-item-action"><i class="fas fa-rocket fa-fw me-2"></i>Getting Started</a>
                     <a href="#dashboard" class="list-group-item list-group-item-action"><i class="fas fa-tachometer-alt fa-fw me-2"></i>Dashboard</a>
-                    <a href="#projects-list" class="list-group-item list-group-item-action"><i class="fas fa-list-ul fa-fw me-2"></i>Projects List & Creation</a>
-                    <a href="#upcoming-milestones" class="list-group-item list-group-item-action"><i class="fas fa-calendar-alt fa-fw me-2"></i>Upcoming Milestones</a>
+                    <a href="#projects-list" class="list-group-item list-group-item-action"><i class="fas fa-list-ul fa-fw me-2"></i>Projects List</a>
                     <a href="#project-detail" class="list-group-item list-group-item-action"><i class="fas fa-info-circle fa-fw me-2"></i>Project Detail Page</a>
                     <a href="#project-reports" class="list-group-item list-group-item-action"><i class="fas fa-chart-bar fa-fw me-2"></i>Reports & Analysis</a>
                 </div>
@@ -92,160 +82,98 @@
         </div>
     </div>
 
-    <!-- Right Column: Help Content -->
     <div class="col-md-9">
-        <!-- Getting Started Section -->
         <div id="getting-started" class="help-section card mb-4">
             <div class="card-body">
                 <h3><i class="fas fa-rocket text-primary me-2"></i>Getting Started: A Typical Workflow</h3>
-                <p>Welcome to the Project Tracker! Here’s a typical workflow to get you started on managing your projects effectively.</p>
+                <p>Welcome to the Project Tracker! This application is designed to bring clarity, accountability, and real-time insights to your project management process. This guide will walk you through a typical project lifecycle from creation to analysis.</p>
                 
                 <h5>Step 1: Create a New Project</h5>
-                <p>Everything begins with a project. Navigate to the <strong><a href="{% url 'tracker_new_project' %}">Add New Project</a></strong> page from the main navigation bar or the Dashboard. You will be asked to fill in the following essential details:</p>
-                <ul>
-                    <li><strong>Project Code:</strong> A unique identifier for your project (e.g., "PROJ-001"). This cannot be changed later.</li>
-                    <li><strong>Customer Name:</strong> The client or stakeholder for this project.</li>
-                    <li><strong>Project Value:</strong> The monetary value of the project.</li>
-                    <li><strong>SO Punch Date:</strong> The official start date of the project.</li>
-                    <li><strong>Segment:</strong> The business category or department the project belongs to.</li>
-                </ul>
+                <p>All work is organized by project. To begin, navigate to the <strong><a href="{% url 'tracker_new_project' %}">Add New Project</a></strong> page. You will be asked to fill in a few key details that form the foundation of your project record: the <strong>Project Code</strong> (a unique ID), the <strong>Customer Name</strong>, its financial <strong>Value</strong>, the <strong>SO Punch Date</strong> (the official start date), and the business <strong>Segment</strong> it belongs to.</p>
 
                 <h5>Step 2: Update Progress on the Detail Page</h5>
-                <p>Once a project is created, you will be taken to its <strong>Project Detail Page</strong>. This is your command center for that specific project. Here you will update the status of each stage in the <strong>Automation</strong> and <strong>Emulation</strong> tabs. Set the <code>Planned Date</code> for each stage and update the <code>Status</code> as work progresses. When a stage is complete, set its status to <code>Completed</code> and enter the <code>Actual Date</code>.</p>
+                <p>The <strong>Project Detail Page</strong> is your primary workspace for managing a project's progress. Here, you'll find lists of predefined stages. The core workflow is to set a <code>Planned Date</code> for each stage, update its <code>Status</code> as work progresses, and critically, enter the <code>Actual Date</code> of completion. This data is the engine that drives all the performance metrics and reports in the application.</p>
                 
-                <h5>Step 3: Monitor with the Dashboard & Milestones</h5>
-                <p>Visit the <strong>Dashboard</strong> daily for a high-level overview. For a more focused view on upcoming deadlines, use the <strong>Upcoming Milestones</strong> page to see all planned stages across all projects, sortable by urgency.</p>
+                <h5>Step 3: Monitor with the Dashboard</h5>
+                <p>The <strong>Dashboard</strong> offers a high-level "mission control" view of your entire portfolio. It's designed for daily check-ins to monitor key health indicators, spot long-running "chronic" projects that may need attention, and review the pipeline of recently created work.</p>
 
-                <h5>Step 4: Communicate via Project Updates</h5>
-                <p>Use the <strong>Project Updates</strong> section at the bottom of the detail page to log progress, flag risks, and assign actions. This creates a clear history of communication for the project.</p>
-
-                <h5>Step 5: Analyze with Reports</h5>
-                <p>When you need to dive deeper, use the <strong>Reports Page</strong>. Its powerful filters allow you to create custom views of your data. For example, you can find all projects in a specific segment that have their "Design" stage on hold. You can then export this view as a PDF for meetings or records.</p>
+                <h5>Step 4: Analyze with Reports</h5>
+                <p>The <strong>Reports Page</strong> is your tool for business intelligence. It allows you to "ask questions" of your project data. By combining various filters, you can uncover trends, identify systemic delays, and generate targeted data sets for meetings and strategic planning. Any report you generate can be instantly exported to PDF.</p>
             </div>
         </div>
 
-        <!-- Dashboard Section -->
         <div id="dashboard" class="help-section card mb-4">
             <div class="card-body">
                 <h3><i class="fas fa-tachometer-alt text-primary me-2"></i>The Dashboard</h3>
-                <p>The dashboard is your main landing page, providing a real-time, high-level overview of your project portfolio. Use the date filters at the top to focus on a specific period.</p>
-                <h5>Key Metrics Explained</h5>
+                <p>The dashboard is your main landing page, designed for at-a-glance monitoring of the entire project landscape. Use the date filters at the top to focus on a specific period, such as "This Month" or a custom date range.</p>
+                <img src="{% static 'tracker_static/project_KPIs.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project KPI Screenshot">
+                
+                <h5>Chronic Projects & Recently Created Projects</h5>
+                <p>These tables automatically highlight important projects. The "Chronic Projects" table is particularly useful for identifying projects that may be stalled or forgotten.</p>
+                <img src="{% static 'tracker_static/chronic_projects.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Chronic Projects Screenshot">
+                <img src="{% static 'tracker_static/recent_projects.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Recent Project Screenshot">
+                <p> Both tables feature live column filtering to help you find information quickly.</p>
                 <ul>
-                    <li><strong>Live Projects:</strong> The total count of projects considered active within the selected time frame.</li>
-                    <li><strong>Active Projects:</strong> The number of live projects that currently have at least one stage "In Progress".</li>
-                    <li><strong>Department OTIF %:</strong> The "On-Time, In-Full" percentage. This critical metric shows the percentage of completed stages that were finished on or before their planned date.</li>
-                    <li><strong>Delayed Projects:</strong> The number of live projects that have at least one stage on "Hold".</li>
-                    <li><strong>Value of Live Projects:</strong> The total monetary value of all projects in the "Live Projects" metric.</li>
+                    <li><strong>How it Works:</strong> To quickly find an item in either table, simply type into an input field located directly below a column header (e.g., "Filter Code..."). The table will instantly update as you type to show only matching rows, without needing to reload the page.</li>
                 </ul>
-                <h5>Chronic Projects</h5>
-                <p>This table is designed to draw your attention to projects that might be stalled. It lists projects that are still open (not yet completed) and filters them based on how long ago they were started. You can quickly toggle between projects open for more than <strong>6 months, 1 year, or 2 years</strong>.</p>
+                <img src="{% static 'tracker_static/text_filter.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Text Filter Screenshot"> 
             </div>
         </div>
 
-        <!-- All Projects Page Section -->
         <div id="projects-list" class="help-section card mb-4">
             <div class="card-body">
-                <h3><i class="fas fa-list-ul text-primary me-2"></i>Projects List & Creation</h3>
-                <p>The "Projects" page provides a comprehensive, sortable, and searchable list of every project in the system. You can quickly find a project and see its key details at a glance.</p>
-                <ul>
-                    <li><strong>Adding a Project:</strong> Click the "Add New Project" button to navigate to the project creation form.</li>
-                    <li><strong>Project Code:</strong> Clicking on a project's code will take you directly to its detailed view.</li>
-                    <li><strong>Progress Bar:</strong> A visual indicator of the project's overall completion percentage, calculated from its stages.</li>
-                    <li><strong>Status Badge:</strong> Shows the current overall status of the project, which is determined by the status of its individual stages (e.g., On Track, At Risk, Delayed).</li>
-                    <li><strong>Actions:</strong> Quickly view the project detail page or delete a project (a confirmation will be required).</li>
-                </ul>
-            </div>
-        </div>
-        
-        <!-- Upcoming Milestones Section -->
-        <div id="upcoming-milestones" class="help-section card mb-4">
-            <div class="card-body">
-                <h3><i class="fas fa-calendar-alt text-primary me-2"></i>Upcoming Milestones</h3>
-                <p>This page provides a centralized, cross-project view of all future tasks and deadlines, helping with resource planning and identifying potential conflicts.</p>
-                <h5>Filtering and Searching</h5>
-                <ul>
-                    <li><strong>Time Filters:</strong> Use the pills at the top to quickly filter milestones due in the "Next 7 Days", "Next 30 Days", or view "All Upcoming" and "Overdue" milestones.</li>
-                    <li><strong>Search:</strong> You can search for a specific project or customer name to narrow down the list.</li>
-                </ul>
-                <h5>Urgency & Grouping</h5>
-                <ul>
-                    <li><strong>Project Grouping:</strong> Milestones are conveniently grouped by project.</li>
-                    <li><strong>Urgency Badges:</strong> The "Urgency" column uses color-coded badges to instantly show if a milestone is overdue, due today, tomorrow, or further in the future.</li>
-                </ul>
-                <h5>Exporting</h5>
-                <p>You can export the current filtered view of the milestones list to either an <strong>Excel (.xlsx)</strong> or <strong>PDF</strong> file using the "Export" dropdown. This is useful for sharing with teams or for offline planning.</p>
+                <h3><i class="fas fa-list-ul text-primary me-2"></i>Projects List</h3>
+                <p>While the dashboard provides a summary, the "Projects" page is the complete, unfiltered repository of every project in the system. It serves as the single source of truth for all projects, regardless of status or age.</p>
+                <h5>Live Column Filtering</h5>
+                <p>The most powerful feature of this page is the live filtering. Use the input fields at the top of the table to instantly search the entire project database. You can even combine filters. For example, to find all "In Progress" projects for "ABC Corp", type "ABC Corp" in the Customer filter, and then type "In Progress" in the Status filter. The list will narrow down with each keystroke.</p>
+                <img src="{% static 'tracker_static/project_list.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project List Screenshot">
             </div>
         </div>
 
-        <!-- Project Detail Page Section -->
         <div id="project-detail" class="help-section card mb-4">
             <div class="card-body">
                 <h3><i class="fas fa-info-circle text-primary me-2"></i>Project Detail Page</h3>
-                <p>This is the central hub for managing and tracking a single project. It contains several key interactive components.</p>
+                <p>This is the central hub where all detailed work on a single project is managed and tracked.</p>
                 
-                <h5>Project Timelines</h5>
-                <p>The two graphical roadmaps (one for Automation, one for Emulation) visualize the project's lifecycle. Each circle represents a stage.</p>
+                <h5>Project Timelines & Stages</h5>
+                <p>The graphical roadmaps provide a quick visual summary of a project's progress. The solid green progress line is a key indicator, as it only advances to the last <strong>consecutively completed</strong> stage, giving you a true picture of committed progress rather than a simple count of completed tasks. Below the timeline, the tabs for <strong>Automation</strong> and <strong>Emulation</strong> are where you perform the actual updates.</p>
+                 <img src="{% static 'tracker_static/project_stages_timeline.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project Stages Screenshot">
+                <h5>Project Summary & Key Metrics</h5>
+                <p>This card gives you a vital snapshot of the project's health. It includes schedule variance and two distinct OTIF (On-Time In-Full) metrics:</p>
                 <ul>
-                    <li><strong>Colors & Icons:</strong> The color and icon of a circle indicate its status (e.g., green check for Completed, yellow spinning icon for In Progress).</li>
-                    <li><strong>Progress Line:</strong> The green line connecting the stages only advances to the last <strong>fully completed</strong> stage, giving you a true visual of committed progress.</li>
-                    <li><strong>Tooltips:</strong> Hover over any circle to see more details, including planned and actual dates.</li>
+                    <li><code>Overall OTIF % (All Stages)</code>: Think of this as the project's "term grade." It looks at every stage completed so far and calculates the percentage that met their planned deadline. This reveals how well the project is adhering to its internal schedule throughout its lifecycle.</li>
+                    <li><code>Project OTIF (Handover)</code>: Think of this as the project's "final exam." This metric ignores all intermediate stages and focuses only on the final delivery. It answers one question: was the project handed over to the client on or before the promised date?</li>
                 </ul>
+                <img src="{% static 'tracker_static/project_summary.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project List Screenshot">
 
-                <h5>Managing Stages (Automation & Emulation Tabs)</h5>
-                <p>This is where you update the project's progress. In each tab, you'll find a table of stages. For each stage, you can:</p>
+                <h5>Recent Activity</h5>
+                <p>This card gives you a recent 5 updates made in the projects, with the name of person who did the changes & the time of change done. If you want to see all changes then simply click on the View All button at the upper right corner of the card, you will get all updates made in this project:</p>
                 <ul>
-                    <li><strong>Set Planned Date:</strong> Define the target completion date for the stage.</li>
-                    <li><strong>Update Status:</strong> Change the status from <code>Not started</code> to <code>In Progress</code>, <code>Completed</code>, <code>Hold</code>, or <code>Not Applicable</code>.</li>
-                    <li><strong>Set Actual Date:</strong> This field is only enabled when the status is set to <code>Completed</code>.</li>
-                    <li><strong>Use Actions Dropdown:</strong> For each stage, you can save it individually, view its change history, or manage remarks.</li>
+                    <li><strong> Recent Activity:</strong> </li>
                 </ul>
-                <blockquote><strong>Tip:</strong> Use the "Save All" button at the top of the table to save all your changes in that category at once!</blockquote>
+                <img src="{% static 'tracker_static/recent_activity.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Recent Activity Screenshot">
+                <ul>
+                    <li><strong>All Activities After Clicking View All Button:</strong> </li>
+                </ul>
+                <img src="{% static 'tracker_static/all_activities.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="All Activities Screenshot">
 
-                <h5>Project Summary & Recent Activity</h5>
-                <p>The cards below the stage tables provide a quick summary of the project's health, including its overall status, next milestones, and schedule variance. The Recent Activity feed shows the last few changes made to the project's stages. Click "View All" to see the complete, detailed history on a separate page.</p>
-
-                <h5 id="project-updates">Project Updates & Communication</h5>
-                <p>Located at the bottom of the page, this section is for communication, collaboration, and logging the narrative of a project's progress.</p>
-                <h6>Adding an Update</h6>
-                <p>Use the form to post a new update. Each update has three components:</p>
-                <ul>
-                    <li><strong>The Update Text:</strong> Share what's new, what's been done, or what's needed.</li>
-                    <li><strong>Category:</strong> Assign a category to help classify the update:
-                        <ul>
-                            <li><code>Information</code>: A general update on progress.</li>
-                            <li><code>Action Required</code>: An update that requires someone to take action.</li>
-                            <li><code>Risk Identified</code>: Highlights a potential risk to the project.</li>
-                        </ul>
-                    </li>
-                    <li><strong>Flag for Senior Review:</strong> Check this box to create a prominent red flag on the update, ensuring it gets attention from management.</li>
-                </ul>
-                <h6>Managing Risks and Actions</h6>
-                <p>Updates categorized as <code>Risk</code> or <code>Action</code> have special functionality:</p>
-                <ul>
-                    <li><strong>Status:</strong> They can be marked as "Open" or "Closed".</li>
-                    <li><strong>Mitigation Plan:</strong> For risks, you can add a specific mitigation plan to document how the risk will be handled. This is done via a modal window.</li>
-                    <li><strong>Editing/Deleting:</strong> You can edit or delete your own updates using the dropdown menu on each update item.</li>
-                </ul>
-                <h6>Update History</h6>
-                <p>The feed below the form shows the most recent updates. If a project has a long history, you can click the <strong>"View all updates..."</strong> link to see the complete log on a separate page.</p>
             </div>
         </div>
         
-        <!-- Reports Page Section -->
         <div id="project-reports" class="help-section card mb-4">
             <div class="card-body">
                 <h3><i class="fas fa-chart-bar text-primary me-2"></i>Reports & Analysis</h3>
-                <p>The reports page is a powerful tool for deep-dive analysis and creating custom views of your project data. The entire page, including KPIs and charts, is driven by the filters you apply.</p>
-                <h5>Advanced Filtering</h5>
-                <p>The "Filter Options" panel is collapsible and contains two types of filters:</p>
-                <ul>
-                    <li><strong>General Filters:</strong> Filter by multiple Segments, a SO Punch Date range, or a Project Value range.</li>
-                    <li><strong>Stage Specific Filters:</strong> This is a highly powerful feature. You can filter projects based on the status and actual completion date of any individual stage. For example, find all projects where the "Civil" stage was completed in the last month.</li>
-                </ul>
-                <h5>Dynamic Charts & KPIs</h5>
-                <p>The Key Performance Indicator (KPI) cards and the charts for "Status Distribution" and "Projects by Segment" will all update dynamically to reflect the data that matches your active filters.</p>
-                <h5>Export to PDF</h5>
-                <p>After setting your filters to get the exact data view you need, click the <strong>"Export as PDF"</strong> button. This will generate a PDF of the current report, including the KPIs, filtered table, and charts, which is perfect for sharing or archiving.</p>
+                <p>The reports page is the business intelligence hub of the application. It's designed to help you answer complex questions about your project data by building specific queries through multiple layers of filters.</p>
+                
+                <h5>A Multi-Layered Filtering Workflow Example</h5>
+                <p>Imagine a manager asks: "Show me all high-value 'AMR' projects started this year that are currently on hold." Here’s how you would use the tools:</p>
+                <ol>
+                    <li>First, use the main <strong>"Filter Options"</strong> panel. You would select "AMR" from the Segments list, set the "SO Punch Date Range" for the current year, and set the "Value Range" Min field to "10".</li>
+                    <li>Then, in the "Stage Specific Filters", find the row for "Go Live" (or another relevant stage) and select "Hold" from the status dropdown. Click "Apply Filters".</li>
+                    <li>The table now shows your specific dataset. If the list is still long, you can use the <strong>Live Column Filters</strong> (e.g., type a customer name) to narrow it down further.</li>
+                    <li>Finally, you can click on any project row to expand its <strong>Collapsible Summary</strong> and view its key stats without leaving the page.</li>
+                </ol>
+                 <img src="{% static 'tracker_static/report_filter.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Filter In Reports Screenshot">
             </div>
         </div>
     </div>
@@ -256,44 +184,28 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ... (The script for handling navigation remains the same) ...
     const navLinks = document.querySelectorAll('.help-nav .list-group-item');
     const helpSections = document.querySelectorAll('.help-section');
 
     function showSection(targetId) {
-        // Remove active class from all nav links
-        navLinks.forEach(link => {
-            link.classList.remove('active');
-        });
-
-        // Hide all help sections
-        helpSections.forEach(section => {
-            section.classList.remove('active');
-        });
-
-        // Find the clicked link and add active class
+        navLinks.forEach(link => link.classList.remove('active'));
+        helpSections.forEach(section => section.classList.remove('active'));
         const activeLink = document.querySelector(`.help-nav a[href="${targetId}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-        }
-
-        // Find the target section and show it
+        if (activeLink) activeLink.classList.add('active');
         const targetSection = document.querySelector(targetId);
-        if (targetSection) {
-            targetSection.classList.add('active');
-        }
+        if (targetSection) targetSection.classList.add('active');
     }
 
-    // Set the initial state (show the first section)
-    showSection('#getting-started');
+    const initialHash = window.location.hash || '#getting-started';
+    showSection(initialHash);
 
-    // Add click event listeners to nav links
     navLinks.forEach(link => {
         link.addEventListener('click', function(event) {
-            event.preventDefault(); // Prevent the default anchor jump
+            event.preventDefault();
             const targetId = this.getAttribute('href');
             showSection(targetId);
-            // Optional: Update URL hash for shareable links
-            // history.pushState(null, null, targetId);
+            history.pushState(null, null, targetId);
         });
     });
 });
