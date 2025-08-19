@@ -6,12 +6,6 @@
 
 {% block extra_css %}
 <style>
-    .expandable-row {
-        cursor: pointer;
-    }
-    .expandable-row:hover {
-        background-color: #f5f7fb;
-    }
     .details-row td {
         background-color: #f8fafd;
         border-top: none !important;
@@ -129,6 +123,17 @@
                     <div>
                         <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-2"></i>Apply Filters</button>
                         <a href="{% url 'project_reports' %}" class="btn btn-outline-secondary">Reset Filters</a>
+                        
+                        {% if hide_completed_active %}
+                            <a href="?{{ request.GET.urlencode|cut:'&hide_completed=1'|cut:'hide_completed=1' }}" class="btn btn-info">
+                                <i class="fas fa-eye me-2"></i>Show Completed
+                            </a>
+                        {% else %}
+                            <a href="?{{ request.GET.urlencode }}&hide_completed=1" class="btn btn-outline-info">
+                                <i class="fas fa-eye-slash me-2"></i>Hide Completed
+                            </a>
+                        {% endif %}
+                        
                         <a href="{% url 'export_report_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-danger ms-auto" target="_blank"><i class="fas fa-file-pdf me-2"></i>Export as PDF</a>
                     </div>
                 </form>
@@ -149,19 +154,26 @@
                             <th>Value in Cr.</th>
                             <th>Completion</th>
                             <th>Status</th>
-                            <th class="text-center">Actions</th> {# New Column Header #}
+                            <th class="text-center">Actions</th>
+                        </tr>
+                        {# NEW: Row for filter inputs #}
+                        <tr class="table-filter-row">
+                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Code..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Segment..." onkeyup="filterTable()"></th>
+                            <th></th> {# No filter for Value #}
+                            <th></th> {# No filter for Completion #}
+                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterTable()"></th>
+                            <th></th> {# No filter for Actions #}
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in projects_with_details %}
                         {% with project=item.project %}
                         <tr>
-                            {# This cell contains a normal link that WILL navigate #}
                             <td>
                                 <strong><a href="{% url 'tracker_project_detail' project.id %}">{{ project.code }}</a></strong>
                             </td>
-
-                            {# These cells WILL trigger the collapse #}
                             <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
                                 {{ project.customer_name }}
                             </td>
@@ -177,8 +189,6 @@
                             <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
                                 <span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span>
                             </td>
-
-                            {# This cell contains the View button that WILL navigate #}
                             <td class="text-center">
                                 <a href="{% url 'tracker_project_detail' project.id %}" class="btn btn-sm btn-outline-primary" title="View Project Details">
                                     <i class="fas fa-eye"></i>
@@ -189,7 +199,6 @@
                             <td colspan="7">
                                 <div class="collapse" id="details-{{ project.id }}">
                                     <div class="details-content">
-                                        {# The details grid remains the same #}
                                         <div class="details-grid">
                                             <div class="detail-item">
                                                 <h6>SO Punch Date</h6>
@@ -211,7 +220,7 @@
                                             </div>
                                             <div class="detail-item">
                                                 <h6>Emulation Schedule</h6>
-                                                <p>
+                                                 <p>
                                                     {% if item.emu_schedule is not None %}
                                                         {% if item.emu_schedule > 0 %}<span class="badge bg-danger">Delayed by {{ item.emu_schedule }} day{{ item.emu_schedule|pluralize }}</span>
                                                         {% elif item.emu_schedule < 0 %}<span class="badge bg-success">Ahead by {{ item.emu_schedule|abs }} day{{ item.emu_schedule|abs|pluralize }}</span>
@@ -255,29 +264,65 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // --- Chart Initialization Code ---
-    // Status Pie Chart
     const statusCtx = document.getElementById('statusPieChart');
     if (statusCtx && {{ status_data|safe }}.length > 0) {
         new Chart(statusCtx, { type: 'pie', data: { labels: {{ status_labels|safe }}, datasets: [{ data: {{ status_data|safe }}, backgroundColor: ['#28a745','#ffc107','#dc3545','#6c757d'] }] }, options: { responsive: true, plugins: { legend: { position: 'top' } } } });
     }
-    // Segment Bar Chart
     const segmentCtx = document.getElementById('segmentBarChart');
     if (segmentCtx && {{ segment_data|safe }}.length > 0) {
         new Chart(segmentCtx, { type: 'bar', data: { labels: {{ segment_labels|safe }}, datasets: [{ label: '# of Projects', data: {{ segment_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)' }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
     }
-
-    // --- Click Handler for Project Links ---
-    // Select all links that are inside an expandable row
-    const projectLinks = document.querySelectorAll('.expandable-row a');
-
-    projectLinks.forEach(function(link) {
-        // Add a click event listener to each of those links
-        link.addEventListener('click', function(event) {
-            // Stop the click from propagating to the parent <tr>
-            // This allows the link to navigate normally without triggering the collapse.
-            event.stopPropagation();
-        });
-    });
 });
+</script>
+<script>
+    function filterTable() {
+        // Get all filter input values and convert to uppercase for case-insensitive search
+        const filterCode = document.querySelector('.table-filter-row th:nth-child(1) input').value.toUpperCase();
+        const filterCustomer = document.querySelector('.table-filter-row th:nth-child(2) input').value.toUpperCase();
+        const filterSegment = document.querySelector('.table-filter-row th:nth-child(3) input').value.toUpperCase();
+        const filterStatus = document.querySelector('.table-filter-row th:nth-child(6) input').value.toUpperCase();
+
+        // Get the table body and all main project rows
+        const tableBody = document.querySelector('.table-custom tbody');
+        const projectRows = tableBody.querySelectorAll('tr:not(.details-row)'); // Select only main rows
+
+        // Loop through each main project row
+        projectRows.forEach(row => {
+            const detailsRow = row.nextElementSibling; // Get the associated details row
+            if (!detailsRow || !detailsRow.classList.contains('details-row')) {
+                // This handles the "empty" row case and prevents errors
+                if (row.querySelectorAll('td').length === 1) { // A simple check for the 'empty' row
+                    const emptyText = row.cells[0].textContent.toUpperCase();
+                    if (filterCode === '' && filterCustomer === '' && filterSegment === '' && filterStatus === '') {
+                        row.style.display = ""; // Show empty row if no filters
+                    } else {
+                        row.style.display = "none"; // Hide empty row if any filter
+                    }
+                }
+                return;
+            }
+
+            // Get the cell text content for each column we want to filter
+            const codeText = row.cells[0].textContent.toUpperCase();
+            const customerText = row.cells[1].textContent.toUpperCase();
+            const segmentText = row.cells[2].textContent.toUpperCase();
+            const statusText = row.cells[5].textContent.toUpperCase();
+
+            // Check if the row's content includes the filter text for all active filters
+            if (codeText.includes(filterCode) &&
+                customerText.includes(filterCustomer) &&
+                segmentText.includes(filterSegment) &&
+                statusText.includes(filterStatus)) 
+            {
+                // If all filters match, show both the main row and its details row
+                row.style.display = "";
+                detailsRow.style.display = "";
+            } else {
+                // If any filter does not match, hide both rows
+                row.style.display = "none";
+                detailsRow.style.display = "none";
+            }
+        });
+    }
 </script>
 {% endblock %}

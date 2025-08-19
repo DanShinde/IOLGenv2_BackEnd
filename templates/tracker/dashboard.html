@@ -97,7 +97,25 @@
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-custom table-striped">
-                        <thead><tr><th>Project Code</th><th>Customer</th><th>Age</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
+                        <thead class="table-light">
+                            <tr>
+                                <th>Project Code</th>
+                                <th>Customer</th>
+                                <th>Age</th>
+                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>Actions</th>
+                            </tr>
+                            {# NEW: Row for filter inputs #}
+                            <tr class="table-filter-row">
+                                <th><input type="text" class="form-control form-control-sm" placeholder="Filter Code..." onkeyup="filterDashboardTables(this)"></th>
+                                <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterDashboardTables(this)"></th>
+                                <th></th> {# No filter for Age #}
+                                <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterDashboardTables(this)"></th>
+                                <th></th> {# No filter for Progress #}
+                                <th></th> {# No filter for Actions #}
+                            </tr>
+                        </thead>
                         <tbody>
                             {% for project in chronic_projects %}
                             <tr>
@@ -126,7 +144,29 @@
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-custom table-striped">
-                        <thead><tr><th>Project Code</th><th>Customer</th><th>Segment</th><th>Value in Cr.</th><th>SO Punch Date</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
+                        <thead class="table-light">
+                            <tr>
+                                <th>Project Code</th>
+                                <th>Customer</th>
+                                <th>Segment</th>
+                                <th>Value in Cr.</th>
+                                <th>SO Punch Date</th>
+                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>Actions</th>
+                            </tr>
+                            {# NEW: Row for filter inputs #}
+                            <tr class="table-filter-row">
+                                <th><input type="text" class="form-control form-control-sm" placeholder="Filter Code..." onkeyup="filterDashboardTables(this)"></th>
+                                <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterDashboardTables(this)"></th>
+                                <th><input type="text" class="form-control form-control-sm" placeholder="Filter Segment..." onkeyup="filterDashboardTables(this)"></th>
+                                <th></th> {# No filter for Value #}
+                                <th></th> {# No filter for Date #}
+                                <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterDashboardTables(this)"></th>
+                                <th></th> {# No filter for Progress #}
+                                <th></th> {# No filter for Actions #}
+                            </tr>
+                        </thead>
                         <tbody>
                             {% for project in recent_projects %}
                             <tr>
@@ -169,5 +209,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+</script>
+<script>
+    function filterDashboardTables(inputEl) {
+        const table = inputEl.closest('table');
+        const filterRow = inputEl.closest('.table-filter-row');
+        const tableBody = table.querySelector('tbody');
+        const dataRows = tableBody.querySelectorAll('tr');
+        
+        // Create an array of all filter values for the current table
+        const filters = Array.from(filterRow.querySelectorAll('input')).map(input => input.value.toUpperCase());
+
+        dataRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length === 0) return; // Skip header or empty rows
+
+            let rowVisible = true;
+
+            // Loop through each filter and check against the corresponding cell
+            filters.forEach((filterText, index) => {
+                if (filterText !== '') { // Only apply filter if there is text
+                    const cellText = cells[index] ? cells[index].textContent.toUpperCase() : '';
+                    if (!cellText.includes(filterText)) {
+                        rowVisible = false;
+                    }
+                }
+            });
+
+            row.style.display = rowVisible ? "" : "none";
+        });
+    }
 </script>
 {% endblock %}

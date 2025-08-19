@@ -305,7 +305,19 @@ def dashboard(request):
 def project_reports(request):
     projects_qs = Project.objects.select_related('segment_con').prefetch_related('stages').all()
 
-    # --- Get standard filter values (This part is unchanged) ---
+    # --- Check for the 'hide_completed' filter ---
+    hide_completed = request.GET.get('hide_completed') == '1'
+    if hide_completed:
+        # First, find the IDs of all projects that are considered "Completed"
+        completed_project_ids = Project.objects.filter(
+            stages__name='Handover',
+            stages__status='Completed'
+        ).values_list('id', flat=True)
+
+        # Then, exclude them from our main query
+        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
+
+    # --- Get standard filter values ---
     selected_segment_ids = request.GET.getlist('segments')
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
@@ -325,7 +337,7 @@ def project_reports(request):
             projects_qs = projects_qs.filter(value__lte=float(max_value))
         except (ValueError, TypeError): pass
 
-    # --- Process Stage-Specific Filters (This part is unchanged) ---
+    # --- Process Stage-Specific Filters ---
     stage_filters_from_request = {}
     for stage_key, stage_display in Stage.STAGE_NAMES:
         status = request.GET.get(f'stage_{stage_key}_status')
@@ -337,20 +349,20 @@ def project_reports(request):
             if status: stage_query_filters['stages__status'] = status
             if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
             projects_qs = projects_qs.filter(**stage_query_filters)
-            
+
     distinct_projects = projects_qs.distinct()
 
-    # --- NEW: Prepare projects with their detailed summaries ---
+    # --- Prepare projects with their detailed summaries ---
     projects_with_details = []
     automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
     emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
 
     for project in distinct_projects:
         all_stages = list(project.stages.all())
-        
+
         auto_stages = sorted([s for s in all_stages if s.stage_type == 'Automation'], key=lambda s: automation_order.get(s.name, 99))
         emu_stages = sorted([s for s in all_stages if s.stage_type == 'Emulation'], key=lambda s: emulation_order.get(s.name, 99))
-        
+
         projects_with_details.append({
             'project': project,
             'otif': project.get_otif_percentage(),
@@ -359,9 +371,8 @@ def project_reports(request):
             'auto_schedule': get_schedule_status(auto_stages),
             'emu_schedule': get_schedule_status(emu_stages),
         })
-    # --- END OF NEW LOGIC ---
 
-    # --- Calculate Standard KPIs (This part is unchanged) ---
+    # --- Calculate Standard KPIs ---
     total_projects_found = distinct_projects.count()
     total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
     completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
@@ -370,8 +381,8 @@ def project_reports(request):
     total_completed = completed_stages.count()
     on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
     on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
-    
-    # --- Prepare standard chart data (This part is unchanged) ---
+
+    # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
     status_labels = list(status_counts.keys())
     status_data = list(status_counts.values())
@@ -380,7 +391,7 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
-        'projects_with_details': projects_with_details, # Pass the new list to the template
+        'projects_with_details': projects_with_details,
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
@@ -393,6 +404,7 @@ def project_reports(request):
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'stage_filters': stage_filters_from_request,
         'on_time_completion_rate': on_time_completion_rate,
+        'hide_completed_active': hide_completed,
     }
     return render(request, 'tracker/project_report.html', context)
 
