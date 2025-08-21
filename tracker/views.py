@@ -160,7 +160,7 @@ def project_detail(request, project_id):
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
-    # --- GET Request Logic (This part is unchanged) ---
+    # --- GET Request Logic ---
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
     
@@ -198,20 +198,36 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
+    # MODIFICATION: Get all remarks for each category for the new modals
+    automation_remarks = StageRemark.objects.filter(
+        stage__project=project, stage__stage_type='Automation'
+    ).select_related('stage', 'added_by').order_by('-created_at')
+
+    emulation_remarks = StageRemark.objects.filter(
+        stage__project=project, stage__stage_type='Emulation'
+    ).select_related('stage', 'added_by').order_by('-created_at')
+
     context = {
-        'project': project, 'automation_stages': automation_stages, 'emulation_stages': emulation_stages,
-        'updates': updates, 'updates_count': updates_count,
+        'project': project, 
+        'automation_stages': automation_stages, 
+        'emulation_stages': emulation_stages,
+        'updates': updates, 
+        'updates_count': updates_count,
         'completion_percentage': get_completion_percentage(all_stages),
         'timeline_progress_auto': timeline_progress_auto,
         'timeline_progress_emu': timeline_progress_emu,
-        'overall_otif_percentage': get_otif_percentage(all_stages), # Renamed for clarity
-        'project_otif': get_final_project_otif(all_stages), # Added new calculation
+        'overall_otif_percentage': get_otif_percentage(all_stages),
+        'project_otif': get_final_project_otif(all_stages),
         'overall_status': get_overall_status(all_stages),
         'automation_schedule_status': get_schedule_status(automation_stages), 
         'emulation_schedule_status': get_schedule_status(emulation_stages),
         'next_automation_milestone': get_next_milestone(automation_stages), 
         'next_emulation_milestone': get_next_milestone(emulation_stages),
-        'last_update_time': last_update_time, 'recent_activity': recent_activity,
+        'last_update_time': last_update_time, 
+        'recent_activity': recent_activity,
+        # MODIFICATION: Add the new remark lists to the context
+        'automation_remarks': automation_remarks,
+        'emulation_remarks': emulation_remarks,
     }
     
     return render(request, 'tracker/project_detail.html', context)
@@ -223,8 +239,34 @@ def delete_project(request, project_id):
     messages.success(request, "Project deleted successfully.")
     return redirect('tracker_index')
 
+@login_required
+def edit_remark(request, remark_id):
+    remark = get_object_or_404(StageRemark, pk=remark_id)
+    project_id = remark.stage.project.id
+    # Security check: only the author or a staff member can edit
+    if request.user == remark.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            new_text = request.POST.get('remark_text')
+            if new_text:
+                remark.text = new_text
+                remark.save()
+                messages.success(request, "Remark updated successfully.")
+    else:
+        messages.error(request, "You do not have permission to edit this remark.")
+    return redirect('tracker_project_detail', project_id=project_id)
 
-# In tracker/views.py
+@login_required
+def delete_remark(request, remark_id):
+    remark = get_object_or_404(StageRemark, pk=remark_id)
+    project_id = remark.stage.project.id
+    # Security check: only the author or a staff member can delete
+    if request.user == remark.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            remark.delete()
+            messages.success(request, "Remark deleted successfully.")
+    else:
+        messages.error(request, "You do not have permission to delete this remark.")
+    return redirect('tracker_project_detail', project_id=project_id)
 
 @login_required
 def dashboard(request):
