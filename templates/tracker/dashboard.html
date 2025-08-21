@@ -70,7 +70,15 @@
     <div class="col-lg-8">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Project Completion (Live in Period)</h5></div>
-            <div class="card-body"><canvas id="progressChart" height="120"></canvas></div>
+            
+            {# This card-body is now our fixed-height "viewport" with a scrollbar #}
+            <div class="card-body" style="height: 450px; overflow-y: auto;">
+                
+                {# This inner div will grow taller than the viewport if needed #}
+                <div id="progressChartContainer" style="position: relative;">
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
     <div class="col-lg-4">
@@ -193,14 +201,53 @@
 document.addEventListener('DOMContentLoaded', function() {
     Chart.register(ChartDataLabels);
 
-    const progressCtx = document.getElementById('progressChart').getContext('2d');
+    // --- SCRIPT FOR SCROLLABLE PROGRESS CHART ---
+    const progressCtx = document.getElementById('progressChart');
+    const progressChartContainer = document.getElementById('progressChartContainer');
+
+    // 1. Define the fixed height for our viewing area and for each bar
+    const viewportHeight = 420; // The height of our visible chart area in pixels
+    const heightPerProject = 40; // The desired height for each project's bar
+
+    // 2. Calculate the total height the chart CONTENT needs to be
+    const projectsCount = {{ labels|safe }}.length;
+    const totalContentHeight = projectsCount * heightPerProject;
+
+    // 3. Determine the final height for the chart's container
+    // It will be AT LEAST the height of the viewport, or taller if there are many projects.
+    const finalHeight = Math.max(viewportHeight, totalContentHeight);
+    
+    // 4. Apply the calculated height to the inner container
+    progressChartContainer.style.height = `${finalHeight}px`;
+
+    // 5. Create the chart
     new Chart(progressCtx, {
         type: 'bar',
-        data: { labels: {{ labels|safe }}, datasets: [ { label: 'On Track (>= 80%)', data: {{ on_track_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)', borderWidth: 1 }, { label: 'At Risk (40-79%)', data: {{ at_risk_data|safe }}, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderWidth: 1 }, { label: 'Delayed (< 40%)', data: {{ delayed_data|safe }}, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderWidth: 1 } ] },
-        options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: true, position: 'top' }, datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value, context) { return value > 0 ? value + '%' : null; } } }, scales: { x: { stacked: true, min: 0, max: 100, title: { display: true, text: 'Completion %' } }, y: { stacked: true } } }
+        data: { 
+            labels: {{ labels|safe }}, 
+            datasets: [ 
+                { label: 'On Track (>= 80%)', data: {{ on_track_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)', borderWidth: 1 }, 
+                { label: 'At Risk (40-79%)', data: {{ at_risk_data|safe }}, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderWidth: 1 }, 
+                { label: 'Delayed (< 40%)', data: {{ delayed_data|safe }}, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderWidth: 1 } 
+            ] 
+        },
+        options: { 
+            indexAxis: 'y', 
+            responsive: true,
+            maintainAspectRatio: false, // This is crucial to allow resizing
+            plugins: { 
+                legend: { display: true, position: 'top' }, 
+                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value, context) { return value > 0 ? value + '%' : null; } } 
+            }, 
+            scales: { 
+                x: { stacked: true, min: 0, max: 100, title: { display: true, text: 'Completion %' } }, 
+                y: { stacked: true } 
+            } 
+        }
     });
 
-    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    // --- Status Chart (This part is unchanged) ---
+    const statusCtx = document.getElementById('statusChart').getContext('d');
     if (statusCtx && {{ status_data|safe }}.length > 0) {
         new Chart(statusCtx, {
             type: 'pie',
@@ -209,35 +256,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-</script>
-<script>
-    function filterDashboardTables(inputEl) {
-        const table = inputEl.closest('table');
-        const filterRow = inputEl.closest('.table-filter-row');
-        const tableBody = table.querySelector('tbody');
-        const dataRows = tableBody.querySelectorAll('tr');
-        
-        // Create an array of all filter values for the current table
-        const filters = Array.from(filterRow.querySelectorAll('input')).map(input => input.value.toUpperCase());
-
-        dataRows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length === 0) return; // Skip header or empty rows
-
-            let rowVisible = true;
-
-            // Loop through each filter and check against the corresponding cell
-            filters.forEach((filterText, index) => {
-                if (filterText !== '') { // Only apply filter if there is text
-                    const cellText = cells[index] ? cells[index].textContent.toUpperCase() : '';
-                    if (!cellText.includes(filterText)) {
-                        rowVisible = false;
-                    }
-                }
-            });
-
-            row.style.display = rowVisible ? "" : "none";
-        });
-    }
 </script>
 {% endblock %}
