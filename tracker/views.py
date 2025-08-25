@@ -14,8 +14,7 @@ from collections import Counter
 from collections import Counter, defaultdict 
 from tracker.utils import (
     get_completion_percentage, get_otif_percentage, get_overall_status,
-    get_schedule_status, get_next_milestone,get_final_project_otif
-
+    get_schedule_status, get_next_milestone
 )
 from django.core.cache import cache
 from io import BytesIO
@@ -161,7 +160,6 @@ def project_detail(request, project_id):
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
-    # --- GET Request Logic ---
     # --- GET Request Logic (This part is unchanged) ---
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
@@ -200,37 +198,16 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    # MODIFICATION: Get all remarks for each category for the new modals
-    automation_remarks = StageRemark.objects.filter(
-        stage__project=project, stage__stage_type='Automation'
-    ).select_related('stage', 'added_by').order_by('-created_at')
-
-    emulation_remarks = StageRemark.objects.filter(
-        stage__project=project, stage__stage_type='Emulation'
-    ).select_related('stage', 'added_by').order_by('-created_at')
-
     context = {
-        'project': project, 
-        'automation_stages': automation_stages, 
-        'emulation_stages': emulation_stages,
-        'updates': updates, 
-        'updates_count': updates_count,
+        'project': project, 'automation_stages': automation_stages, 'emulation_stages': emulation_stages,
+        'updates': updates, 'updates_count': updates_count,
         'completion_percentage': get_completion_percentage(all_stages),
         'timeline_progress_auto': timeline_progress_auto,
-        'timeline_progress_emu': timeline_progress_emu,
-        'overall_otif_percentage': get_otif_percentage(all_stages),
-        'project_otif': get_final_project_otif(all_stages),
-        'overall_status': get_overall_status(all_stages),
-        'automation_schedule_status': get_schedule_status(automation_stages), 
-        'emulation_schedule_status': get_schedule_status(emulation_stages),
-        'next_automation_milestone': get_next_milestone(automation_stages), 
-        'next_emulation_milestone': get_next_milestone(emulation_stages),
-        'last_update_time': last_update_time, 
-        'recent_activity': recent_activity,
-        # MODIFICATION: Add the new remark lists to the context
-        'automation_remarks': automation_remarks,
-        'emulation_remarks': emulation_remarks,
-
+        'timeline_progress_emu': timeline_progress_emu, # ✅ Pass new variable
+        'otif_percentage': get_otif_percentage(all_stages), 'overall_status': get_overall_status(all_stages),
+        'automation_schedule_status': get_schedule_status(automation_stages), 'emulation_schedule_status': get_schedule_status(emulation_stages),
+        'next_automation_milestone': get_next_milestone(automation_stages), 'next_emulation_milestone': get_next_milestone(emulation_stages),
+        'last_update_time': last_update_time, 'recent_activity': recent_activity,
     }
     
     return render(request, 'tracker/project_detail.html', context)
@@ -242,34 +219,6 @@ def delete_project(request, project_id):
     messages.success(request, "Project deleted successfully.")
     return redirect('tracker_index')
 
-@login_required
-def edit_remark(request, remark_id):
-    remark = get_object_or_404(StageRemark, pk=remark_id)
-    project_id = remark.stage.project.id
-    # Security check: only the author or a staff member can edit
-    if request.user == remark.added_by or request.user.is_staff:
-        if request.method == 'POST':
-            new_text = request.POST.get('remark_text')
-            if new_text:
-                remark.text = new_text
-                remark.save()
-                messages.success(request, "Remark updated successfully.")
-    else:
-        messages.error(request, "You do not have permission to edit this remark.")
-    return redirect('tracker_project_detail', project_id=project_id)
-
-@login_required
-def delete_remark(request, remark_id):
-    remark = get_object_or_404(StageRemark, pk=remark_id)
-    project_id = remark.stage.project.id
-    # Security check: only the author or a staff member can delete
-    if request.user == remark.added_by or request.user.is_staff:
-        if request.method == 'POST':
-            remark.delete()
-            messages.success(request, "Remark deleted successfully.")
-    else:
-        messages.error(request, "You do not have permission to delete this remark.")
-    return redirect('tracker_project_detail', project_id=project_id)
 
 # In tracker/views.py
 
@@ -350,20 +299,7 @@ def dashboard(request):
 
 @login_required
 def project_reports(request):
-    projects_qs = Project.objects.select_related('segment_con').prefetch_related('stages').all()
-
-    # --- Check for the 'hide_completed' filter ---
-    hide_completed = request.GET.get('hide_completed') == '1'
-    if hide_completed:
-        # First, find the IDs of all projects that are considered "Completed"
-        completed_project_ids = Project.objects.filter(
-            stages__name='Handover',
-            stages__status='Completed'
-        ).values_list('id', flat=True)
-
-        # Then, exclude them from our main query
-        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
-
+    projects = Project.objects.select_related('segment_con').prefetch_related('stages').all()
 
     # --- Get standard filter values ---
     selected_segment_ids = request.GET.getlist('segments')
@@ -373,18 +309,25 @@ def project_reports(request):
     max_value = request.GET.get('max_value')
 
     if selected_segment_ids:
-        projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
+        projects = projects.filter(segment_con__id__in=selected_segment_ids)
+    
     if start_date and end_date:
-        projects_qs = projects_qs.filter(so_punch_date__range=[start_date, end_date])
+        projects = projects.filter(so_punch_date__range=[start_date, end_date])
+
+    # --- NEW: Filter by Project Value ---
     if min_value:
         try:
-            projects_qs = projects_qs.filter(value__gte=float(min_value))
-        except (ValueError, TypeError): pass
+            projects = projects.filter(value__gte=float(min_value))
+        except (ValueError, TypeError):
+            # Silently ignore if the value is not a valid number
+            pass
     if max_value:
         try:
-            projects_qs = projects_qs.filter(value__lte=float(max_value))
-        except (ValueError, TypeError): pass
-
+            projects = projects.filter(value__lte=float(max_value))
+        except (ValueError, TypeError):
+            # Silently ignore if the value is not a valid number
+            pass
+    # --- END OF NEW FILTER ---
 
     # --- Process Stage-Specific Filters ---
     stage_filters_from_request = {}
@@ -393,39 +336,18 @@ def project_reports(request):
         start = request.GET.get(f'stage_{stage_key}_start')
         end = request.GET.get(f'stage_{stage_key}_end')
 
-        
         if status or (start and end):
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
             stage_query_filters = {'stages__name': stage_key}
             if status: stage_query_filters['stages__status'] = status
             if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
-            projects_qs = projects_qs.filter(**stage_query_filters)
-
-    distinct_projects = projects_qs.distinct()
-
-    # --- Prepare projects with their detailed summaries ---
-    projects_with_details = []
-    automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
-    emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
-
-    for project in distinct_projects:
-        all_stages = list(project.stages.all())
-
-        auto_stages = sorted([s for s in all_stages if s.stage_type == 'Automation'], key=lambda s: automation_order.get(s.name, 99))
-        emu_stages = sorted([s for s in all_stages if s.stage_type == 'Emulation'], key=lambda s: emulation_order.get(s.name, 99))
-
-        projects_with_details.append({
-            'project': project,
-            'otif': project.get_otif_percentage(),
-            'next_auto_milestone': get_next_milestone(auto_stages),
-            'next_emu_milestone': get_next_milestone(emu_stages),
-            'auto_schedule': get_schedule_status(auto_stages),
-            'emu_schedule': get_schedule_status(emu_stages),
-        })
-
-    # --- Calculate Standard KPIs ---
+            projects = projects.filter(**stage_query_filters)
+            
+    # We use distinct projects for all calculations
+    distinct_projects = projects.distinct()
     total_projects_found = distinct_projects.count()
 
+    # --- Calculate Standard KPIs ---
     total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
     completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
     average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
@@ -433,8 +355,6 @@ def project_reports(request):
     total_completed = completed_stages.count()
     on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
     on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
-
-    
     
     # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
@@ -445,22 +365,20 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
-
+        'projects': distinct_projects,
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
         'all_segments': trackerSegment.objects.all(),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
         'start_date': start_date, 'end_date': end_date,
-        'min_value': min_value, 'max_value': max_value,
-
+        'min_value': min_value, # Pass min_value to template
+        'max_value': max_value, # Pass max_value to template
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'stage_filters': stage_filters_from_request,
         'on_time_completion_rate': on_time_completion_rate,
-        'hide_completed_active': hide_completed,
-
     }
     return render(request, 'tracker/project_report.html', context)
 
@@ -669,7 +587,6 @@ def export_report_pdf(request):
             p.get_overall_status()
         ])
 
-
     project_table = Table(table_data)
     project_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -680,7 +597,6 @@ def export_report_pdf(request):
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
-
 
     elements.append(project_table)
     doc.build(elements)
@@ -788,11 +704,3 @@ def all_project_updates(request, project_id):
         'updates': updates
     }
     return render(request, 'tracker/all_project_updates.html', context)
-
-@login_required
-def help_page(request):
-    """
-    Renders the help and documentation page.
-    """
-    return render(request, 'tracker/help_page.html')
-

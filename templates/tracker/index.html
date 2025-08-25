@@ -1,9 +1,5 @@
 {% extends 'tracker/base.html' %}
-
-{% load humanize %}
-
-{% block title %}Projects | Project Tracker{% endblock %}
-
+{% load humanize %}  {% block title %}Projects | Project Tracker{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -25,9 +21,6 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-custom table-striped table-hover mb-0">
-
-                {# CORRECTED: Added thead tag #}
-
                 <thead class="table-light">
                     <tr>
                         <th>Code</th>
@@ -38,16 +31,6 @@
                         <th>Status</th>
                         <th>Progress</th>
                         <th>Actions</th>
-                    </tr>
-                    <tr class="table-filter-row">
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Code..." onkeyup="filterTable(this)"></th>
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterTable(this)"></th>
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Segment..." onkeyup="filterTable(this)"></th>
-                        <th></th> {# No filter for Value #}
-                        <th></th> {# No filter for Date #}
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterTable(this)"></th>
-                        <th></th> {# No filter for Progress #}
-                        <th></th> {# No filter for Actions #}
                     </tr>
                 </thead>
                 <tbody>
@@ -98,45 +81,4 @@
         </div>
     </div>
 </div>
-
-{% endblock %}
-
-{% block scripts %}
-<script>
-    function filterTable(inputEl) {
-        const table = inputEl.closest('table');
-        const filterRow = table.querySelector('.table-filter-row');
-        const tableBody = table.querySelector('tbody');
-        const dataRows = tableBody.querySelectorAll('tr');
-
-        // Get an array of all filter inputs to check their column index
-        const filterInputs = Array.from(filterRow.querySelectorAll('th'));
-
-        // Build a map of column index to filter value
-        const filters = {};
-        filterInputs.forEach((th, index) => {
-            const input = th.querySelector('input');
-            if (input && input.value !== '') {
-                filters[index] = input.value.toUpperCase();
-            }
-        });
-
-        dataRows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length === 0) return;
-
-            let rowVisible = true;
-            for (const colIndex in filters) {
-                const filterText = filters[colIndex];
-                const cellText = cells[colIndex] ? cells[colIndex].textContent.toUpperCase() : '';
-                if (!cellText.includes(filterText)) {
-                    rowVisible = false;
-                    break; // No need to check other filters if one fails
-                }
-            }
-            row.style.display = rowVisible ? "" : "none";
-        });
-    }
-</script>
-
 {% endblock %}
