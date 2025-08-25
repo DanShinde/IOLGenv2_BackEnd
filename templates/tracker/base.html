@@ -154,6 +154,10 @@
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'new_project' %}active{% endif %}" href="{% url 'tracker_new_project' %}"><i class="fas fa-plus-circle"></i>Add Project</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'project_reports' %}active{% endif %}" href="{% url 'project_reports' %}"><i class="fas fa-chart-bar"></i>Reports</a></li>
                         <li class="nav-item"><a class="nav-link" href="{% url 'tracker_upcoming_milestones' %}"><i class="fas fa-calendar-alt me-2"></i> Upcoming Milestones</a></li>
+
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'help_page' %}active{% endif %}" href="{% url 'help_page' %}"><i class="fas fa-question-circle me-1"></i>Help
+        </a>
+    </li>
                     {% endif %}
                 </ul>
                 <div class="hidden md:flex items-center space-x-2">
@@ -161,6 +165,7 @@
                         <i class="fas fa-home"></i>
                     </a>
                 </div>
+
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
                         <li class="nav-item dropdown user-dropdown">
