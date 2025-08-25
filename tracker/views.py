@@ -15,6 +15,7 @@ from collections import Counter, defaultdict
 from tracker.utils import (
     get_completion_percentage, get_otif_percentage, get_overall_status,
     get_schedule_status, get_next_milestone,get_final_project_otif
+
 )
 from django.core.cache import cache
 from io import BytesIO
@@ -161,6 +162,7 @@ def project_detail(request, project_id):
         return HttpResponseRedirect(redirect_url)
 
     # --- GET Request Logic ---
+    # --- GET Request Logic (This part is unchanged) ---
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
     
@@ -228,6 +230,7 @@ def project_detail(request, project_id):
         # MODIFICATION: Add the new remark lists to the context
         'automation_remarks': automation_remarks,
         'emulation_remarks': emulation_remarks,
+
     }
     
     return render(request, 'tracker/project_detail.html', context)
@@ -267,6 +270,8 @@ def delete_remark(request, remark_id):
     else:
         messages.error(request, "You do not have permission to delete this remark.")
     return redirect('tracker_project_detail', project_id=project_id)
+
+# In tracker/views.py
 
 @login_required
 def dashboard(request):
@@ -359,6 +364,7 @@ def project_reports(request):
         # Then, exclude them from our main query
         projects_qs = projects_qs.exclude(id__in=completed_project_ids)
 
+
     # --- Get standard filter values ---
     selected_segment_ids = request.GET.getlist('segments')
     start_date = request.GET.get('start_date')
@@ -379,12 +385,15 @@ def project_reports(request):
             projects_qs = projects_qs.filter(value__lte=float(max_value))
         except (ValueError, TypeError): pass
 
+
     # --- Process Stage-Specific Filters ---
     stage_filters_from_request = {}
     for stage_key, stage_display in Stage.STAGE_NAMES:
         status = request.GET.get(f'stage_{stage_key}_status')
         start = request.GET.get(f'stage_{stage_key}_start')
         end = request.GET.get(f'stage_{stage_key}_end')
+
+        
         if status or (start and end):
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
             stage_query_filters = {'stages__name': stage_key}
@@ -416,6 +425,7 @@ def project_reports(request):
 
     # --- Calculate Standard KPIs ---
     total_projects_found = distinct_projects.count()
+
     total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
     completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
     average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
@@ -424,6 +434,8 @@ def project_reports(request):
     on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
     on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
 
+    
+    
     # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
     status_labels = list(status_counts.keys())
@@ -433,7 +445,7 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
-        'projects_with_details': projects_with_details,
+
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
@@ -441,12 +453,14 @@ def project_reports(request):
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
         'start_date': start_date, 'end_date': end_date,
         'min_value': min_value, 'max_value': max_value,
+
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'stage_filters': stage_filters_from_request,
         'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
+
     }
     return render(request, 'tracker/project_report.html', context)
 
@@ -655,6 +669,7 @@ def export_report_pdf(request):
             p.get_overall_status()
         ])
 
+
     project_table = Table(table_data)
     project_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -665,6 +680,7 @@ def export_report_pdf(request):
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
+
 
     elements.append(project_table)
     doc.build(elements)
@@ -779,3 +795,4 @@ def help_page(request):
     Renders the help and documentation page.
     """
     return render(request, 'tracker/help_page.html')
+

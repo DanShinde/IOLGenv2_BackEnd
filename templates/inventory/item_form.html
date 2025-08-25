@@ -1,0 +1,505 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}{% if form.instance.pk %}Edit {{ form.instance.name }}{% else %}Add New Item{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary: #4361ee;
+        --primary-light: #e0e7ff;
+        --secondary: #3f37c9;
+        --dark: #1e1b4b;
+        --light: #f8fafc;
+        --success: #10b981;
+        --danger: #ef4444;
+        --warning: #f59e0b;
+        --gray: #6b7280;
+        --gray-light: #e5e7eb;
+    }
+
+    .form-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        perspective: 1000px;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        transform-style: preserve-3d;
+        transition: transform 0.5s ease, box-shadow 0.5s ease;
+        position: relative;
+    }
+
+    .form-card:hover {
+        transform: translateY(-5px) rotateX(1deg);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
+    }
+
+    .form-header {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: white;
+        padding: 1.5rem 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .form-header::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+        transform: rotate(30deg);
+    }
+
+    .form-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .form-icon {
+        margin-right: 12px;
+        font-size: 1.2em;
+    }
+
+    .form-body {
+        padding: 2rem;
+        background: var(--light);
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+
+    .form-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--dark);
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 1rem;
+        border: 2px solid var(--gray-light);
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        font-size: 1rem;
+        background: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    }
+
+    .form-control:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px var(--primary-light);
+        outline: none;
+    }
+
+    .form-control::placeholder {
+        color: var(--gray);
+        opacity: 0.5;
+    }
+
+    .form-select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e");
+        background-position: right 1rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em;
+        padding-right: 3rem;
+    }
+
+    .form-textarea {
+        min-height: 120px;
+        resize: vertical;
+        line-height: 1.6;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        padding-top: 1.5rem;
+        margin-top: 2rem;
+        border-top: 1px solid var(--gray-light);
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.875rem 1.75rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn:active {
+        transform: translateY(0);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+    }
+
+    .btn-secondary {
+        background: white;
+        color: var(--dark);
+        border: 2px solid var(--gray-light);
+    }
+
+    .btn-secondary:hover {
+        background: var(--gray-light);
+    }
+
+    .error-message {
+        color: var(--danger);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .error-message::before {
+        content: "⚠";
+        font-size: 1em;
+    }
+
+    .help-text {
+        color: var(--gray);
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .help-text::before {
+        content: "ℹ";
+        font-size: 1em;
+    }
+
+    /* Floating animation for important fields */
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+
+    .important-field .form-control {
+        border-left: 4px solid var(--primary);
+        animation: float 3s ease-in-out infinite;
+    }
+
+    /* Custom checkbox */
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        margin-top: 1rem;
+    }
+
+    .custom-checkbox {
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid var(--gray-light);
+        border-radius: 6px;
+        margin-right: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background: white;
+    }
+
+    .custom-checkbox:hover {
+        border-color: var(--primary);
+    }
+
+    .custom-checkbox.checked {
+        background: var(--primary);
+        border-color: var(--primary);
+    }
+
+    .checkbox-label {
+        color: var(--dark);
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    /* Date picker enhancement */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(0.5);
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+        filter: invert(0.3);
+        background: rgba(0,0,0,0.05);
+    }
+
+    /* File upload styling */
+    .file-upload {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+        width: 100%;
+    }
+
+    .file-upload-btn {
+        width: 100%;
+        padding: 1rem;
+        border: 2px dashed var(--gray-light);
+        border-radius: 10px;
+        background: white;
+        color: var(--gray);
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .file-upload-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--primary-light);
+    }
+
+    .file-upload-input {
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+    }
+
+    /* Character counter */
+    .char-counter {
+        text-align: right;
+        font-size: 0.75rem;
+        color: var(--gray);
+        margin-top: 0.25rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="form-card">
+        <div class="form-header">
+            <h1 class="form-title">
+                <i class="fas {% if form.instance.pk %}fa-edit{% else %}fa-plus-circle{% endif %} form-icon"></i>
+                {% if form.instance.pk %}Edit {{ form.instance.name }}{% else %}Add New Item{% endif %}
+            </h1>
+        </div>
+        
+        <div class="form-body">
+            <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="form-grid">
+                    {% for field in form %}
+                    <div class="form-group {% if field.field.required %}important-field{% endif %}">
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            {{ field.label }}
+                            {% if field.field.required %}<span style="color: var(--danger);">*</span>{% endif %}
+                        </label>
+                        
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="checkbox-container">
+                            <div class="custom-checkbox {% if field.value %}checked{% endif %}" 
+                                 onclick="this.classList.toggle('checked'); document.getElementById('{{ field.id_for_label }}').checked = !document.getElementById('{{ field.id_for_label }}').checked;">
+                                {% if field.value %}<i class="fas fa-check text-white"></i>{% endif %}
+                            </div>
+                            <span class="checkbox-label">{{ field.label }}</span>
+                            {{ field }}
+                        </div>
+                        {% elif field.field.widget.input_type == 'file' %}
+                        <div class="file-upload">
+                            <div class="file-upload-btn">
+                                <i class="fas fa-cloud-upload-alt" style="margin-right: 8px;"></i>
+                                Choose file...
+                            </div>
+                            {{ field }}
+                        </div>
+                        {% else %}
+                        {{ field }}
+                        {% endif %}
+                        
+                        {% if field.help_text %}
+                        <p class="help-text">{{ field.help_text }}</p>
+                        {% endif %}
+                        
+                        {% for error in field.errors %}
+                        <p class="error-message">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="form-actions">
+                    <a href="{% if form.instance.pk %}{% url 'inventory-item-detail' form.instance.pk %}{% else %}{% url 'inventory-item-list' %}{% endif %}" 
+                       class="btn btn-secondary">
+                        <i class="fas fa-times" style="margin-right: 8px;"></i>Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas {% if form.instance.pk %}fa-save{% else %}fa-plus{% endif %}" style="margin-right: 8px;"></i>
+                        {% if form.instance.pk %}Update Item{% else %}Create Item{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 3D card effect on mouse move
+    const card = document.querySelector('.form-card');
+    if (card) {
+        card.addEventListener('mousemove', (e) => {
+            const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
+            const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
+            card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+        });
+
+        card.addEventListener('mouseenter', () => {
+            card.style.transition = 'none';
+        });
+
+        card.addEventListener('mouseleave', () => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.transform = 'rotateY(0deg) rotateX(0deg)';
+        });
+    }
+
+    // Show selected file name
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const fileName = this.files[0]?.name || 'No file chosen';
+            const uploadBtn = this.previousElementSibling;
+            uploadBtn.innerHTML = `<i class="fas fa-file" style="margin-right: 8px;"></i>${fileName}`;
+        });
+    });
+
+    // Character counter for textareas
+    const textareas = document.querySelectorAll('textarea');
+    textareas.forEach(textarea => {
+        const counter = document.createElement('div');
+        counter.className = 'char-counter';
+        counter.textContent = `${textarea.value.length}/${textarea.maxLength || '∞'}`;
+        textarea.parentNode.appendChild(counter);
+        
+        textarea.addEventListener('input', function() {
+            counter.textContent = `${this.value.length}/${this.maxLength || '∞'}`;
+            if (this.maxLength && this.value.length > this.maxLength * 0.9) {
+                counter.style.color = 'var(--danger)';
+            } else {
+                counter.style.color = 'var(--gray)';
+            }
+        });
+    });
+
+    // Set quantity to 1 and make readonly for both tools and materials
+    const itemTypeField = document.getElementById('id_item_type');
+    const quantityField = document.getElementById('id_quantity');
+    const minQuantityField = document.getElementById('id_min_quantity');
+
+    function setupQuantityFields() {
+        if (quantityField) {
+            quantityField.value = 1;
+            quantityField.readOnly = true;
+            quantityField.style.backgroundColor = '#f3f4f6';
+        }
+        if (minQuantityField) {
+            minQuantityField.value = 0;
+            minQuantityField.readOnly = true;
+            minQuantityField.style.backgroundColor = '#f3f4f6';
+        }
+    }
+
+    if (itemTypeField) {
+        setupQuantityFields();
+        itemTypeField.addEventListener('change', setupQuantityFields);
+    }
+    
+    // Initialize on page load
+    setupQuantityFields();
+
+    // Form validation
+    const forms = document.querySelectorAll('.needs-validation');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Add error styling to invalid fields
+                const invalidFields = form.querySelectorAll(':invalid');
+                invalidFields.forEach(field => {
+                    field.style.borderColor = 'var(--danger)';
+                    field.nextElementSibling?.classList.add('error-message');
+                });
+            }
+            
+            form.classList.add('was-validated');
+        }, false);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -11,15 +11,15 @@ admin.site.register(StandardString)
 class ClusterTemplateAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     list_display = (
         'id', 'cluster_name', 'block_type', 'uploaded_by', 'uploaded_at',
-        'updated_by', 'updated_at', 'segment', 'parameters_count'
+        'updated_by', 'updated_at', 'control_library', 'parameters_count'
     )  # Display all fields
     search_fields = ('cluster_name',)  # Optional: Allows searching by cluster_name
-    list_filter = ('segment', 'uploaded_by')
+    list_filter = ('segment', 'control_library','block_type' , 'uploaded_by')
 
 admin.site.register(ClusterTemplate, ClusterTemplateAdmin)
 
 
-
+ 
 @admin.register(ControlLibrary)
 class SegmentAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')  # Display ID and name in the admin list view

@@ -1,7 +1,9 @@
 {% extends 'tracker/base.html' %}
+
 {% load humanize %}
 
 {% block title %}Projects | Project Tracker{% endblock %}
+
 
 {% block content %}
 <div class="page-header">
@@ -23,7 +25,9 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-custom table-striped table-hover mb-0">
+
                 {# CORRECTED: Added thead tag #}
+
                 <thead class="table-light">
                     <tr>
                         <th>Code</th>
@@ -94,6 +98,7 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -133,4 +138,5 @@
         });
     }
 </script>
+
 {% endblock %}

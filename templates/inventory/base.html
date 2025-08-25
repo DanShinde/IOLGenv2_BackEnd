@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Inventory Management System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .status-available { background-color: #dcfce7; color: #166534; }
+        .status-assigned { background-color: #fef3c7; color: #92400e; }
+        .status-dispatched { background-color: #fee2e2; color: #991b1b; }
+        .status-retired { background-color: #e5e7eb; color: #4b5563; }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .nav-link {
+            transition: all 0.2s ease;
+        }
+        
+        .nav-link.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .nav-link.active:hover {
+            background-color: #2563eb;
+        }
+        
+        .dropdown-menu {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+        
+        .dropdown:hover .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Mobile menu button -->
+        <button id="mobile-menu-button" class="md:hidden fixed z-50 top-4 left-4 p-2 rounded-md bg-blue-600 text-white">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar bg-white w-64 fixed h-full shadow-lg z-40">
+            <div class="p-4 border-b border-gray-200">
+                <h1 class="text-xl font-bold text-gray-800">Inventory System</h1>
+                <p class="text-sm text-gray-600">v0.2.0</p>
+            </div>
+            
+            <!-- User Profile -->
+            <div class="p-4 border-b border-gray-200 flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div>
+                    <p class="font-medium text-gray-800">
+                        {% if user.is_authenticated %}
+                            {{ user.get_full_name|default:user.username }}
+                        {% else %}
+                            Guest User
+                        {% endif %}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        {% if user.is_authenticated %}
+                            {{ user.groups.first|default:"Admin" }}
+                        {% else %}
+                            Not logged in
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="p-4">
+                <ul class="space-y-1">
+                    <li>
+                        <a href="{% url 'inventory-dashboard' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-dashboard' %}active{% endif %}">
+                            <i class="fas fa-tachometer-alt mr-3 text-blue-500"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    
+                    <li>
+                        <a href="{% url 'inventory-item-list' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-item-list' or request.resolver_match.url_name == 'inventory-item-detail' or request.resolver_match.url_name == 'inventory-item-create' or request.resolver_match.url_name == 'inventory-item-update' %}active{% endif %}">
+                            <i class="fas fa-boxes mr-3 text-green-500"></i>
+                            <span>Inventory</span>
+                        </a>
+                    </li>
+                    
+                    
+                    
+                    <li>
+                        <a href="{% url 'inventory-transfer-item' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if 'transfer' in request.resolver_match.url_name %}active{% endif %}">
+                            <i class="fas fa-exchange-alt mr-3 text-purple-500"></i>
+                            <span>Transfers</span>
+                        </a>
+                    </li>
+                    
+                    <li>
+                        <a href="{% url 'inventory-history-list' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-history-list' %}active{% endif %}">
+                            <i class="fas fa-history mr-3 text-indigo-500"></i>
+                            <span>History</span>
+                        </a>
+                    </li>
+                    
+                    <li>
+                        <a href="{% url 'inventory-reports' %}" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 {% if request.resolver_match.url_name == 'inventory-reports' %}active{% endif %}">
+                            <i class="fas fa-chart-bar mr-3 text-teal-500"></i>
+                            <span>Reports</span>
+                        </a>
+                    </li>
+                </ul>
+                
+                <!-- Admin Section -->
+                {% if user.is_staff %}
+                <div class="mt-8 pt-4 border-t border-gray-200">
+                    <p class="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                        <i class="fas fa-crown mr-1"></i>Admin
+                    </p>
+                    <ul class="space-y-1">
+                        <li>
+                            <a href="/admin/" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100">
+                                <i class="fas fa-cog mr-3 text-gray-500"></i>
+                                <span>Admin Panel</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/admin/auth/user/" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100">
+                                <i class="fas fa-users mr-3 text-gray-500"></i>
+                                <span>Manage Users</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+            </nav>
+        </div>
+
+        <!-- Main content -->
+        <div class="flex-1 flex flex-col overflow-hidden md:ml-64">
+            <!-- Top header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="px-4 py-4 flex justify-between items-center">
+                    <div class="flex items-center">
+                        <h2 class="text-xl font-semibold text-gray-800">
+                            {% block page_title %}
+                                {% if request.resolver_match.url_name == 'inventory-dashboard' %}Dashboard
+                                {% elif request.resolver_match.url_name == 'inventory-item-list' %}Inventory Items
+                                {% elif 'transfer' in request.resolver_match.url_name %}Transfers
+                                {% elif request.resolver_match.url_name == 'inventory-history-list' %}History
+                                {% elif request.resolver_match.url_name == 'inventory-reports' %}Reports
+                                {% else %}Inventory System
+                                {% endif %}
+                            {% endblock %}
+                        </h2>
+                        
+                        <!-- Breadcrumb for specific pages -->
+                        {% if request.resolver_match.url_name == 'inventory-item-detail' or request.resolver_match.url_name == 'inventory-item-update' or request.resolver_match.url_name == 'inventory-item-create' %}
+                        <div class="ml-2 text-sm text-gray-500">
+                            <i class="fas fa-chevron-right mx-2"></i>
+                            {% if request.resolver_match.url_name == 'inventory-item-create' %}Add New Item
+                            {% elif request.resolver_match.url_name == 'inventory-item-update' %}Edit Item
+                            {% elif request.resolver_match.url_name == 'inventory-item-detail' %}Item Details
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+
+                        <!-- Quick Actions -->
+                        <div class="hidden md:flex items-center space-x-2">
+                            <a href="{% url 'home' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors" title="Home">
+                                <i class="fas fa-home"></i>
+                            </a>
+                            <a href="{% url 'inventory-item-create' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors" title="Add Item">
+                                <i class="fas fa-plus"></i>
+                            </a>
+                            <a href="{% url 'inventory-transfer-item' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-purple-600 transition-colors" title="Transfer Items">
+                                <i class="fas fa-exchange-alt"></i>
+                            </a>
+                        </div>
+                        
+                        <!-- Notifications -->
+                        <button class="p-2 rounded-full hover:bg-gray-100 relative" title="Notifications">
+                            <i class="fas fa-bell text-gray-500"></i>
+                            <span class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400"></span>
+                        </button>
+                        
+                        <!-- User Menu -->
+                        <div class="relative">
+                            <button id="user-menu-button" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <span class="hidden md:inline text-sm font-medium text-gray-700">
+                                    {% if user.is_authenticated %}
+                                        {{ user.get_short_name|default:user.username }}
+                                    {% else %}
+                                        Guest
+                                    {% endif %}
+                                </span>
+                                <i class="fas fa-chevron-down text-xs text-gray-500"></i>
+                            </button>
+                            
+                            <!-- User dropdown -->
+                            <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
+                                {% if user.is_authenticated %}
+                                <div class="px-4 py-2 border-b border-gray-200">
+                                    <p class="text-sm font-medium text-gray-900">{{ user.get_full_name|default:user.username }}</p>
+                                    <p class="text-xs text-gray-500">{{ user.email }}</p>
+                                </div>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-user mr-2"></i>Your Profile
+                                </a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-cog mr-2"></i>Settings
+                                </a>
+                                <div class="border-t border-gray-200"></div>
+                                <a href="{% url 'admin:logout' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>Sign out
+                                </a>
+                                {% else %}
+                                <a href="{% url 'admin:login' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <i class="fas fa-sign-in-alt mr-2"></i>Sign in
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main content area -->
+            <main class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <!-- Flash Messages -->
+                {% if messages %}
+                <div class="mb-4">
+                    {% for message in messages %}
+                    <div class="alert {{ message.tags }} p-4 rounded-lg mb-2 flex items-center">
+                        {% if message.tags == 'success' %}
+                            <i class="fas fa-check-circle mr-2 text-green-600"></i>
+                        {% elif message.tags == 'error' %}
+                            <i class="fas fa-exclamation-circle mr-2 text-red-600"></i>
+                        {% elif message.tags == 'warning' %}
+                            <i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>
+                        {% else %}
+                            <i class="fas fa-info-circle mr-2 text-blue-600"></i>
+                        {% endif %}
+                        <span>{{ message }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% block content %}{% endblock %}
+            </main>
+
+            <!-- Footer -->
+            <footer class="bg-white border-t border-gray-200 py-4 px-4">
+                <div class="flex justify-between items-center text-sm text-gray-500">
+                    <div>
+                        &copy; {% now "Y" %} Inventory Management System. All rights reserved.
+                    </div>
+                    <div class="flex space-x-4">
+                        <span>Version 0.2.0</span>
+                        <span>•</span>
+                        <a href="#" class="hover:text-gray-700">Support</a>
+                        <span>•</span>
+                        <a href="#" class="hover:text-gray-700">Documentation</a>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-button').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('open');
+        });
+
+        // User dropdown toggle
+        document.getElementById('user-menu-button').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('user-dropdown').classList.toggle('hidden');
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            const userDropdown = document.getElementById('user-dropdown');
+            const userMenuButton = document.getElementById('user-menu-button');
+            
+            if (!userMenuButton.contains(event.target)) {
+                userDropdown.classList.add('hidden');
+            }
+        });
+
+        // Enhanced active state management
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const currentPath = window.location.pathname;
+            
+            navLinks.forEach(link => {
+                // Remove existing active classes
+                link.classList.remove('active');
+                
+                // Add active class if current page matches
+                if (link.href === window.location.href || 
+                    (currentPath.includes('transfer') && link.href.includes('transfer-item'))) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Dropdown animation enhancement
+        document.querySelectorAll('.dropdown').forEach(dropdown => {
+            const menu = dropdown.querySelector('.dropdown-menu');
+            const chevron = dropdown.querySelector('.fa-chevron-down');
+            
+            dropdown.addEventListener('mouseenter', () => {
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+            });
+            
+            dropdown.addEventListener('mouseleave', () => {
+                if (chevron) chevron.style.transform = 'rotate(0deg)';
+            });
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

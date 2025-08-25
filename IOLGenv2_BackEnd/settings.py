@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'home',
     'tracker',
     'django.contrib.humanize'
+    'inventory',
 ]
 
 MIDDLEWARE = [

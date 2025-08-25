@@ -1,0 +1,102 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <!-- Summary Cards -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="p-3 bg-blue-100 rounded-full mr-4">
+                <i class="fas fa-tools text-blue-600 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">Total Tools</h3>
+                <p class="text-2xl font-bold">{{ tools_count }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="p-3 bg-green-100 rounded-full mr-4">
+                <i class="fas fa-boxes text-green-600 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">Total Materials</h3>
+                <p class="text-2xl font-bold">{{ materials_count }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="p-3 bg-purple-100 rounded-full mr-4">
+                <i class="fas fa-users text-purple-600 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700">Active Users</h3>
+                <p class="text-2xl font-bold">{{ users_count }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Recent Assignments -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-bold mb-4">Recent Assignments</h2>
+        <div class="space-y-4">
+            {% for assignment in recent_assignments %}
+            <div class="border-l-4 border-blue-500 pl-4 py-2">
+                <div class="flex justify-between">
+                    <h3 class="font-medium">{{ assignment.item.name }}</h3>
+                    <span class="text-sm text-gray-500">{{ assignment.assignment_date }}</span>
+                </div>
+                <p class="text-sm text-gray-600">Assigned to {{ assignment.assigned_to.get_full_name|default:assignment.assigned_to.username }}</p>
+            </div>
+            {% empty %}
+            <p class="text-gray-500">No recent assignments</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Recent Dispatches -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-bold mb-4">Recent Dispatches</h2>
+        <div class="space-y-4">
+            {% for dispatch in recent_dispatches %}
+            <div class="border-l-4 border-green-500 pl-4 py-2">
+                <div class="flex justify-between">
+                    <h3 class="font-medium">{{ dispatch.quantity }} x {{ dispatch.item.name }}</h3>
+                    <span class="text-sm text-gray-500">{{ dispatch.dispatch_date }}</span>
+                </div>
+                <p class="text-sm text-gray-600">To {{ dispatch.project }}</p>
+            </div>
+            {% empty %}
+            <p class="text-gray-500">No recent dispatches</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="mt-8 bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-bold mb-4">Recent Activity</h2>
+    <div class="space-y-4">
+        {% for record in recent_history %}
+        <div class="flex items-start">
+            <div class="mr-3 mt-1 text-{{ record.action_color }}-500">
+                <i class="fas fa-{{ record.action_icon }}"></i>
+            </div>
+            <div>
+                <p class="font-medium">{{ record.item.name }} - {{ record.get_action_display }}</p>
+                <p class="text-sm text-gray-600">{{ record.details }}</p>
+                <p class="text-xs text-gray-500">{{ record.timestamp }}</p>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-gray-500">No recent activity</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

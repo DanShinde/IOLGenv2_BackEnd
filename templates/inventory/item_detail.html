@@ -1,0 +1,91 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}{{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg p-6">
+    <div class="flex justify-between items-start mb-6">
+        <div>
+            <h2 class="text-2xl font-bold">{{ item.name }}</h2>
+            <p class="text-gray-600">{{ item.make }} {{ item.model }}</p>
+        </div>
+        <span class="px-3 py-1 rounded-full text-sm font-medium 
+            {% if item.item_type == 'TOOL' %}bg-blue-100 text-blue-800
+            {% else %}bg-green-100 text-green-800{% endif %}">
+            {{ item.get_item_type_display }}
+        </span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div>
+            <h3 class="text-lg font-semibold mb-2">Details</h3>
+            <div class="space-y-2">
+                <p><span class="font-medium">Serial Number:</span> {{ item.serial_number }}</p>
+                <p><span class="font-medium">Status:</span> 
+                    <span class="px-2 py-1 text-xs rounded-full status-{{ item.status|lower }}">
+                        {{ item.get_status_display }}
+                    </span>
+                </p>
+                <p><span class="font-medium">Quantity:</span> {{ item.quantity }}</p>
+                <p><span class="font-medium">Location:</span> {{ item.location|default:"-" }}</p>
+                <p><span class="font-medium">Category:</span> {{ item.category|default:"-" }}</p>
+                <p><span class="font-medium">Added:</span> {{ item.created_at|date:"M d, Y" }}</p>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-semibold mb-2">Description</h3>
+            <p class="text-gray-700">{{ item.description|default:"No description provided" }}</p>
+            
+            {% if item.purchase_date or item.purchase_cost %}
+            <h3 class="text-lg font-semibold mt-4 mb-2">Purchase Info</h3>
+            <div class="space-y-2">
+                {% if item.purchase_date %}
+                <p><span class="font-medium">Purchase Date:</span> {{ item.purchase_date }}</p>
+                {% endif %}
+                {% if item.purchase_cost %}
+                <p><span class="font-medium">Cost:</span> ${{ item.purchase_cost }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="flex space-x-4">
+        <a href="{% url 'inventory-item-update' item.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+            <i class="fas fa-edit mr-2"></i>Edit
+        </a>
+        {% if item.status == 'AVAILABLE' %}
+        <a href="{% url 'inventory-transfer-item' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
+            <i class="fas fa-plus mr-2"></i>Assign/Dispatch
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- History Section -->
+<div class="mt-8 bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-bold mb-4">Recent History</h2>
+    <div class="space-y-4">
+        {% for record in history %}
+        <div class="flex items-start">
+            <div class="mr-3 mt-1 text-{{ record.action_color }}-500">
+                <i class="fas fa-{{ record.action_icon }}"></i>
+            </div>
+            <div>
+                <div class="flex justify-between">
+                    <p class="font-medium">{{ record.get_action_display }}</p>
+                    <span class="text-sm text-gray-500">{{ record.timestamp|date:"M d, Y H:i" }}</span>
+                </div>
+                <p class="text-sm text-gray-600">{{ record.details }}</p>
+                {% if record.user %}
+                <p class="text-xs text-gray-500">By {{ record.user.get_full_name|default:record.user.username }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-gray-500">No history records found</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
