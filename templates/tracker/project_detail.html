@@ -177,6 +177,11 @@
                 <form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="automationStagesForm">
                     {% csrf_token %}<input type="hidden" name="active_tab" value="automation">
                     <div class="d-flex justify-content-end align-items-center mb-3">
+
+                            <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#allRemarksModalAutomation">
+                                <i class="fas fa-comments me-1"></i> View All Remarks
+                            </button>
+
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
                     <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>{% for stage in automation_stages %}<tr><td><strong>{{ stage.name }}</strong></td><td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td><td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td><td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td><td><div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button><ul class="dropdown-menu"><li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li></ul></div></td></tr>{% endfor %}</tbody></table></div>
@@ -186,6 +191,11 @@
                 <form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="emulationStagesForm">
                     {% csrf_token %}<input type="hidden" name="active_tab" value="emulation">
                     <div class="d-flex justify-content-end align-items-center mb-3">
+
+                            <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#allRemarksModalEmulation">
+                                <i class="fas fa-comments me-1"></i> View All Remarks
+                            </button>
+
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
                     <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>{% for stage in emulation_stages %}<tr><td><strong>{{ stage.name }}</strong></td><td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td><td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td><td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td><td><div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button><ul class="dropdown-menu"><li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li></ul></div></td></tr>{% endfor %}</tbody></table></div>
@@ -232,6 +242,35 @@
                 <hr>
                 <div class="row">
                     <div class="col-6 border-end">
+
+                         <h6 class="text-muted">Overall OTIF % (All Stages)</h6>
+                         <p class="h5 mb-0">
+                            {% if overall_otif_percentage is not None %}
+                                {{ overall_otif_percentage|floatformat:1 }}%
+                            {% else %}
+                                <span class="text-muted small">No completed stages yet</span>
+                            {% endif %}
+                         </p>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Project Delivery Status (Handover)</h6>
+                        <p class="mb-0">
+                            {% if project_otif == 101 %}
+                                <span class="badge bg-success fs-6">Before Time In Full</span>
+                            {% elif project_otif == 100 %}
+                                <span class="badge bg-primary fs-6">On Time In Full</span>
+                            {% elif project_otif == 0 %}
+                                <span class="badge bg-danger fs-6">Delayed</span>
+                            {% else %}
+                                <span class="text-muted small">Pending Completion</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6 border-end">
+
                          <h6 class="text-muted">Automation Schedule</h6>
                          {% with schedule_status=automation_schedule_status %}
                             {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
@@ -326,9 +365,12 @@
     </div>
 </div>
 
+
 {% for stage in automation_stages %}{% include 'tracker/partials/stage_modals.html' with stage=stage %}{% endfor %}
 {% for stage in emulation_stages %}{% include 'tracker/partials/stage_modals.html' with stage=stage %}{% endfor %}
 {% include 'tracker/partials/project_update_modals.html' with updates=updates %}
+{% include 'tracker/partials/all_remarks_modals.html' %}
+
 
 {% endblock %}
 
