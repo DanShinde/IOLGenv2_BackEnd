@@ -16,19 +16,15 @@ class Project(models.Model):
     customer_name = models.CharField(max_length=100)
     value = models.DecimalField(max_digits=12, decimal_places=2)
     so_punch_date = models.DateField()
-    segment = models.CharField(max_length=255, blank=True, null=True)
+    # The redundant 'segment' CharField and the custom 'save' method have been removed.
+    # 'segment_con' is now the single source of truth.
     segment_con = models.ForeignKey(
-        trackerSegment, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        trackerSegment,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name="tracker_projects1"
     )
-    def save(self, *args, **kwargs):
-    # Store the name of the DeviceType before saving
-        if self.segment_con:
-            self.segment = self.segment_con.name
-        super(Project, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.code
@@ -38,7 +34,7 @@ class Project(models.Model):
         total = stages.count()
         completed = stages.filter(status="Completed").count()
         return round((completed / total) * 100) if total > 0 else 0
-    
+
     from datetime import timedelta
 
     def get_otif_percentage(self):

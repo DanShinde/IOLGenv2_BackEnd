@@ -253,14 +253,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- Status Chart (This part is unchanged) ---
-    const statusCtx = document.getElementById('statusChart').getContext('d');
+    // --- Status Chart (This part is corrected) ---
+    const statusCanvas = document.getElementById('statusChart');
 
-    if (statusCtx && {{ status_data|safe }}.length > 0) {
+    if (statusCanvas && {{ status_data|safe }}.length > 0) {
+        // ✅ CORRECTED: Changed getContext('d') to getContext('2d')
+        const statusCtx = statusCanvas.getContext('2d');
         new Chart(statusCtx, {
             type: 'pie',
-            data: { labels: {{ status_labels|safe }}, datasets: [{ label: 'Project Status', data: {{ status_data|safe }}, backgroundColor: ['rgba(255, 193, 7, 0.7)', 'rgba(220, 53, 69, 0.7)', 'rgba(108, 117, 125, 0.7)', 'rgba(40, 167, 69, 0.7)'] }] },
-            options: { responsive: true, plugins: { legend: { position: 'top' } } }
+            data: { 
+                labels: {{ status_labels|safe }}, 
+                datasets: [{ 
+                    label: 'Project Status', 
+                    data: {{ status_data|safe }}, 
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.7)',   // On Track
+                        'rgba(255, 193, 7, 0.7)',   // At Risk
+                        'rgba(220, 53, 69, 0.7)',   // Delayed
+                        'rgba(108, 117, 125, 0.7)'  // On Hold / Other
+                    ] 
+                }] 
+            },
+            options: { 
+                responsive: true, 
+                plugins: { 
+                    legend: { position: 'top' } 
+                } 
+            }
         });
     }
 });
