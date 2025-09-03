@@ -445,6 +445,8 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
+        # ✅ THE FIX IS HERE: Added the missing 'projects_with_details' to the context
+        'projects_with_details': projects_with_details,
 
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
@@ -463,6 +465,7 @@ def project_reports(request):
 
     }
     return render(request, 'tracker/project_report.html', context)
+
 
 @login_required
 def project_activity(request, project_id):

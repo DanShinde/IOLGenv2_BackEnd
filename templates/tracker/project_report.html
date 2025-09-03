@@ -255,79 +255,182 @@
     </div>
 
     <div class="row mt-4">
-        <div class="col-md-5"><div class="card h-100"><div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution</h5></div><div class="card-body d-flex justify-content-center align-items-center"><canvas id="statusPieChart"></canvas></div></div></div>
-        <div class="col-md-7"><div class="card h-100"><div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Projects by Segment</h5></div><div class="card-body"><canvas id="segmentBarChart"></canvas></div></div></div>
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution</h5></div>
+                <div class="card-body d-flex justify-content-center align-items-center">
+                    <canvas id="statusPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Projects by Segment</h5></div>
+                <div class="card-body">
+                    <canvas id="segmentBarChart"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
     
 </div>
 {% endblock %}
 
 {% block scripts %}
+
 {{ block.super }}
 <script>
+// ✅ NEW: Function to make cards in a row the same height
+function equalizeChartCardHeights() {
+    const chartRow = document.querySelector('.row.mt-4');
+    if (!chartRow) return;
+
+    const cards = chartRow.querySelectorAll('.card');
+    if (cards.length < 2) return;
+
+    // Use a small timeout to ensure charts have rendered before we measure them
+    setTimeout(() => {
+        let maxHeight = 0;
+        // First, reset any previously set heights to get the natural height
+        cards.forEach(card => {
+            card.style.height = 'auto';
+        });
+
+        // Find the height of the tallest card
+        cards.forEach(card => {
+            if (card.offsetHeight > maxHeight) {
+                maxHeight = card.offsetHeight;
+            }
+        });
+
+        // Set all cards to the height of the tallest one
+        cards.forEach(card => {
+            card.style.height = `${maxHeight}px`;
+        });
+    }, 200); // 200ms delay
+}
+
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Register the datalabels plugin
+    Chart.register(ChartDataLabels);
+
     // --- Chart Initialization Code ---
+
     // Status Pie Chart
     const statusCtx = document.getElementById('statusPieChart');
     if (statusCtx && {{ status_data|safe }}.length > 0) {
-        new Chart(statusCtx, { type: 'pie', data: { labels: {{ status_labels|safe }}, datasets: [{ data: {{ status_data|safe }}, backgroundColor: ['#28a745','#ffc107','#dc3545','#6c757d'] }] }, options: { responsive: true, plugins: { legend: { position: 'top' } } } });
-    }
-    // Segment Bar Chart
-    const segmentCtx = document.getElementById('segmentBarChart');
-    if (segmentCtx && {{ segment_data|safe }}.length > 0) {
-        new Chart(segmentCtx, { type: 'bar', data: { labels: {{ segment_labels|safe }}, datasets: [{ label: '# of Projects', data: {{ segment_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)' }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
-    }
-});
-</script>
-<script>
-    function filterTable() {
-        // Get all filter input values and convert to uppercase for case-insensitive search
-        const filterCode = document.querySelector('.table-filter-row th:nth-child(1) input').value.toUpperCase();
-        const filterCustomer = document.querySelector('.table-filter-row th:nth-child(2) input').value.toUpperCase();
-        const filterSegment = document.querySelector('.table-filter-row th:nth-child(3) input').value.toUpperCase();
-        const filterStatus = document.querySelector('.table-filter-row th:nth-child(6) input').value.toUpperCase();
-
-        // Get the table body and all main project rows
-        const tableBody = document.querySelector('.table-custom tbody');
-        const projectRows = tableBody.querySelectorAll('tr:not(.details-row)'); // Select only main rows
-
-        // Loop through each main project row
-        projectRows.forEach(row => {
-            const detailsRow = row.nextElementSibling; // Get the associated details row
-            if (!detailsRow || !detailsRow.classList.contains('details-row')) {
-                // This handles the "empty" row case and prevents errors
-                if (row.querySelectorAll('td').length === 1) { // A simple check for the 'empty' row
-                    const emptyText = row.cells[0].textContent.toUpperCase();
-                    if (filterCode === '' && filterCustomer === '' && filterSegment === '' && filterStatus === '') {
-                        row.style.display = ""; // Show empty row if no filters
-                    } else {
-                        row.style.display = "none"; // Hide empty row if any filter
+        new Chart(statusCtx, {
+            type: 'pie',
+            data: {
+                labels: {{ status_labels|safe }},
+                datasets: [{
+                    data: {{ status_data|safe }},
+                    backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    datalabels: {
+                        color: '#fff', font: { weight: 'bold' },
+                        formatter: (value, ctx) => {
+                            const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1) + '%';
+                            return `${value} (${percentage})`;
+                        }
                     }
                 }
-                return;
-            }
-
-            // Get the cell text content for each column we want to filter
-            const codeText = row.cells[0].textContent.toUpperCase();
-            const customerText = row.cells[1].textContent.toUpperCase();
-            const segmentText = row.cells[2].textContent.toUpperCase();
-            const statusText = row.cells[5].textContent.toUpperCase();
-
-            // Check if the row's content includes the filter text for all active filters
-            if (codeText.includes(filterCode) &&
-                customerText.includes(filterCustomer) &&
-                segmentText.includes(filterSegment) &&
-                statusText.includes(filterStatus)) 
-            {
-                // If all filters match, show both the main row and its details row
-                row.style.display = "";
-                detailsRow.style.display = "";
-            } else {
-                // If any filter does not match, hide both rows
-                row.style.display = "none";
-                detailsRow.style.display = "none";
             }
         });
+    }
+
+    // Segment Bar Chart
+    const segmentCtx = document.getElementById('segmentBarChart');
+    const segmentData = {{ segment_data|safe }};
+    if (segmentCtx && segmentData.length > 0) {
+        const maxSegmentValue = Math.max(...segmentData);
+        new Chart(segmentCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ segment_labels|safe }},
+                datasets: [{
+                    label: '# of Projects',
+                    data: segmentData,
+                    backgroundColor: 'rgba(67, 97, 238, 0.7)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: {
+                        anchor: 'end', align: 'end', color: '#444', font: { weight: 'bold' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true, ticks: { stepSize: 1 }, max: maxSegmentValue + 2
+                    }
+                }
+            }
+        });
+    }
+    
+    // ✅ NEW: Call the function to make the cards the same height
+    equalizeChartCardHeights();
+    // Optional: Re-run when the window is resized
+    window.addEventListener('resize', equalizeChartCardHeights);
+});
+</script>
+
+<script>
+    // The filterTable function remains unchanged
+    function filterTable() {
+        const filterValues = {
+            code: document.querySelector('.table-filter-row th:nth-child(1) input').value.toUpperCase(),
+            customer: document.querySelector('.table-filter-row th:nth-child(2) input').value.toUpperCase(),
+            segment: document.querySelector('.table-filter-row th:nth-child(3) input').value.toUpperCase(),
+            status: document.querySelector('.table-filter-row th:nth-child(6) input').value.toUpperCase()
+        };
+        const tableBody = document.querySelector('.table-custom tbody');
+        if (!tableBody) { return; }
+        const allRows = tableBody.getElementsByTagName('tr');
+        let visibleProjectCount = 0;
+        let noResultsRow = null;
+        for (let i = 0; i < allRows.length; i++) {
+            const row = allRows[i];
+            if (row.classList.contains('details-row')) { continue; }
+            if (row.cells.length === 1 && row.cells[0].hasAttribute('colspan')) {
+                noResultsRow = row;
+                continue;
+            }
+            const detailsRow = allRows[i + 1];
+            const rowData = {
+                code: row.cells[0]?.textContent.toUpperCase() || '',
+                customer: row.cells[1]?.textContent.toUpperCase() || '',
+                segment: row.cells[2]?.textContent.toUpperCase() || '',
+                status: row.cells[5]?.textContent.toUpperCase() || ''
+            };
+            const isMatch = rowData.code.includes(filterValues.code) &&
+                            rowData.customer.includes(filterValues.customer) &&
+                            rowData.segment.includes(filterValues.segment) &&
+                            rowData.status.includes(filterValues.status);
+            if (isMatch) {
+                row.style.display = 'table-row';
+                if (detailsRow) detailsRow.style.display = 'table-row';
+                visibleProjectCount++;
+            } else {
+                row.style.display = 'none';
+                if (detailsRow) detailsRow.style.display = 'none';
+            }
+        }
+        if (noResultsRow) {
+            noResultsRow.style.display = (visibleProjectCount === 0) ? 'table-row' : 'none';
+        }
     }
 </script>
 {% endblock %}
