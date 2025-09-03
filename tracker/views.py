@@ -23,10 +23,11 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.pagesizes import letter, landscape, A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
 import csv
 from itertools import groupby
 from operator import attrgetter
+import json
 
 def login_view(request):
     if request.method == 'POST':
@@ -799,3 +800,50 @@ def help_page(request):
     """
     return render(request, 'tracker/help_page.html')
 
+@login_required
+def update_stage_ajax(request, stage_id):
+    if request.method == 'POST':
+        stage = get_object_or_404(Stage, id=stage_id)
+        
+        try:
+            data = json.loads(request.body)
+            field_name = data.get('field_name')
+            new_value = data.get('new_value')
+
+            # Get the old value for history logging before we change it
+            old_value = getattr(stage, field_name)
+
+            # Map the field name to a user-friendly name for the history log
+            field_map = {
+                'planned_date': 'Planned Date',
+                'status': 'Status',
+                'actual_date': 'Actual Date',
+            }
+            history_field_name = field_map.get(field_name, field_name.replace('_', ' ').title())
+
+            # Update the field on the stage object
+            if 'date' in field_name:
+                setattr(stage, field_name, parse_date(new_value) if new_value else None)
+            else:
+                setattr(stage, field_name, new_value)
+
+            # If status is changed to anything other than 'Completed', clear the actual_date
+            if field_name == 'status' and new_value != 'Completed':
+                stage.actual_date = None
+            
+            stage.save()
+
+            # Create a history record of the change
+            StageHistory.objects.create(
+                stage=stage,
+                changed_by=request.user,
+                field_name=history_field_name,
+                old_value=str(old_value),
+                new_value=str(new_value)
+            )
+            return JsonResponse({'status': 'success', 'message': 'Stage updated successfully.'})
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)

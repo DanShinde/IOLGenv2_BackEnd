@@ -6,6 +6,13 @@
 
 {% block extra_css %}
 <style>
+    /* Add styles for our new autosave indicator */
+    .autosave-indicator {
+        display: inline-block;
+        width: 20px; /* Reserve space */
+        text-align: center;
+        margin-right: 5px;
+    }
 
     .remark-item {
     display: flex;
@@ -184,7 +191,31 @@
 
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>{% for stage in automation_stages %}<tr><td><strong>{{ stage.name }}</strong></td><td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td><td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td><td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td><td><div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button><ul class="dropdown-menu"><li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li></ul></div></td></tr>{% endfor %}</tbody></table></div>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+                        {% for stage in automation_stages %}
+                        <tr>
+                            <td><strong>{{ stage.name }}</strong></td>
+                            <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
+                            <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="autosave-indicator" id="autosave-indicator-{{ stage.id }}"></span>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
+                                        <ul class="dropdown-menu">
+                                            <li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
+                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
+                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody></table></div>
                 </form>
             </div>
             <div class="tab-pane fade {% if request.GET.active_tab == 'emulation' %}show active{% endif %}" id="emulation-content" role="tabpanel">
@@ -198,7 +229,31 @@
 
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>{% for stage in emulation_stages %}<tr><td><strong>{{ stage.name }}</strong></td><td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td><td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td><td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td><td><div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button><ul class="dropdown-menu"><li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li><li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li></ul></div></td></tr>{% endfor %}</tbody></table></div>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+                        {% for stage in emulation_stages %}
+                        <tr>
+                            <td><strong>{{ stage.name }}</strong></td>
+                            <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
+                            <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="autosave-indicator" id="autosave-indicator-{{ stage.id }}"></span>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
+                                        <ul class="dropdown-menu">
+                                            <li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
+                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
+                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody></table></div>
                 </form>
             </div>
         </div>
@@ -404,6 +459,80 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (this.value === 'Risk') { mitigationContainer.classList.remove('d-none'); } else { mitigationContainer.classList.add('d-none'); }
             });
         }
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Helper function to get the CSRF token from cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // The main function to handle the auto-save
+    async function handleStageUpdate(event) {
+        const input = event.target;
+        const stageId = input.dataset.stageId;
+        const fieldName = input.dataset.fieldName;
+        const newValue = input.value;
+        
+        const indicator = document.getElementById(`autosave-indicator-${stageId}`);
+        indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
+
+        // ✅ CORRECTED: Generate the URL dynamically using Django's url template tag
+        const url = "{% url 'update_stage_ajax' 0 %}".replace('0', stageId);
+
+        try {
+            const response = await fetch(url, { // Use the dynamically generated URL
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    field_name: fieldName,
+                    new_value: newValue
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+            } else {
+                indicator.innerHTML = `<i class="fas fa-times-circle text-danger" title="${data.message || 'Unknown error'}"></i>`;
+                alert(`Error saving stage: ${data.message}`);
+            }
+
+        } catch (error) {
+            indicator.innerHTML = `<i class="fas fa-times-circle text-danger" title="${error}"></i>`;
+            alert('An unexpected network error occurred.');
+        }
+
+        // Clear the indicator after a few seconds
+        setTimeout(() => {
+            indicator.innerHTML = '';
+        }, 3000);
+    }
+
+    // Attach the event listener to all designated input fields
+    const autosaveInputs = document.querySelectorAll('.autosave-input');
+    autosaveInputs.forEach(input => {
+        input.addEventListener('change', handleStageUpdate);
     });
 });
 </script>
