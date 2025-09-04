@@ -89,39 +89,40 @@
             <h1 class="page-title">{{ project.code }} - {{ project.customer_name }}</h1>
             <p class="page-subtitle">{{project.segment_con.name|default:'No Segment'}}</p>
         </div>
+        <div>
+            <a href="{% url 'tracker_edit_project' project.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-edit me-2"></i>Edit Project
+            </a>
         </div>
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card mb-3 h-100">
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6 class="text-muted">Project Value</h6>
-                            <h4 class="card-title">₹{{ project.value|intcomma }}</h4>
-                        </div>
-                        <div class="text-end">
-                            <h6 class="text-muted">SO Punch Date</h6>
-                            <h4 class="card-title">{{ project.so_punch_date|date:"M d, Y" }}</h4>
-                        </div>
-                    </div>
+    </div>
+    
+    <div class="card mb-4"> {# This is the main card for consolidated details #}
+        <div class="card-body">
+            <div class="row align-items-center mb-3">
+                <div class="col-md-4 border-end">
+                    <h6 class="text-muted">Project Value</h6>
+                    <h4 class="card-title">₹{{ project.value|intcomma }}</h4>
+                </div>
+                <div class="col-md-4 border-end">
+                    <h6 class="text-muted">SO Punch Date</h6>
+                    <h4 class="card-title">{{ project.so_punch_date|date:"M d, Y" }}</h4>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-muted">PACe</h6>
+                    <h4 class="card-title">{{ project.pace.name|default:'N/A' }}</h4>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <div class="progress-wrapper">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span class="text-muted">Overall Completion</span>
-                            <span class="text-primary fw-bold">{{ completion_percentage }}%</span>
-                        </div>
-                        <div class="progress" style="height: 15px;">
-                            <div class="progress-bar bg-primary" role="progressbar"
-                                 style="width: {{ completion_percentage }}%;"
-                                 aria-valuenow="{{ completion_percentage }}"
-                                 aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                    </div>
+            <hr>
+            <div class="progress-wrapper mt-3">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Overall Completion</span>
+                    <span class="text-primary fw-bold">{{ completion_percentage }}%</span>
+                </div>
+                <div class="progress" style="height: 15px;">
+                    <div class="progress-bar bg-primary" role="progressbar"
+                         style="width: {{ completion_percentage }}%;"
+                         aria-valuenow="{{ completion_percentage }}"
+                         aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
             </div>
         </div>

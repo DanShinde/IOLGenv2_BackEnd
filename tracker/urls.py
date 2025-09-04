@@ -29,4 +29,5 @@ urlpatterns = [
     path('update/<int:update_id>/mitigation/', views.save_mitigation_plan, name='save_mitigation_plan'),
     path('help/', views.help_page, name='help_page'),
     path('stage/<int:stage_id>/update-ajax/', views.update_stage_ajax, name='update_stage_ajax'),
+    path('project/<int:project_id>/edit/', views.edit_project, name='tracker_edit_project'),
 ]

@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate
+from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace 
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -68,29 +68,69 @@ def new_project(request):
         code = request.POST['code']
         if Project.objects.filter(code=code).exists():
             messages.error(request, "Project code already exists.")
-            return render(request, 'tracker/project_form.html', {'segments': trackerSegment.objects.all()})
+            # ✅ Pass paces to context on error
+            return render(request, 'tracker/project_form.html', {
+                'segments': trackerSegment.objects.all(),
+                'paces': Pace.objects.all()
+                })
         
         segment_id = request.POST.get('segment')
         segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
         
+        # ✅ Get the Pace contact
+        pace_id = request.POST.get('pace')
+        pace = Pace.objects.get(id=pace_id) if pace_id else None
+
         project = Project.objects.create(
             code=code, customer_name=request.POST['customer_name'],
             value=request.POST['value'], so_punch_date=parse_date(request.POST['so_punch_date']),
-            segment_con=segment_con
+            segment_con=segment_con,
+            pace=pace # ✅ Save the Pace contact
         )
         
-        # Create Automation Stages
+        # ... stage creation logic is unchanged ...
         for stage_name, _ in Stage.AUTOMATION_STAGES:
             Stage.objects.create(project=project, name=stage_name, stage_type='Automation')
-            
-        # Create Emulation Stages
         for stage_name, _ in Stage.EMULATION_STAGES:
             Stage.objects.create(project=project, name=stage_name, stage_type='Emulation')
 
         messages.success(request, "Project created successfully!")
         return redirect('tracker_project_detail', project_id=project.id)
     
-    return render(request, 'tracker/project_form.html', {'segments': trackerSegment.objects.all()})
+    # ✅ Pass paces to context for the GET request
+    context = {
+        'segments': trackerSegment.objects.all(),
+        'paces': Pace.objects.all()
+    }
+    return render(request, 'tracker/project_form.html', context)
+
+@login_required
+def edit_project(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+
+    if request.method == 'POST':
+        # Update project fields from the form
+        project.customer_name = request.POST['customer_name']
+        project.value = request.POST['value']
+        project.so_punch_date = parse_date(request.POST['so_punch_date'])
+
+        segment_id = request.POST.get('segment')
+        project.segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
+
+        pace_id = request.POST.get('pace')
+        project.pace = Pace.objects.get(id=pace_id) if pace_id else None
+
+        project.save()
+        messages.success(request, f"Project '{project.code}' updated successfully!")
+        return redirect('tracker_project_detail', project_id=project.id)
+
+    # For a GET request, show the form pre-filled with project data
+    context = {
+        'project': project,
+        'segments': trackerSegment.objects.all(),
+        'paces': Pace.objects.all()
+    }
+    return render(request, 'tracker/project_form.html', context)
 
 @login_required
 def project_detail(request, project_id):

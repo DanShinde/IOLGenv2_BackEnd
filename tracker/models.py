@@ -10,6 +10,16 @@ class trackerSegment(models.Model):
 
     def __str__(self):
         return self.name
+    
+class Pace(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        verbose_name = "PACe"
+        verbose_name_plural = "PACe"
+
+    def __str__(self):
+        return self.name    
 
 class Project(models.Model):
     code = models.CharField(max_length=50, unique=True)
@@ -24,6 +34,13 @@ class Project(models.Model):
         null=True,
         blank=True,
         related_name="tracker_projects1"
+    )
+    pace = models.ForeignKey(
+        Pace,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects"
     )
 
     def __str__(self):
