@@ -143,6 +143,7 @@ class Stage(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='stages')
     name = models.CharField(max_length=100, choices=STAGE_NAMES)
     stage_type = models.CharField(max_length=20, choices=STAGE_TYPE_CHOICES, default='Automation')
+    planned_start_date = models.DateField(null=True, blank=True)
     planned_date = models.DateField(null=True, blank=True)
     actual_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="Not started")

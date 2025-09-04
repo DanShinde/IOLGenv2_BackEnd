@@ -155,39 +155,42 @@ def project_detail(request, project_id):
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             
-            # Check if status is 'Completed' but the date is missing
             if new_status == 'Completed' and not actual_date_val:
-                messages.error(request, f"Please add a completion date for stage '{stage.name}' to save it as 'Completed'.")
+                messages.error(request, f"Please add an actual finish date for stage '{stage.name}' to save it as 'Completed'.")
                 validation_passed = False
         
-        # If any validation failed, stop and redirect back immediately
         if not validation_passed:
             base_url = reverse('tracker_project_detail', args=[project.id])
             redirect_url = f'{base_url}?active_tab={active_tab}'
             return HttpResponseRedirect(redirect_url)
         # --- END OF NEW VALIDATION LOGIC ---
 
-        # If validation passed, proceed with saving changes
-        success_message = "Changes saved successfully!" # Default message
+        success_message = "Changes saved successfully!"
         for stage in stages_to_save:
+            # Get new values from the form
+            new_planned_start = parse_date(request.POST.get(f'planned_start_date_{stage.id}'))
             new_planned = parse_date(request.POST.get(f'planned_date_{stage.id}'))
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
             
+            # Log changes to history
+            if stage.planned_start_date != new_planned_start:
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Start Date", old_value=str(stage.planned_start_date), new_value=str(new_planned_start))
             if stage.planned_date != new_planned:
-                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Date", old_value=str(stage.planned_date), new_value=str(new_planned))
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Finish Date", old_value=str(stage.planned_date), new_value=str(new_planned))
             if stage.status != new_status:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Status", old_value=stage.status, new_value=new_status)
             if stage.actual_date != new_actual:
-                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Date", old_value=str(stage.actual_date), new_value=str(new_actual))
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Finish Date", old_value=str(stage.actual_date), new_value=str(new_actual))
             
+            # Update the stage object
+            stage.planned_start_date = new_planned_start
             stage.planned_date = new_planned
             stage.status = new_status
             stage.actual_date = new_actual
             stage.save()
 
-        # Update success message based on action
         if 'save_all_automation' in request.POST:
             success_message = "Automation Stages saved successfully!"
         elif 'save_all_emulation' in request.POST:
@@ -202,8 +205,7 @@ def project_detail(request, project_id):
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
-    # --- GET Request Logic ---
-    # --- GET Request Logic (This part is unchanged) ---
+    # --- GET Request Logic (unchanged) ---
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
     
@@ -221,7 +223,6 @@ def project_detail(request, project_id):
     last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
     last_update_time = last_update_obj.changed_at if last_update_obj else project.so_punch_date
     
-    # Timeline Calculation for Automation
     applicable_auto_stages = [s for s in automation_stages if s.status != "Not Applicable"]
     last_completed_auto_index = -1
     for i, stage in enumerate(applicable_auto_stages):
@@ -231,7 +232,6 @@ def project_detail(request, project_id):
     if last_completed_auto_index >= 0 and total_auto_segments > 0:
         timeline_progress_auto = round((last_completed_auto_index / total_auto_segments) * 100)
 
-    # Timeline Calculation for Emulation
     applicable_emu_stages = [s for s in emulation_stages if s.status != "Not Applicable"]
     last_completed_emu_index = -1
     for i, stage in enumerate(applicable_emu_stages):
@@ -241,7 +241,6 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    # MODIFICATION: Get all remarks for each category for the new modals
     automation_remarks = StageRemark.objects.filter(
         stage__project=project, stage__stage_type='Automation'
     ).select_related('stage', 'added_by').order_by('-created_at')
@@ -268,7 +267,6 @@ def project_detail(request, project_id):
         'next_emulation_milestone': get_next_milestone(emulation_stages),
         'last_update_time': last_update_time, 
         'recent_activity': recent_activity,
-        # MODIFICATION: Add the new remark lists to the context
         'automation_remarks': automation_remarks,
         'emulation_remarks': emulation_remarks,
 
@@ -870,14 +868,14 @@ def update_stage_ajax(request, stage_id):
             field_name = data.get('field_name')
             new_value = data.get('new_value')
 
-            # Get the old value for history logging before we change it
             old_value = getattr(stage, field_name)
 
-            # Map the field name to a user-friendly name for the history log
+            # Map field names to user-friendly names for the history log
             field_map = {
-                'planned_date': 'Planned Date',
+                'planned_start_date': 'Planned Start Date',
+                'planned_date': 'Planned Finish Date',
                 'status': 'Status',
-                'actual_date': 'Actual Date',
+                'actual_date': 'Actual Finish Date',
             }
             history_field_name = field_map.get(field_name, field_name.replace('_', ' ').title())
 
@@ -887,7 +885,6 @@ def update_stage_ajax(request, stage_id):
             else:
                 setattr(stage, field_name, new_value)
 
-            # If status is changed to anything other than 'Completed', clear the actual_date
             if field_name == 'status' and new_value != 'Completed':
                 stage.actual_date = None
             

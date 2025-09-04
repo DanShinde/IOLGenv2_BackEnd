@@ -14,6 +14,38 @@
         margin-right: 5px;
     }
 
+    /* Style for stages marked as "Not Applicable" */
+    .stage-not-applicable {
+        background-color: #f8f9fa !important;
+        opacity: 0.65;
+    }
+    .stage-not-applicable td,
+    .stage-not-applicable strong {
+        text-decoration: line-through;
+        color: #6c757d !important;
+    }
+
+    /* Styles for table icons to match the timeline component */
+    .table-status-icon {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 0.7rem;
+        margin-right: 10px;
+        vertical-align: middle;
+        flex-shrink: 0;
+    }
+    .table-status-icon.status-completed { background-color: var(--success); }
+    .table-status-icon.status-in-progress { background-color: var(--warning); color: #000; }
+    .table-status-icon.status-hold { background-color: var(--danger); }
+    .table-status-icon.status-not-applicable { background-color: var(--gray); }
+    .table-status-icon.status-not-started { background-color: transparent; border: 2px solid #adb5bd; }
+
+
     .remark-item {
     display: flex;
     margin-bottom: 1rem;
@@ -141,7 +173,13 @@
                         {% with status=stage.status|default:"Not started" %}
                         <div class="roadmap-step">
                             <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
-                                {% if status == "Completed" %}<i class="fas fa-check"></i>{% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>{% elif status == "Hold" %}<i class="fas fa-pause"></i>{% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>{% else %}<i class="far fa-circle"></i>{% endif %}
+                                {% comment %} TIMELINE ICONS REVERTED TO ORIGINAL STATE {% endcomment %}
+                                {% if status == "Completed" %}<i class="fas fa-check"></i>
+                                {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
+                                {% elif status == "Hold" %}<i class="fas fa-pause"></i>
+                                {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
+                                {% else %}<i class="far fa-circle"></i>
+                                {% endif %}
                             </div>
                             <div class="roadmap-label">{{ stage.name }}</div>
                         </div>
@@ -162,7 +200,13 @@
                         {% with status=stage.status|default:"Not started" %}
                         <div class="roadmap-step">
                             <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
-                                {% if status == "Completed" %}<i class="fas fa-check"></i>{% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>{% elif status == "Hold" %}<i class="fas fa-pause"></i>{% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>{% else %}<i class="far fa-circle"></i>{% endif %}
+                                {% comment %} TIMELINE ICONS REVERTED TO ORIGINAL STATE {% endcomment %}
+                                {% if status == "Completed" %}<i class="fas fa-check"></i>
+                                {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
+                                {% elif status == "Hold" %}<i class="fas fa-pause"></i>
+                                {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
+                                {% else %}<i class="far fa-circle"></i>
+                                {% endif %}
                             </div>
                             <div class="roadmap-label">{{ stage.name }}</div>
                         </div>
@@ -192,10 +236,23 @@
 
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:25%">Stage</th><th style="width:15%">Planned Start Date</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Actual Finish Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
                         {% for stage in automation_stages %}
-                        <tr>
-                            <td><strong>{{ stage.name }}</strong></td>
+                        <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="table-status-icon status-{{ stage.status|slugify }}">
+                                        {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
+                                        {% elif stage.status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
+                                        {% elif stage.status == 'Hold' %}<i class="fas fa-pause"></i>
+                                        {% elif stage.status == 'Not Applicable' %}<i class="fas fa-ban"></i>
+                                        {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
+                                        {% endif %}
+                                    </div>
+                                    <strong>{{ stage.name }}</strong>
+                                </div>
+                            </td>
+                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
@@ -230,10 +287,23 @@
 
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:30%">Stage</th><th style="width:20%">Planned Date</th><th style="width:20%">Status</th><th style="width:20%">Actual Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:25%">Stage</th><th style="width:15%">Planned Start Date</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Actual Finish Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
                         {% for stage in emulation_stages %}
-                        <tr>
-                            <td><strong>{{ stage.name }}</strong></td>
+                        <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
+                           <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="table-status-icon status-{{ stage.status|slugify }}">
+                                        {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
+                                        {% elif stage.status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
+                                        {% elif stage.status == 'Hold' %}<i class="fas fa-pause"></i>
+                                        {% elif stage.status == 'Not Applicable' %}<i class="fas fa-ban"></i>
+                                        {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
+                                        {% endif %}
+                                    </div>
+                                    <strong>{{ stage.name }}</strong>
+                                </div>
+                            </td>
+                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
@@ -435,22 +505,86 @@
 {{ block.super }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Initialize Bootstrap tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl, { html: true, sanitize: false }); });
 
-    const rows = document.querySelectorAll('#automationStagesForm tbody tr, #emulationStagesForm tbody tr'); 
+    const rows = document.querySelectorAll('#automationStagesForm tbody tr, #emulationStagesForm tbody tr');
     const today = new Date().toISOString().split('T')[0];
+
     rows.forEach(row => {
-        const pDI = row.querySelector('.planned-date'), sS = row.querySelector('.status-select'), aDI = row.querySelector('.actual-date');
-        if (!pDI || !sS || !aDI) return;
-        const tF = () => {
-            const p = pDI.value, iC = sS.value === 'Completed';
-            if (p) { sS.disabled = false; aDI.disabled = !iC; if (!iC) aDI.value = ''; } else { sS.disabled = true; aDI.disabled = true; aDI.value = ''; }
+        const plannedStartInput = row.querySelector('.autosave-input[data-field-name="planned_start_date"]');
+        const plannedFinishInput = row.querySelector('.planned-date');
+        const statusSelect = row.querySelector('.status-select');
+        const actualFinishInput = row.querySelector('.actual-date');
+
+        if (!plannedStartInput || !plannedFinishInput || !statusSelect || !actualFinishInput) return;
+
+        const updateRowState = () => {
+            const isNotApplicable = statusSelect.value === 'Not Applicable';
+
+            // Toggle visual style for the entire row
+            row.classList.toggle('stage-not-applicable', isNotApplicable);
+
+            // Disable all date inputs if status is N/A
+            plannedStartInput.disabled = isNotApplicable;
+            plannedFinishInput.disabled = isNotApplicable;
+            actualFinishInput.disabled = isNotApplicable;
+
+            // If N/A, clear dates, ensure all status options are available, and then exit.
+            if (isNotApplicable) {
+                statusSelect.querySelectorAll('option').forEach(opt => opt.disabled = false);
+                // Clear date inputs for N/A stages
+                plannedStartInput.value = '';
+                plannedFinishInput.value = '';
+                actualFinishInput.value = '';
+                return;
+            }
+
+            // --- If NOT N/A, proceed with the standard logic ---
+            const hasPlannedFinishDate = plannedFinishInput.value;
+            const statusOptions = statusSelect.querySelectorAll('option');
+
+            if (hasPlannedFinishDate) {
+                // If there's a date, enable all options.
+                statusOptions.forEach(opt => opt.disabled = false);
+            } else {
+                // If there's NO date, disable all options except for "Not Applicable".
+                statusOptions.forEach(opt => {
+                    opt.disabled = (opt.value !== 'Not Applicable');
+                });
+                
+                // If the currently selected value is now disabled, reset it to "Not started"
+                // (assuming "Not started" is the default for non-applicable states without a planned date)
+                if (statusSelect.value !== 'Not Applicable' && statusSelect.value !== 'Not started') {
+                    statusSelect.value = 'Not started';
+                }
+            }
+            
+            // This logic depends on the current status, which might have just been reset.
+            const isCompleted = statusSelect.value === 'Completed';
+            actualFinishInput.disabled = !isCompleted;
+            if (!isCompleted) {
+                actualFinishInput.value = '';
+            }
         };
-        const vAD = () => { if (aDI.value > today) { alert("Actual date cannot be in the future."); aDI.value = ''; } };
-        tF(); pDI.addEventListener('input', tF); sS.addEventListener('change', tF); aDI.addEventListener('change', vAD);
+        
+        const validateActualDate = () => {
+            if (actualFinishInput.value && actualFinishInput.value > today) { // Check if value exists before comparing
+                alert("Actual Finish Date cannot be in the future.");
+                actualFinishInput.value = '';
+            }
+        };
+
+        // Initial setup and event listeners
+        updateRowState();
+        plannedStartInput.addEventListener('change', updateRowState); // Also trigger on planned start date change
+        plannedFinishInput.addEventListener('change', updateRowState);
+        statusSelect.addEventListener('change', updateRowState);
+        actualFinishInput.addEventListener('change', validateActualDate);
     });
 
+    // Logic for edit modals (unchanged)
     const editModals = document.querySelectorAll('[id^="editUpdateModal"]');
     editModals.forEach(modal => {
         const categorySelect = modal.querySelector('select[name="update_category"]');
