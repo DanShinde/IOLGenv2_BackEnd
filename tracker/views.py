@@ -507,7 +507,9 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
+
         'projects_with_details': projects_with_details,
+
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
@@ -525,6 +527,7 @@ def project_reports(request):
         'hide_completed_active': hide_completed,
     }
     return render(request, 'tracker/project_report.html', context)
+
 
 @login_required
 def project_activity(request, project_id):
