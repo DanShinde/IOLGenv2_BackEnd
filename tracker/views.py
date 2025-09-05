@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate
+from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace 
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -23,10 +23,11 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.pagesizes import letter, landscape, A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, JsonResponse, QueryDict
 import csv
 from itertools import groupby
 from operator import attrgetter
+import json
 
 def login_view(request):
     if request.method == 'POST':
@@ -67,29 +68,69 @@ def new_project(request):
         code = request.POST['code']
         if Project.objects.filter(code=code).exists():
             messages.error(request, "Project code already exists.")
-            return render(request, 'tracker/project_form.html', {'segments': trackerSegment.objects.all()})
+            # ✅ Pass paces to context on error
+            return render(request, 'tracker/project_form.html', {
+                'segments': trackerSegment.objects.all(),
+                'paces': Pace.objects.all()
+                })
         
         segment_id = request.POST.get('segment')
         segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
         
+        # ✅ Get the Pace contact
+        pace_id = request.POST.get('pace')
+        pace = Pace.objects.get(id=pace_id) if pace_id else None
+
         project = Project.objects.create(
             code=code, customer_name=request.POST['customer_name'],
             value=request.POST['value'], so_punch_date=parse_date(request.POST['so_punch_date']),
-            segment_con=segment_con
+            segment_con=segment_con,
+            pace=pace # ✅ Save the Pace contact
         )
         
-        # Create Automation Stages
+        # ... stage creation logic is unchanged ...
         for stage_name, _ in Stage.AUTOMATION_STAGES:
             Stage.objects.create(project=project, name=stage_name, stage_type='Automation')
-            
-        # Create Emulation Stages
         for stage_name, _ in Stage.EMULATION_STAGES:
             Stage.objects.create(project=project, name=stage_name, stage_type='Emulation')
 
         messages.success(request, "Project created successfully!")
         return redirect('tracker_project_detail', project_id=project.id)
     
-    return render(request, 'tracker/project_form.html', {'segments': trackerSegment.objects.all()})
+    # ✅ Pass paces to context for the GET request
+    context = {
+        'segments': trackerSegment.objects.all(),
+        'paces': Pace.objects.all()
+    }
+    return render(request, 'tracker/project_form.html', context)
+
+@login_required
+def edit_project(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+
+    if request.method == 'POST':
+        # Update project fields from the form
+        project.customer_name = request.POST['customer_name']
+        project.value = request.POST['value']
+        project.so_punch_date = parse_date(request.POST['so_punch_date'])
+
+        segment_id = request.POST.get('segment')
+        project.segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
+
+        pace_id = request.POST.get('pace')
+        project.pace = Pace.objects.get(id=pace_id) if pace_id else None
+
+        project.save()
+        messages.success(request, f"Project '{project.code}' updated successfully!")
+        return redirect('tracker_project_detail', project_id=project.id)
+
+    # For a GET request, show the form pre-filled with project data
+    context = {
+        'project': project,
+        'segments': trackerSegment.objects.all(),
+        'paces': Pace.objects.all()
+    }
+    return render(request, 'tracker/project_form.html', context)
 
 @login_required
 def project_detail(request, project_id):
@@ -114,39 +155,42 @@ def project_detail(request, project_id):
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             
-            # Check if status is 'Completed' but the date is missing
             if new_status == 'Completed' and not actual_date_val:
-                messages.error(request, f"Please add a completion date for stage '{stage.name}' to save it as 'Completed'.")
+                messages.error(request, f"Please add an actual finish date for stage '{stage.name}' to save it as 'Completed'.")
                 validation_passed = False
         
-        # If any validation failed, stop and redirect back immediately
         if not validation_passed:
             base_url = reverse('tracker_project_detail', args=[project.id])
             redirect_url = f'{base_url}?active_tab={active_tab}'
             return HttpResponseRedirect(redirect_url)
         # --- END OF NEW VALIDATION LOGIC ---
 
-        # If validation passed, proceed with saving changes
-        success_message = "Changes saved successfully!" # Default message
+        success_message = "Changes saved successfully!"
         for stage in stages_to_save:
+            # Get new values from the form
+            new_planned_start = parse_date(request.POST.get(f'planned_start_date_{stage.id}'))
             new_planned = parse_date(request.POST.get(f'planned_date_{stage.id}'))
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
             
+            # Log changes to history
+            if stage.planned_start_date != new_planned_start:
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Start Date", old_value=str(stage.planned_start_date), new_value=str(new_planned_start))
             if stage.planned_date != new_planned:
-                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Date", old_value=str(stage.planned_date), new_value=str(new_planned))
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Finish Date", old_value=str(stage.planned_date), new_value=str(new_planned))
             if stage.status != new_status:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Status", old_value=stage.status, new_value=new_status)
             if stage.actual_date != new_actual:
-                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Date", old_value=str(stage.actual_date), new_value=str(new_actual))
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Finish Date", old_value=str(stage.actual_date), new_value=str(new_actual))
             
+            # Update the stage object
+            stage.planned_start_date = new_planned_start
             stage.planned_date = new_planned
             stage.status = new_status
             stage.actual_date = new_actual
             stage.save()
 
-        # Update success message based on action
         if 'save_all_automation' in request.POST:
             success_message = "Automation Stages saved successfully!"
         elif 'save_all_emulation' in request.POST:
@@ -161,8 +205,7 @@ def project_detail(request, project_id):
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
-    # --- GET Request Logic ---
-    # --- GET Request Logic (This part is unchanged) ---
+    # --- GET Request Logic (unchanged) ---
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
     
@@ -180,7 +223,6 @@ def project_detail(request, project_id):
     last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
     last_update_time = last_update_obj.changed_at if last_update_obj else project.so_punch_date
     
-    # Timeline Calculation for Automation
     applicable_auto_stages = [s for s in automation_stages if s.status != "Not Applicable"]
     last_completed_auto_index = -1
     for i, stage in enumerate(applicable_auto_stages):
@@ -190,7 +232,6 @@ def project_detail(request, project_id):
     if last_completed_auto_index >= 0 and total_auto_segments > 0:
         timeline_progress_auto = round((last_completed_auto_index / total_auto_segments) * 100)
 
-    # Timeline Calculation for Emulation
     applicable_emu_stages = [s for s in emulation_stages if s.status != "Not Applicable"]
     last_completed_emu_index = -1
     for i, stage in enumerate(applicable_emu_stages):
@@ -200,7 +241,6 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    # MODIFICATION: Get all remarks for each category for the new modals
     automation_remarks = StageRemark.objects.filter(
         stage__project=project, stage__stage_type='Automation'
     ).select_related('stage', 'added_by').order_by('-created_at')
@@ -227,7 +267,6 @@ def project_detail(request, project_id):
         'next_emulation_milestone': get_next_milestone(emulation_stages),
         'last_update_time': last_update_time, 
         'recent_activity': recent_activity,
-        # MODIFICATION: Add the new remark lists to the context
         'automation_remarks': automation_remarks,
         'emulation_remarks': emulation_remarks,
 
@@ -350,30 +389,61 @@ def dashboard(request):
 
 @login_required
 def project_reports(request):
-    projects_qs = Project.objects.select_related('segment_con').prefetch_related('stages').all()
+    # --- Session logic for retaining filters ---
+    
+    # 1. Handle explicit reset action
+    if 'reset' in request.GET:
+        if 'report_filters' in request.session:
+            del request.session['report_filters']
+        return redirect('project_reports')
+
+    # Determine which query parameters to use: from request or from session
+    if not request.GET: # If no filters in URL
+        # Check if filters are stored in session
+        if 'report_filters' in request.session:
+            # Rebuild query string and redirect
+            saved_filters = request.session.get('report_filters', {})
+            if saved_filters:
+                query_dict = QueryDict(mutable=True)
+                query_dict.update(saved_filters)
+                return redirect(f"{reverse('project_reports')}?{query_dict.urlencode()}")
+    else:
+        # Filters are in the URL, save them to the session
+        request.session['report_filters'] = request.GET.dict()
+
+    # The rest of the view logic now uses the active query parameters
+    query_params = request.GET or request.session.get('report_filters', {})
+    # --- End of session logic ---
+
+    projects_qs = Project.objects.select_related('segment_con','pace').prefetch_related('stages').all()
 
     # --- Check for the 'hide_completed' filter ---
-    hide_completed = request.GET.get('hide_completed') == '1'
+    hide_completed = query_params.get('hide_completed') == '1'
     if hide_completed:
-        # First, find the IDs of all projects that are considered "Completed"
         completed_project_ids = Project.objects.filter(
             stages__name='Handover',
             stages__status='Completed'
         ).values_list('id', flat=True)
-
-        # Then, exclude them from our main query
         projects_qs = projects_qs.exclude(id__in=completed_project_ids)
 
-
     # --- Get standard filter values ---
-    selected_segment_ids = request.GET.getlist('segments')
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-    min_value = request.GET.get('min_value')
-    max_value = request.GET.get('max_value')
+    # getlist needs a QueryDict, not a regular dict
+    params_for_getlist = QueryDict(mutable=True)
+    params_for_getlist.update(query_params)
+    selected_segment_ids = params_for_getlist.getlist('segments')
+    selected_pace_ids = params_for_getlist.getlist('paces')
+
+    start_date = query_params.get('start_date')
+    end_date = query_params.get('end_date')
+    min_value = query_params.get('min_value')
+    max_value = query_params.get('max_value')
 
     if selected_segment_ids:
         projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
+        
+    if selected_pace_ids:
+        projects_qs = projects_qs.filter(pace__id__in=selected_pace_ids)
+
     if start_date and end_date:
         projects_qs = projects_qs.filter(so_punch_date__range=[start_date, end_date])
     if min_value:
@@ -385,14 +455,12 @@ def project_reports(request):
             projects_qs = projects_qs.filter(value__lte=float(max_value))
         except (ValueError, TypeError): pass
 
-
     # --- Process Stage-Specific Filters ---
     stage_filters_from_request = {}
     for stage_key, stage_display in Stage.STAGE_NAMES:
-        status = request.GET.get(f'stage_{stage_key}_status')
-        start = request.GET.get(f'stage_{stage_key}_start')
-        end = request.GET.get(f'stage_{stage_key}_end')
-
+        status = query_params.get(f'stage_{stage_key}_status')
+        start = query_params.get(f'stage_{stage_key}_start')
+        end = query_params.get(f'stage_{stage_key}_end')
         
         if status or (start and end):
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
@@ -407,13 +475,10 @@ def project_reports(request):
     projects_with_details = []
     automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
     emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
-
     for project in distinct_projects:
         all_stages = list(project.stages.all())
-
         auto_stages = sorted([s for s in all_stages if s.stage_type == 'Automation'], key=lambda s: automation_order.get(s.name, 99))
         emu_stages = sorted([s for s in all_stages if s.stage_type == 'Emulation'], key=lambda s: emulation_order.get(s.name, 99))
-
         projects_with_details.append({
             'project': project,
             'otif': project.get_otif_percentage(),
@@ -425,7 +490,6 @@ def project_reports(request):
 
     # --- Calculate Standard KPIs ---
     total_projects_found = distinct_projects.count()
-
     total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
     completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
     average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
@@ -433,8 +497,6 @@ def project_reports(request):
     total_completed = completed_stages.count()
     on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
     on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
-
-    
     
     # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
@@ -445,24 +507,24 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
-        # ✅ THE FIX IS HERE: Added the missing 'projects_with_details' to the context
+
         'projects_with_details': projects_with_details,
 
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
         'all_segments': trackerSegment.objects.all(),
+        'all_paces': Pace.objects.all(),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
+        'selected_pace_ids': [int(i) for i in selected_pace_ids],
         'start_date': start_date, 'end_date': end_date,
         'min_value': min_value, 'max_value': max_value,
-
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'stage_filters': stage_filters_from_request,
         'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
-
     }
     return render(request, 'tracker/project_report.html', context)
 
@@ -799,3 +861,49 @@ def help_page(request):
     """
     return render(request, 'tracker/help_page.html')
 
+@login_required
+def update_stage_ajax(request, stage_id):
+    if request.method == 'POST':
+        stage = get_object_or_404(Stage, id=stage_id)
+        
+        try:
+            data = json.loads(request.body)
+            field_name = data.get('field_name')
+            new_value = data.get('new_value')
+
+            old_value = getattr(stage, field_name)
+
+            # Map field names to user-friendly names for the history log
+            field_map = {
+                'planned_start_date': 'Planned Start Date',
+                'planned_date': 'Planned Finish Date',
+                'status': 'Status',
+                'actual_date': 'Actual Finish Date',
+            }
+            history_field_name = field_map.get(field_name, field_name.replace('_', ' ').title())
+
+            # Update the field on the stage object
+            if 'date' in field_name:
+                setattr(stage, field_name, parse_date(new_value) if new_value else None)
+            else:
+                setattr(stage, field_name, new_value)
+
+            if field_name == 'status' and new_value != 'Completed':
+                stage.actual_date = None
+            
+            stage.save()
+
+            # Create a history record of the change
+            StageHistory.objects.create(
+                stage=stage,
+                changed_by=request.user,
+                field_name=history_field_name,
+                old_value=str(old_value),
+                new_value=str(new_value)
+            )
+            return JsonResponse({'status': 'success', 'message': 'Stage updated successfully.'})
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
