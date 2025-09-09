@@ -39,6 +39,8 @@ class ClusterTemplate(models.Model):
     updated_by = models.CharField(max_length=255)
     updated_at = models.DateTimeField(auto_now=True)
     segment = models.CharField(max_length=255)
+    is_assignable = models.BooleanField(default=True)
+    is_protected = models.BooleanField(default=False)
     dependencies = models.ManyToManyField(
         'self', 
         symmetrical=False, 
@@ -144,7 +146,7 @@ def delete_cluster_template_cache(sender, instance, **kwargs):
 @receiver([post_save, post_delete], sender=Parameter)
 def delete_info_cache(sender, instance, **kwargs):
     clear_info_cache("Parameter",instance.id)
-    clear_info_cache("Parameter",instance.parameter_name)
+    clear_info_cache("parameters:cluster_name",instance.cluster.cluster_name)
 
 # Signal: Clear cache when an Info instance is created or updated
 @receiver([post_save, post_delete], sender=ClusterTemplate)

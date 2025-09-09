@@ -3,7 +3,7 @@ from django.db import models
 from IOLGen.models import Segment
 from django.db.models.signals import post_save, post_delete, post_init
 from django.dispatch import receiver
-from django.core.cache import cache
+from django.core.cache import cache, caches
 
 def print_all_cache():
     try:
@@ -73,6 +73,13 @@ def clear_info_cache(prefix,id):
     cache_key = f"{prefix}_{id}"
     cache.delete(cache_key)
     cache.delete(f"{prefix}:{id}")
+    # try:
+    #     cacher = caches['default']  # or whatever cache alias you use
+    #     keys = list(cacher._cache.keys())
+    #     # print(keys)
+    # except Exception as e:
+    #     print(f"Error accessing cache keys: {e}")
+
 
 # Signal: Clear cache when an Info instance is created or updated or deleted
 @receiver([post_save,post_delete], sender=Info)

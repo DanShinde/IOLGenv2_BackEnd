@@ -368,7 +368,7 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, queryset, self.cache_timeout)
         return queryset
 
-    @method_decorator(cache_page(60 * 15))  # Cache only GET requests
+    # @method_decorator(cache_page(60 * 15))  # Cache only GET requests
     def list(self, request, *args, **kwargs):
         """List all parameters with caching."""
         queryset = self.get_queryset()
