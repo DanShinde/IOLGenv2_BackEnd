@@ -236,7 +236,7 @@
 
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:25%">Stage</th><th style="width:15%">Planned Start Date</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Actual Finish Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
                         {% for stage in automation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
                             <td>
@@ -252,9 +252,9 @@
                                     <strong>{{ stage.name }}</strong>
                                 </div>
                             </td>
-                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
                             <td>
                                 <div class="d-flex align-items-center">
@@ -287,7 +287,7 @@
 
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:25%">Stage</th><th style="width:15%">Planned Start Date</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Actual Finish Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
                         {% for stage in emulation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
                            <td>
@@ -303,9 +303,9 @@
                                     <strong>{{ stage.name }}</strong>
                                 </div>
                             </td>
-                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
                             <td>
                                 <div class="d-flex align-items-center">
@@ -442,6 +442,7 @@
         </div>
     </div>
 </div>
+
 
 <div class="row mt-4">
     <div class="col-12">
