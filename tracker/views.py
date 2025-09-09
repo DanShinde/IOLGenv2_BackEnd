@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace 
+from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -28,6 +28,8 @@ import csv
 from itertools import groupby
 from operator import attrgetter
 import json
+from django.contrib.auth import get_user_model
+
 
 def login_view(request):
     if request.method == 'POST':
@@ -135,6 +137,8 @@ def edit_project(request, project_id):
 @login_required
 def project_detail(request, project_id):
     project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
+    User = get_user_model()
+    project_users = User.objects.all()
 
     if request.method == 'POST':
         stages_to_save = []
@@ -168,12 +172,16 @@ def project_detail(request, project_id):
         success_message = "Changes saved successfully!"
         for stage in stages_to_save:
             # Get new values from the form
-            new_planned_start = parse_date(request.POST.get(f'planned_start_date_{stage.id}'))
-            new_planned = parse_date(request.POST.get(f'planned_date_{stage.id}'))
+            new_planned_start_str = request.POST.get(f'planned_start_date_{stage.id}')
+            new_planned_str = request.POST.get(f'planned_date_{stage.id}')
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
-            new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
             
+            # Safely parse date strings
+            new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
+            new_planned = parse_date(new_planned_str) if new_planned_str else None
+            new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
+
             # Log changes to history
             if stage.planned_start_date != new_planned_start:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Start Date", old_value=str(stage.planned_start_date), new_value=str(new_planned_start))
@@ -269,7 +277,7 @@ def project_detail(request, project_id):
         'recent_activity': recent_activity,
         'automation_remarks': automation_remarks,
         'emulation_remarks': emulation_remarks,
-
+        'project_users': project_users,
     }
     
     return render(request, 'tracker/project_detail.html', context)
@@ -507,9 +515,7 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
-
         'projects_with_details': projects_with_details,
-
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
@@ -528,11 +534,10 @@ def project_reports(request):
     }
     return render(request, 'tracker/project_report.html', context)
 
-
 @login_required
 def project_activity(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
-    history_logs = StageHistory.objects.filter(stage__project=project).order_by('-changed_at')
+    history_logs = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')
     return render(request, 'tracker/project_activity.html', {
         'project': project,
         'history_logs': history_logs,
@@ -776,43 +781,60 @@ def add_project_update(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
     if request.method == 'POST':
         text = request.POST.get('update_text')
-        category = request.POST.get('update_category')
-        needs_review = 'needs_review' in request.POST
+        push_pull_type = request.POST.get('push_pull_type')
+        who_id = request.POST.get('who')
+        eta_date = request.POST.get('eta_date')
 
-        if text and category:
+        who = get_object_or_404(get_user_model(), pk=who_id) if who_id else None
+        eta = parse_date(eta_date) if eta_date else None
+
+        if text and push_pull_type:
             ProjectUpdate.objects.create(
                 project=project,
                 author=request.user,
                 text=text,
-                category=category,
-                needs_review=needs_review
+                push_pull_type=push_pull_type,
+                who=who,
+                eta=eta,
             )
             messages.success(request, "Project update added successfully.")
         else:
-            messages.error(request, "Update text and category are required.")
+            messages.error(request, "Update text and type are required.")
     
     # Redirect back to the project detail page
     return redirect('tracker_project_detail', project_id=project.id)
 
 @login_required
 def edit_project_update(request, update_id):
-    update = get_object_or_404(ProjectUpdate, id=update_id, author=request.user)
-    if request.method == 'POST':
-        update.text = request.POST.get('update_text', update.text)
-        update.category = request.POST.get('update_category', update.category)
-        update.needs_review = 'needs_review' in request.POST
-        
-        # If the category is changed away from Risk, clear the mitigation plan
-        if update.category != 'Risk':
-            update.mitigation_plan = ''
+    update = get_object_or_404(ProjectUpdate, id=update_id)
+    # Check if the user is the author or a staff member to allow editing
+    if request.user == update.author or request.user.is_staff:
+        if request.method == 'POST':
+            new_status = request.POST.get('update_status', update.status)
+            
+            # If the status is being changed to 'Closed', set the closed_at timestamp.
+            if new_status == 'Closed' and update.status != 'Closed':
+                update.closed_at = timezone.now()
+            # If the status is changed from 'Closed' to something else, clear the timestamp.
+            elif new_status != 'Closed' and update.status == 'Closed':
+                update.closed_at = None
 
-        # If it is a risk, save the mitigation plan
-        if update.category == 'Risk':
-             update.mitigation_plan = request.POST.get('mitigation_plan', update.mitigation_plan)
+            update.text = request.POST.get('update_text', update.text)
+            update.push_pull_type = request.POST.get('push_pull_type', update.push_pull_type)
+            who_id = request.POST.get('who')
+            eta_date = request.POST.get('eta_date')
+            update.status = new_status
 
-        update.save()
-        messages.success(request, "Update saved successfully.")
-    return redirect('tracker_project_detail', project_id=update.project.id)
+            update.who = get_object_or_404(get_user_model(), pk=who_id) if who_id else None
+            update.eta = parse_date(eta_date) if eta_date else None
+            
+            update.save()
+            messages.success(request, "Update saved successfully.")
+        return redirect('tracker_project_detail', project_id=update.project.id)
+    else:
+        messages.error(request, "You do not have permission to edit this update.")
+        return redirect('tracker_project_detail', project_id=update.project.id)
+
 
 @login_required
 def delete_project_update(request, update_id):
@@ -847,10 +869,13 @@ def save_mitigation_plan(request, update_id):
 @login_required
 def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
-    updates = project.updates.select_related('author').all()
+    updates = project.updates.select_related('author', 'who').prefetch_related('remarks').all()
+    project_users = get_user_model().objects.all()
+
     context = {
         'project': project,
-        'updates': updates
+        'updates': updates,
+        'project_users': project_users,
     }
     return render(request, 'tracker/all_project_updates.html', context)
 
@@ -907,3 +932,47 @@ def update_stage_ajax(request, stage_id):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+
+@login_required
+def add_update_remark(request, update_id):
+    update = get_object_or_404(ProjectUpdate, id=update_id)
+    if request.method == 'POST':
+        text = request.POST.get('remark_text')
+        if text:
+            UpdateRemark.objects.create(
+                update=update, 
+                text=text, 
+                added_by=request.user
+            )
+            messages.success(request, "Remark added successfully.")
+    return redirect('tracker_project_detail', project_id=update.project.id)
+
+@login_required
+def edit_update_remark(request, remark_id):
+    remark = get_object_or_404(UpdateRemark, pk=remark_id)
+    # Only allow the author or a staff member to edit
+    if request.user == remark.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            new_text = request.POST.get('remark_text')
+            if new_text:
+                remark.text = new_text
+                remark.save()
+                messages.success(request, "Remark updated successfully.")
+    else:
+        messages.error(request, "You do not have permission to edit this remark.")
+    return redirect('tracker_project_detail', project_id=remark.update.project.id)
+
+
+@login_required
+def delete_update_remark(request, remark_id):
+    remark = get_object_or_404(UpdateRemark, pk=remark_id)
+    project_id = remark.update.project.id
+    # Only allow the author or a staff member to delete
+    if request.user == remark.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            remark.delete()
+            messages.success(request, "Remark deleted successfully.")
+    else:
+        messages.error(request, "You do not have permission to delete this remark.")
+    return redirect('tracker_project_detail', project_id=project_id)

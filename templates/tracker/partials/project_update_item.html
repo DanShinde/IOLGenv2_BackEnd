@@ -1,70 +1,119 @@
 {% load humanize %}
-<div class="d-flex mb-4 pb-4 border-bottom">
-    <div class="me-3">
-        <span class="user-avatar" style="width: 40px; height: 40px; background-color: var(--primary-dark);">
-            {{ update.author.username|slice:":1"|upper|default:"S" }}
-        </span>
-    </div>
-
-    <div class="w-100">
-        <div class="d-flex justify-content-between">
-            <div>
-                <span class="fw-bold">{{ update.author.get_full_name|default:update.author.username|default:"System" }}</span>
-                <small class="text-muted ms-2">{{ update.created_at|naturaltime }}</small>
+<div class="accordion-item mb-3">
+    <h2 class="accordion-header" id="heading{{ update.id }}">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ update.id }}" aria-expanded="false" aria-controls="collapse{{ update.id }}">
+            <div class="d-flex w-100 align-items-center">
+                <div class="me-3">
+                    <span class="user-avatar" style="width: 40px; height: 40px; background-color: var(--primary-dark);">
+                        {{ update.author.username|slice:":1"|upper|default:"S" }}
+                    </span>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <span class="fw-bold">{{ update.author.get_full_name|default:update.author.username|default:"System" }}</span>
+                            <small class="text-muted ms-2">{% if update.created_at %}{{ update.created_at|naturaltime }}{% endif %}</small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="badge {% if update.push_pull_type == 'Push' %}bg-primary{% else %}bg-info{% endif %} me-2">{{ update.get_push_pull_type_display }}</span>
+                            <span class="badge {% if update.status == 'Open' %}bg-danger{% elif update.status == 'In Progress' %}bg-warning text-dark{% else %}bg-success{% endif %} me-2">{{ update.status }}</span>
+                            {% if update.status == 'Closed' and update.closed_at %}
+                                <small class="text-muted ms-2">Marked as closed on {{ update.closed_at|date:"M d, Y, H:i" }}</small>
+                            {% endif %}
+                            {% if update.who %}
+                                <span class="badge bg-secondary me-2">To: {{ update.who.username }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <small>{{ update.text|truncatechars:100 }}</small>
+                    </div>
+                </div>
             </div>
-            {% if update.author == user or user.is_staff %}
-            <div class="dropdown">
-                <a href="#" class="text-muted" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-h"></i></a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editUpdateModal{{ update.id }}"><i class="fas fa-edit me-2"></i>Edit</a></li>
-                    <li>
-                        <form action="{% url 'delete_project_update' update.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this update?');">
-                            {% csrf_token %}
-                            <button type="submit" class="dropdown-item text-danger"><i class="fas fa-trash me-2"></i>Delete</button>
-                        </form>
-                    </li>
-                </ul>
+        </button>
+    </h2>
+    <div id="collapse{{ update.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ update.id }}" data-bs-parent="#updateAccordion">
+        <div class="accordion-body">
+            <div class="d-flex justify-content-between mb-3">
+                <div class="w-100">
+                    <p class="mb-2">{{ update.text|linebreaksbr }}</p>
+                    {% if update.eta %}
+                        <p class="small text-muted mb-0"><i class="far fa-calendar-alt me-1"></i>ETA: {{ update.eta|date:"M d, Y" }}</p>
+                    {% endif %}
+                </div>
+                <div class="dropdown">
+                    <a href="#" class="text-muted" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-ellipsis-h"></i></a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editUpdateModal{{ update.id }}"><i class="fas fa-edit me-2"></i>Edit</a></li>
+                        <li>
+                            <form action="{% url 'delete_project_update' update.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this update?');">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-danger"><i class="fas fa-trash me-2"></i>Delete</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
             </div>
-            {% endif %}
-        </div>
-        
-        <div class="mt-1">
-            <span class="badge {% if update.category == 'Risk' %}bg-danger-soft text-danger{% elif update.category == 'Action' %}bg-warning-soft text-warning{% else %}bg-info-soft text-info{% endif %}">{{ update.category }}</span>
-            {% if update.needs_review %}<span class="badge bg-danger-soft text-danger ms-1"><i class="fas fa-flag me-1"></i>Review Needed</span>{% endif %}
-            {% if update.category == 'Action' or update.category == 'Risk' %}<span class="badge {% if update.status == 'Open' %}bg-success-soft text-success{% else %}bg-secondary{% endif %} ms-1">{{ update.status }}</span>{% endif %}
-        </div>
 
-        <div class="mt-2">
-            {{ update.text|linebreaksbr }}
-        </div>
+            <hr>
 
-        {% if update.mitigation_plan %}
-        <div class="mt-2 p-2 bg-light border rounded">
-            <strong class="small"><i class="fas fa-shield-alt me-1"></i>Mitigation Plan:</strong>
-            <p class="mb-0 small">{{ update.mitigation_plan|linebreaksbr }}</p>
-        </div>
-        {% endif %}
+            <div class="mb-3">
+                <form action="{% url 'edit_project_update' update.id %}" method="post" class="d-flex align-items-center">
+                    {% csrf_token %}
+                    <strong class="me-2">Update Status:</strong>
+                    <select name="update_status" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                        <option value="Open" {% if update.status == 'Open' %}selected{% endif %}>Open</option>
+                        <option value="In Progress" {% if update.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                        <option value="Closed" {% if update.status == 'Closed' %}selected{% endif %}>Closed</option>
+                    </select>
+                </form>
+            </div>
 
-        {% if update.category == 'Action' or update.category == 'Risk' %}
-        <div class="mt-2">
-            <form action="{% url 'toggle_update_status' update.id %}" method="post" style="display: inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm {% if update.status == 'Open' %}btn-outline-success{% else %}btn-outline-secondary{% endif %}">
-                    <i class="fas fa-{% if update.status == 'Open' %}check-circle{% else %}redo{% endif %} me-1"></i> Mark as {{ update.status|yesno:"Closed,Open" }}
-                </button>
-            </form>
-            {% if update.category == 'Risk' %}
-            <button class="btn btn-sm btn-outline-dark ms-2" data-bs-toggle="modal" data-bs-target="#mitigationModal{{ update.id }}">
-                <i class="fas fa-shield-alt me-1"></i> {{ update.mitigation_plan|yesno:"Edit,Add" }} Mitigation
-            </button>
-            {% endif %}
+            <hr>
+
+            <div class="remarks-section">
+                <h6 class="mb-3">Remarks</h6>
+                <form action="{% url 'add_update_remark' update.id %}" method="post" class="mb-3">
+                    {% csrf_token %}
+                    <div class="input-group">
+                        <textarea name="remark_text" class="form-control form-control-sm" rows="2" placeholder="Add a remark..." required></textarea>
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-plus me-1"></i>Add</button>
+                    </div>
+                </form>
+                <div class="remarks-list">
+                    {% for remark in update.remarks.all %}
+                        <div class="d-flex mb-2 align-items-start remark-box">
+                            <div class="me-2">
+                                <span class="user-avatar" style="width: 30px; height: 30px; font-size: 0.7rem; background-color: var(--secondary);">
+                                    {{ remark.added_by.username|slice:":1"|upper }}
+                                </span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <p class="mb-0 small">
+                                    <strong>{{ remark.added_by.username }}</strong>: {{ remark.text|linebreaksbr }}
+                                </p>
+                                <small class="text-muted">{{ remark.created_at|date:"M d, Y, H:i" }}</small>
+                            </div>
+                            {% if user == remark.added_by or user.is_staff %}
+                                <div class="btn-group">
+                                    <a class="text-muted ms-2" href="#" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editUpdateRemarkModal{{ remark.id }}"><i class="fas fa-edit me-2"></i>Edit</a></li>
+                                        <li>
+                                            <form action="{% url 'delete_update_remark' remark.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this remark?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-danger"><i class="fas fa-trash me-2"></i>Delete</button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <p class="text-muted small">No remarks yet. Be the first to add one!</p>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
-        {% endif %}
     </div>
 </div>
-<style>
-.bg-danger-soft { background-color: rgba(220, 53, 69, 0.1); }
-.bg-warning-soft { background-color: rgba(255, 193, 7, 0.1); }
-.bg-info-soft { background-color: rgba(13, 202, 240, 0.1); }
-.bg-success-soft { background-color: rgba(25, 135, 84, 0.1); }
-</style>
