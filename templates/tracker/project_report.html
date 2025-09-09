@@ -411,13 +411,16 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script>
+    // The filterTable function remains unchanged
     function filterTable() {
         const filterValues = {
             code: document.querySelector('.table-filter-row th:nth-child(1) input').value.toUpperCase(),
+
             customer: document.querySelector('.table-filter-row th:n-child(2) input').value.toUpperCase(),
             segment: document.querySelector('.table-filter-row th:nth-child(3) input').value.toUpperCase(),
             pace: document.querySelector('.table-filter-row th:nth-child(4) input').value.toUpperCase(),
             status: document.querySelector('.table-filter-row th:nth-child(7) input').value.toUpperCase()
+
         };
         const tableBody = document.querySelector('.table-custom tbody');
         if (!tableBody) { return; }
@@ -436,13 +439,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 code: row.cells[0]?.textContent.toUpperCase() || '',
                 customer: row.cells[1]?.textContent.toUpperCase() || '',
                 segment: row.cells[2]?.textContent.toUpperCase() || '',
+
                 pace: row.cells[3]?.textContent.toUpperCase() || '',
                 status: row.cells[6]?.textContent.toUpperCase() || ''
+
             };
             const isMatch = rowData.code.includes(filterValues.code) &&
                             rowData.customer.includes(filterValues.customer) &&
                             rowData.segment.includes(filterValues.segment) &&
                             rowData.pace.includes(filterValues.pace) &&
+
                             rowData.status.includes(filterValues.status);
             if (isMatch) {
                 row.style.display = 'table-row';

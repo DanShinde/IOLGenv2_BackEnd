@@ -35,6 +35,7 @@ class Project(models.Model):
         blank=True,
         related_name="tracker_projects1"
     )
+
     pace = models.ForeignKey(
         Pace,
         on_delete=models.SET_NULL,
@@ -42,6 +43,7 @@ class Project(models.Model):
         blank=True,
         related_name="projects"
     )
+
 
     def __str__(self):
         return self.code
