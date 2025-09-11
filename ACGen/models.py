@@ -94,8 +94,9 @@ class GenerationLog(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.CharField(max_length=255)
     generation_time = models.DateTimeField(auto_now_add=True)
-    project_name = models.CharField(max_length=500)
+    project_name = models.CharField(max_length=500, null=True, blank=True)
     project_file_name = models.CharField(max_length=500)
+    Log_Event = models.CharField(max_length=1000, default="Done")
 
     def __str__(self):
         return f"Log for {self.project_name} at {self.generation_time}"

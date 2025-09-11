@@ -51,7 +51,7 @@ class ParameterSerializer(serializers.ModelSerializer):
 class GenerationLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = GenerationLog
-        fields = ['id', 'user', 'generation_time', 'project_name', 'project_file_name']
+        fields = ['id', 'user', 'generation_time', 'project_name', 'project_file_name', 'Log_Event']
         read_only_fields = ['id', 'user', 'generation_time']
 
     def validate_project_file_name(self, value):
