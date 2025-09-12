@@ -28,7 +28,7 @@ class StandardString(models.Model):
 # ClusterTemplate Model
 class ClusterTemplate(models.Model):
     id = models.AutoField(primary_key=True)
-    cluster_name = models.CharField(max_length=255, unique=True)
+    cluster_name = models.CharField(max_length=255, unique=True, db_index=True)
     cluster_config = models.TextField(null=True,blank=True)
     cluster_string = models.TextField(null=True, blank=True)
     cluster_path = models.CharField(max_length=512, null=True, blank=True)

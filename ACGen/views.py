@@ -115,8 +115,9 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
             'segment': self.request.query_params.get('segment'),
             'control_library': self.request.query_params.get('control_library'),
             'block_type': self.request.query_params.get('block_type'),
-            # Add more filter parameters as needed
+            'cluster_name': self.request.query_params.get('cluster_name'),
         }
+
 
     def get_queryset(self):
         filter_params = self.get_filter_params()
