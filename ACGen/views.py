@@ -151,7 +151,7 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         
         if compact:
             # Use a custom serializer for compact response or limit fields
-            kwargs['fields'] = ['id','cluster_name', 'cluster_path', 'block_type', 'cluster_config', 'dependencies']
+            kwargs['fields'] = ['id','cluster_name', 'cluster_path', 'block_type', 'cluster_config', 'dependencies', 'segment']
             
         return super().get_serializer(*args, **kwargs)
 
@@ -198,6 +198,7 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
                 'cluster_path', 
                 'block_type', 
                 'cluster_config',
+                'segment',
                 'control_library'
                 ).annotate(
                     dependencies=ArrayAgg('dependencies', distinct=True)
