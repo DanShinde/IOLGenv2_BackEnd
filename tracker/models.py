@@ -43,6 +43,15 @@ class Project(models.Model):
         related_name="projects"
     )
 
+    pace = models.ForeignKey(
+        Pace,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects"
+    )
+
+
     def __str__(self):
         return self.code
 

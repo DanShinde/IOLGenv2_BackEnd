@@ -6,6 +6,7 @@ from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project
+
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -24,6 +25,7 @@ from reportlab.lib.pagesizes import letter, landscape, A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse, QueryDict
 import csv
 from itertools import groupby
@@ -32,6 +34,7 @@ import json
 from django.contrib.auth import get_user_model
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
+
 
 
 def login_view(request):
@@ -175,15 +178,19 @@ def project_detail(request, project_id):
         success_message = "Changes saved successfully!"
         for stage in stages_to_save:
             # Get new values from the form
+
             new_planned_start_str = request.POST.get(f'planned_start_date_{stage.id}')
             new_planned_str = request.POST.get(f'planned_date_{stage.id}')
+
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             
+
             # Safely parse date strings
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
+
 
             # Log changes to history
             if stage.planned_start_date != new_planned_start:
@@ -472,6 +479,8 @@ def project_reports(request):
         status = query_params.get(f'stage_{stage_key}_status')
         start = query_params.get(f'stage_{stage_key}_start')
         end = query_params.get(f'stage_{stage_key}_end')
+
+
         if status or (start and end):
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
             stage_query_filters = {'stages__name': stage_key}
@@ -517,6 +526,7 @@ def project_reports(request):
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
     context = {
+
         'projects_with_details': projects_with_details,
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
@@ -1109,6 +1119,7 @@ def update_stage_ajax(request, stage_id):
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
 
 
+
 @login_required
 def add_update_remark(request, update_id):
     update = get_object_or_404(ProjectUpdate, id=update_id)
@@ -1151,3 +1162,4 @@ def delete_update_remark(request, remark_id):
     else:
         messages.error(request, "You do not have permission to delete this remark.")
     return redirect('tracker_project_detail', project_id=project_id)
+

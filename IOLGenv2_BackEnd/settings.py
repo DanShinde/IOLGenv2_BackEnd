@@ -318,7 +318,7 @@ JAZZMIN_SETTINGS = {
     
     "topmenu_links": [
         {"name": "Home",  "url": "home", "permissions": ["auth.view_user"]},
-        {"name": "Company", "url": "/admin/addons/company/"},
+        {"name": "Clear Cache", "url": "/cacheclear/"},
     ],
 
 

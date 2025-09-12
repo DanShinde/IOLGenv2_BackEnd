@@ -29,6 +29,7 @@ urlpatterns = [
     path('help/', views.help_page, name='help_page'),
     path('stage/<int:stage_id>/update-ajax/', views.update_stage_ajax, name='update_stage_ajax'),
     path('project/<int:project_id>/edit/', views.edit_project, name='tracker_edit_project'),
+
     path('update/<int:update_id>/add_remark/', views.add_update_remark, name='add_update_remark'),
     path('update-remark/<int:remark_id>/edit/', views.edit_update_remark, name='edit_update_remark'),
     path('update-remark/<int:remark_id>/delete/', views.delete_update_remark, name='delete_update_remark'),
@@ -36,3 +37,4 @@ urlpatterns = [
     path('all-push-pull-content/export/excel/', views.export_push_pull_excel, name='export_push_pull_excel'),
     path('all-push-pull-content/export/pdf/', views.export_push_pull_pdf, name='export_push_pull_pdf'),
 ]
+

@@ -28,7 +28,7 @@ class StandardString(models.Model):
 # ClusterTemplate Model
 class ClusterTemplate(models.Model):
     id = models.AutoField(primary_key=True)
-    cluster_name = models.CharField(max_length=255, unique=True)
+    cluster_name = models.CharField(max_length=255, unique=True, db_index=True)
     cluster_config = models.TextField(null=True,blank=True)
     cluster_string = models.TextField(null=True, blank=True)
     cluster_path = models.CharField(max_length=512, null=True, blank=True)
@@ -39,6 +39,8 @@ class ClusterTemplate(models.Model):
     updated_by = models.CharField(max_length=255)
     updated_at = models.DateTimeField(auto_now=True)
     segment = models.CharField(max_length=255)
+    is_assignable = models.BooleanField(default=True)
+    is_protected = models.BooleanField(default=False)
     dependencies = models.ManyToManyField(
         'self', 
         symmetrical=False, 
@@ -92,8 +94,9 @@ class GenerationLog(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.CharField(max_length=255)
     generation_time = models.DateTimeField(auto_now_add=True)
-    project_name = models.CharField(max_length=500)
+    project_name = models.CharField(max_length=500, null=True, blank=True)
     project_file_name = models.CharField(max_length=500)
+    Log_Event = models.CharField(max_length=1000, default="Done")
 
     def __str__(self):
         return f"Log for {self.project_name} at {self.generation_time}"
@@ -144,7 +147,7 @@ def delete_cluster_template_cache(sender, instance, **kwargs):
 @receiver([post_save, post_delete], sender=Parameter)
 def delete_info_cache(sender, instance, **kwargs):
     clear_info_cache("Parameter",instance.id)
-    clear_info_cache("Parameter",instance.parameter_name)
+    clear_info_cache("parameters:cluster_name",instance.cluster.cluster_name)
 
 # Signal: Clear cache when an Info instance is created or updated
 @receiver([post_save, post_delete], sender=ClusterTemplate)
