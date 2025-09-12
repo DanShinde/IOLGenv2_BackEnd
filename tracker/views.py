@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -19,16 +19,19 @@ from tracker.utils import (
 )
 from django.core.cache import cache
 from io import BytesIO
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.pagesizes import letter, landscape, A4
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse, QueryDict
 import csv
 from itertools import groupby
 from operator import attrgetter
 import json
 from django.contrib.auth import get_user_model
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side
 
 
 def login_view(request):
@@ -469,7 +472,6 @@ def project_reports(request):
         status = query_params.get(f'stage_{stage_key}_status')
         start = query_params.get(f'stage_{stage_key}_start')
         end = query_params.get(f'stage_{stage_key}_end')
-        
         if status or (start and end):
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
             stage_query_filters = {'stages__name': stage_key}
@@ -830,6 +832,12 @@ def edit_project_update(request, update_id):
             
             update.save()
             messages.success(request, "Update saved successfully.")
+        
+        # Determine redirect URL based on the referring page
+        referer = request.META.get('HTTP_REFERER')
+        if referer and reverse('all_push_pull_content') in referer:
+            return redirect('all_push_pull_content')
+        
         return redirect('tracker_project_detail', project_id=update.project.id)
     else:
         messages.error(request, "You do not have permission to edit this update.")
@@ -878,6 +886,173 @@ def all_project_updates(request, project_id):
         'project_users': project_users,
     }
     return render(request, 'tracker/all_project_updates.html', context)
+
+
+@login_required
+def all_push_pull_content(request):
+    updates = ProjectUpdate.objects.select_related(
+        'project', 
+        'author', 
+        'who'
+    ).prefetch_related('remarks').all()
+    project_users = get_user_model().objects.all()
+
+    context = {
+        'updates': updates,
+        'project_users': project_users,
+    }
+    return render(request, 'tracker/all_push_pull_content.html', context)
+
+
+@login_required
+def export_push_pull_excel(request):
+    updates = ProjectUpdate.objects.select_related(
+        'project', 
+        'author', 
+        'who'
+    ).prefetch_related('remarks').all()
+    
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "All Push-Pull Contents"
+    
+    # Headers
+    headers = [
+        'Project Code', 'Type', 'What', 'Who', 'ETA', 'Status', 'Created At', 'Closed At', 'Remarks'
+    ]
+    sheet.append(headers)
+    
+    # Populate with data
+    for update in updates:
+        remarks_text = "\n".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
+
+        # Make datetime objects timezone-naive for openpyxl
+        created_at_naive = update.created_at.replace(tzinfo=None) if update.created_at else None
+        closed_at_naive = update.closed_at.replace(tzinfo=None) if update.closed_at else None
+
+        row = [
+            update.project.code,
+            update.get_push_pull_type_display(),
+            update.text,
+            update.who.username if update.who else 'N/A',
+            update.eta,
+            update.status,
+            created_at_naive,
+            closed_at_naive,
+            remarks_text
+        ]
+        sheet.append(row)
+
+    # Set up the response
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    workbook.save(response)
+    
+    return response
+
+@login_required
+def export_push_pull_pdf(request):
+    updates = ProjectUpdate.objects.select_related(
+        'project', 
+        'author', 
+        'who'
+    ).prefetch_related('remarks').all()
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Define a custom style for long text with word wrapping
+    long_text_style = ParagraphStyle(
+        'long_text_style',
+        parent=styles['Normal'],
+        wordWrap='CJK',
+        spaceAfter=6,
+        alignment=4,
+        textColor=colors.black, # Set text color to black
+        fontName='Helvetica',
+    )
+    
+    # Define a style for table headers
+    header_style = ParagraphStyle(
+        'header_style',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        textColor=colors.whitesmoke,
+        alignment=1, # Center alignment for headers
+    )
+    
+    # Title and generation date
+    elements.append(Paragraph("All Push-Pull Contents", styles['Title']))
+    elements.append(Paragraph(f"Report Generated on: {timezone.now().strftime('%d-%b-%Y %I:%M %p')}", styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm)) # Add some space
+
+    table_data = [
+        [
+            Paragraph('Project Code', header_style),
+            Paragraph('Type', header_style),
+            Paragraph('What', header_style),
+            Paragraph('Who', header_style),
+            Paragraph('When', header_style),
+            Paragraph('Status', header_style),
+            Paragraph('Remarks', header_style)
+        ]
+    ]
+
+    for update in updates:
+        remarks_list = [f"• {r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()]
+        
+        # Pre-process content for each cell to handle long text
+        what_cell = Paragraph(update.text, long_text_style)
+        remarks_cell = Paragraph("<br/>".join(remarks_list), long_text_style) if remarks_list else 'N/A'
+        
+        row = [
+            update.project.code,
+            update.get_push_pull_type_display(),
+            what_cell,
+            update.who.username if update.who else 'N/A',
+            update.eta.strftime('%Y-%m-%d') if update.eta else 'N/A',
+            update.status,
+            remarks_cell
+        ]
+        table_data.append(row)
+        
+    # Set flexible column widths for better text distribution
+    col_widths = [1.8*cm, 2.5*cm, 5*cm, 2*cm, 2.5*cm, 2.5*cm, 6.2*cm]
+    
+    # Table style definition
+    table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black), # Set text color for the body
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('LEFTPADDING', (0, 0), (-1,-1), 6),
+        ('RIGHTPADDING', (0, 0), (-1,-1), 6),
+        ('WORDWRAP', (0, 0), (-1, -1), 1),
+    ])
+
+    table = Table(table_data, colWidths=col_widths)
+    table.setStyle(table_style)
+    elements.append(table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer, content_type='application/pdf')
+    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    
+    return response
+
 
 @login_required
 def help_page(request):
