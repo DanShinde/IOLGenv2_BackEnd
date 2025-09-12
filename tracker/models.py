@@ -35,6 +35,13 @@ class Project(models.Model):
         blank=True,
         related_name="tracker_projects1"
     )
+    pace = models.ForeignKey(
+        Pace,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects"
+    )
 
     pace = models.ForeignKey(
         Pace,
@@ -183,22 +190,42 @@ class ProjectUpdate(models.Model):
     
     STATUS_CHOICES = [
         ('Open', 'Open'),
+        ('In Progress', 'In Progress'),
         ('Closed', 'Closed'),
+    ]
+
+    PUSH_PULL_CHOICES = [
+        ('Push', 'Push Content'),
+        ('Pull', 'Pull Content'),
     ]
     
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='updates')
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     text = models.TextField()
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='Information')
-    needs_review = models.BooleanField(default=False)
+    # The 'category' and 'needs_review' fields have been removed or commented out.
+    # To avoid errors, it's safer to keep them until migrations are run correctly.
+    # category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='Information')
+    # needs_review = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     # ✅ NEW FIELDS
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Open', null=True, blank=True)
-    mitigation_plan = models.TextField(null=True, blank=True)
+    push_pull_type = models.CharField(max_length=10, choices=PUSH_PULL_CHOICES, default='Push')
+    who = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='updates_addressed_to')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
+    eta = models.DateField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
         return f"Update for {self.project.code} at {self.created_at.strftime('%Y-%m-%d')}"
+
+class UpdateRemark(models.Model):
+    update = models.ForeignKey(ProjectUpdate, on_delete=models.CASCADE, related_name="remarks")
+    text = models.TextField()
+    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Remark on Update {self.update.id} by {self.added_by.username} at {self.created_at}"

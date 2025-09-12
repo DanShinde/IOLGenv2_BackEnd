@@ -1,0 +1,135 @@
+{% extends 'tracker/base.html' %}
+{% load humanize %}
+
+{% block title %}All Push-Pull Contents{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+            <h1 class="page-title">All Push-Pull Contents</h1>
+            <p class="page-subtitle">A summary of all push-pull content across all projects.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'export_push_pull_excel' %}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
+            <a href="{% url 'export_push_pull_pdf' %}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle" id="pushPullTable">
+                <thead>
+                    <tr>
+                        <th>
+                            Project Code
+                            <input type="text" class="form-control form-control-sm mt-1 filter-input" placeholder="Filter..." data-column="0">
+                        </th>
+                        <th>
+                            Type
+                            <input type="text" class="form-control form-control-sm mt-1 filter-input" placeholder="Filter..." data-column="1">
+                        </th>
+                        <th>
+                            What
+                            <input type="text" class="form-control form-control-sm mt-1 filter-input" placeholder="Filter..." data-column="2">
+                        </th>
+                        <th>
+                            Who
+                            <input type="text" class="form-control form-control-sm mt-1 filter-input" placeholder="Filter..." data-column="3">
+                        </th>
+                        <th>
+                            When
+                            <input type="text" class="form-control form-control-sm mt-1 filter-input" placeholder="Filter..." data-column="4">
+                        </th>
+                        <th>
+                            Status
+                            <input type="text" class="form-control form-control-sm mt-1 filter-input" placeholder="Filter..." data-column="5">
+                        </th>
+                        <th>
+                            Remarks
+                            <input type="text" class="form-control form-control-sm mt-1 filter-input" placeholder="Filter..." data-column="6">
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for update in updates %}
+                        <tr data-bs-toggle="modal" data-bs-target="#editUpdateModal{{ update.id }}">
+                            <td>
+                                <a href="{% url 'tracker_project_detail' update.project.id %}" onclick="event.stopPropagation();">
+                                    {{ update.project.code }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge {% if update.push_pull_type == 'Push' %}bg-primary{% else %}bg-info{% endif %}">
+                                    {{ update.get_push_pull_type_display }}
+                                </span>
+                            </td>
+                            <td>{{ update.text|truncatechars:50 }}</td>
+                            <td>{{ update.who.username|default:'N/A' }}</td>
+                            <td>{{ update.eta|date:"M d, Y"|default:'N/A' }}</td>
+                            <td>
+                                <span class="badge {% if update.status == 'Open' %}bg-danger{% elif update.status == 'In Progress' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ update.status }}
+                                </span>
+                                {% if update.status == 'Closed' and update.closed_at %}
+                                    <br><small class="text-muted">{{ update.closed_at|date:"M d, Y" }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if update.remarks.all %}
+                                    <ul>
+                                        {% for remark in update.remarks.all %}
+                                            <li>
+                                                <strong>{{ remark.added_by.username }}:</strong>
+                                                {{ remark.text|truncatechars:50 }}
+                                                <br><small class="text-muted">{{ remark.created_at|date:"M d, Y, H:i" }}</small>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">No push-pull content found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% include 'tracker/partials/project_update_modals.html' with updates=updates project_users=project_users %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('pushPullTable');
+    const filters = document.querySelectorAll('.filter-input');
+    const rows = table.querySelectorAll('tbody tr');
+
+    filters.forEach(filter => {
+        filter.addEventListener('keyup', function() {
+            const filterValue = this.value.toLowerCase();
+            const columnIndex = this.dataset.column;
+
+            rows.forEach(row => {
+                const cell = row.querySelectorAll('td')[columnIndex];
+                if (cell) {
+                    const cellText = cell.textContent || cell.innerText;
+                    if (cellText.toLowerCase().indexOf(filterValue) > -1) {
+                        row.style.display = "";
+                    } else {
+                        row.style.display = "none";
+                    }
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

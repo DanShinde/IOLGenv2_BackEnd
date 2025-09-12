@@ -109,6 +109,14 @@
     .bg-warning-soft { background-color: rgba(255, 193, 7, 0.1); }
     .bg-info-soft { background-color: rgba(13, 202, 240, 0.1); }
     .bg-success-soft { background-color: rgba(25, 135, 84, 0.1); }
+
+    /* New style for remark items */
+    .remark-box {
+        background-color: #f8f9fa;
+        border-left: 3px solid #0d6efd;
+        padding: 10px;
+        margin-top: 10px;
+    }
 </style>
 {% endblock %}
 
@@ -173,7 +181,7 @@
                         {% with status=stage.status|default:"Not started" %}
                         <div class="roadmap-step">
                             <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
-                                {% comment %} TIMELINE ICONS REVERTED TO ORIGINAL STATE {% endcomment %}
+
                                 {% if status == "Completed" %}<i class="fas fa-check"></i>
                                 {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
                                 {% elif status == "Hold" %}<i class="fas fa-pause"></i>
@@ -200,7 +208,7 @@
                         {% with status=stage.status|default:"Not started" %}
                         <div class="roadmap-step">
                             <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
-                                {% comment %} TIMELINE ICONS REVERTED TO ORIGINAL STATE {% endcomment %}
+
                                 {% if status == "Completed" %}<i class="fas fa-check"></i>
                                 {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
                                 {% elif status == "Hold" %}<i class="fas fa-pause"></i>
@@ -236,7 +244,9 @@
 
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:25%">Stage</th><th style="width:15%">Planned Start Date</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Actual Finish Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
+
                         {% for stage in automation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
                             <td>
@@ -252,9 +262,11 @@
                                     <strong>{{ stage.name }}</strong>
                                 </div>
                             </td>
-                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
+
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
+
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
                             <td>
                                 <div class="d-flex align-items-center">
@@ -287,7 +299,9 @@
 
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:25%">Stage</th><th style="width:15%">Planned Start Date</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Actual Finish Date</th><th style="width:10%">Actions</th></tr></thead><tbody>
+
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
+
                         {% for stage in emulation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
                            <td>
@@ -303,9 +317,11 @@
                                     <strong>{{ stage.name }}</strong>
                                 </div>
                             </td>
-                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
+
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
+
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
                             <td>
                                 <div class="d-flex align-items-center">
@@ -446,39 +462,47 @@
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-bullhorn me-2"></i>Project Updates</h5></div>
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-bullhorn me-2"></i>Push-Pull Contents</h5></div>
             <div class="card-body">
                 <form action="{% url 'add_project_update' project.id %}" method="post" class="mb-4 p-3 bg-light rounded">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label for="update_text" class="form-label fw-bold">Add a New Update</label>
+                        <label for="update_text" class="form-label fw-bold">Add a New Push/Pull Content</label>
                         <textarea name="update_text" id="update_text" rows="3" class="form-control" placeholder="Share a new update on the project's progress, risks, or actions needed..." required></textarea>
                     </div>
-                    <div class="row align-items-center">
-                        <div class="col-md-4">
-                            <label for="update_category" class="form-label small mb-0">Category</label>
-                            <select name="update_category" id="update_category" class="form-select form-select-sm">
-                                <option value="Information">Information</option><option value="Action">Action Required</option><option value="Risk">Risk Identified</option>
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-3">
+                            <label for="push_pull_type" class="form-label small mb-0">Type</label>
+                            <select name="push_pull_type" id="push_pull_type" class="form-select form-select-sm">
+                                <option value="Push">Push Content</option>
+                                <option value="Pull">Pull Content</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <div class="form-check mt-3">
-                                <input class="form-check-input" type="checkbox" name="needs_review" value="true" id="needs_review">
-                                <label class="form-check-label" for="needs_review">Flag for Senior Review</label>
-                            </div>
+                        <div class="col-md-3">
+                            <label for="who" class="form-label small mb-0">Who</label>
+                            <select name="who" id="who" class="form-select form-select-sm">
+                                <option value="">Select User (Optional)</option>
+                                {% for user in project_users %}
+                                <option value="{{ user.id }}">{{ user.username }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                        <div class="col-md-4 text-end">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle me-2"></i>Post Update</button>
+                        <div class="col-md-3">
+                            <label for="eta_date" class="form-label small mb-0">ETA</label>
+                            <input type="date" name="eta_date" id="eta_date" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-12 text-end">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save</button>
                         </div>
                     </div>
                 </form>
                 <hr>
-                <h5 class="mt-4">Update History</h5>
-                <div class="update-feed mt-3">
+                <h5 class="mt-4">Push Pull Content Summary</h5>
+                <div class="update-feed mt-3 accordion" id="updateAccordion">
                     {% for update in updates %}
                         {% include 'tracker/partials/project_update_item.html' with update=update user=user %}
                     {% empty %}
-                        <p class="text-muted text-center py-3">No project updates have been added yet.</p>
+                        <p class="text-muted text-center py-3">No push pull contents have been added yet.</p>
                     {% endfor %}
                 </div>
                 {% if updates_count > 5 %}

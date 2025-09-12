@@ -5,7 +5,8 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Project, Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace 
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project
+
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -19,15 +20,22 @@ from tracker.utils import (
 )
 from django.core.cache import cache
 from io import BytesIO
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.pagesizes import letter, landscape, A4
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse, QueryDict
 import csv
 from itertools import groupby
 from operator import attrgetter
 import json
+from django.contrib.auth import get_user_model
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side
+
+
 
 def login_view(request):
     if request.method == 'POST':
@@ -135,6 +143,8 @@ def edit_project(request, project_id):
 @login_required
 def project_detail(request, project_id):
     project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
+    User = get_user_model()
+    project_users = User.objects.all()
 
     if request.method == 'POST':
         stages_to_save = []
@@ -168,12 +178,20 @@ def project_detail(request, project_id):
         success_message = "Changes saved successfully!"
         for stage in stages_to_save:
             # Get new values from the form
-            new_planned_start = parse_date(request.POST.get(f'planned_start_date_{stage.id}'))
-            new_planned = parse_date(request.POST.get(f'planned_date_{stage.id}'))
+
+            new_planned_start_str = request.POST.get(f'planned_start_date_{stage.id}')
+            new_planned_str = request.POST.get(f'planned_date_{stage.id}')
+
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
-            new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
             
+
+            # Safely parse date strings
+            new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
+            new_planned = parse_date(new_planned_str) if new_planned_str else None
+            new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
+
+
             # Log changes to history
             if stage.planned_start_date != new_planned_start:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Start Date", old_value=str(stage.planned_start_date), new_value=str(new_planned_start))
@@ -269,7 +287,7 @@ def project_detail(request, project_id):
         'recent_activity': recent_activity,
         'automation_remarks': automation_remarks,
         'emulation_remarks': emulation_remarks,
-
+        'project_users': project_users,
     }
     
     return render(request, 'tracker/project_detail.html', context)
@@ -461,7 +479,8 @@ def project_reports(request):
         status = query_params.get(f'stage_{stage_key}_status')
         start = query_params.get(f'stage_{stage_key}_start')
         end = query_params.get(f'stage_{stage_key}_end')
-        
+
+
         if status or (start and end):
             stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
             stage_query_filters = {'stages__name': stage_key}
@@ -509,7 +528,6 @@ def project_reports(request):
     context = {
 
         'projects_with_details': projects_with_details,
-
         'total_projects_found': total_projects_found,
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
@@ -528,11 +546,10 @@ def project_reports(request):
     }
     return render(request, 'tracker/project_report.html', context)
 
-
 @login_required
 def project_activity(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
-    history_logs = StageHistory.objects.filter(stage__project=project).order_by('-changed_at')
+    history_logs = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')
     return render(request, 'tracker/project_activity.html', {
         'project': project,
         'history_logs': history_logs,
@@ -776,43 +793,66 @@ def add_project_update(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
     if request.method == 'POST':
         text = request.POST.get('update_text')
-        category = request.POST.get('update_category')
-        needs_review = 'needs_review' in request.POST
+        push_pull_type = request.POST.get('push_pull_type')
+        who_id = request.POST.get('who')
+        eta_date = request.POST.get('eta_date')
 
-        if text and category:
+        who = get_object_or_404(get_user_model(), pk=who_id) if who_id else None
+        eta = parse_date(eta_date) if eta_date else None
+
+        if text and push_pull_type:
             ProjectUpdate.objects.create(
                 project=project,
                 author=request.user,
                 text=text,
-                category=category,
-                needs_review=needs_review
+                push_pull_type=push_pull_type,
+                who=who,
+                eta=eta,
             )
             messages.success(request, "Project update added successfully.")
         else:
-            messages.error(request, "Update text and category are required.")
+            messages.error(request, "Update text and type are required.")
     
     # Redirect back to the project detail page
     return redirect('tracker_project_detail', project_id=project.id)
 
 @login_required
 def edit_project_update(request, update_id):
-    update = get_object_or_404(ProjectUpdate, id=update_id, author=request.user)
-    if request.method == 'POST':
-        update.text = request.POST.get('update_text', update.text)
-        update.category = request.POST.get('update_category', update.category)
-        update.needs_review = 'needs_review' in request.POST
+    update = get_object_or_404(ProjectUpdate, id=update_id)
+    # Check if the user is the author or a staff member to allow editing
+    if request.user == update.author or request.user.is_staff:
+        if request.method == 'POST':
+            new_status = request.POST.get('update_status', update.status)
+            
+            # If the status is being changed to 'Closed', set the closed_at timestamp.
+            if new_status == 'Closed' and update.status != 'Closed':
+                update.closed_at = timezone.now()
+            # If the status is changed from 'Closed' to something else, clear the timestamp.
+            elif new_status != 'Closed' and update.status == 'Closed':
+                update.closed_at = None
+
+            update.text = request.POST.get('update_text', update.text)
+            update.push_pull_type = request.POST.get('push_pull_type', update.push_pull_type)
+            who_id = request.POST.get('who')
+            eta_date = request.POST.get('eta_date')
+            update.status = new_status
+
+            update.who = get_object_or_404(get_user_model(), pk=who_id) if who_id else None
+            update.eta = parse_date(eta_date) if eta_date else None
+            
+            update.save()
+            messages.success(request, "Update saved successfully.")
         
-        # If the category is changed away from Risk, clear the mitigation plan
-        if update.category != 'Risk':
-            update.mitigation_plan = ''
+        # Determine redirect URL based on the referring page
+        referer = request.META.get('HTTP_REFERER')
+        if referer and reverse('all_push_pull_content') in referer:
+            return redirect('all_push_pull_content')
+        
+        return redirect('tracker_project_detail', project_id=update.project.id)
+    else:
+        messages.error(request, "You do not have permission to edit this update.")
+        return redirect('tracker_project_detail', project_id=update.project.id)
 
-        # If it is a risk, save the mitigation plan
-        if update.category == 'Risk':
-             update.mitigation_plan = request.POST.get('mitigation_plan', update.mitigation_plan)
-
-        update.save()
-        messages.success(request, "Update saved successfully.")
-    return redirect('tracker_project_detail', project_id=update.project.id)
 
 @login_required
 def delete_project_update(request, update_id):
@@ -847,12 +887,182 @@ def save_mitigation_plan(request, update_id):
 @login_required
 def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
-    updates = project.updates.select_related('author').all()
+    updates = project.updates.select_related('author', 'who').prefetch_related('remarks').all()
+    project_users = get_user_model().objects.all()
+
     context = {
         'project': project,
-        'updates': updates
+        'updates': updates,
+        'project_users': project_users,
     }
     return render(request, 'tracker/all_project_updates.html', context)
+
+
+@login_required
+def all_push_pull_content(request):
+    updates = ProjectUpdate.objects.select_related(
+        'project', 
+        'author', 
+        'who'
+    ).prefetch_related('remarks').all()
+    project_users = get_user_model().objects.all()
+
+    context = {
+        'updates': updates,
+        'project_users': project_users,
+    }
+    return render(request, 'tracker/all_push_pull_content.html', context)
+
+
+@login_required
+def export_push_pull_excel(request):
+    updates = ProjectUpdate.objects.select_related(
+        'project', 
+        'author', 
+        'who'
+    ).prefetch_related('remarks').all()
+    
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "All Push-Pull Contents"
+    
+    # Headers
+    headers = [
+        'Project Code', 'Type', 'What', 'Who', 'ETA', 'Status', 'Created At', 'Closed At', 'Remarks'
+    ]
+    sheet.append(headers)
+    
+    # Populate with data
+    for update in updates:
+        remarks_text = "\n".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
+
+        # Make datetime objects timezone-naive for openpyxl
+        created_at_naive = update.created_at.replace(tzinfo=None) if update.created_at else None
+        closed_at_naive = update.closed_at.replace(tzinfo=None) if update.closed_at else None
+
+        row = [
+            update.project.code,
+            update.get_push_pull_type_display(),
+            update.text,
+            update.who.username if update.who else 'N/A',
+            update.eta,
+            update.status,
+            created_at_naive,
+            closed_at_naive,
+            remarks_text
+        ]
+        sheet.append(row)
+
+    # Set up the response
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    workbook.save(response)
+    
+    return response
+
+@login_required
+def export_push_pull_pdf(request):
+    updates = ProjectUpdate.objects.select_related(
+        'project', 
+        'author', 
+        'who'
+    ).prefetch_related('remarks').all()
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Define a custom style for long text with word wrapping
+    long_text_style = ParagraphStyle(
+        'long_text_style',
+        parent=styles['Normal'],
+        wordWrap='CJK',
+        spaceAfter=6,
+        alignment=4,
+        textColor=colors.black, # Set text color to black
+        fontName='Helvetica',
+    )
+    
+    # Define a style for table headers
+    header_style = ParagraphStyle(
+        'header_style',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        textColor=colors.whitesmoke,
+        alignment=1, # Center alignment for headers
+    )
+    
+    # Title and generation date
+    elements.append(Paragraph("All Push-Pull Contents", styles['Title']))
+    elements.append(Paragraph(f"Report Generated on: {timezone.now().strftime('%d-%b-%Y %I:%M %p')}", styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm)) # Add some space
+
+    table_data = [
+        [
+            Paragraph('Project Code', header_style),
+            Paragraph('Type', header_style),
+            Paragraph('What', header_style),
+            Paragraph('Who', header_style),
+            Paragraph('When', header_style),
+            Paragraph('Status', header_style),
+            Paragraph('Remarks', header_style)
+        ]
+    ]
+
+    for update in updates:
+        remarks_list = [f"• {r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()]
+        
+        # Pre-process content for each cell to handle long text
+        what_cell = Paragraph(update.text, long_text_style)
+        remarks_cell = Paragraph("<br/>".join(remarks_list), long_text_style) if remarks_list else 'N/A'
+        
+        row = [
+            update.project.code,
+            update.get_push_pull_type_display(),
+            what_cell,
+            update.who.username if update.who else 'N/A',
+            update.eta.strftime('%Y-%m-%d') if update.eta else 'N/A',
+            update.status,
+            remarks_cell
+        ]
+        table_data.append(row)
+        
+    # Set flexible column widths for better text distribution
+    col_widths = [1.8*cm, 2.5*cm, 5*cm, 2*cm, 2.5*cm, 2.5*cm, 6.2*cm]
+    
+    # Table style definition
+    table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black), # Set text color for the body
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('LEFTPADDING', (0, 0), (-1,-1), 6),
+        ('RIGHTPADDING', (0, 0), (-1,-1), 6),
+        ('WORDWRAP', (0, 0), (-1, -1), 1),
+    ])
+
+    table = Table(table_data, colWidths=col_widths)
+    table.setStyle(table_style)
+    elements.append(table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer, content_type='application/pdf')
+    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    
+    return response
+
 
 @login_required
 def help_page(request):
@@ -907,3 +1117,49 @@ def update_stage_ajax(request, stage_id):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
+
+
+
+@login_required
+def add_update_remark(request, update_id):
+    update = get_object_or_404(ProjectUpdate, id=update_id)
+    if request.method == 'POST':
+        text = request.POST.get('remark_text')
+        if text:
+            UpdateRemark.objects.create(
+                update=update, 
+                text=text, 
+                added_by=request.user
+            )
+            messages.success(request, "Remark added successfully.")
+    return redirect('tracker_project_detail', project_id=update.project.id)
+
+@login_required
+def edit_update_remark(request, remark_id):
+    remark = get_object_or_404(UpdateRemark, pk=remark_id)
+    # Only allow the author or a staff member to edit
+    if request.user == remark.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            new_text = request.POST.get('remark_text')
+            if new_text:
+                remark.text = new_text
+                remark.save()
+                messages.success(request, "Remark updated successfully.")
+    else:
+        messages.error(request, "You do not have permission to edit this remark.")
+    return redirect('tracker_project_detail', project_id=remark.update.project.id)
+
+
+@login_required
+def delete_update_remark(request, remark_id):
+    remark = get_object_or_404(UpdateRemark, pk=remark_id)
+    project_id = remark.update.project.id
+    # Only allow the author or a staff member to delete
+    if request.user == remark.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            remark.delete()
+            messages.success(request, "Remark deleted successfully.")
+    else:
+        messages.error(request, "You do not have permission to delete this remark.")
+    return redirect('tracker_project_detail', project_id=project_id)
+

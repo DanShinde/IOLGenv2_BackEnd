@@ -9,28 +9,60 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+    /* IMPROVEMENT: Refined color palette and added new variables for consistency */
     :root {
-        --primary: #4361ee; --primary-dark: #3a56d4; --secondary: #3f37c9; --accent: #4895ef; --success: #28a745; --warning: #ffc107; --danger: #dc3545; --dark: #1b263b; --light: #f8f9fa; --gray: #8d99ae; --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); --transition: all 0.3s ease;
+        --primary: #4361ee;
+        --primary-dark: #3a56d4;
+        --secondary: #3f37c9;
+        --accent: #4895ef;
+        --success: #28a745;
+        --warning: #ffc107;
+        --danger: #dc3545;
+        --dark: #1b263b;
+        --light: #f8f9fa;
+        --gray: #8d99ae;
+        --border-color: #e9ecef;
+        --border-radius: 14px; /* Softer radius */
+        --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+        --card-shadow-hover: 0 10px 15px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.08);
+        --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
+
+    /* IMPROVEMENT: Custom scrollbar for a more integrated look */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gray); }
+
+    /* IMPROVEMENT: Added a fade-in animation for a smoother page load */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
     body {
-        /* IMPROVEMENT: Added a subtle gradient for a more modern background */
-        background: linear-gradient(180deg, #f5f7fb 0%, #ffffff 100%);
+        background: #f7f9fc; /* A simpler, clean background */
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #333;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
         padding-top: 80px;
-        visibility: hidden;
+        animation: fadeIn 0.5s ease-out; /* Apply fade-in animation */
     }
+
+    /* IMPROVEMENT: Modern "glassmorphism" navbar effect */
     .navbar-custom {
-        background: linear-gradient(135deg, var(--dark) 0%, #2a3a5c 100%);
+        background: rgba(27, 38, 59, 0.85); /* Dark background with transparency */
+        backdrop-filter: blur(10px); /* The blur effect */
+        -webkit-backdrop-filter: blur(10px);
         box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
         padding: 0.8rem 1rem;
         position: fixed;
         top: 0;
         width: 100%;
         z-index: 1030;
+        transition: var(--transition);
     }
     .navbar-brand {
         font-weight: 700; font-size: 1.5rem; color: white !important; display: flex; align-items: center;
@@ -39,102 +71,105 @@
         height: 32px; width: auto; margin-right: 10px;
     }
     .navbar-custom .nav-link {
-        color: rgba(255, 255, 255, 0.85) !important; font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 8px; margin: 0 3px;
-        /* IMPROVEMENT: Added transition for smoother hover effects */
+        color: rgba(255, 255, 255, 0.85) !important;
+        font-weight: 500;
+        padding: 0.5rem 1rem !important;
+        border-radius: 8px;
+        margin: 0 3px;
         transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
     .navbar-custom .nav-link:hover, .navbar-custom .nav-link.active {
         color: white !important; background: rgba(255, 255, 255, 0.15);
     }
-    .navbar-custom .nav-link i {
-        margin-right: 8px; width: 20px; text-align: center;
-    }
-    .user-dropdown .dropdown-toggle::after {
-        display: none;
-    }
+    .navbar-custom .nav-link i { font-size: 1.1rem; }
+    .user-dropdown .dropdown-toggle::after { display: none; }
     .user-avatar {
         width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;
     }
+
     .main-container {
         margin-top: 20px; margin-bottom: 40px; flex: 1;
     }
     .page-header {
-        background: white; border-radius: 12px;
-        /* IMPROVEMENT: Increased padding and margin for better spacing */
-        padding: 30px;
-        box-shadow: var(--card-shadow);
-        margin-bottom: 30px;
+        background: white; border-radius: var(--border-radius); padding: 30px; box-shadow: var(--card-shadow); margin-bottom: 30px;
     }
     .page-title {
         color: var(--dark); font-weight: 700; margin-bottom: 5px;
     }
-    .page-subtitle {
-        color: var(--gray); font-size: 1.1rem;
-    }
+    .page-subtitle { color: var(--gray); font-size: 1.1rem; }
+
+    /* IMPROVEMENT: Softer shadows, radius, and hover effects */
     .card {
-        border: none; border-radius: 12px; box-shadow: var(--card-shadow); transition: var(--transition); margin-bottom: 25px;
-        /* IMPROVEMENT: Added a top border for a subtle accent */
-        border-top: 3px solid transparent;
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        transition: var(--transition);
+        margin-bottom: 25px;
+        border-top: 4px solid transparent;
     }
     .card:hover {
-        transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0, 0, 0, 0.12);
-        /* IMPROVEMENT: Show border on hover */
-        border-top-color: var(--primary);
+        transform: translateY(-5px);
+        box-shadow: var(--card-shadow-hover);
+        border-top-color: var(--primary); /* Smoother border appearance */
     }
     .card-header {
-        background: white; border-bottom: 1px solid rgba(0, 0, 0, 0.05); padding: 18px 25px; font-weight: 600; color: var(--dark); display: flex; align-items: center; justify-content: space-between;
+        background: white; border-bottom: 1px solid var(--border-color); padding: 18px 25px; font-weight: 600; color: var(--dark); display: flex; align-items: center; justify-content: space-between;
+        border-radius: var(--border-radius) var(--border-radius) 0 0; /* Match card radius */
     }
-    /* IMPROVEMENT: New utility class for actions in card headers */
-    .card-header-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-    .card-body {
-        padding: 25px;
-    }
-    .card-header-title {
-        display: flex; align-items: center; font-size: 1.1rem; font-weight: 600; margin: 0;
-    }
-    .card-header-title i {
-        font-size: 1.1rem; width: 28px; text-align: center; margin-right: 8px; color: var(--primary);
-    }
+    .card-header-actions { display: flex; gap: 0.5rem; }
+    .card-body { padding: 25px; }
+    .card-header-title { display: flex; align-items: center; font-size: 1.1rem; font-weight: 600; margin: 0; }
+    .card-header-title i { font-size: 1.1rem; width: 28px; text-align: center; margin-right: 8px; color: var(--primary); }
+
     .metric-card {
-        background: white; border-radius: 12px; padding: 20px; box-shadow: var(--card-shadow); height: 100%; transition: var(--transition);
-        /* IMPROVEMENT: Changed from border-left to a more subtle border-top */
+        background: white; border-radius: var(--border-radius); padding: 20px; box-shadow: var(--card-shadow); height: 100%; transition: var(--transition);
         border-top: 4px solid var(--primary);
     }
-    .metric-card:hover {
-        transform: translateY(-3px);
-    }
+    .metric-card:hover { transform: translateY(-3px); box-shadow: var(--card-shadow-hover); }
     .metric-icon {
         width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 15px; background: rgba(67, 97, 238, 0.1); color: var(--primary);
     }
-    .metric-value {
-        font-size: 1.8rem; font-weight: 700; color: var(--dark); margin-bottom: 5px;
-    }
-    .metric-label {
-        color: var(--gray); font-size: 0.95rem; margin-bottom: 8px;
-    }
-    .table-custom {
-        border-collapse: separate; border-spacing: 0; width: 100%;
-    }
-    /* IMPROVEMENT: Added hover effect for table rows */
-    .table-custom tbody tr:hover {
-        background-color: #f5f7fb;
-    }
+    .metric-value { font-size: 1.8rem; font-weight: 700; color: var(--dark); margin-bottom: 5px; }
+    .metric-label { color: var(--gray); font-size: 0.95rem; margin-bottom: 8px; }
+
+    /* IMPROVEMENT: Cleaner table header and row hover */
+    .table-custom { border-collapse: separate; border-spacing: 0; width: 100%; }
+    .table-custom tbody tr:hover { background-color: #f5f7fb; }
     .table-custom thead th {
-        background-color: #f8fafd; color: var(--dark); font-weight: 600; border-top: 1px solid #eaeff5; border-bottom: 2px solid #eaeff5; padding: 12px 15px;
+        background-color: #f8fafd; color: var(--dark); font-weight: 600; border-top: 1px solid var(--border-color); border-bottom: 2px solid var(--border-color); padding: 12px 15px; text-align: left;
     }
-    .table-custom tbody td {
-        padding: 15px; border-bottom: 1px solid #eaeff5; vertical-align: middle;
-    }
-    .status-badge {
-        padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500;
-    }
+    .table-custom tbody td { padding: 15px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+    .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
     .bg-completed { background-color: var(--success); color: white; }
     .bg-in-progress { background-color: var(--accent); color: white; }
     .bg-not-started { background-color: var(--gray); color: white; }
     .bg-hold { background-color: var(--danger); color: white; }
+
+    /* IMPROVEMENT: Enhanced footer design */
+    .footer {
+        background-color: #ffffff;
+        border-top: 1px solid var(--border-color);
+        padding: 1.5rem 0;
+    }
+    
+    /* IMPROVEMENT: Themed modal for consistency */
+    #messageModal .modal-content {
+        border-radius: var(--border-radius);
+        border: none;
+        box-shadow: var(--card-shadow-hover);
+    }
+    #messageModal .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem 1.5rem;
+    }
+     #messageModal .modal-footer {
+        border-top: 1px solid var(--border-color);
+        background-color: #f7f9fc;
+        padding: 0.75rem 1.5rem;
+    }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -149,22 +184,15 @@
             <div class="collapse navbar-collapse" id="navbarContent">
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'tracker_dashboard' %}"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}" href="{% url 'tracker_index' %}"><i class="fas fa-list-ul"></i>Projects</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'new_project' %}active{% endif %}" href="{% url 'tracker_new_project' %}"><i class="fas fa-plus-circle"></i>Add Project</a></li>
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_dashboard' %}active{% endif %}" href="{% url 'tracker_dashboard' %}"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_index' or request.resolver_match.url_name == 'tracker_project_detail' %}active{% endif %}" href="{% url 'tracker_index' %}"><i class="fas fa-list-ul"></i>Projects</a></li>
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_new_project' %}active{% endif %}" href="{% url 'tracker_new_project' %}"><i class="fas fa-plus-circle"></i>Add Project</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'project_reports' %}active{% endif %}" href="{% url 'project_reports' %}"><i class="fas fa-chart-bar"></i>Reports</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'tracker_upcoming_milestones' %}"><i class="fas fa-calendar-alt me-2"></i> Upcoming Milestones</a></li>
-
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'help_page' %}active{% endif %}" href="{% url 'help_page' %}"><i class="fas fa-question-circle me-1"></i>Help
-        </a>
-    </li>
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_upcoming_milestones' %}active{% endif %}" href="{% url 'tracker_upcoming_milestones' %}"><i class="fas fa-calendar-alt"></i>Upcoming Milestones</a></li>
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'all_push_pull_content' %}active{% endif %}" href="{% url 'all_push_pull_content' %}"><i class="fas fa-arrows-alt-h"></i>Push-Pull Content</a></li>
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'help_page' %}active{% endif %}" href="{% url 'help_page' %}"><i class="fas fa-question-circle"></i>Help</a></li>
                     {% endif %}
                 </ul>
-                <div class="hidden md:flex items-center space-x-2">
-                    <a href="{% url 'home' %}" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors" title="Home">
-                        <i class="fas fa-home"></i>
-                    </a>
-                </div>
 
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
@@ -175,12 +203,12 @@
                                 {% if user.is_staff %}<li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="fas fa-user-shield me-2"></i>Admin</a></li>{% endif %}
                                 <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Settings</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><form action="{% url 'logoutw' %}" method="post" style="display: inline;">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt me-2"></i>Logout</button></form></li>
+                                <li><form action="{% url 'tracker_logout' %}" method="post" style="display: inline;">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt me-2"></i>Logout</button></form></li>
                             </ul>
                         </li>
                     {% else %}
-                        <li class="nav-item"><a class="nav-link" href="{% url 'tracker_login' %}"><i class="fas fa-sign-in-alt me-1"></i>Login</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'tracker_signup' %}"><i class="fas fa-user-plus me-1"></i>Register</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'tracker_login' %}"><i class="fas fa-sign-in-alt"></i>Login</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'tracker_signup' %}"><i class="fas fa-user-plus"></i>Register</a></li>
                     {% endif %}
                 </ul>
             </div>
@@ -189,43 +217,43 @@
     
     <div class="container-fluid main-container">
         {% if messages %}
-                <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            {% for message in messages %}
-                                {% if forloop.first %}
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="messageModalLabel">
-                                        {% if 'success' in message.tags %}
-                                            <i class="fas fa-check-circle text-success me-2"></i>Success
-                                        {% elif 'error' in message.tags %}
-                                            <i class="fas fa-times-circle text-danger me-2"></i>Error
-                                        {% else %}
-                                            <i class="fas fa-info-circle text-info me-2"></i>Notification
-                                        {% endif %}
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <ul class="list-unstyled mb-0">
-                                {% endif %}
-                                        <li class="mb-2">{{ message }}</li>
-                                {% if forloop.last %}
-                                    </ul>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
-                                </div>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
+            <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        {% for message in messages %}
+                            {% if forloop.first %}
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="messageModalLabel">
+                                    {% if 'success' in message.tags %}
+                                        <i class="fas fa-check-circle text-success me-2"></i>Success
+                                    {% elif 'error' in message.tags %}
+                                        <i class="fas fa-times-circle text-danger me-2"></i>Error
+                                    {% else %}
+                                        <i class="fas fa-info-circle text-info me-2"></i>Notification
+                                    {% endif %}
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <ul class="list-unstyled mb-0">
+                            {% endif %}
+                                    <li class="mb-2">{{ message }}</li>
+                            {% if forloop.last %}
+                                </ul>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
                     </div>
                 </div>
-                {% endif %}
+            </div>
+        {% endif %}
         {% block content %}{% endblock %}
     </div>
 
-    <footer class="footer mt-auto py-3 bg-light">
+    <footer class="footer mt-auto py-3">
         <div class="container-fluid text-center">
             <span class="text-muted">Project Tracker &copy; {% now "Y" %} | A comprehensive project management solution</span>
         </div>
@@ -237,6 +265,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
+        // Scroll restoration script
         if (history.scrollRestoration) { history.scrollRestoration = 'manual'; }
         document.addEventListener("DOMContentLoaded", function(event) { 
             var scrollpos = sessionStorage.getItem('scrollpos');
@@ -244,7 +273,6 @@
             if (scrollpos && scrollpath === window.location.pathname) {
                 window.scrollTo(0, parseInt(scrollpos));
             }
-            document.body.style.visibility = 'visible';
             sessionStorage.removeItem('scrollpos');
             sessionStorage.removeItem('scrollpath');
         });
@@ -252,8 +280,7 @@
             sessionStorage.setItem('scrollpos', window.scrollY);
             sessionStorage.setItem('scrollpath', window.location.pathname);
         });
-    </script>
-    <script>
+
         // Script to automatically trigger the message modal
         var messageModalElement = document.getElementById('messageModal');
         if (messageModalElement) {
