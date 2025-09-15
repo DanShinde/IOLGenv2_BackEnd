@@ -8,7 +8,7 @@ from .models import Stage, StageRemark, StageHistory, ProjectUpdate
 
 def clear_project_cache(instance):
     # This helper function doesn't need to change
-    if hasattr(instance, 'project'):
+    if hasattr(instance, 'project') and instance.project:
         project_id = instance.project.id
     elif hasattr(instance, 'stage'):
         project_id = instance.stage.project.id

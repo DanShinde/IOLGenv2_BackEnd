@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Project, Stage,trackerSegment, Pace  
+from .models import Project, Stage,trackerSegment, Pace, ContactPerson  
 from import_export.admin import ImportExportModelAdmin
 
 
@@ -32,3 +32,8 @@ class PaceAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)    
 
+# ✅ NEW: Register the ContactPerson model
+@admin.register(ContactPerson)
+class ContactPersonAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)

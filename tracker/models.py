@@ -171,6 +171,16 @@ class StageRemark(models.Model):
     def __str__(self):
         return f"Remark for {self.stage.name} at {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
+# ✅ NEW MODEL: ContactPerson
+class ContactPerson(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
 
 class ProjectUpdate(models.Model):
     CATEGORY_CHOICES = [
@@ -189,8 +199,15 @@ class ProjectUpdate(models.Model):
         ('Push', 'Push Content'),
         ('Pull', 'Pull Content'),
     ]
-    
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='updates')
+
+    # ✅ NEW: Choices for the new content type field
+    CONTENT_TYPE_CHOICES = [
+        ('Project', 'Project'),
+        ('General', 'General'),
+    ]
+
+    # ✅ UPDATED: The project field is now optional
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='updates', null=True, blank=True)
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     text = models.TextField()
     # The 'category' and 'needs_review' fields have been removed or commented out.
@@ -199,18 +216,20 @@ class ProjectUpdate(models.Model):
     # needs_review = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # ✅ NEW FIELDS
+    # ✅ UPDATED FIELD: Using the new ContactPerson model
     push_pull_type = models.CharField(max_length=10, choices=PUSH_PULL_CHOICES, default='Push')
-    who = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='updates_addressed_to')
+    who_contact = models.ForeignKey(ContactPerson, on_delete=models.SET_NULL, null=True, blank=True, related_name='updates_assigned_to')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
     eta = models.DateField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+    # ✅ NEW FIELD: To distinguish between project and general content
+    content_type = models.CharField(max_length=10, choices=CONTENT_TYPE_CHOICES, default='Project')
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Update for {self.project.code} at {self.created_at.strftime('%Y-%m-%d')}"
+        return f"Update for {self.project.code if self.project else 'General'} at {self.created_at.strftime('%Y-%m-%d')}"
 
 class UpdateRemark(models.Model):
     update = models.ForeignKey(ProjectUpdate, on_delete=models.CASCADE, related_name="remarks")

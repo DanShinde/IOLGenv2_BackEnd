@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project, ContactPerson
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -140,14 +140,12 @@ def edit_project(request, project_id):
 @login_required
 def project_detail(request, project_id):
     project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
-    User = get_user_model()
-    project_users = User.objects.all()
+    contact_persons = ContactPerson.objects.all()
 
     if request.method == 'POST':
         stages_to_save = []
         active_tab = request.POST.get('active_tab', 'automation')
         
-        # Determine which stages to process based on the button pressed
         if 'save_all_automation' in request.POST:
             stages_to_save = project.stages.filter(stage_type='Automation')
         elif 'save_all_emulation' in request.POST:
@@ -156,7 +154,6 @@ def project_detail(request, project_id):
             stage_id = request.POST.get('stage_id')
             stages_to_save = project.stages.filter(id=stage_id)
 
-        # --- NEW VALIDATION LOGIC ---
         validation_passed = True
         for stage in stages_to_save:
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
@@ -170,22 +167,18 @@ def project_detail(request, project_id):
             base_url = reverse('tracker_project_detail', args=[project.id])
             redirect_url = f'{base_url}?active_tab={active_tab}'
             return HttpResponseRedirect(redirect_url)
-        # --- END OF NEW VALIDATION LOGIC ---
 
         success_message = "Changes saved successfully!"
         for stage in stages_to_save:
-            # Get new values from the form
             new_planned_start_str = request.POST.get(f'planned_start_date_{stage.id}')
             new_planned_str = request.POST.get(f'planned_date_{stage.id}')
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             
-            # Safely parse date strings
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
 
-            # Log changes to history
             if stage.planned_start_date != new_planned_start:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Start Date", old_value=str(stage.planned_start_date), new_value=str(new_planned_start))
             if stage.planned_date != new_planned:
@@ -195,7 +188,6 @@ def project_detail(request, project_id):
             if stage.actual_date != new_actual:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Finish Date", old_value=str(stage.actual_date), new_value=str(new_actual))
             
-            # Update the stage object
             stage.planned_start_date = new_planned_start
             stage.planned_date = new_planned
             stage.status = new_status
@@ -216,7 +208,6 @@ def project_detail(request, project_id):
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
-    # --- GET Request Logic (unchanged) ---
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
     
@@ -227,7 +218,7 @@ def project_detail(request, project_id):
 
     all_stages = automation_stages + emulation_stages
     
-    updates = project.updates.select_related('author').all()[:5]
+    updates = project.updates.select_related('author', 'who_contact').prefetch_related('remarks').all()[:5]
     updates_count = project.updates.count()
     
     recent_activity = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')[:5]
@@ -261,10 +252,10 @@ def project_detail(request, project_id):
     ).select_related('stage', 'added_by').order_by('-created_at')
 
     context = {
-        'project': project, 
-        'automation_stages': automation_stages, 
+        'project': project,
+        'automation_stages': automation_stages,
         'emulation_stages': emulation_stages,
-        'updates': updates, 
+        'updates': updates,
         'updates_count': updates_count,
         'completion_percentage': get_completion_percentage(all_stages),
         'timeline_progress_auto': timeline_progress_auto,
@@ -272,15 +263,15 @@ def project_detail(request, project_id):
         'overall_otif_percentage': get_otif_percentage(all_stages),
         'project_otif': get_final_project_otif(all_stages),
         'overall_status': get_overall_status(all_stages),
-        'automation_schedule_status': get_schedule_status(automation_stages), 
+        'automation_schedule_status': get_schedule_status(automation_stages),
         'emulation_schedule_status': get_schedule_status(emulation_stages),
-        'next_automation_milestone': get_next_milestone(automation_stages), 
+        'next_automation_milestone': get_next_milestone(automation_stages),
         'next_emulation_milestone': get_next_milestone(emulation_stages),
-        'last_update_time': last_update_time, 
+        'last_update_time': last_update_time,
         'recent_activity': recent_activity,
         'automation_remarks': automation_remarks,
         'emulation_remarks': emulation_remarks,
-        'project_users': project_users,
+        'contact_persons': contact_persons,
     }
     
     return render(request, 'tracker/project_detail.html', context)
@@ -321,8 +312,6 @@ def delete_remark(request, remark_id):
         messages.error(request, "You do not have permission to delete this remark.")
     return redirect('tracker_project_detail', project_id=project_id)
 
-# In tracker/views.py
-
 @login_required
 def dashboard(request):
     today = timezone.now().date()
@@ -340,7 +329,7 @@ def dashboard(request):
             'this_month': ("Current Month", today.replace(day=1), today), 'this_year': ("Current Year", today.replace(day=1, month=1), today),
             'all': ("All Time", None, None),
         }
-        display_period, start_date, end_date = period_map.get(period, ("Last 30 Days", today - timedelta(days=30), today))
+        display_period, start_date, end_date = period_map.get(period,("Last 30 Days", today - timedelta(days=30), today))
     if period == 'all' and not (custom_start and custom_end):
         live_projects = Project.objects.all().distinct()
     else:
@@ -357,7 +346,7 @@ def dashboard(request):
     # NEW, ROBUST QUERY
     # 1. First, get the IDs of all projects that are genuinely completed.
     completed_project_ids = Project.objects.filter(
-        stages__name='Handover', 
+        stages__name='Handover',
         stages__status='Completed'
     ).values_list('id', flat=True)
 
@@ -784,11 +773,14 @@ def add_project_update(request, project_id):
     if request.method == 'POST':
         text = request.POST.get('update_text')
         push_pull_type = request.POST.get('push_pull_type')
-        who_id = request.POST.get('who')
-        eta_date = request.POST.get('eta_date')
+        who_name = request.POST.get('who_contact')
 
-        who = get_object_or_404(get_user_model(), pk=who_id) if who_id else None
-        eta = parse_date(eta_date) if eta_date else None
+        if who_name:
+            who_contact, created = ContactPerson.objects.get_or_create(name=who_name)
+        else:
+            who_contact = None
+
+        eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
 
         if text and push_pull_type:
             ProjectUpdate.objects.create(
@@ -796,47 +788,84 @@ def add_project_update(request, project_id):
                 author=request.user,
                 text=text,
                 push_pull_type=push_pull_type,
-                who=who,
+                who_contact=who_contact,
                 eta=eta,
+                content_type='Project',
             )
-            messages.success(request, "Project update added successfully.")
+            messages.success(request, "Push-Pull content added successfully.")
         else:
             messages.error(request, "Update text and type are required.")
     
-    # Redirect back to the project detail page
     return redirect('tracker_project_detail', project_id=project.id)
+
+@login_required
+def add_general_update(request):
+    if request.method == 'POST':
+        text = request.POST.get('update_text')
+        push_pull_type = request.POST.get('push_pull_type')
+        who_name = request.POST.get('who_contact')
+
+        if who_name:
+            who_contact, created = ContactPerson.objects.get_or_create(name=who_name)
+        else:
+            who_contact = None
+        
+        eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
+
+        if text and push_pull_type:
+            ProjectUpdate.objects.create(
+                author=request.user,
+                text=text,
+                push_pull_type=push_pull_type,
+                who_contact=who_contact,
+                eta=eta,
+                content_type='General',
+            )
+            messages.success(request, "General content added successfully.")
+        else:
+            messages.error(request, "Update text and type are required.")
+    
+    # ✅ FIX: Use the correct URL name with keyword arguments
+    return redirect('all_push_pull_content_filtered', filter='general')
+
 
 @login_required
 def edit_project_update(request, update_id):
     update = get_object_or_404(ProjectUpdate, id=update_id)
-    # Check if the user is the author or a staff member to allow editing
     if request.user == update.author or request.user.is_staff:
         if request.method == 'POST':
             new_status = request.POST.get('update_status', update.status)
             
-            # If the status is being changed to 'Closed', set the closed_at timestamp.
             if new_status == 'Closed' and update.status != 'Closed':
                 update.closed_at = timezone.now()
-            # If the status is changed from 'Closed' to something else, clear the timestamp.
             elif new_status != 'Closed' and update.status == 'Closed':
                 update.closed_at = None
+            
+            who_name = request.POST.get('who_contact')
+            if who_name:
+                who_contact, created = ContactPerson.objects.get_or_create(name=who_name)
+            else:
+                who_contact = None
 
             update.text = request.POST.get('update_text', update.text)
             update.push_pull_type = request.POST.get('push_pull_type', update.push_pull_type)
-            who_id = request.POST.get('who')
+            update.who_contact = who_contact
             eta_date = request.POST.get('eta_date')
             update.status = new_status
 
-            update.who = get_object_or_404(get_user_model(), pk=who_id) if who_id else None
             update.eta = parse_date(eta_date) if eta_date else None
             
             update.save()
-            messages.success(request, "Update saved successfully.")
+            messages.success(request, "Push-Pull content saved successfully.")
         
-        # Determine redirect URL based on the referring page
         referer = request.META.get('HTTP_REFERER')
-        if referer and reverse('all_push_pull_content') in referer:
-            return redirect('all_push_pull_content')
+        if referer and 'all-push-pull-content' in referer:
+            filter_type = 'all'
+            if 'filter=project' in referer:
+                filter_type = 'project'
+            elif 'filter=general' in referer:
+                filter_type = 'general'
+            return redirect('all_push_pull_content_filtered', filter=filter_type)
         
         return redirect('tracker_project_detail', project_id=update.project.id)
     else:
@@ -846,11 +875,30 @@ def edit_project_update(request, update_id):
 
 @login_required
 def delete_project_update(request, update_id):
-    update = get_object_or_404(ProjectUpdate, id=update_id, author=request.user)
-    project_id = update.project.id
-    update.delete()
-    messages.success(request, "Update deleted.")
-    return redirect('tracker_project_detail', project_id=project_id)
+    update = get_object_or_404(ProjectUpdate, id=update_id)
+    if request.user == update.author or request.user.is_staff:
+        project_id = update.project.id if update.project else None
+        update.delete()
+        messages.success(request, "Push-Pull content deleted.")
+        referer = request.META.get('HTTP_REFERER')
+        if referer and 'all-push-pull-content' in referer:
+            filter_type = 'all'
+            if 'filter=project' in referer:
+                filter_type = 'project'
+            elif 'filter=general' in referer:
+                filter_type = 'general'
+            return redirect('all_push_pull_content_filtered', filter=filter_type)
+        
+        if project_id:
+            return redirect('tracker_project_detail', project_id=project_id)
+        else:
+            return redirect('all_push_pull_content')
+    else:
+        messages.error(request, "You do not have permission to delete this update.")
+        if update.project:
+            return redirect('tracker_project_detail', project_id=update.project.id)
+        else:
+            return redirect('all_push_pull_content')
 
 @login_required
 def toggle_update_status(request, update_id):
@@ -862,7 +910,6 @@ def toggle_update_status(request, update_id):
     update.save()
     messages.success(request, f"'{update.category}' status changed to {update.status}.")
     return redirect('tracker_project_detail', project_id=update.project.id)
-
 
 
 @login_required
@@ -877,40 +924,67 @@ def save_mitigation_plan(request, update_id):
 @login_required
 def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
-    updates = project.updates.select_related('author', 'who').prefetch_related('remarks').all()
-    project_users = get_user_model().objects.all()
+    updates = project.updates.select_related('author', 'who_contact').prefetch_related('remarks').all()
+    contact_persons = ContactPerson.objects.all()
 
     context = {
         'project': project,
         'updates': updates,
-        'project_users': project_users,
+        'contact_persons': contact_persons,
     }
     return render(request, 'tracker/all_project_updates.html', context)
 
 
 @login_required
-def all_push_pull_content(request):
-    updates = ProjectUpdate.objects.select_related(
-        'project', 
-        'author', 
-        'who'
-    ).prefetch_related('remarks').all()
-    project_users = get_user_model().objects.all()
+def all_push_pull_content(request, filter=None):
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'who_contact').prefetch_related('remarks').order_by('-created_at')
+
+    if filter == 'project':
+        updates_qs = updates_qs.filter(content_type='Project')
+    elif filter == 'general':
+        updates_qs = updates_qs.filter(content_type='General')
+    
+    updates = updates_qs.all()
+    contact_persons = ContactPerson.objects.all()
+    projects = Project.objects.all()
 
     context = {
         'updates': updates,
-        'project_users': project_users,
+        'contact_persons': contact_persons,
+        'projects': projects,
+        'filter': filter,
     }
     return render(request, 'tracker/all_push_pull_content.html', context)
+
+@login_required
+def add_contact_person_ajax(request):
+    if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        name = request.POST.get('name')
+        if not name:
+            return JsonResponse({'status': 'error', 'message': 'Name is required'}, status=400)
+        
+        contact, created = ContactPerson.objects.get_or_create(name=name)
+        
+        return JsonResponse({'status': 'success', 'id': contact.id, 'name': contact.name, 'created': created})
+    
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=405)
 
 
 @login_required
 def export_push_pull_excel(request):
-    updates = ProjectUpdate.objects.select_related(
-        'project', 
-        'author', 
-        'who'
-    ).prefetch_related('remarks').all()
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'who_contact').prefetch_related('remarks')
+    filter = request.GET.get('filter')
+
+    if filter == 'project':
+        updates_qs = updates_qs.filter(content_type='Project')
+    elif filter == 'general':
+        updates_qs = updates_qs.filter(content_type='General')
+
+    updates = updates_qs.all()
+    
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename={filename}'
     
     workbook = Workbook()
     sheet = workbook.active
@@ -924,18 +998,19 @@ def export_push_pull_excel(request):
     
     # Populate with data
     for update in updates:
-        remarks_text = "\n".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
+        remarks_text = " | ".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
 
         # Make datetime objects timezone-naive for openpyxl
         created_at_naive = update.created_at.replace(tzinfo=None) if update.created_at else None
         closed_at_naive = update.closed_at.replace(tzinfo=None) if update.closed_at else None
+        eta_naive = update.eta.replace(tzinfo=None) if update.eta else None
 
         row = [
-            update.project.code,
+            update.project.code if update.project else 'N/A',
             update.get_push_pull_type_display(),
             update.text,
-            update.who.username if update.who else 'N/A',
-            update.eta,
+            update.who_contact.name if update.who_contact else 'N/A',
+            eta_naive,
             update.status,
             created_at_naive,
             closed_at_naive,
@@ -944,52 +1019,48 @@ def export_push_pull_excel(request):
         sheet.append(row)
 
     # Set up the response
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    )
-    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
-    response['Content-Disposition'] = f'attachment; filename={filename}'
     workbook.save(response)
     
     return response
 
 @login_required
 def export_push_pull_pdf(request):
-    updates = ProjectUpdate.objects.select_related(
-        'project', 
-        'author', 
-        'who'
-    ).prefetch_related('remarks').all()
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'who_contact').prefetch_related('remarks')
+    filter = request.GET.get('filter')
+
+    if filter == 'project':
+        updates_qs = updates_qs.filter(content_type='Project')
+    elif filter == 'general':
+        updates_qs = updates_qs.filter(content_type='General')
+
+    updates = updates_qs.all()
     
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
     elements = []
     styles = getSampleStyleSheet()
 
-    # Define a custom style for long text with word wrapping
     long_text_style = ParagraphStyle(
         'long_text_style',
         parent=styles['Normal'],
         wordWrap='CJK',
         spaceAfter=6,
         alignment=4,
-        textColor=colors.black, # Set text color to black
+        textColor=colors.black,
         fontName='Helvetica',
     )
     
-    # Define a style for table headers
     header_style = ParagraphStyle(
         'header_style',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
         textColor=colors.whitesmoke,
-        alignment=1, # Center alignment for headers
+        alignment=1,
     )
     
-    # Title and generation date
     elements.append(Paragraph("All Push-Pull Contents", styles['Title']))
     elements.append(Paragraph(f"Report Generated on: {timezone.now().strftime('%d-%b-%Y %I:%M %p')}", styles['Normal']))
-    elements.append(Spacer(1, 0.5*cm)) # Add some space
+    elements.append(Spacer(1, 0.5*cm))
 
     table_data = [
         [
@@ -997,34 +1068,32 @@ def export_push_pull_pdf(request):
             Paragraph('Type', header_style),
             Paragraph('What', header_style),
             Paragraph('Who', header_style),
-            Paragraph('When', header_style),
+            Paragraph('ETA', header_style),
             Paragraph('Status', header_style),
             Paragraph('Remarks', header_style)
         ]
     ]
-
+    
     for update in updates:
         remarks_list = [f"• {r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()]
         
-        # Pre-process content for each cell to handle long text
         what_cell = Paragraph(update.text, long_text_style)
+        who_cell = Paragraph(update.who_contact.name if update.who_contact else 'N/A', long_text_style)
         remarks_cell = Paragraph("<br/>".join(remarks_list), long_text_style) if remarks_list else 'N/A'
         
         row = [
-            update.project.code,
+            update.project.code if update.project else 'N/A',
             update.get_push_pull_type_display(),
             what_cell,
-            update.who.username if update.who else 'N/A',
+            who_cell,
             update.eta.strftime('%Y-%m-%d') if update.eta else 'N/A',
             update.status,
             remarks_cell
         ]
         table_data.append(row)
         
-    # Set flexible column widths for better text distribution
     col_widths = [1.8*cm, 2.5*cm, 5*cm, 2*cm, 2.5*cm, 2.5*cm, 6.2*cm]
     
-    # Table style definition
     table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -1033,7 +1102,7 @@ def export_push_pull_pdf(request):
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black), # Set text color for the body
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('LEFTPADDING', (0, 0), (-1,-1), 6),
         ('RIGHTPADDING', (0, 0), (-1,-1), 6),
@@ -1052,7 +1121,6 @@ def export_push_pull_pdf(request):
     response['Content-Disposition'] = f'attachment; filename={filename}'
     
     return response
-
 
 @login_required
 def help_page(request):
@@ -1116,8 +1184,8 @@ def add_update_remark(request, update_id):
         text = request.POST.get('remark_text')
         if text:
             UpdateRemark.objects.create(
-                update=update, 
-                text=text, 
+                update=update,
+                text=text,
                 added_by=request.user
             )
             messages.success(request, "Remark added successfully.")
