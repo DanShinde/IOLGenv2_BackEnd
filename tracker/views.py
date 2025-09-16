@@ -1054,13 +1054,13 @@ def export_push_pull_excel(request):
         sheet.append(row)
 
     # Set up the response
-"""
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    )
-    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
-    response['Content-Disposition'] = f'attachment; filename={filename}'
-"""
+    """
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+    """
     workbook.save(response)
     
     return response
