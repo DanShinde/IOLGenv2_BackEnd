@@ -461,7 +461,9 @@
 
 <div class="row mt-4">
     <div class="col-12">
-        <div class="card">
+
+        <div class="card" id="push-pull-contents">
+
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-bullhorn me-2"></i>Push-Pull Contents</h5></div>
             <div class="card-body">
                 <form action="{% url 'add_project_update' project.id %}" method="post" class="mb-4 p-3 bg-light rounded">
@@ -479,13 +481,15 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label for="who" class="form-label small mb-0">Who</label>
-                            <select name="who" id="who" class="form-select form-select-sm">
-                                <option value="">Select User (Optional)</option>
-                                {% for user in project_users %}
-                                <option value="{{ user.id }}">{{ user.username }}</option>
+
+                            <label for="who_contact" class="form-label small mb-0">Who</label>
+                            <input class="form-control form-control-sm" list="contact-persons-list" id="who_contact" name="who_contact" placeholder="Type or select a person">
+                            <datalist id="contact-persons-list">
+                                {% for person in contact_persons %}
+                                    <option value="{{ person.name }}">
                                 {% endfor %}
-                            </select>
+                            </datalist>
+
                         </div>
                         <div class="col-md-3">
                             <label for="eta_date" class="form-label small mb-0">ETA</label>
@@ -500,7 +504,7 @@
                 <h5 class="mt-4">Push Pull Content Summary</h5>
                 <div class="update-feed mt-3 accordion" id="updateAccordion">
                     {% for update in updates %}
-                        {% include 'tracker/partials/project_update_item.html' with update=update user=user %}
+                        {% include 'tracker/partials/project_update_item.html' with update=update user=user contact_persons=contact_persons %}
                     {% empty %}
                         <p class="text-muted text-center py-3">No push pull contents have been added yet.</p>
                     {% endfor %}
@@ -518,7 +522,7 @@
 
 {% for stage in automation_stages %}{% include 'tracker/partials/stage_modals.html' with stage=stage %}{% endfor %}
 {% for stage in emulation_stages %}{% include 'tracker/partials/stage_modals.html' with stage=stage %}{% endfor %}
-{% include 'tracker/partials/project_update_modals.html' with updates=updates %}
+{% include 'tracker/partials/project_update_modals.html' with updates=updates contact_persons=contact_persons %}
 {% include 'tracker/partials/all_remarks_modals.html' %}
 
 
@@ -693,6 +697,14 @@ document.addEventListener('DOMContentLoaded', function () {
     autosaveInputs.forEach(input => {
         input.addEventListener('change', handleStageUpdate);
     });
+
+    // New script to scroll to the push-pull contents section on load
+    if (window.location.hash === '#push-pull-contents') {
+        const targetElement = document.getElementById('push-pull-contents');
+        if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
 });
 </script>
 {% endblock %}

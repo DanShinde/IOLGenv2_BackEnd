@@ -115,9 +115,8 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
             'segment': self.request.query_params.get('segment'),
             'control_library': self.request.query_params.get('control_library'),
             'block_type': self.request.query_params.get('block_type'),
-            'cluster_name': self.request.query_params.get('cluster_name'),
+            # Add more filter parameters as needed
         }
-
 
     def get_queryset(self):
         filter_params = self.get_filter_params()
@@ -151,7 +150,7 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         
         if compact:
             # Use a custom serializer for compact response or limit fields
-            kwargs['fields'] = ['id','cluster_name', 'cluster_path', 'block_type', 'cluster_config', 'dependencies', 'segment']
+            kwargs['fields'] = ['id','cluster_name', 'cluster_path', 'block_type', 'cluster_config', 'dependencies']
             
         return super().get_serializer(*args, **kwargs)
 
@@ -198,7 +197,6 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
                 'cluster_path', 
                 'block_type', 
                 'cluster_config',
-                'segment',
                 'control_library'
                 ).annotate(
                     dependencies=ArrayAgg('dependencies', distinct=True)
@@ -370,7 +368,7 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
         cache.set(cache_key, queryset, self.cache_timeout)
         return queryset
 
-    # @method_decorator(cache_page(60 * 15))  # Cache only GET requests
+    @method_decorator(cache_page(60 * 15))  # Cache only GET requests
     def list(self, request, *args, **kwargs):
         """List all parameters with caching."""
         queryset = self.get_queryset()

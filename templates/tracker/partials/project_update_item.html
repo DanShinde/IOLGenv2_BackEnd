@@ -20,8 +20,10 @@
                             {% if update.status == 'Closed' and update.closed_at %}
                                 <small class="text-muted ms-2">Marked as closed on {{ update.closed_at|date:"M d, Y, H:i" }}</small>
                             {% endif %}
-                            {% if update.who %}
-                                <span class="badge bg-secondary me-2">To: {{ update.who.username }}</span>
+
+                            {% if update.who_contact %}
+                                <span class="badge bg-secondary me-2">To: {{ update.who_contact.name }}</span>
+
                             {% endif %}
                         </div>
                     </div>

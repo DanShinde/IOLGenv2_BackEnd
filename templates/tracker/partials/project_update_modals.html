@@ -22,13 +22,15 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Who</label>
-                            <select name="who" class="form-select">
-                                <option value="">Select User (Optional)</option>
-                                {% for user in project_users %}
-                                <option value="{{ user.id }}" {% if update.who and update.who.id == user.id %}selected{% endif %}>{{ user.username }}</option>
+
+                            <label for="who_contact-edit-{{ update.id }}" class="form-label">Who</label>
+                            <input class="form-control" list="contact-persons-list" id="who_contact-edit-{{ update.id }}" name="who_contact" value="{% if update.who_contact %}{{ update.who_contact.name }}{% endif %}" placeholder="Type or select a person">
+                            <datalist id="contact-persons-list">
+                                {% for person in contact_persons %}
+                                    <option value="{{ person.name }}">
                                 {% endfor %}
-                            </select>
+                            </datalist>
+
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status</label>

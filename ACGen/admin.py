@@ -42,11 +42,11 @@ admin.site.register(Parameter, ParameterAdmin)
 
 class GenerationLogAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     list_display = (
-        'id', 'user', 'generation_time', 'Log_Event', 'project_name', 'project_file_name'
+        'id', 'user', 'generation_time', 'project_name', 'project_file_name'
     )  
     # Display all fields
     search_fields = ('user','project_name','project_file_name')  # Optional: Allows searching by cluster_name
-    list_filter = ('user', 'project_name', 'Log_Event')
+    list_filter = ('user', 'project_name')
 
 admin.site.register(GenerationLog, GenerationLogAdmin)
 
