@@ -20,3 +20,4 @@ waitress
 firebase-admin
 gunicorn
 reportlab
+openpyxl

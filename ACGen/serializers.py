@@ -51,13 +51,7 @@ class ParameterSerializer(serializers.ModelSerializer):
 class GenerationLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = GenerationLog
-        fields = ['id', 'user', 'generation_time', 'project_name', 'project_file_name']
+        fields = ['id', 'user', 'generation_time', 'project_name', 'project_file_name', 'Log_Event']
         read_only_fields = ['id', 'user', 'generation_time']
 
-    def validate_project_file_name(self, value):
-        # Match A followed by 4 digits or I followed by 3 digits
-        if not re.search(r'\bA\d{4}\b|\bI\d{3}\b', value):
-            raise serializers.ValidationError(
-                "project_file_name must contain a project code in the format AXXXX (4 digits) or IXXX (3 digits)."
-            )
-        return value
+
