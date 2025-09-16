@@ -461,7 +461,9 @@
 
 <div class="row mt-4">
     <div class="col-12">
+
         <div class="card" id="push-pull-contents">
+
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-bullhorn me-2"></i>Push-Pull Contents</h5></div>
             <div class="card-body">
                 <form action="{% url 'add_project_update' project.id %}" method="post" class="mb-4 p-3 bg-light rounded">
@@ -479,6 +481,7 @@
                             </select>
                         </div>
                         <div class="col-md-3">
+
                             <label for="who_contact" class="form-label small mb-0">Who</label>
                             <input class="form-control form-control-sm" list="contact-persons-list" id="who_contact" name="who_contact" placeholder="Type or select a person">
                             <datalist id="contact-persons-list">
@@ -486,6 +489,7 @@
                                     <option value="{{ person.name }}">
                                 {% endfor %}
                             </datalist>
+
                         </div>
                         <div class="col-md-3">
                             <label for="eta_date" class="form-label small mb-0">ETA</label>

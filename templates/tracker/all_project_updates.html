@@ -22,7 +22,9 @@
     <div class="card-body">
         <div class="update-feed accordion" id="updateAccordion">
             {% for update in updates %}
+
                 {% include 'tracker/partials/project_update_item.html' with update=update user=user contact_persons=contact_persons %}
+
             {% empty %}
                 <p class="text-muted text-center py-3">No push-pull contents have been added yet.</p>
             {% endfor %}
@@ -30,6 +32,8 @@
     </div>
 </div>
 
+
 {% include 'tracker/partials/project_update_modals.html' with updates=updates contact_persons=contact_persons %}
+
 
 {% endblock %}

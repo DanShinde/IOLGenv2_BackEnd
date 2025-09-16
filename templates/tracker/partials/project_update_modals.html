@@ -22,6 +22,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
+
                             <label for="who_contact-edit-{{ update.id }}" class="form-label">Who</label>
                             <input class="form-control" list="contact-persons-list" id="who_contact-edit-{{ update.id }}" name="who_contact" value="{% if update.who_contact %}{{ update.who_contact.name }}{% endif %}" placeholder="Type or select a person">
                             <datalist id="contact-persons-list">
@@ -29,6 +30,7 @@
                                     <option value="{{ person.name }}">
                                 {% endfor %}
                             </datalist>
+
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status</label>

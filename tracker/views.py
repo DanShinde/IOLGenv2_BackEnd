@@ -5,12 +5,9 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-<<<<<<< HEAD
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project, ContactPerson
-=======
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project
 
->>>>>>> 85c4d169d60e4ad5740ec3e9cffd1858d2acc12d
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project, ContactPerson
+
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -147,7 +144,9 @@ def edit_project(request, project_id):
 @login_required
 def project_detail(request, project_id):
     project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
+
     contact_persons = ContactPerson.objects.all()
+
 
     if request.method == 'POST':
         stages_to_save = []
@@ -177,31 +176,27 @@ def project_detail(request, project_id):
 
         success_message = "Changes saved successfully!"
         for stage in stages_to_save:
-<<<<<<< HEAD
-=======
+
             # Get new values from the form
 
->>>>>>> 85c4d169d60e4ad5740ec3e9cffd1858d2acc12d
             new_planned_start_str = request.POST.get(f'planned_start_date_{stage.id}')
             new_planned_str = request.POST.get(f'planned_date_{stage.id}')
 
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             
-<<<<<<< HEAD
-=======
+
 
             # Safely parse date strings
->>>>>>> 85c4d169d60e4ad5740ec3e9cffd1858d2acc12d
+
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
 
-<<<<<<< HEAD
-=======
+
 
             # Log changes to history
->>>>>>> 85c4d169d60e4ad5740ec3e9cffd1858d2acc12d
+
             if stage.planned_start_date != new_planned_start:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Planned Start Date", old_value=str(stage.planned_start_date), new_value=str(new_planned_start))
             if stage.planned_date != new_planned:
@@ -294,7 +289,9 @@ def project_detail(request, project_id):
         'recent_activity': recent_activity,
         'automation_remarks': automation_remarks,
         'emulation_remarks': emulation_remarks,
+
         'contact_persons': contact_persons,
+
     }
     
     return render(request, 'tracker/project_detail.html', context)
@@ -799,6 +796,7 @@ def add_project_update(request, project_id):
     if request.method == 'POST':
         text = request.POST.get('update_text')
         push_pull_type = request.POST.get('push_pull_type')
+
         who_name = request.POST.get('who_contact')
 
         if who_name:
@@ -808,15 +806,18 @@ def add_project_update(request, project_id):
 
         eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
 
+
         if text and push_pull_type:
             ProjectUpdate.objects.create(
                 project=project,
                 author=request.user,
                 text=text,
                 push_pull_type=push_pull_type,
+
                 who_contact=who_contact,
                 eta=eta,
                 content_type='Project',
+
             )
             messages.success(request, "Push-Pull content added successfully.")
         else:
@@ -892,6 +893,7 @@ def edit_project_update(request, update_id):
             elif 'filter=general' in referer:
                 filter_type = 'general'
             return redirect('all_push_pull_content_filtered', filter=filter_type)
+
         
         return redirect('tracker_project_detail', project_id=update.project.id)
     else:
@@ -950,13 +952,16 @@ def save_mitigation_plan(request, update_id):
 @login_required
 def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
+
     updates = project.updates.select_related('author', 'who_contact').prefetch_related('remarks').all()
     contact_persons = ContactPerson.objects.all()
+
 
     context = {
         'project': project,
         'updates': updates,
         'contact_persons': contact_persons,
+
     }
     return render(request, 'tracker/all_project_updates.html', context)
 
@@ -1011,6 +1016,7 @@ def export_push_pull_excel(request):
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
     response['Content-Disposition'] = f'attachment; filename={filename}'
+
     
     workbook = Workbook()
     sheet = workbook.active
@@ -1024,7 +1030,9 @@ def export_push_pull_excel(request):
     
     # Populate with data
     for update in updates:
+
         remarks_text = " | ".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
+
 
         # Make datetime objects timezone-naive for openpyxl
         created_at_naive = update.created_at.replace(tzinfo=None) if update.created_at else None
@@ -1037,6 +1045,7 @@ def export_push_pull_excel(request):
             update.text,
             update.who_contact.name if update.who_contact else 'N/A',
             eta_naive,
+
             update.status,
             created_at_naive,
             closed_at_naive,
@@ -1045,12 +1054,20 @@ def export_push_pull_excel(request):
         sheet.append(row)
 
     # Set up the response
+"""
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+"""
     workbook.save(response)
     
     return response
 
 @login_required
 def export_push_pull_pdf(request):
+
     updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'who_contact').prefetch_related('remarks')
     filter = request.GET.get('filter')
 
@@ -1060,11 +1077,13 @@ def export_push_pull_pdf(request):
         updates_qs = updates_qs.filter(content_type='General')
 
     updates = updates_qs.all()
+
     
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
     elements = []
     styles = getSampleStyleSheet()
+
 
     long_text_style = ParagraphStyle(
         'long_text_style',
@@ -1072,21 +1091,25 @@ def export_push_pull_pdf(request):
         wordWrap='CJK',
         spaceAfter=6,
         alignment=4,
+
         textColor=colors.black,
         fontName='Helvetica',
     )
     
+
     header_style = ParagraphStyle(
         'header_style',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
         textColor=colors.whitesmoke,
+
         alignment=1,
     )
     
     elements.append(Paragraph("All Push-Pull Contents", styles['Title']))
     elements.append(Paragraph(f"Report Generated on: {timezone.now().strftime('%d-%b-%Y %I:%M %p')}", styles['Normal']))
     elements.append(Spacer(1, 0.5*cm))
+
 
     table_data = [
         [
@@ -1112,14 +1135,17 @@ def export_push_pull_pdf(request):
             update.get_push_pull_type_display(),
             what_cell,
             who_cell,
+
             update.eta.strftime('%Y-%m-%d') if update.eta else 'N/A',
             update.status,
             remarks_cell
         ]
         table_data.append(row)
         
+
     col_widths = [1.8*cm, 2.5*cm, 5*cm, 2*cm, 2.5*cm, 2.5*cm, 6.2*cm]
     
+
     table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -1129,6 +1155,7 @@ def export_push_pull_pdf(request):
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('LEFTPADDING', (0, 0), (-1,-1), 6),
         ('RIGHTPADDING', (0, 0), (-1,-1), 6),
@@ -1147,6 +1174,7 @@ def export_push_pull_pdf(request):
     response['Content-Disposition'] = f'attachment; filename={filename}'
     
     return response
+
 
 @login_required
 def help_page(request):
@@ -1213,6 +1241,7 @@ def add_update_remark(request, update_id):
             UpdateRemark.objects.create(
                 update=update,
                 text=text,
+
                 added_by=request.user
             )
             messages.success(request, "Remark added successfully.")

@@ -209,6 +209,7 @@ class ProjectUpdate(models.Model):
         ('Pull', 'Pull Content'),
     ]
 
+
     # ✅ NEW: Choices for the new content type field
     CONTENT_TYPE_CHOICES = [
         ('Project', 'Project'),
@@ -217,6 +218,7 @@ class ProjectUpdate(models.Model):
 
     # ✅ UPDATED: The project field is now optional
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='updates', null=True, blank=True)
+
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     text = models.TextField()
     # The 'category' and 'needs_review' fields have been removed or commented out.
@@ -224,6 +226,7 @@ class ProjectUpdate(models.Model):
     # category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='Information')
     # needs_review = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
 
     # ✅ UPDATED FIELD: Using the new ContactPerson model
     push_pull_type = models.CharField(max_length=10, choices=PUSH_PULL_CHOICES, default='Push')
@@ -234,11 +237,13 @@ class ProjectUpdate(models.Model):
     # ✅ NEW FIELD: To distinguish between project and general content
     content_type = models.CharField(max_length=10, choices=CONTENT_TYPE_CHOICES, default='Project')
 
+
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
         return f"Update for {self.project.code if self.project else 'General'} at {self.created_at.strftime('%Y-%m-%d')}"
+
 
 class UpdateRemark(models.Model):
     update = models.ForeignKey(ProjectUpdate, on_delete=models.CASCADE, related_name="remarks")
