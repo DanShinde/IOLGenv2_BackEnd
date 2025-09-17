@@ -407,6 +407,8 @@ def dashboard(request):
     }
     return render(request, 'tracker/dashboard.html', context)
 
+# tracker/views.py
+
 @login_required
 def project_reports(request):
     # --- Session logic for retaining filters ---
@@ -433,9 +435,9 @@ def project_reports(request):
 
     # The rest of the view logic now uses the active query parameters
     query_params = request.GET or request.session.get('report_filters', {})
-    # --- End of session logic ---
-
-    projects_qs = Project.objects.select_related('segment_con','pace').prefetch_related('stages').all()
+    
+    # --- The FIX is in this line: We add select_related and prefetch_related ---
+    projects_qs = Project.objects.select_related('segment_con', 'pace').prefetch_related('stages').all()
 
     # --- Check for the 'hide_completed' filter ---
     hide_completed = query_params.get('hide_completed') == '1'
@@ -975,13 +977,21 @@ def all_project_updates(request, project_id):
 
 @login_required
 def all_push_pull_content(request, filter=None):
+    # Check for an explicit filter in the URL query parameters
     if 'filter' in request.GET and request.GET['filter'] in ['all', 'project', 'general']:
-        request.session['push_pull_filter'] = request.GET['filter']
-        return redirect('all_push_pull_content_filtered', filter=request.session['push_pull_filter'])
+        if request.GET['filter'] == 'all':
+            # ✅ Corrected: If 'all' is explicitly requested, clear the session filter.
+            if 'push_pull_filter' in request.session:
+                del request.session['push_pull_filter']
+        else:
+            request.session['push_pull_filter'] = request.GET['filter']
+        # Redirect to the clean URL without the query parameter to prevent issues
+        return redirect('all_push_pull_content')
 
+    # Get the current filter from the session, defaulting to 'all' if not present
     current_filter = request.session.get('push_pull_filter', 'all')
     
-    updates_qs = ProjectUpdate.objects.select_related('author').prefetch_related('project', 'who_contact', 'remarks').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1047,9 +1057,15 @@ def export_push_pull_excel(request):
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
         remarks_text = " | ".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
 
+        # --- FIX START ---
+        # A date object does not have a tzinfo attribute, so it doesn't need to be replaced.
+        # A datetime object does, and must be made naive to be compatible with openpyxl.
         created_at_naive = update.created_at.replace(tzinfo=None) if update.created_at else None
         closed_at_naive = update.closed_at.replace(tzinfo=None) if update.closed_at else None
-        eta_naive = update.eta.replace(tzinfo=None) if update.eta else None
+        
+        # The ETA field is a DateField, so no timezone removal is needed.
+        eta_naive = update.eta
+        # --- FIX END ---
 
         row = [
             update.project.code if update.project else 'N/A',

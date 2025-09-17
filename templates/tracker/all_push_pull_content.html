@@ -62,7 +62,7 @@
         <h5 class="card-header-title"><i class="fas fa-list me-2"></i>Content Summary</h5>
         <ul class="nav nav-pills">
             <li class="nav-item">
-                <a class="nav-link {% if not filter or filter == 'all' %}active{% endif %}" href="{% url 'all_push_pull_content' %}">All</a>
+                <a class="nav-link {% if not filter or filter == 'all' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=all">All</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if filter == 'project' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=project">Project</a>
@@ -90,6 +90,7 @@
 
 {% block scripts %}
 {{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Select2 initialization for the "add new general update" form
@@ -112,16 +113,22 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isExisting) {
                 return null;
             }
-
             return {
                 id: term,
                 text: term,
                 new: true
             };
+        },
+        templateResult: function (data) {
+            if (data.new) {
+                var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
+                return $result;
+            }
+            return data.text;
         }
     });
 
-    // Handle new tags (persons) being added via AJAX
+    // Handle new tags (persons) being added via AJAX for the "Add" form
     $('#who_contact').on('select2:select', function (e) {
         const data = e.params.data;
         if (data.new) {
@@ -150,6 +157,67 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentSelection = $select.val() || [];
                     const updatedSelection = currentSelection.filter(item => item !== data.id);
                     $select.val(updatedSelection).trigger('change');
+                }
+            });
+        }
+    });
+
+    // Initialize Select2 for the edit modals when they are shown
+    $('.select2-multiple-edit').each(function() {
+        if (!$(this).data('select2')) { // Check if Select2 is already initialized
+            $(this).select2({
+                tags: true,
+                tokenSeparators: [','],
+                theme: 'bootstrap-5',
+                placeholder: "Select or type person(s)",
+                width: '100%',
+                createTag: function(params) {
+                    const term = $.trim(params.term);
+                    if (term === '' || $.isNumeric(term)) {
+                        return null;
+                    }
+                    return { id: term, text: term, new: true };
+                },
+                templateResult: function (data) {
+                    if (data.new) {
+                        var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
+                        return $result;
+                    }
+                    return data.text;
+                }
+            });
+            
+            // Add the AJAX handler for new tags in edit modals as well
+            $(this).on('select2:select', function(e) {
+                const data = e.params.data;
+                if (data.new) {
+                    const $select = $(this);
+                    $.ajax({
+                        url: "{% url 'add_contact_person_ajax' %}",
+                        method: 'POST',
+                        data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                        success: function(response) {
+                            if(response.status === 'success') {
+                                const newOption = new Option(response.name, response.id, false, false);
+                                $select.find(`option[value="${data.id}"]`).remove();
+                                $select.append(newOption).trigger('change');
+                                const currentSelection = $select.val() || [];
+                                currentSelection.push(response.id);
+                                $select.val(currentSelection).trigger('change');
+                            } else {
+                                alert('Error creating new contact.');
+                                const currentSelection = $select.val() || [];
+                                const updatedSelection = currentSelection.filter(item => item !== data.id);
+                                $select.val(updatedSelection).trigger('change');
+                            }
+                        },
+                        error: function() {
+                            alert('Error creating new contact.');
+                            const currentSelection = $select.val() || [];
+                            const updatedSelection = currentSelection.filter(item => item !== data.id);
+                            $select.val(updatedSelection).trigger('change');
+                        }
+                    });
                 }
             });
         }

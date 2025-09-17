@@ -309,9 +309,9 @@
                                 <div class="d-flex align-items-center">
                                     <div class="table-status-icon status-{{ stage.status|slugify }}">
                                         {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
-                                        {% elif stage.status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
-                                        {% elif stage.status == 'Hold' %}<i class="fas fa-pause"></i>
-                                        {% elif stage.status == "Not Applicable" %}<i class="fas fa-ban"></i>
+                                        {% elif status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
+                                        {% elif status == 'Hold' %}<i class="fas fa-pause"></i>
+                                        {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
                                         {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
                                         {% endif %}
                                     </div>
@@ -512,13 +512,10 @@
             placeholder: "Select or type person(s)",
             width: '100%',
             createTag: function(params) {
-                // Return null if the user's input is a number
                 const term = $.trim(params.term);
-                if ($.isNumeric(term)) {
+                if (term === '' || $.isNumeric(term)) {
                     return null;
                 }
-                
-                // Only create a tag if it doesn't already exist as a selectable option
                 const existingOptions = $('#who_contact').find('option');
                 const isExisting = existingOptions.filter(function() {
                     return $.trim($(this).text()).toLowerCase() === term.toLowerCase();
@@ -527,16 +524,17 @@
                 if (isExisting) {
                     return null;
                 }
-
                 return {
-                    id: term, // Use the new name as a temporary ID
+                    id: term,
                     text: term,
                     new: true
                 };
             },
             templateResult: function (data) {
                 if (data.new) {
-                    return `<b>(New)</b> ${data.text}`;
+                    // Use a jQuery object to correctly render the HTML
+                    var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
+                    return $result;
                 }
                 return data.text;
             }
@@ -547,24 +545,20 @@
             const data = e.params.data;
             if (data.new) {
                 const $select = $(this);
-                // An AJAX call to create the new contact
                 $.ajax({
                     url: "{% url 'add_contact_person_ajax' %}",
                     method: 'POST',
                     data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
                     success: function(response) {
                         if(response.status === 'success') {
-                            // Update the option with the real ID from the server
                             const newOption = new Option(response.name, response.id, false, false);
                             $select.find(`option[value="${data.id}"]`).remove();
                             $select.append(newOption).trigger('change');
-                            // Re-select the newly created and now permanent option
                             const currentSelection = $select.val() || [];
                             currentSelection.push(response.id);
                             $select.val(currentSelection).trigger('change');
                         } else {
                             alert('Error creating new contact.');
-                            // Revert the selection if there's an error
                             const currentSelection = $select.val() || [];
                             const updatedSelection = currentSelection.filter(item => item !== data.id);
                             $select.val(updatedSelection).trigger('change');
@@ -572,7 +566,6 @@
                     },
                     error: function() {
                         alert('Error creating new contact.');
-                        // Revert the selection on error
                         const currentSelection = $select.val() || [];
                         const updatedSelection = currentSelection.filter(item => item !== data.id);
                         $select.val(updatedSelection).trigger('change');
@@ -583,16 +576,63 @@
 
         // Initialize Select2 for the edit modals when they are shown
         $('.select2-multiple-edit').each(function() {
-            $(this).select2({
-                tags: true,
-                tokenSeparators: [','],
-                theme: 'bootstrap-5',
-                placeholder: "Select or type person(s)",
-                width: '100%',
-                createTag: function(params) {
-                    return { id: params.term, text: params.term, new: true };
-                }
-            });
+            if (!$(this).data('select2')) { // Check if Select2 is already initialized
+                $(this).select2({
+                    tags: true,
+                    tokenSeparators: [','],
+                    theme: 'bootstrap-5',
+                    placeholder: "Select or type person(s)",
+                    width: '100%',
+                    createTag: function(params) {
+                        const term = $.trim(params.term);
+                        if (term === '' || $.isNumeric(term)) {
+                            return null;
+                        }
+                        return { id: term, text: term, new: true };
+                    },
+                    templateResult: function (data) {
+                        if (data.new) {
+                             var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
+                             return $result;
+                        }
+                        return data.text;
+                    }
+                });
+                
+                // Add the AJAX handler for new tags in edit modals as well
+                $(this).on('select2:select', function(e) {
+                    const data = e.params.data;
+                    if (data.new) {
+                        const $select = $(this);
+                        $.ajax({
+                            url: "{% url 'add_contact_person_ajax' %}",
+                            method: 'POST',
+                            data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                            success: function(response) {
+                                if(response.status === 'success') {
+                                    const newOption = new Option(response.name, response.id, false, false);
+                                    $select.find(`option[value="${data.id}"]`).remove();
+                                    $select.append(newOption).trigger('change');
+                                    const currentSelection = $select.val() || [];
+                                    currentSelection.push(response.id);
+                                    $select.val(currentSelection).trigger('change');
+                                } else {
+                                    alert('Error creating new contact.');
+                                    const currentSelection = $select.val() || [];
+                                    const updatedSelection = currentSelection.filter(item => item !== data.id);
+                                    $select.val(updatedSelection).trigger('change');
+                                }
+                            },
+                            error: function() {
+                                alert('Error creating new contact.');
+                                const currentSelection = $select.val() || [];
+                                const updatedSelection = currentSelection.filter(item => item !== data.id);
+                                $select.val(updatedSelection).trigger('change');
+                            }
+                        });
+                    }
+                });
+            }
         });
     });
 </script>

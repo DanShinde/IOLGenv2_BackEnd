@@ -25,9 +25,15 @@
                             {% if update.status == 'Closed' and update.closed_at %}
                                 <small class="text-muted ms-2">Marked as closed on {{ update.closed_at|date:"M d, Y, H:i" }}</small>
                             {% endif %}
-                            {% for person in update.who_contact.all %}
-                                <span class="badge bg-secondary me-2">To: {{ person.name }}</span>
-                            {% endfor %}
+                            
+                            {% if update.who_contact.all %}
+                                {% for person in update.who_contact.all %}
+                                    <span class="badge bg-secondary me-2">To: {{ person.name }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="badge bg-light text-dark me-2">No person assigned</span>
+                            {% endif %}
+                            
                         </div>
                     </div>
                     <div class="mt-1">
