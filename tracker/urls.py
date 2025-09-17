@@ -29,18 +29,13 @@ urlpatterns = [
     path('help/', views.help_page, name='help_page'),
     path('stage/<int:stage_id>/update-ajax/', views.update_stage_ajax, name='update_stage_ajax'),
     path('project/<int:project_id>/edit/', views.edit_project, name='tracker_edit_project'),
-
     path('update/<int:update_id>/add_remark/', views.add_update_remark, name='add_update_remark'),
     path('update-remark/<int:remark_id>/edit/', views.edit_update_remark, name='edit_update_remark'),
     path('update-remark/<int:remark_id>/delete/', views.delete_update_remark, name='delete_update_remark'),
-    # ✅ UPDATED: Add an optional filter parameter to the URL
     path('all-push-pull-content/', views.all_push_pull_content, name='all_push_pull_content'),
     path('all-push-pull-content/<str:filter>/', views.all_push_pull_content, name='all_push_pull_content_filtered'),
     path('all-push-pull-content/export/excel/', views.export_push_pull_excel, name='export_push_pull_excel'),
     path('all-push-pull-content/export/pdf/', views.export_push_pull_pdf, name='export_push_pull_pdf'),
-
-    # ✅ NEW: URL to create a new general update
     path('general-update/add/', views.add_general_update, name='add_general_update'),
     path('contact/add-ajax/', views.add_contact_person_ajax, name='add_contact_person_ajax'),
 ]
-

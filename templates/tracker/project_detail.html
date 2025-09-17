@@ -5,6 +5,7 @@
 {% block title %}{{ project.code }} | Project Tracker{% endblock %}
 
 {% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
     /* Add styles for our new autosave indicator */
     .autosave-indicator {
@@ -255,7 +256,7 @@
                                         {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
                                         {% elif stage.status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
                                         {% elif stage.status == 'Hold' %}<i class="fas fa-pause"></i>
-                                        {% elif stage.status == 'Not Applicable' %}<i class="fas fa-ban"></i>
+                                        {% elif stage.status == "Not Applicable" %}<i class="fas fa-ban"></i>
                                         {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
                                         {% endif %}
                                     </div>
@@ -308,9 +309,9 @@
                                 <div class="d-flex align-items-center">
                                     <div class="table-status-icon status-{{ stage.status|slugify }}">
                                         {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
-                                        {% elif stage.status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
-                                        {% elif stage.status == 'Hold' %}<i class="fas fa-pause"></i>
-                                        {% elif stage.status == 'Not Applicable' %}<i class="fas fa-ban"></i>
+                                        {% elif status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
+                                        {% elif status == 'Hold' %}<i class="fas fa-pause"></i>
+                                        {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
                                         {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
                                         {% endif %}
                                     </div>
@@ -385,34 +386,6 @@
                 <div class="row">
                     <div class="col-6 border-end">
 
-                         <h6 class="text-muted">Overall OTIF % (All Stages)</h6>
-                         <p class="h5 mb-0">
-                            {% if overall_otif_percentage is not None %}
-                                {{ overall_otif_percentage|floatformat:1 }}%
-                            {% else %}
-                                <span class="text-muted small">No completed stages yet</span>
-                            {% endif %}
-                         </p>
-                    </div>
-                    <div class="col-6">
-                        <h6 class="text-muted">Project Delivery Status (Handover)</h6>
-                        <p class="mb-0">
-                            {% if project_otif == 101 %}
-                                <span class="badge bg-success fs-6">Before Time In Full</span>
-                            {% elif project_otif == 100 %}
-                                <span class="badge bg-primary fs-6">On Time In Full</span>
-                            {% elif project_otif == 0 %}
-                                <span class="badge bg-danger fs-6">Delayed</span>
-                            {% else %}
-                                <span class="text-muted small">Pending Completion</span>
-                            {% endif %}
-                        </p>
-                    </div>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="col-6 border-end">
-
                          <h6 class="text-muted">Automation Schedule</h6>
                          {% with schedule_status=automation_schedule_status %}
                             {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
@@ -481,15 +454,12 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-
                             <label for="who_contact" class="form-label small mb-0">Who</label>
-                            <input class="form-control form-control-sm" list="contact-persons-list" id="who_contact" name="who_contact" placeholder="Type or select a person">
-                            <datalist id="contact-persons-list">
+                            <select name="who_contact" id="who_contact" class="form-control form-control-sm select2-multiple" multiple="multiple">
                                 {% for person in contact_persons %}
-                                    <option value="{{ person.name }}">
+                                    <option value="{{ person.id }}">{{ person.name }}</option>
                                 {% endfor %}
-                            </datalist>
-
+                            </select>
                         </div>
                         <div class="col-md-3">
                             <label for="eta_date" class="form-label small mb-0">ETA</label>
@@ -531,101 +501,141 @@
 
 {% block scripts %}
 {{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Initialize Bootstrap tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl, { html: true, sanitize: false }); });
-
-    const rows = document.querySelectorAll('#automationStagesForm tbody tr, #emulationStagesForm tbody tr');
-    const today = new Date().toISOString().split('T')[0];
-
-    rows.forEach(row => {
-        const plannedStartInput = row.querySelector('.autosave-input[data-field-name="planned_start_date"]');
-        const plannedFinishInput = row.querySelector('.planned-date');
-        const statusSelect = row.querySelector('.status-select');
-        const actualFinishInput = row.querySelector('.actual-date');
-
-        if (!plannedStartInput || !plannedFinishInput || !statusSelect || !actualFinishInput) return;
-
-        const updateRowState = () => {
-            const isNotApplicable = statusSelect.value === 'Not Applicable';
-
-            // Toggle visual style for the entire row
-            row.classList.toggle('stage-not-applicable', isNotApplicable);
-
-            // Disable all date inputs if status is N/A
-            plannedStartInput.disabled = isNotApplicable;
-            plannedFinishInput.disabled = isNotApplicable;
-            actualFinishInput.disabled = isNotApplicable;
-
-            // If N/A, clear dates, ensure all status options are available, and then exit.
-            if (isNotApplicable) {
-                statusSelect.querySelectorAll('option').forEach(opt => opt.disabled = false);
-                // Clear date inputs for N/A stages
-                plannedStartInput.value = '';
-                plannedFinishInput.value = '';
-                actualFinishInput.value = '';
-                return;
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize Select2 for the "add new update" form
+        $('#who_contact').select2({
+            tags: true,
+            tokenSeparators: [','],
+            theme: 'bootstrap-5',
+            placeholder: "Select or type person(s)",
+            width: '100%',
+            createTag: function(params) {
+                const term = $.trim(params.term);
+                if (term === '' || $.isNumeric(term)) {
+                    return null;
+                }
+                const existingOptions = $('#who_contact').find('option');
+                const isExisting = existingOptions.filter(function() {
+                    return $.trim($(this).text()).toLowerCase() === term.toLowerCase();
+                }).length > 0;
+                
+                if (isExisting) {
+                    return null;
+                }
+                return {
+                    id: term,
+                    text: term,
+                    new: true
+                };
+            },
+            templateResult: function (data) {
+                if (data.new) {
+                    // Use a jQuery object to correctly render the HTML
+                    var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
+                    return $result;
+                }
+                return data.text;
             }
+        });
+        
+        // Handle new tags (persons) being added via AJAX
+        $('#who_contact').on('select2:select', function (e) {
+            const data = e.params.data;
+            if (data.new) {
+                const $select = $(this);
+                $.ajax({
+                    url: "{% url 'add_contact_person_ajax' %}",
+                    method: 'POST',
+                    data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                    success: function(response) {
+                        if(response.status === 'success') {
+                            const newOption = new Option(response.name, response.id, false, false);
+                            $select.find(`option[value="${data.id}"]`).remove();
+                            $select.append(newOption).trigger('change');
+                            const currentSelection = $select.val() || [];
+                            currentSelection.push(response.id);
+                            $select.val(currentSelection).trigger('change');
+                        } else {
+                            alert('Error creating new contact.');
+                            const currentSelection = $select.val() || [];
+                            const updatedSelection = currentSelection.filter(item => item !== data.id);
+                            $select.val(updatedSelection).trigger('change');
+                        }
+                    },
+                    error: function() {
+                        alert('Error creating new contact.');
+                        const currentSelection = $select.val() || [];
+                        const updatedSelection = currentSelection.filter(item => item !== data.id);
+                        $select.val(updatedSelection).trigger('change');
+                    }
+                });
+            }
+        });
 
-            // --- If NOT N/A, proceed with the standard logic ---
-            const hasPlannedFinishDate = plannedFinishInput.value;
-            const statusOptions = statusSelect.querySelectorAll('option');
-
-            if (hasPlannedFinishDate) {
-                // If there's a date, enable all options.
-                statusOptions.forEach(opt => opt.disabled = false);
-            } else {
-                // If there's NO date, disable all options except for "Not Applicable".
-                statusOptions.forEach(opt => {
-                    opt.disabled = (opt.value !== 'Not Applicable');
+        // Initialize Select2 for the edit modals when they are shown
+        $('.select2-multiple-edit').each(function() {
+            if (!$(this).data('select2')) { // Check if Select2 is already initialized
+                $(this).select2({
+                    tags: true,
+                    tokenSeparators: [','],
+                    theme: 'bootstrap-5',
+                    placeholder: "Select or type person(s)",
+                    width: '100%',
+                    createTag: function(params) {
+                        const term = $.trim(params.term);
+                        if (term === '' || $.isNumeric(term)) {
+                            return null;
+                        }
+                        return { id: term, text: term, new: true };
+                    },
+                    templateResult: function (data) {
+                        if (data.new) {
+                             var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
+                             return $result;
+                        }
+                        return data.text;
+                    }
                 });
                 
-                // If the currently selected value is now disabled, reset it to "Not started"
-                // (assuming "Not started" is the default for non-applicable states without a planned date)
-                if (statusSelect.value !== 'Not Applicable' && statusSelect.value !== 'Not started') {
-                    statusSelect.value = 'Not started';
-                }
+                // Add the AJAX handler for new tags in edit modals as well
+                $(this).on('select2:select', function(e) {
+                    const data = e.params.data;
+                    if (data.new) {
+                        const $select = $(this);
+                        $.ajax({
+                            url: "{% url 'add_contact_person_ajax' %}",
+                            method: 'POST',
+                            data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                            success: function(response) {
+                                if(response.status === 'success') {
+                                    const newOption = new Option(response.name, response.id, false, false);
+                                    $select.find(`option[value="${data.id}"]`).remove();
+                                    $select.append(newOption).trigger('change');
+                                    const currentSelection = $select.val() || [];
+                                    currentSelection.push(response.id);
+                                    $select.val(currentSelection).trigger('change');
+                                } else {
+                                    alert('Error creating new contact.');
+                                    const currentSelection = $select.val() || [];
+                                    const updatedSelection = currentSelection.filter(item => item !== data.id);
+                                    $select.val(updatedSelection).trigger('change');
+                                }
+                            },
+                            error: function() {
+                                alert('Error creating new contact.');
+                                const currentSelection = $select.val() || [];
+                                const updatedSelection = currentSelection.filter(item => item !== data.id);
+                                $select.val(updatedSelection).trigger('change');
+                            }
+                        });
+                    }
+                });
             }
-            
-            // This logic depends on the current status, which might have just been reset.
-            const isCompleted = statusSelect.value === 'Completed';
-            actualFinishInput.disabled = !isCompleted;
-            if (!isCompleted) {
-                actualFinishInput.value = '';
-            }
-        };
-        
-        const validateActualDate = () => {
-            if (actualFinishInput.value && actualFinishInput.value > today) { // Check if value exists before comparing
-                alert("Actual Finish Date cannot be in the future.");
-                actualFinishInput.value = '';
-            }
-        };
-
-        // Initial setup and event listeners
-        updateRowState();
-        plannedStartInput.addEventListener('change', updateRowState); // Also trigger on planned start date change
-        plannedFinishInput.addEventListener('change', updateRowState);
-        statusSelect.addEventListener('change', updateRowState);
-        actualFinishInput.addEventListener('change', validateActualDate);
+        });
     });
-
-    // Logic for edit modals (unchanged)
-    const editModals = document.querySelectorAll('[id^="editUpdateModal"]');
-    editModals.forEach(modal => {
-        const categorySelect = modal.querySelector('select[name="update_category"]');
-        const mitigationContainer = modal.querySelector('[id^="mitigation-plan-container-"]');
-        if (categorySelect && mitigationContainer) {
-            categorySelect.addEventListener('change', function() {
-                if (this.value === 'Risk') { mitigationContainer.classList.remove('d-none'); } else { mitigationContainer.classList.add('d-none'); }
-            });
-        }
-    });
-});
 </script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // Helper function to get the CSRF token from cookies
@@ -655,11 +665,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const indicator = document.getElementById(`autosave-indicator-${stageId}`);
         indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
 
-        // ✅ CORRECTED: Generate the URL dynamically using Django's url template tag
         const url = "{% url 'update_stage_ajax' 0 %}".replace('0', stageId);
 
         try {
-            const response = await fetch(url, { // Use the dynamically generated URL
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

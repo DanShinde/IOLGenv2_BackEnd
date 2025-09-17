@@ -72,14 +72,14 @@
         </div>
     </div>
 
-    <div class="card mb-4">
-        <a href="#filterCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button">
-            <h5 class="card-header-title mb-0"><i class="fas fa-sliders-h me-2"></i>Filter Options</h5>
-            <i class="fas fa-chevron-down"></i>
-        </a>
-        <div class="collapse" id="filterCollapse">
-            <div class="card-body">
-                <form method="get">
+    <form method="get">
+        <div class="card mb-4">
+            <a href="#filterCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button">
+                <h5 class="card-header-title mb-0"><i class="fas fa-sliders-h me-2"></i>Filter Options</h5>
+                <i class="fas fa-chevron-down"></i>
+            </a>
+            <div class="collapse" id="filterCollapse">
+                <div class="card-body">
                     <fieldset class="mb-4">
                         <legend class="h6">General Filters</legend>
                         <div class="row">
@@ -138,28 +138,26 @@
                             {% endfor %}
                         </fieldset>
                     </div>
-
-                    <hr class="my-4">
-                    <div>
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-2"></i>Apply Filters</button>
-                        <a href="{% url 'project_reports' %}?reset=true" class="btn btn-outline-secondary">Reset Filters</a>
-                        
-                        {% if hide_completed_active %}
-                            <a href="?{{ request.GET.urlencode|cut:'&hide_completed=1'|cut:'hide_completed=1' }}" class="btn btn-info">
-                                <i class="fas fa-eye me-2"></i>Show Completed
-                            </a>
-                        {% else %}
-                            <a href="?{{ request.GET.urlencode }}&hide_completed=1" class="btn btn-outline-info">
-                                <i class="fas fa-eye-slash me-2"></i>Hide Completed
-                            </a>
-                        {% endif %}
-                        
-                        <a href="{% url 'export_report_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-danger ms-auto" target="_blank"><i class="fas fa-file-pdf me-2"></i>Export as PDF</a>
-                    </div>
-                </form>
+                </div>
+            </div>
+            <div class="card-footer d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-2"></i>Apply Filters</button>
+                <a href="{% url 'project_reports' %}?reset=true" class="btn btn-outline-secondary">Reset Filters</a>
+                
+                {% if hide_completed_active %}
+                    <a href="?{{ request.GET.urlencode|cut:'&hide_completed=1'|cut:'hide_completed=1' }}" class="btn btn-info">
+                        <i class="fas fa-eye me-2"></i>Show Completed
+                    </a>
+                {% else %}
+                    <a href="?{{ request.GET.urlencode }}&hide_completed=1" class="btn btn-outline-info">
+                        <i class="fas fa-eye-slash me-2"></i>Hide Completed
+                    </a>
+                {% endif %}
+                
+                <a href="{% url 'export_report_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf me-2"></i>Export as PDF</a>
             </div>
         </div>
-    </div>
+    </form>
 
     <div class="card">
         <div class="card-header"><h5 class="card-header-title"><i class="fas fa-table me-2"></i>Filtered Results</h5></div>
