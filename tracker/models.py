@@ -230,7 +230,7 @@ class ProjectUpdate(models.Model):
 
     # ✅ UPDATED FIELD: Using the new ContactPerson model
     push_pull_type = models.CharField(max_length=10, choices=PUSH_PULL_CHOICES, default='Push')
-    who_contact = models.ForeignKey(ContactPerson, on_delete=models.SET_NULL, null=True, blank=True, related_name='updates_assigned_to')
+    who_contact = models.ManyToManyField(ContactPerson, blank=True, related_name='updates_assigned_to')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
     eta = models.DateField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)

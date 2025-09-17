@@ -22,15 +22,12 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-
-                            <label for="who_contact-edit-{{ update.id }}" class="form-label">Who</label>
-                            <input class="form-control" list="contact-persons-list" id="who_contact-edit-{{ update.id }}" name="who_contact" value="{% if update.who_contact %}{{ update.who_contact.name }}{% endif %}" placeholder="Type or select a person">
-                            <datalist id="contact-persons-list">
+                            <label class="form-label">Who</label>
+                            <select name="who_contact" id="who_contact_edit_{{ update.id }}" class="form-control select2-multiple-edit" multiple="multiple">
                                 {% for person in contact_persons %}
-                                    <option value="{{ person.name }}">
+                                    <option value="{{ person.id }}" {% for contact in update.who_contact.all %}{% if person.id == contact.id %}selected{% endif %}{% endfor %}>{{ person.name }}</option>
                                 {% endfor %}
-                            </datalist>
-
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Status</label>

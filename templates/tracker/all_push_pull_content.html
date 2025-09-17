@@ -39,12 +39,11 @@
                 </div>
                 <div class="col-md-3">
                     <label for="who_contact" class="form-label small mb-0">Who</label>
-                    <input class="form-control form-control-sm" list="contact-persons-list" id="who_contact" name="who_contact" placeholder="Type or select a person">
-                    <datalist id="contact-persons-list">
+                    <select name="who_contact" id="who_contact" class="form-control form-control-sm select2-multiple" multiple="multiple">
                         {% for person in contact_persons %}
-                        <option value="{{ person.name }}">
+                        <option value="{{ person.id }}">{{ person.name }}</option>
                         {% endfor %}
-                    </datalist>
+                    </select>
                 </div>
                 <div class="col-md-3">
                     <label for="eta_date" class="form-label small mb-0">ETA</label>
@@ -91,50 +90,108 @@
 
 {% block scripts %}
 {{ block.super }}
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const table = document.getElementById('pushPullTable');
-    const filters = document.querySelectorAll('.filter-input');
-    const rows = table.querySelectorAll('tbody tr');
+    // Select2 initialization for the "add new general update" form
+    $('#who_contact').select2({
+        tags: true,
+        tokenSeparators: [','],
+        theme: 'bootstrap-5',
+        placeholder: "Select or type person(s)",
+        width: '100%',
+        createTag: function(params) {
+            const term = $.trim(params.term);
+            if (term === '' || $.isNumeric(term)) {
+                return null;
+            }
+            const existingOptions = $('#who_contact').find('option');
+            const isExisting = existingOptions.filter(function() {
+                return $.trim($(this).text()).toLowerCase() === term.toLowerCase();
+            }).length > 0;
+            
+            if (isExisting) {
+                return null;
+            }
 
+            return {
+                id: term,
+                text: term,
+                new: true
+            };
+        }
+    });
 
-    // Filter functionality
-
-    filters.forEach(filter => {
-        filter.addEventListener('keyup', function() {
-            const filterValue = this.value.toLowerCase();
-            const columnIndex = this.dataset.column;
-
-            rows.forEach(row => {
-                const cell = row.querySelectorAll('td')[columnIndex];
-                if (cell) {
-                    const cellText = cell.textContent || cell.innerText;
-                    if (cellText.toLowerCase().indexOf(filterValue) > -1) {
-                        row.style.display = "";
+    // Handle new tags (persons) being added via AJAX
+    $('#who_contact').on('select2:select', function (e) {
+        const data = e.params.data;
+        if (data.new) {
+            const $select = $(this);
+            $.ajax({
+                url: "{% url 'add_contact_person_ajax' %}",
+                method: 'POST',
+                data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                success: function(response) {
+                    if(response.status === 'success') {
+                        const newOption = new Option(response.name, response.id, false, false);
+                        $select.find(`option[value="${data.id}"]`).remove();
+                        $select.append(newOption).trigger('change');
+                        const currentSelection = $select.val() || [];
+                        currentSelection.push(response.id);
+                        $select.val(currentSelection).trigger('change');
                     } else {
-                        row.style.display = "none";
+                        alert('Error creating new contact.');
+                        const currentSelection = $select.val() || [];
+                        const updatedSelection = currentSelection.filter(item => item !== data.id);
+                        $select.val(updatedSelection).trigger('change');
+                    }
+                },
+                error: function() {
+                    alert('Error creating new contact.');
+                    const currentSelection = $select.val() || [];
+                    const updatedSelection = currentSelection.filter(item => item !== data.id);
+                    $select.val(updatedSelection).trigger('change');
+                }
+            });
+        }
+    });
+
+    const table = document.getElementById('pushPullTable');
+    if (table) {
+        const filters = document.querySelectorAll('.filter-input');
+        const rows = table.querySelectorAll('tbody tr');
+
+        filters.forEach(filter => {
+            filter.addEventListener('keyup', function() {
+                const filterValue = this.value.toLowerCase();
+                const columnIndex = this.dataset.column;
+
+                rows.forEach(row => {
+                    const cell = row.querySelectorAll('td')[columnIndex];
+                    if (cell) {
+                        const cellText = cell.textContent || cell.innerText;
+                        if (cellText.toLowerCase().indexOf(filterValue) > -1) {
+                            row.style.display = "";
+                        } else {
+                            row.style.display = "none";
+                        }
+                    }
+                });
+            });
+        });
+
+        rows.forEach(row => {
+            row.addEventListener('click', function(event) {
+                if (!event.target.closest('a')) {
+                    const updateId = this.dataset.updateId;
+                    const modalElement = document.getElementById(`editUpdateModal${updateId}`);
+                    if (modalElement) {
+                        const modal = new bootstrap.Modal(modalElement);
+                        modal.show();
                     }
                 }
             });
         });
-    });
-
-
-    // Modal trigger functionality on row click, but not link click
-    rows.forEach(row => {
-        row.addEventListener('click', function(event) {
-            // Check if the click target is NOT an anchor tag or part of an anchor tag
-            if (!event.target.closest('a')) {
-                const updateId = this.dataset.updateId;
-                const modalElement = document.getElementById(`editUpdateModal${updateId}`);
-                if (modalElement) {
-                    const modal = new bootstrap.Modal(modalElement);
-                    modal.show();
-                }
-            }
-        });
-    });
+    }
 
 });
 </script>
