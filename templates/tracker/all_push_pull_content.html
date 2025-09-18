@@ -12,14 +12,23 @@
         </div>
         <div class="d-flex gap-2">
 
-            <a href="{% url 'export_push_pull_excel' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
-            <a href="{% url 'export_push_pull_pdf' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
+            {% if not is_public_view %}
+                <a href="{% url 'export_push_pull_excel' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
+                <a href="{% url 'export_push_pull_pdf' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
+            {% endif %}
+
+            {% if not is_public_view %}
+            <a href="{% url 'public_push_pull_content' access_token='a1b2c3d4-e5f6-7890-1234-567890abcdef' %}" class="btn btn-primary" target="_blank">
+                <i class="fas fa-share-alt me-2"></i>Share Link
+            </a>
+            {% endif %}
 
         </div>
     </div>
 </div>
 
 
+{% if not is_public_view %}
 <div class="card mb-4">
     <div class="card-header"><h5 class="card-header-title"><i class="fas fa-plus-circle me-2"></i>Add General Push-Pull Content</h5></div>
     <div class="card-body">
@@ -56,36 +65,74 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-header-title"><i class="fas fa-list me-2"></i>Content Summary</h5>
-        <ul class="nav nav-pills">
-            <li class="nav-item">
-                <a class="nav-link {% if not filter or filter == 'all' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=all">All</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if filter == 'project' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=project">Project</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if filter == 'general' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=general">Non-Project</a>
-            </li>
-        </ul>
-    </div>
+    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-list me-2"></i>Content Summary</h5></div>
     <div class="card-body">
+        <div class="d-flex flex-wrap gap-3 mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fw-bold">Category:</span>
+                <ul class="nav nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link {% if not filter or filter == 'all' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=all">All</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if filter == 'project' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=project">Project</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if filter == 'general' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=general">Non-Project</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fw-bold">Type:</span>
+                <ul class="nav nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link {% if not push_pull_filter or push_pull_filter == 'all' %}active{% endif %}" href="?push_pull_filter=all&status_filter={{ status_filter|default:'all' }}">All Types</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if push_pull_filter == 'push' %}active{% endif %}" href="?push_pull_filter=push&status_filter={{ status_filter|default:'all' }}">Push</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if push_pull_filter == 'pull' %}active{% endif %}" href="?push_pull_filter=pull&status_filter={{ status_filter|default:'all' }}">Pull</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fw-bold">Status:</span>
+                <ul class="nav nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link {% if not status_filter or status_filter == 'all' %}active{% endif %}" href="?status_filter=all&push_pull_filter={{ push_pull_filter|default:'all' }}">All Status</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if status_filter == 'open' %}active{% endif %}" href="?status_filter=open&push_pull_filter={{ push_pull_filter|default:'all' }}">Open</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if status_filter == 'closed' %}active{% endif %}" href="?status_filter=closed&push_pull_filter={{ push_pull_filter|default:'all' }}">Closed</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
         <div class="accordion" id="updateAccordion">
             {% for update in updates %}
-                {% include 'tracker/partials/project_update_item.html' with update=update contact_persons=contact_persons %}
+                {% if is_public_view %}
+                    {% include 'tracker/partials/public_update_item.html' with update=update %}
+                {% else %}
+                    {% include 'tracker/partials/project_update_item.html' with update=update contact_persons=contact_persons %}
+                {% endif %}
             {% empty %}
                 <p class="text-muted text-center py-3">No push-pull content found.</p>
             {% endfor %}
-
         </div>
     </div>
 </div>
 
 
-{% include 'tracker/partials/project_update_modals.html' with updates=updates contact_persons=contact_persons %}
+{% if not is_public_view %}
+    {% include 'tracker/partials/project_update_modals.html' with updates=updates contact_persons=contact_persons %}
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
