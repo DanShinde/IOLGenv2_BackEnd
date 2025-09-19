@@ -474,7 +474,7 @@
                 <h5 class="mt-4">Push Pull Content Summary</h5>
                 <div class="update-feed mt-3 accordion" id="updateAccordion">
                     {% for update in updates %}
-                        {% include 'tracker/partials/project_update_item.html' with update=update user=user contact_persons=contact_persons %}
+                        {% include 'tracker/partials/project_update_item.html' with update=update user=user contact_persons=contact_persons redirect_to='project_detail' %}
                     {% empty %}
                         <p class="text-muted text-center py-3">No push pull contents have been added yet.</p>
                     {% endfor %}

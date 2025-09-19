@@ -980,24 +980,40 @@ def all_push_pull_content(request, filter=None):
     # Check for an explicit filter in the URL query parameters
     if 'filter' in request.GET and request.GET['filter'] in ['all', 'project', 'general']:
         if request.GET['filter'] == 'all':
-            # ✅ Corrected: If 'all' is explicitly requested, clear the session filter.
+
             if 'push_pull_filter' in request.session:
                 del request.session['push_pull_filter']
         else:
             request.session['push_pull_filter'] = request.GET['filter']
-        # Redirect to the clean URL without the query parameter to prevent issues
+
+        # This redirect is crucial for a clean URL and consistent filtering
         return redirect('all_push_pull_content')
 
-    # Get the current filter from the session, defaulting to 'all' if not present
+    # Get the current filters from the session and request
     current_filter = request.session.get('push_pull_filter', 'all')
-    
+    status_filter = request.GET.get('status_filter', 'all')
+    push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
+
+
     updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
     elif current_filter == 'general':
         updates_qs = updates_qs.filter(content_type='General')
-    
+
+    # ✅ NEW: Apply push/pull filtering
+    if push_pull_filter == 'push':
+        updates_qs = updates_qs.filter(push_pull_type='Push')
+    elif push_pull_filter == 'pull':
+        updates_qs = updates_qs.filter(push_pull_type='Pull')
+
+    # Apply status filtering
+    if status_filter == 'open':
+        updates_qs = updates_qs.filter(status='Open')
+    elif status_filter == 'closed':
+        updates_qs = updates_qs.filter(status='Closed')
+
     updates = updates_qs.all()
     contact_persons = ContactPerson.objects.all()
     projects = Project.objects.all()
@@ -1007,6 +1023,10 @@ def all_push_pull_content(request, filter=None):
         'contact_persons': contact_persons,
         'projects': projects,
         'filter': current_filter,
+
+        'status_filter': status_filter,
+        'push_pull_filter': push_pull_filter, # ✅ NEW: Pass push/pull filter to template
+
     }
     return render(request, 'tracker/all_push_pull_content.html', context)
 
@@ -1248,41 +1268,147 @@ def add_update_remark(request, update_id):
     update = get_object_or_404(ProjectUpdate, id=update_id)
     if request.method == 'POST':
         text = request.POST.get('remark_text')
+        redirect_to = request.POST.get('redirect_to') # ✅ Get the new hidden field
         if text:
             UpdateRemark.objects.create(
                 update=update,
                 text=text,
-
                 added_by=request.user
             )
             messages.success(request, "Remark added successfully.")
-    return redirect('tracker_project_detail', project_id=update.project.id)
+            
+    # ✅ Corrected redirect logic to handle both project and non-project updates
+    if redirect_to == 'project_detail' and update.project:
+        # Redirect back to the specific project detail page
+        return redirect('tracker_project_detail', project_id=update.project.id)
+    else:
+        # Default to the general content page or the filtered page
+        return redirect('all_push_pull_content_filtered', filter='general')
 
 @login_required
 def edit_update_remark(request, remark_id):
     remark = get_object_or_404(UpdateRemark, pk=remark_id)
-    # Only allow the author or a staff member to edit
-    if request.user == remark.added_by or request.user.is_staff:
-        if request.method == 'POST':
-            new_text = request.POST.get('remark_text')
+    redirect_to = None
+
+    if request.method == 'POST':
+        # Grab the redirect_to value from the form first
+        redirect_to = request.POST.get('redirect_to')
+        new_text = request.POST.get('remark_text')
+
+        # Security check: only the author or a staff member can edit
+        if request.user == remark.added_by or request.user.is_staff:
             if new_text:
                 remark.text = new_text
                 remark.save()
                 messages.success(request, "Remark updated successfully.")
+        else:
+            messages.error(request, "You do not have permission to edit this remark.")
+    
+    # ✅ Corrected redirect logic
+    if redirect_to == 'project_detail' and remark.update.project:
+        # Redirect back to the project page
+        return redirect('tracker_project_detail', project_id=remark.update.project.id)
     else:
-        messages.error(request, "You do not have permission to edit this remark.")
-    return redirect('tracker_project_detail', project_id=remark.update.project.id)
+        # Default to the all push-pull content page
+        return redirect('all_push_pull_content_filtered', filter='general')
 
 
 @login_required
 def delete_update_remark(request, remark_id):
     remark = get_object_or_404(UpdateRemark, pk=remark_id)
-    project_id = remark.update.project.id
-    # Only allow the author or a staff member to delete
+    redirect_to = request.POST.get('redirect_to')
+    
+    # Security check: only the author or a staff member can delete
     if request.user == remark.added_by or request.user.is_staff:
         if request.method == 'POST':
             remark.delete()
             messages.success(request, "Remark deleted successfully.")
     else:
         messages.error(request, "You do not have permission to delete this remark.")
-    return redirect('tracker_project_detail', project_id=project_id)
+
+
+    # ✅ Corrected redirect logic
+    if redirect_to == 'project_detail' and remark.update.project:
+        # Redirect back to the project page if the update has a project
+        return redirect('tracker_project_detail', project_id=remark.update.project.id)
+    else:
+        # Redirect back to the general content page
+        return redirect('all_push_pull_content_filtered', filter='general')
+    
+
+from uuid import UUID
+
+def public_push_pull_content(request, access_token):
+    try:
+        # The access_token is ALREADY a UUID object because of the URL converter.
+        valid_token = UUID("a1b2c3d4-e5f6-7890-1234-567890abcdef") 
+
+        if access_token != valid_token:
+            return HttpResponse("Unauthorized", status=401)
+            
+    except ValueError:
+        return HttpResponse("Invalid Token", status=400)
+    
+    # ✅ NEW: Read filter parameters from the URL
+    current_filter = request.GET.get('filter', 'all')
+    status_filter = request.GET.get('status_filter', 'all')
+    push_pull_filter = request.GET.get('push_pull_filter', 'all')
+
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+
+    if current_filter == 'project':
+        updates_qs = updates_qs.filter(content_type='Project')
+    elif current_filter == 'general':
+        updates_qs = updates_qs.filter(content_type='General')
+
+    if push_pull_filter == 'push':
+        updates_qs = updates_qs.filter(push_pull_type='Push')
+    elif push_pull_filter == 'pull':
+        updates_qs = updates_qs.filter(push_pull_type='Pull')
+        
+    if status_filter == 'open':
+        updates_qs = updates_qs.filter(status='Open')
+    elif status_filter == 'closed':
+        updates_qs = updates_qs.filter(status='Closed')
+
+    updates = updates_qs.all()
+    contact_persons = ContactPerson.objects.all()
+
+    # The redirect logic needs to be updated to redirect back to the public URL
+    if request.method == 'POST':
+        update_id = request.POST.get('update_id')
+        update = get_object_or_404(ProjectUpdate, id=update_id)
+
+        if 'update_status' in request.POST:
+            update.status = request.POST['update_status']
+            update.save()
+            messages.success(request, f"Update status for item {update.id} changed to {update.status}.")
+            return redirect('public_push_pull_content', access_token=str(access_token))
+        
+        if 'remark_text' in request.POST:
+            text = request.POST.get('remark_text')
+            if text:
+                try:
+                    public_user = get_user_model().objects.get(username='public_user')
+                except get_user_model().DoesNotExist:
+                    public_user = get_user_model().objects.create_user('public_user', 'public@example.com', 'some_random_password', is_active=False)
+
+                UpdateRemark.objects.create(
+                    update=update,
+                    text=text,
+                    added_by=public_user
+                )
+                messages.success(request, "Remark added successfully.")
+            return redirect('public_push_pull_content', access_token=str(access_token))
+    
+    context = {
+        'updates': updates,
+        'contact_persons': contact_persons,
+        'is_public_view': True,
+        'access_token': str(access_token),
+        'filter': current_filter,
+        'status_filter': status_filter,
+        'push_pull_filter': push_pull_filter,
+    }
+    return render(request, 'tracker/all_push_pull_content.html', context)
+
