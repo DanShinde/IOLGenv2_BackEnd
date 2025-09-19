@@ -980,10 +980,12 @@ def all_push_pull_content(request, filter=None):
     # Check for an explicit filter in the URL query parameters
     if 'filter' in request.GET and request.GET['filter'] in ['all', 'project', 'general']:
         if request.GET['filter'] == 'all':
+
             if 'push_pull_filter' in request.session:
                 del request.session['push_pull_filter']
         else:
             request.session['push_pull_filter'] = request.GET['filter']
+
         # This redirect is crucial for a clean URL and consistent filtering
         return redirect('all_push_pull_content')
 
@@ -991,6 +993,7 @@ def all_push_pull_content(request, filter=None):
     current_filter = request.session.get('push_pull_filter', 'all')
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
+
 
     updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
 
@@ -1020,8 +1023,10 @@ def all_push_pull_content(request, filter=None):
         'contact_persons': contact_persons,
         'projects': projects,
         'filter': current_filter,
+
         'status_filter': status_filter,
         'push_pull_filter': push_pull_filter, # ✅ NEW: Pass push/pull filter to template
+
     }
     return render(request, 'tracker/all_push_pull_content.html', context)
 
@@ -1321,6 +1326,7 @@ def delete_update_remark(request, remark_id):
     else:
         messages.error(request, "You do not have permission to delete this remark.")
 
+
     # ✅ Corrected redirect logic
     if redirect_to == 'project_detail' and remark.update.project:
         # Redirect back to the project page if the update has a project
@@ -1405,3 +1411,4 @@ def public_push_pull_content(request, access_token):
         'push_pull_filter': push_pull_filter,
     }
     return render(request, 'tracker/all_push_pull_content.html', context)
+
