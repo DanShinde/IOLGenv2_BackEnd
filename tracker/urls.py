@@ -39,4 +39,5 @@ urlpatterns = [
     path('general-update/add/', views.add_general_update, name='add_general_update'),
     path('contact/add-ajax/', views.add_contact_person_ajax, name='add_contact_person_ajax'),
     path('public/push-pull-content/<uuid:access_token>/', views.public_push_pull_content, name='public_push_pull_content'),
+
 ]

@@ -68,7 +68,9 @@
 {% endif %}
 
 <div class="card">
+
     <div class="card-header"><h5 class="card-header-title"><i class="fas fa-list me-2"></i>Content Summary</h5></div>
+
     <div class="card-body">
         <div class="d-flex flex-wrap gap-3 mb-3">
             <div class="d-flex align-items-center gap-2">
@@ -275,6 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const filters = document.querySelectorAll('.filter-input');
         const rows = table.querySelectorAll('tbody tr');
 
+
         filters.forEach(filter => {
             filter.addEventListener('keyup', function() {
                 const filterValue = this.value.toLowerCase();
@@ -293,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         });
+
 
         rows.forEach(row => {
             row.addEventListener('click', function(event) {
