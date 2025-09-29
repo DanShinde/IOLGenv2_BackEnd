@@ -860,7 +860,7 @@ def add_general_update(request):
 @login_required
 def edit_project_update(request, update_id):
     update = get_object_or_404(ProjectUpdate, id=update_id)
-    if request.user == update.author or request.user.is_staff:
+    if request.user == update.author or request.user.groups.filter(name='Trackers').exists():
         if request.method == 'POST':
             new_status = request.POST.get('update_status', update.status)
             
@@ -869,24 +869,32 @@ def edit_project_update(request, update_id):
             elif new_status != 'Closed' and update.status == 'Closed':
                 update.closed_at = None
             
-            who_contact_ids = request.POST.getlist('who_contact')
+            # Update text and push_pull_type only if they're in the POST data
+            if 'update_text' in request.POST:
+                update.text = request.POST.get('update_text', update.text)
+            if 'push_pull_type' in request.POST:
+                update.push_pull_type = request.POST.get('push_pull_type', update.push_pull_type)
             
-            update.text = request.POST.get('update_text', update.text)
-            update.push_pull_type = request.POST.get('push_pull_type', update.push_pull_type)
             update.status = new_status
-            eta_date = request.POST.get('eta_date')
-            update.eta = parse_date(eta_date) if eta_date else None
+            
+            # Only update ETA if it's in the POST data
+            if 'eta_date' in request.POST:
+                eta_date = request.POST.get('eta_date')
+                update.eta = parse_date(eta_date) if eta_date else None
             
             update.save()
             
-            update.who_contact.clear()
-            for contact_id in who_contact_ids:
-                if contact_id:
-                    try:
-                        contact = ContactPerson.objects.get(pk=contact_id)
-                        update.who_contact.add(contact)
-                    except ContactPerson.DoesNotExist:
-                        pass
+            # Only update who_contact if it's in the POST data
+            if 'who_contact' in request.POST:
+                who_contact_ids = request.POST.getlist('who_contact')
+                update.who_contact.clear()
+                for contact_id in who_contact_ids:
+                    if contact_id:
+                        try:
+                            contact = ContactPerson.objects.get(pk=contact_id)
+                            update.who_contact.add(contact)
+                        except ContactPerson.DoesNotExist:
+                            pass
 
             messages.success(request, "Push-Pull content saved successfully.")
         
