@@ -1,0 +1,666 @@
+{% extends 'planner/_base.html' %}
+
+{% block title %}Help & Documentation{% endblock %}
+
+{% block content %}
+<style>
+    .header-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .help-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+    .help-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+    .step-card {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    .step-card:hover {
+        border-color: #4f46e5;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.1);
+    }
+    .feature-highlight {
+        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        border: 2px solid #10b981;
+        border-radius: 12px;
+    }
+    .calculation-table {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .table-header {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: white;
+    }
+    .table-row:nth-child(even) {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+    .icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+    .large-icon {
+        width: 3rem;
+        height: 3rem;
+    }
+    .xl-icon {
+        width: 4rem;
+        height: 4rem;
+    }
+    .nav-card {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border: 2px solid #3b82f6;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+    }
+    .nav-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+    }
+    .toc-item {
+        transition: all 0.2s ease;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+    }
+    .toc-item:hover {
+        background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+        transform: translateX(4px);
+    }
+</style>
+
+<header class="header-gradient shadow-xl">
+    <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center">
+            <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+                <h1 class="text-4xl font-bold text-white">Help & Documentation</h1>
+                <p class="text-indigo-100 mt-2">Complete guide to using the Capacity Planning System</p>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        <a href="#getting-started" class="nav-card p-6 block">
+            <div class="flex items-center mb-3">
+                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                <h3 class="font-bold text-blue-900">Getting Started</h3>
+            </div>
+            <p class="text-blue-800 text-sm">Step-by-step setup guide</p>
+        </a>
+        
+        <a href="#capacity-calculations" class="nav-card p-6 block">
+            <div class="flex items-center mb-3">
+                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                </svg>
+                <h3 class="font-bold text-blue-900">Capacity Calculations</h3>
+            </div>
+            <p class="text-blue-800 text-sm">How the math works</p>
+        </a>
+        
+        <a href="#features" class="nav-card p-6 block">
+            <div class="flex items-center mb-3">
+                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                </svg>
+                <h3 class="font-bold text-blue-900">Key Features</h3>
+            </div>
+            <p class="text-blue-800 text-sm">Explore capabilities</p>
+        </a>
+        
+        <a href="#best-practices" class="nav-card p-6 block">
+            <div class="flex items-center mb-3">
+                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+                <h3 class="font-bold text-blue-900">Best Practices</h3>
+            </div>
+            <p class="text-blue-800 text-sm">Tips and recommendations</p>
+        </a>
+    </div>
+
+    <section id="getting-started" class="help-card mb-12">
+        <div class="bg-gradient-to-r from-green-500 to-emerald-600 px-8 py-6">
+            <div class="flex items-center">
+                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                <div>
+                    <h2 class="text-3xl font-bold text-white">Getting Started Guide</h2>
+                    <p class="text-green-100 mt-2">Follow these steps to set up your capacity planning system</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">1</div>
+                        <h3 class="text-xl font-bold text-gray-800">Initial Configuration</h3>
+                    </div>
+                    <p class="text-gray-600 mb-4">Set up the core parameters before adding data.</p>
+                    <ul class="space-y-2">
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>General Settings:</strong> Working hours per day</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>Capacity Settings:</strong> Meeting/leave hours, efficiency factors</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>Holidays:</strong> Company non-working days</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>Project Types:</strong> Segment + Category with involvement %</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">2</div>
+                        <h3 class="text-xl font-bold text-gray-800">Add Your Data</h3>
+                    </div>
+                    <p class="text-gray-600 mb-4">Populate the system with your team and workload.</p>
+                    <ul class="space-y-2">
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>Workforce:</strong> Add employees with designations</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>Projects:</strong> Create project entries</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>Activities:</strong> Schedule tasks with assignments</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700"><strong>Sales Forecast:</strong> Import Excel pipeline data</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">3</div>
+                        <h3 class="text-xl font-bold text-gray-800">Set Up Benchmarks</h3>
+                    </div>
+                    <p class="text-gray-600 mb-4">Configure effort estimation for automatic calculations.</p>
+                    <ul class="space-y-2">
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-purple-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700">Define project value → effort day mappings</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-purple-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700">System uses linear interpolation between points</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-purple-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700">Enables automatic forecast effort calculation</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">4</div>
+                        <h3 class="text-xl font-bold text-gray-800">Analyze Results</h3>
+                    </div>
+                    <p class="text-gray-600 mb-4">Review capacity planning reports and insights.</p>
+                    <ul class="space-y-2">
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-amber-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700">View monthly supply vs demand analysis</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-amber-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700">Identify resource shortages and surpluses</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 text-amber-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700">Plan hiring and resource allocation</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="capacity-calculations" class="help-card mb-12">
+        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 px-8 py-6">
+            <div class="flex items-center">
+                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                </svg>
+                <div>
+                    <h2 class="text-3xl font-bold text-white">Capacity Calculation Details</h2>
+                    <p class="text-blue-100 mt-2">Understanding how the system calculates supply and demand</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-8">
+            <div class="calculation-table overflow-hidden">
+                <table class="w-full">
+                    <thead class="table-header">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-semibold">Metric</th>
+                            <th class="px-6 py-4 text-left font-semibold">Description</th>
+                            <th class="px-6 py-4 text-left font-semibold">Calculation Formula</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        <tr class="table-row">
+                            <td class="px-6 py-4 font-semibold text-green-700">Supply (Available Hours)</td>
+                            <td class="px-6 py-4 text-gray-700">Net productive hours your team has available in a month</td>
+                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
+                                GrossHours - NonProjectHours - EfficiencyLoss
+                            </td>
+                        </tr>
+                        <tr class="table-row">
+                            <td class="px-6 py-4 font-semibold text-amber-700">Demand (Required Hours)</td>
+                            <td class="px-6 py-4 text-gray-700">Total hours needed from confirmed + potential projects</td>
+                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
+                                SUM(LiveProject Hours) + SUM(Forecast Hours)
+                            </td>
+                        </tr>
+                        <tr class="table-row">
+                            <td class="px-6 py-4 font-semibold text-blue-700">Variance</td>
+                            <td class="px-6 py-4 text-gray-700">Monthly surplus (positive) or deficit (negative)</td>
+                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
+                                Supply - Demand
+                            </td>
+                        </tr>
+                        <tr class="table-row">
+                            <td class="px-6 py-4 font-semibold text-purple-700">Required Headcount</td>
+                            <td class="px-6 py-4 text-gray-700">Estimated people needed vs available</td>
+                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
+                                RequiredHours / (AvailableHours / CurrentHeadcount)
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="feature-highlight p-6">
+                    <h4 class="font-bold text-green-800 mb-3 flex items-center">
+                        <svg class="icon mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        Supply Calculation Details
+                    </h4>
+                    <ul class="text-sm text-green-700 space-y-2">
+                        <li><strong>Gross Hours:</strong> Employees × Working Days × Hours/Day</li>
+                        <li><strong>Non-Project Hours:</strong> Meetings + Leave (monthly)</li>
+                        <li><strong>Efficiency Loss:</strong> Percentage of productivity loss</li>
+                        <li><strong>Working Days:</strong> Excludes weekends and holidays</li>
+                    </ul>
+                </div>
+
+                <div class="feature-highlight p-6">
+                    <h4 class="font-bold text-green-800 mb-3 flex items-center">
+                        <svg class="icon mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                        </svg>
+                        Demand Calculation Details
+                    </h4>
+                    <ul class="text-sm text-green-700 space-y-2">
+                        <li><strong>Live Projects:</strong> Scheduled activities × daily hours</li>
+                        <li><strong>Sales Forecast:</strong> Value → Effort (via benchmarks)</li>
+                        <li><strong>Role Involvement:</strong> Engineer/TL/Manager percentages</li>
+                        <li><strong>Time Distribution:</strong> Spread across project duration</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="help-card mb-12">
+        <div class="bg-gradient-to-r from-purple-500 to-pink-600 px-8 py-6">
+            <div class="flex items-center">
+                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                </svg>
+                <div>
+                    <h2 class="text-3xl font-bold text-white">Key Features & Capabilities</h2>
+                    <p class="text-purple-100 mt-2">Explore what the system can do for your organization</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Interactive Gantt Charts</h4>
+                    </div>
+                    <p class="text-gray-600 text-sm">Visual timeline with hover tooltips, overlap detection, and holiday highlighting</p>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Automatic Effort Estimation</h4>
+                    </div>
+                    <p class="text-gray-600 text-sm">Linear interpolation between benchmark points for accurate project sizing</p>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Smart Date Calculation</h4>
+                    </div>
+                    <p class="text-gray-600 text-sm">Automatically excludes weekends and holidays from all scheduling calculations</p>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Excel Integration</h4>
+                    </div>
+                    <p class="text-gray-600 text-sm">Import sales forecasts directly from Excel with drag-and-drop support</p>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Overlap Detection</h4>
+                    </div>
+                    <p class="text-gray-600 text-sm">Visual alerts when team members are assigned to multiple activities simultaneously</p>
+                </div>
+
+                <div class="step-card p-6">
+                    <div class="flex items-center mb-4">
+                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                        </svg>
+                        <h4 class="font-bold text-gray-800">Comprehensive Reporting</h4>
+                    </div>
+                    <p class="text-gray-600 text-sm">Monthly capacity analysis with supply/demand variance and headcount planning</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="best-practices" class="help-card mb-12">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-600 px-8 py-6">
+            <div class="flex items-center">
+                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+                <div>
+                    <h2 class="text-3xl font-bold text-white">Best Practices & Tips</h2>
+                    <p class="text-amber-100 mt-2">Recommendations for optimal system usage</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <div class="space-y-6">
+                    <div class="step-card p-6">
+                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                            <svg class="icon mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Data Accuracy
+                        </h4>
+                        <ul class="text-sm text-gray-700 space-y-2">
+                            <li>• Update capacity settings quarterly to reflect reality</li>
+                            <li>• Regularly review and adjust efficiency loss factors</li>
+                            <li>• Keep project types and benchmarks current</li>
+                            <li>• Maintain accurate employee designations</li>
+                        </ul>
+                    </div>
+
+                    <div class="step-card p-6">
+                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                            <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            Planning Workflow
+                        </h4>
+                        <ul class="text-sm text-gray-700 space-y-2">
+                            <li>• Schedule activities with realistic buffer time</li>
+                            <li>• Review Gantt charts for resource conflicts</li>
+                            <li>• Use consolidated view to balance workloads</li>
+                            <li>• Plan activities at least 2 weeks in advance</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="step-card p-6">
+                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                            <svg class="icon mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Forecasting Tips
+                        </h4>
+                        <ul class="text-sm text-gray-700 space-y-2">
+                            <li>• Include probability percentages in sales data</li>
+                            <li>• Set up multiple benchmarks per project type</li>
+                            <li>• Update forecasts monthly for accuracy</li>
+                            <li>• Consider seasonal variations in planning</li>
+                        </ul>
+                    </div>
+
+                    <div class="step-card p-6">
+                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                            <svg class="icon mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.054 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            Common Pitfalls
+                        </h4>
+                        <ul class="text-sm text-gray-700 space-y-2">
+                            <li>• Don't ignore efficiency loss factors</li>
+                            <li>• Avoid over-optimistic activity durations</li>
+                            <li>• Don't forget to account for holidays</li>
+                            <li>• Review overlaps before finalizing schedules</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-300">
+                <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+                    <svg class="icon mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Quick Reference - Key Actions
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-indigo-600">📊</div>
+                        <p class="text-sm font-medium text-gray-800 mt-1">Check Capacity Plan monthly</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">📈</div>
+                        <p class="text-sm font-medium text-gray-800 mt-1">Update forecasts regularly</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">🎯</div>
+                        <p class="text-sm font-medium text-gray-800 mt-1">Monitor overlaps weekly</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-purple-600">⚙️</div>
+                        <p class="text-sm font-medium text-gray-800 mt-1">Review settings quarterly</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="help-card">
+        <div class="bg-gradient-to-r from-gray-600 to-gray-800 px-8 py-6">
+            <div class="flex items-center">
+                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <div>
+                    <h2 class="text-3xl font-bold text-white">Need Additional Help?</h2>
+                    <p class="text-gray-200 mt-2">Resources for getting the most out of your capacity planning system</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="xl-icon mx-auto text-blue-500 mb-4">📚</div>
+                    <h4 class="font-bold text-gray-800 mb-2">Documentation</h4>
+                    <p class="text-gray-600 text-sm">Comprehensive guides and tutorials for advanced features and configuration options.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="xl-icon mx-auto text-green-500 mb-4">💬</div>
+                    <h4 class="font-bold text-gray-800 mb-2">Community</h4>
+                    <p class="text-gray-600 text-sm">Connect with other users to share best practices and troubleshooting tips.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="xl-icon mx-auto text-purple-500 mb-4">🛠️</div>
+                    <h4 class="font-bold text-gray-800 mb-2">Support</h4>
+                    <p class="text-gray-600 text-sm">Technical assistance and custom configuration help for enterprise deployments.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    // Add intersection observer for active section highlighting
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('a[href^="#"]');
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // Remove active class from all nav items
+                navLinks.forEach(link => {
+                    link.classList.remove('border-indigo-500', 'border-2');
+                    link.classList.add('border-blue-200', 'border-2');
+                });
+                
+                // Add active class to current section's nav item
+                const currentNavLink = document.querySelector(`a[href="#${entry.target.id}"]`);
+                if (currentNavLink) {
+                    currentNavLink.classList.remove('border-blue-200');
+                    currentNavLink.classList.add('border-indigo-500');
+                }
+            }
+        });
+    }, {
+        rootMargin: '-20% 0px -70% 0px'
+    });
+
+    sections.forEach(section => {
+        observer.observe(section);
+    });
+
+    // Add animation to cards on scroll
+    const cards = document.querySelectorAll('.help-card, .step-card');
+    const cardObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, {
+        threshold: 0.1
+    });
+
+    cards.forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        cardObserver.observe(card);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,532 @@
+{% extends 'planner/_base.html' %}
+{% load static %}
+
+{% block title %}Capacity Plan{% endblock %}
+
+{% block content %}
+<style>
+    .metric-card { transition: all 0.3s ease; }
+    .metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .table-header-sticky { position: sticky; top: 0; z-index: 10; }
+    .shortage-alert { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+</style>
+
+<header class="bg-white shadow-md">
+    <div class="max-w-screen-2xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight text-gray-900">Capacity Planning Dashboard</h1>
+                <p class="mt-1 text-lg text-gray-600">Strategic workforce analysis and demand forecasting</p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="exportReport()" class="bg-green-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-green-700 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Export Report
+                </button>
+                <button onclick="refreshData()" class="bg-indigo-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-indigo-700 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="max-w-screen-2xl mx-auto py-10 sm:px-6 lg:px-8">
+    
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="gradient-bg text-white p-6 rounded-lg shadow-lg metric-card">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold">{% if report_data %}{{ report_data|length }}{% else %}0{% endif %}</p>
+                    <p class="text-sm opacity-90">Designations Tracked</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-blue-500 text-white p-6 rounded-lg shadow-lg metric-card">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold">12</p>
+                    <p class="text-sm opacity-90">Months Forecasted</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-green-500 text-white p-6 rounded-lg shadow-lg metric-card">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold" id="totalSupplyHours">-</p>
+                    <p class="text-sm opacity-90">Total Supply Hours</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-orange-500 text-white p-6 rounded-lg shadow-lg metric-card">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold" id="totalDemandHours">-</p>
+                    <p class="text-sm opacity-90">Total Demand Hours</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertContainer" class="mb-6"></div>
+
+    <div class="bg-white p-4 rounded-lg shadow-lg mb-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">View Mode:</label>
+                    <select id="viewMode" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
+                        <option value="hours">Hours View</option>
+                        <option value="headcount">Headcount View</option>
+                        <option value="both">Combined View</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label class="text-sm font-medium text-gray-700">Highlight:</label>
+                    <select id="highlightMode" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
+                        <option value="none">No Highlighting</option>
+                        <option value="shortage">Shortages Only</option>
+                        <option value="surplus">Surplus Only</option>
+                        <option value="critical">Critical Issues</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-sm text-gray-600">Getting Started:</span>
+                <div class="flex items-center space-x-1 text-xs">
+                    <div class="w-3 h-3 bg-blue-500 rounded"></div>
+                    <span>Configure your team in</span>
+                    <a href="{% url 'workforce' %}" class="text-blue-600 hover:underline">Workforce</a>
+                    <span>,</span>
+                    <span>add projects, and import</span>
+                    <a href="{% url 'sales_forecast' %}" class="text-blue-600 hover:underline">Sales Forecasts</a>
+                    <span>to see capacity analysis</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Capacity Analysis Report</h3>
+                    <p class="text-sm text-gray-600">Supply vs. demand analysis for strategic workforce planning</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-1">
+                        <div class="w-3 h-3 bg-green-500 rounded"></div>
+                        <span class="text-xs text-gray-600">Supply</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <div class="w-3 h-3 bg-yellow-500 rounded"></div>
+                        <span class="text-xs text-gray-600">Demand</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <div class="w-3 h-3 bg-red-500 rounded"></div>
+                        <span class="text-xs text-gray-600">Shortage</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <div class="w-3 h-3 bg-blue-500 rounded"></div>
+                        <span class="text-xs text-gray-600">Surplus</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto" style="max-height: 600px;">
+            <table class="min-w-full" id="capacityTable">
+                <thead class="bg-gray-50 table-header-sticky">
+                    <tr>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider sticky left-0 bg-gray-50 z-20 w-40 border-r">Designation</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-48 border-r">Metric</th>
+                        {% if report_data %}
+                            {% for month_data in report_data.0.months %}
+                            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-32 border-r">{{ month_data.month }}</th>
+                            {% endfor %}
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody class="bg-white" id="capacityTableBody">
+                    {% for des_data in report_data %}
+                        <tr class="border-t hover:bg-gray-50" data-designation="{{ des_data.designation }}">
+                            <td rowspan="4" class="px-3 py-4 align-top font-bold text-lg text-indigo-700 whitespace-nowrap sticky left-0 bg-white z-10 border-r">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 mr-3">
+                                        <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                            <span class="text-sm font-medium text-indigo-600">{{ des_data.designation|slice:":2" }}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900">{{ des_data.designation }}</div>
+                                        <div class="text-xs text-gray-500">Role Category</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-3 py-3 text-sm font-medium text-gray-700 whitespace-nowrap border-r bg-green-50">
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                    Supply (Hours)
+                                </div>
+                            </td>
+                            {% for month_data in des_data.months %}
+                            <td class="px-3 py-3 text-center text-sm text-green-600 font-semibold whitespace-nowrap border-r bg-green-50" data-value="{{ month_data.available_hours }}">
+                                {{ month_data.available_hours|floatformat:0 }}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-3 text-sm font-medium text-gray-700 whitespace-nowrap border-r bg-yellow-50">
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                                    Demand (Hours)
+                                </div>
+                            </td>
+                            {% for month_data in des_data.months %}
+                            <td class="px-3 py-3 text-center text-sm text-yellow-600 font-semibold whitespace-nowrap border-r bg-yellow-50" data-value="{{ month_data.required_hours }}">
+                                {{ month_data.required_hours|floatformat:0 }}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="bg-gray-50 font-bold hover:bg-gray-100">
+                            <td class="px-3 py-3 text-sm font-medium text-gray-900 whitespace-nowrap border-r">
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-gray-600 rounded-full mr-2"></div>
+                                    Variance (Hours)
+                                </div>
+                            </td>
+                            {% for month_data in des_data.months %}
+                            <td class="px-3 py-3 text-center text-sm whitespace-nowrap border-r {% if month_data.variance_hours < 0 %}text-red-600 bg-red-50 shortage-alert{% else %}text-blue-600 bg-blue-50{% endif %}" data-value="{{ month_data.variance_hours }}">
+                                <div class="flex items-center justify-center">
+                                    {% if month_data.variance_hours < 0 %}
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    {% else %}
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    {% endif %}
+                                    {{ month_data.variance_hours|floatformat:0 }}
+                                </div>
+                            </td>
+                            {% endfor %}
+                        </tr>
+
+                        <tr class="border-b-4 border-gray-200 hover:bg-gray-50">
+                            <td class="px-3 py-3 text-sm font-medium text-gray-700 whitespace-nowrap italic border-r bg-purple-50">
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                                    Required / Available Headcount
+                                </div>
+                            </td>
+                             {% for month_data in des_data.months %}
+                             <td class="px-3 py-3 text-center text-sm font-semibold whitespace-nowrap border-r bg-purple-50
+                                {% if month_data.required_headcount > month_data.available_headcount %}text-red-600{% else %}text-gray-800{% endif %}">
+                                <div class="flex flex-col items-center">
+                                    <span class="text-lg">{{ month_data.required_headcount|floatformat:1 }}</span>
+                                    <div class="text-xs text-gray-500 border-t pt-1">{{ month_data.available_headcount }} available</div>
+                                </div>
+                             </td>
+                             {% endfor %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="14" class="text-center py-20">
+                                <div class="flex flex-col items-center">
+                                    <svg class="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Capacity Data Available</h3>
+                                    <p class="text-sm text-gray-500 max-w-md text-center mb-6">To generate your capacity analysis report, you need to complete the following setup steps:</p>
+                                    <div class="space-y-2 text-sm text-left">
+                                        <div class="flex items-center text-gray-600">
+                                            <svg class="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Configure your team in Workforce, add projects, and import sales forecasts to see capacity analysis
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden mt-8">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center">
+                <svg class="w-8 h-8 text-gray-600 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
+                </svg>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Capacity Requirements Overview</h3>
+                    <p class="text-sm text-gray-600">Monthly workload breakdown showing live projects vs forecasted demand</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <div class="flex items-center justify-center space-x-6 mb-6">
+                <div class="flex items-center">
+                    <div class="w-4 h-4 bg-violet-500 rounded mr-2"></div>
+                    <span class="text-sm font-medium text-gray-700">Live/Backlog Workload</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 bg-yellow-400 rounded mr-2"></div>
+                    <span class="text-sm font-medium text-gray-700">Forecasted Workload</span>
+                </div>
+            </div>
+            
+            <div class="relative h-96">
+                <canvas id="capacityChart" class="w-full h-full"></canvas>
+            </div>
+            
+            <div class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4">
+                <h4 class="font-semibold text-gray-800 mb-3">Workload Insights</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="text-center bg-white rounded-lg p-3 border border-blue-100">
+                        <p class="text-2xl font-bold text-violet-600" id="totalLiveHours">0</p>
+                        <p class="text-sm text-gray-600">Total Live Hours</p>
+                    </div>
+                    <div class="text-center bg-white rounded-lg p-3 border border-blue-100">
+                        <p class="text-2xl font-bold text-yellow-600" id="totalForecastHours">0</p>
+                        <p class="text-sm text-gray-600">Total Forecast Hours</p>
+                    </div>
+                    <div class="text-center bg-white rounded-lg p-3 border border-blue-100">
+                        <p class="text-2xl font-bold text-indigo-600" id="peakMonth">-</p>
+                        <p class="text-sm text-gray-600">Peak Demand Month</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    calculateSummaryStats();
+    initializeControls();
+    generateAlerts();
+    renderCapacityChart();
+});
+
+function calculateSummaryStats() {
+    let totalSupply = 0;
+    let totalDemand = 0;
+    
+    document.querySelectorAll('#capacityTableBody tr').forEach(row => {
+        const supplyCell = row.querySelector('td.text-green-600');
+        const demandCell = row.querySelector('td.text-yellow-600');
+        if (supplyCell) {
+            totalSupply += parseFloat(supplyCell.dataset.value) || 0;
+        }
+        if (demandCell) {
+            totalDemand += parseFloat(demandCell.dataset.value) || 0;
+        }
+    });
+    
+    document.getElementById('totalSupplyHours').textContent = Math.round(totalSupply).toLocaleString();
+    document.getElementById('totalDemandHours').textContent = Math.round(totalDemand).toLocaleString();
+}
+
+function renderCapacityChart() {
+    const chartData = {{ chart_data|safe }};
+    const ctx = document.getElementById('capacityChart');
+
+    if (!chartData || chartData.length === 0 || !ctx) {
+        console.log("No chart data or canvas element found.");
+        return;
+    }
+    
+    Chart.register(ChartDataLabels);
+    
+    const labels = chartData.map(d => d.month);
+    const liveWorkloadData = chartData.map(d => d.live_workload);
+    const forecastedWorkloadData = chartData.map(d => d.forecasted_workload);
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Live/Backlog Workload',
+                    data: liveWorkloadData,
+                    backgroundColor: '#8b5cf6',
+                    borderColor: '#7c3aed',
+                    borderWidth: 1,
+                    order: 2
+                },
+                {
+                    label: 'Forecasted Workload',
+                    data: forecastedWorkloadData,
+                    backgroundColor: '#facc15',
+                    borderColor: '#eab308',
+                    borderWidth: 1,
+                    order: 2
+                },
+                {
+                    type: 'line',
+                    label: 'Live Workload Trend',
+                    data: liveWorkloadData,
+                    borderColor: '#6d28d9',
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 2,
+                    tension: 0.3,
+                    order: 1
+                },
+                {
+                    type: 'line',
+                    label: 'Forecasted Workload Trend',
+                    data: forecastedWorkloadData,
+                    borderColor: '#ca8a04',
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 2,
+                    tension: 0.3,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: false },
+                legend: { display: false },
+                datalabels: {
+                    // *** THIS IS THE CORRECTED LINE ***
+                    // Display labels only for datasets that are NOT of type 'line'.
+                    display: context => context.dataset.type !== 'line',
+                    anchor: 'end',
+                    align: 'end',
+                    color: '#4b5563',
+                    font: {
+                        weight: 'bold',
+                        size: 10
+                    },
+                    formatter: (value) => value > 0 ? Math.round(value) : null,
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: { display: false }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Man Hours'
+                    }
+                }
+            }
+        }
+    });
+
+    // --- Update Chart Summary Cards ---
+    const totalLive = liveWorkloadData.reduce((a, b) => a + b, 0);
+    const totalForecast = forecastedWorkloadData.reduce((a, b) => a + b, 0);
+    
+    document.getElementById('totalLiveHours').textContent = Math.round(totalLive).toLocaleString();
+    document.getElementById('totalForecastHours').textContent = Math.round(totalForecast).toLocaleString();
+
+    let peakDemand = 0;
+    let peakMonth = '-';
+    chartData.forEach(d => {
+        if (d.total > peakDemand) {
+            peakDemand = d.total;
+            peakMonth = d.month;
+        }
+    });
+    document.getElementById('peakMonth').textContent = peakMonth;
+}
+
+
+function initializeControls() {
+    const viewMode = document.getElementById('viewMode');
+    const highlightMode = document.getElementById('highlightMode');
+    
+    if (viewMode) {
+        viewMode.addEventListener('change', (e) => updateViewMode(e.target.value));
+    }
+    if (highlightMode) {
+        highlightMode.addEventListener('change', (e) => updateHighlighting(e.target.value));
+    }
+}
+
+function updateViewMode(mode) {
+    console.log('View mode changed to:', mode);
+}
+
+function updateHighlighting(mode) {
+    console.log('Highlighting mode changed to:', mode);
+}
+
+function generateAlerts() {
+    const alertContainer = document.getElementById('alertContainer');
+    if (!alertContainer) return;
+
+    const shortages = document.querySelectorAll('.text-red-600.shortage-alert').length;
+    
+    if (shortages > 0) {
+        alertContainer.innerHTML = `
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                <strong>Capacity Alert:</strong> ${shortages} capacity shortages detected. Review the highlighted cells below.
+            </div>
+        `;
+    }
+}
+
+function exportReport() {
+    alert('Export functionality is a placeholder.');
+}
+
+function refreshData() {
+    window.location.reload();
+}
+</script>
+{% endblock %}

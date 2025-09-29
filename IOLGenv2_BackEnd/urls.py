@@ -26,5 +26,6 @@ urlpatterns = [
     path('', include('home.urls')),
     path('tracker/', include('tracker.urls')),
     path('inventory/', include('inventory.urls')),
+    path('planner/', include('planner.urls')),
 
 ]

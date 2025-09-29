@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'tracker',
     'django.contrib.humanize',
     'inventory',
+    'planner',
 ]
 
 MIDDLEWARE = [
@@ -70,6 +71,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'IOLGenv2_BackEnd.middleware.TrackerGroupRequiredMiddleware',
+    'IOLGenv2_BackEnd.middleware.PlannerAuthRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

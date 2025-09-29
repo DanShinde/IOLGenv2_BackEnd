@@ -29,3 +29,19 @@ class TrackerGroupRequiredMiddleware:
             # if not request.user.groups.filter(name='Trackers').exists():
             #     return HttpResponseForbidden("Access denied. User Not in Trackers group.")
         return self.get_response(request)
+
+class PlannerAuthRequiredMiddleware:
+    """
+    Blocks any URL under /planner/ unless the user is authenticated.
+    Redirects unauthenticated users to 'loginw'.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Adjust this prefix if your planner URLs are mounted elsewhere
+        if request.path_info.startswith('/planner/'):
+            if not request.user.is_authenticated:
+                return redirect('loginw')
+        return self.get_response(request)

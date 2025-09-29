@@ -1,0 +1,457 @@
+{% extends 'planner/_base.html' %}
+
+{% block title %}Edit Project Type{% endblock %}
+
+{% block content %}
+<style>
+    .header-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .form-section {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    .form-section:hover {
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .form-input {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    .form-input:focus {
+        border-color: #4f46e5;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        transition: all 0.2s ease;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+    }
+    .btn-secondary {
+        background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+        transition: all 0.2s ease;
+    }
+    .btn-secondary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+    }
+    .page-container {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        min-height: calc(100vh - 80px);
+    }
+    .main-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    .main-card:hover {
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+    .breadcrumb {
+        background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .preview-card {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border: 2px solid #93c5fd;
+        border-radius: 12px;
+        padding: 1.5rem;
+    }
+    .involvement-bar {
+        background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+        border-radius: 6px;
+        height: 8px;
+        overflow: hidden;
+    }
+    .involvement-fill {
+        height: 100%;
+        border-radius: 6px;
+        transition: width 0.3s ease;
+    }
+    .engineer-fill {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    }
+    .teamlead-fill {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    .manager-fill {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    }
+    .icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+    .large-icon {
+        width: 3rem;
+        height: 3rem;
+    }
+</style>
+
+<header class="header-gradient shadow-xl">
+    <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center">
+            <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+            <div>
+                <h1 class="text-4xl font-bold text-white">Edit Project Type</h1>
+                <p class="text-indigo-100 mt-2">Modify project type configuration and involvement percentages</p>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="page-container">
+    <main class="max-w-4xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+        
+        <!-- Breadcrumb Navigation -->
+        <div class="breadcrumb">
+            <nav class="flex items-center space-x-4 text-sm">
+                <a href="{% url 'configuration' %}" class="text-gray-600 hover:text-indigo-600 font-medium flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Configuration
+                </a>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                <span class="text-indigo-600 font-semibold">Edit Project Type</span>
+            </nav>
+        </div>
+
+        <!-- Current Configuration Preview -->
+        <div class="preview-card mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-blue-900 mb-2">Currently Editing</h2>
+                    <div class="flex items-center space-x-4 text-blue-800">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                            <span class="font-semibold">{{ type.segment.name }} - {{ type.category.name }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-blue-700 mb-1">Used in capacity planning calculations</div>
+                    <div class="text-lg font-bold text-blue-900">Project Type Configuration</div>
+                </div>
+            </div>
+            
+            <!-- Current Involvement Visualization -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <div class="flex items-center justify-between text-sm mb-2">
+                        <span class="font-medium text-blue-800">Engineers</span>
+                        <span class="font-bold text-blue-900">{{ type.engineer_involvement }}%</span>
+                    </div>
+                    <div class="involvement-bar">
+                        <div class="involvement-fill engineer-fill" style="width: {{ type.engineer_involvement }}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between text-sm mb-2">
+                        <span class="font-medium text-blue-800">Team Leads</span>
+                        <span class="font-bold text-blue-900">{{ type.team_lead_involvement }}%</span>
+                    </div>
+                    <div class="involvement-bar">
+                        <div class="involvement-fill teamlead-fill" style="width: {{ type.team_lead_involvement }}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between text-sm mb-2">
+                        <span class="font-medium text-blue-800">Managers</span>
+                        <span class="font-bold text-blue-900">{{ type.manager_involvement }}%</span>
+                    </div>
+                    <div class="involvement-bar">
+                        <div class="involvement-fill manager-fill" style="width: {{ type.manager_involvement }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Edit Form -->
+        <div class="main-card">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-8 py-6 border-b border-gray-200">
+                <div class="flex items-center">
+                    <svg class="icon mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    <h2 class="text-2xl font-bold text-gray-800">Project Type Configuration</h2>
+                </div>
+            </div>
+
+            <div class="p-8">
+                <form method="POST" class="space-y-8">
+                    {% csrf_token %}
+                    
+                    <!-- Classification Section -->
+                    <div class="form-section p-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-6 flex items-center">
+                            <svg class="icon mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                            </svg>
+                            Project Classification
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                    Business Segment
+                                </label>
+                                <select name="segment" class="form-input w-full px-4 py-3" required>
+                                    {% for segment in all_segments %}
+                                    <option value="{{ segment.pk }}" {% if type.segment.pk == segment.pk %}selected{% endif %}>
+                                        {{ segment.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">The business area this project type belongs to</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                    </svg>
+                                    Project Category
+                                </label>
+                                <select name="category" class="form-input w-full px-4 py-3" required>
+                                    {% for category in all_categories %}
+                                    <option value="{{ category.pk }}" {% if type.category.pk == category.pk %}selected{% endif %}>
+                                        {{ category.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">The specific type or nature of work</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Involvement Percentages Section -->
+                    <div class="form-section p-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-6 flex items-center">
+                            <svg class="icon mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                            Role Involvement Percentages
+                        </h4>
+                        <p class="text-gray-600 mb-6">Define how much each role typically contributes to this type of project. These percentages are used in capacity planning calculations.</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <div class="flex items-center">
+                                        <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                                        Engineer Involvement (%)
+                                    </div>
+                                </label>
+                                <input type="number" step="0.1" name="engineer_involvement" 
+                                       value="{{ type.engineer_involvement }}" 
+                                       class="form-input w-full px-4 py-3" 
+                                       required min="0" max="200"
+                                       id="engineer_input">
+                                <p class="text-xs text-gray-500 mt-1">Percentage of project effort from engineers</p>
+                                <div class="mt-2">
+                                    <div class="involvement-bar">
+                                        <div class="involvement-fill engineer-fill" id="engineer_bar" style="width: {{ type.engineer_involvement }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <div class="flex items-center">
+                                        <div class="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                                        Team Lead Involvement (%)
+                                    </div>
+                                </label>
+                                <input type="number" step="0.1" name="team_lead_involvement" 
+                                       value="{{ type.team_lead_involvement }}" 
+                                       class="form-input w-full px-4 py-3" 
+                                       required min="0" max="200"
+                                       id="teamlead_input">
+                                <p class="text-xs text-gray-500 mt-1">Percentage of project effort from team leads</p>
+                                <div class="mt-2">
+                                    <div class="involvement-bar">
+                                        <div class="involvement-fill teamlead-fill" id="teamlead_bar" style="width: {{ type.team_lead_involvement }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <div class="flex items-center">
+                                        <div class="w-4 h-4 bg-purple-500 rounded mr-2"></div>
+                                        Manager Involvement (%)
+                                    </div>
+                                </label>
+                                <input type="number" step="0.1" name="manager_involvement" 
+                                       value="{{ type.manager_involvement }}" 
+                                       class="form-input w-full px-4 py-3" 
+                                       required min="0" max="200"
+                                       id="manager_input">
+                                <p class="text-xs text-gray-500 mt-1">Percentage of project effort from managers</p>
+                                <div class="mt-2">
+                                    <div class="involvement-bar">
+                                        <div class="involvement-fill manager-fill" id="manager_bar" style="width: {{ type.manager_involvement }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Involvement Display -->
+                        <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <svg class="w-5 h-5 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium text-amber-800">Total Involvement:</span>
+                                </div>
+                                <span id="total_involvement" class="text-lg font-bold text-amber-900">
+                                    {{ type.engineer_involvement|add:type.team_lead_involvement|add:type.manager_involvement }}%
+                                </span>
+                            </div>
+                            <p class="text-xs text-amber-700 mt-1">
+                                Note: Total can exceed 100% when roles work in parallel or have overlapping responsibilities.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Impact Information -->
+                    <div class="form-section p-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <svg class="icon mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Usage & Impact
+                        </h4>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h5 class="font-semibold text-blue-900 mb-2">This project type is used for:</h5>
+                            <ul class="text-sm text-blue-800 space-y-1">
+                                <li>• <strong>Activity Classification:</strong> Categorizing activities in project planning</li>
+                                <li>• <strong>Capacity Calculations:</strong> Determining role-specific workload requirements</li>
+                                <li>• <strong>Sales Forecast:</strong> Automatic effort estimation based on project values</li>
+                                <li>• <strong>Resource Planning:</strong> Predicting future staffing needs by role</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex justify-end space-x-4 pt-8 border-t border-gray-200">
+                        <a href="{% url 'configuration' %}" 
+                           class="btn-secondary text-white py-3 px-6 rounded-lg font-semibold flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            Cancel Changes
+                        </a>
+                        <button type="submit" class="btn-primary text-white py-3 px-6 rounded-lg font-semibold flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const engineerInput = document.getElementById('engineer_input');
+    const teamleadInput = document.getElementById('teamlead_input');
+    const managerInput = document.getElementById('manager_input');
+    
+    const engineerBar = document.getElementById('engineer_bar');
+    const teamleadBar = document.getElementById('teamlead_bar');
+    const managerBar = document.getElementById('manager_bar');
+    
+    const totalInvolvement = document.getElementById('total_involvement');
+
+    function updateBars() {
+        const engineerValue = parseFloat(engineerInput.value) || 0;
+        const teamleadValue = parseFloat(teamleadInput.value) || 0;
+        const managerValue = parseFloat(managerInput.value) || 0;
+        const total = engineerValue + teamleadValue + managerValue;
+
+        // Update progress bars
+        engineerBar.style.width = Math.min(engineerValue, 100) + '%';
+        teamleadBar.style.width = Math.min(teamleadValue, 100) + '%';
+        managerBar.style.width = Math.min(managerValue, 100) + '%';
+
+        // Update total
+        totalInvolvement.textContent = total.toFixed(1) + '%';
+
+        // Color code the total based on value
+        totalInvolvement.className = total > 150 ? 'text-lg font-bold text-red-600' :
+                                   total > 100 ? 'text-lg font-bold text-amber-600' :
+                                   'text-lg font-bold text-green-600';
+    }
+
+    // Add event listeners
+    engineerInput.addEventListener('input', updateBars);
+    teamleadInput.addEventListener('input', updateBars);
+    managerInput.addEventListener('input', updateBars);
+
+    // Add form validation
+    const form = document.querySelector('form');
+    const inputs = form.querySelectorAll('input, select');
+    
+    inputs.forEach(input => {
+        input.addEventListener('blur', () => {
+            if (input.hasAttribute('required') && !input.value.trim()) {
+                input.classList.add('border-red-300');
+                input.classList.remove('border-gray-300');
+            } else {
+                input.classList.remove('border-red-300');
+                input.classList.add('border-gray-300');
+            }
+        });
+        
+        input.addEventListener('input', () => {
+            if (input.classList.contains('border-red-300') && input.value.trim()) {
+                input.classList.remove('border-red-300');
+                input.classList.add('border-gray-300');
+            }
+        });
+    });
+    
+    // Add confirmation for form submission
+    form.addEventListener('submit', (e) => {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = `
+            <svg class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Saving Changes...
+        `;
+        submitBtn.disabled = true;
+    });
+
+    // Initialize bars on page load
+    updateBars();
+});
+</script>
+{% endblock %}
