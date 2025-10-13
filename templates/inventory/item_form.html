@@ -34,7 +34,6 @@
     }
 
     .form-card:hover {
-        transform: translateY(-5px) rotateX(1deg);
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
     }
 
@@ -158,12 +157,12 @@
     }
 
     .btn:hover {
-        transform: translateY(-2px);
         box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        opacity: 0.9;
     }
 
     .btn:active {
-        transform: translateY(0);
+        opacity: 1;
     }
 
     .btn-primary {
@@ -213,15 +212,9 @@
         font-size: 1em;
     }
 
-    /* Floating animation for important fields */
-    @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
-    }
-
+    /* Important field styling - no animation */
     .important-field .form-control {
         border-left: 4px solid var(--primary);
-        animation: float 3s ease-in-out infinite;
     }
 
     /* Custom checkbox */
@@ -407,24 +400,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 3D card effect on mouse move
-    const card = document.querySelector('.form-card');
-    if (card) {
-        card.addEventListener('mousemove', (e) => {
-            const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
-            const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
-            card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
-        });
-
-        card.addEventListener('mouseenter', () => {
-            card.style.transition = 'none';
-        });
-
-        card.addEventListener('mouseleave', () => {
-            card.style.transition = 'all 0.5s ease';
-            card.style.transform = 'rotateY(0deg) rotateX(0deg)';
-        });
-    }
+    // Removed 3D card effect - keeping it simple
 
     // Show selected file name
     const fileInputs = document.querySelectorAll('input[type="file"]');

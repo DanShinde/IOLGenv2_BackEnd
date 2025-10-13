@@ -94,18 +94,23 @@ def item_create(request):
         form = ItemForm(request.POST, request.FILES)
         if form.is_valid():
             item = form.save()
+            # Set created_by
+            item.created_by = request.user
+            item.save()
+
             # Create history record
             History.objects.create(
                 item=item,
                 action='ADDED',
                 user=request.user,
-                details=f'Item added to inventory with quantity {item.quantity}'
+                details=f'{item.get_item_type_display()} added to inventory with quantity {item.quantity}',
+                location=item.location or 'Warehouse'
             )
             messages.success(request, 
                 f'Successfully added {item.name} ({item.serial_number}) to inventory!',
                 extra_tags='bg-green-100 text-green-800'
             )
-            return redirect('item-detail', pk=item.pk)
+            return redirect('inventory-item-detail', pk=item.pk)
         else:
             messages.error(request, 
                 'Please correct the errors below',
@@ -133,13 +138,14 @@ def item_update(request, pk):
                 item=updated_item,
                 action='UPDATED',
                 user=request.user,
-                details=f'Item details updated'
+                details=f'Item details updated',
+                location=updated_item.location or 'Warehouse'
             )
-            messages.success(request, 
+            messages.success(request,
                 f'Successfully updated {updated_item.name}',
                 extra_tags='bg-green-100 text-green-800'
             )
-            return redirect('item-detail', pk=updated_item.pk)
+            return redirect('inventory-item-detail', pk=updated_item.pk)
         else:
             messages.error(request, 
                 'Please correct the errors below',
@@ -169,16 +175,18 @@ def return_assignment(request, pk):
         
         item = assignment.item
         item.status = 'AVAILABLE'
+        item.location = 'Warehouse'
         item.save()
-        
+
         History.objects.create(
             item=item,
             action='RETURNED',
             user=request.user,
-            details=f'Returned by {assignment.assigned_to.get_full_name() or assignment.assigned_to.username}'
+            details=f'Returned by {assignment.assigned_to.get_full_name() or assignment.assigned_to.username}',
+            location='Warehouse'
         )
         
-        return redirect('transfer-item')
+        return redirect('inventory-transfer-item')
     
     return render(request, 'inventory/return_confirm.html', {'assignment': assignment})
 
@@ -234,9 +242,9 @@ def reports(request):
     
     # User assignments
     user_assignments = User.objects.filter(
-        assignments__return_date__isnull=True
+        tool_assignments__return_date__isnull=True
     ).annotate(
-        tool_count=Count('assignments')
+        tool_count=Count('tool_assignments')
     ).order_by('-tool_count')
     
     context = {
@@ -276,9 +284,14 @@ def transfer_item(request):
                             item=assignment.item,
                             action='RETURNED',
                             user=request.user,
-                            details=f'Returned by {assignment.assigned_to.get_full_name() or assignment.assigned_to.username} (Transfer)'
+                            details=f'Returned by {assignment.assigned_to.get_full_name() or assignment.assigned_to.username} (Transfer)',
+                            location='Warehouse'
                         )
-                        
+
+                        # Update item location
+                        assignment.item.location = f'With {assigned_to.get_full_name() or assigned_to.username}'
+                        assignment.item.save()
+
                         # Create new assignment
                         Assignment.objects.create(
                             item=assignment.item,
@@ -288,13 +301,14 @@ def transfer_item(request):
                             expected_return_date=expected_return_date,
                             notes=f"Transferred from {assignment.assigned_to.get_full_name() or assignment.assigned_to.username}. {notes}".strip()
                         )
-                        
+
                         # Create transfer history
                         History.objects.create(
                             item=assignment.item,
                             action='TRANSFERRED',
                             user=request.user,
-                            details=f'Transferred from {assignment.assigned_to.get_full_name() or assignment.assigned_to.username} to {assigned_to.get_full_name() or assigned_to.username}'
+                            details=f'Transferred from {assignment.assigned_to.get_full_name() or assignment.assigned_to.username} to {assigned_to.get_full_name() or assigned_to.username}',
+                            location=f'With {assigned_to.get_full_name() or assigned_to.username}'
                         )
                         
                         messages.success(request, 
@@ -313,16 +327,18 @@ def transfer_item(request):
                             notes=notes
                         )
                         
-                        # Update item status
+                        # Update item status and location
                         available_item.status = 'ASSIGNED'
+                        available_item.location = f'With {assigned_to.get_full_name() or assigned_to.username}'
                         available_item.save()
-                        
+
                         # Create history
                         History.objects.create(
                             item=available_item,
                             action='ASSIGNED',
                             user=request.user,
-                            details=f'Assigned to {assigned_to.get_full_name() or assigned_to.username}'
+                            details=f'Assigned to {assigned_to.get_full_name() or assigned_to.username}',
+                            location=f'With {assigned_to.get_full_name() or assigned_to.username}'
                         )
                         
                         messages.success(request, 
@@ -333,55 +349,101 @@ def transfer_item(request):
                     # Handle dispatch of item
                     project = form.cleaned_data['project']
                     site_location = form.cleaned_data.get('site_location', '')
-                    
+                    quantity = form.cleaned_data.get('quantity', 1)
+
                     # Get the item (could be available or assigned)
                     item = form.cleaned_data.get('available_item')
                     if not item and form.cleaned_data.get('assignment'):
                         item = form.cleaned_data['assignment'].item
-                    
+
                     if item:
-                        # Create dispatch record
-                        Dispatch.objects.create(
-                            item=item,
-                            quantity=1,
-                            project=project,
-                            site_location=site_location,
-                            dispatched_by=request.user,
-                            dispatch_date=transfer_date,
-                            expected_return_date=expected_return_date,
-                            notes=notes
-                        )
-                        
-                        # If item was assigned, return it first
-                        if item.status == 'ASSIGNED':
-                            active_assignment = Assignment.objects.filter(item=item, return_date__isnull=True).first()
-                            if active_assignment:
-                                active_assignment.return_date = transfer_date
-                                active_assignment.save()
-                                History.objects.create(
-                                    item=item,
-                                    action='RETURNED',
-                                    user=request.user,
-                                    details=f'Returned by {active_assignment.assigned_to.get_full_name() or active_assignment.assigned_to.username} (Dispatch)'
-                                )
-                        
-                        # Update item status
-                        item.status = 'DISPATCHED'
-                        item.save()
-                        
-                        # Create history
-                        History.objects.create(
-                            item=item,
-                            action='DISPATCHED',
-                            user=request.user,
-                            details=f'Dispatched to {project}'
-                        )
-                        
-                        messages.success(request, 
-                            f'Successfully dispatched {item.name} to {project}'
-                        )
+                        # Different logic for TOOLS vs MATERIALS
+                        if item.item_type == 'MATERIAL':
+                            # Materials: Reduce stock and mark as CONSUMED if quantity dispatched
+                            # Create dispatch record
+                            Dispatch.objects.create(
+                                item=item,
+                                quantity=quantity,
+                                project=project,
+                                site_location=site_location,
+                                dispatched_by=request.user,
+                                dispatch_date=transfer_date,
+                                notes=notes
+                            )
+
+                            # Reduce material stock
+                            item.quantity -= quantity
+
+                            # If no stock left, mark as consumed
+                            if item.quantity <= 0:
+                                item.status = 'CONSUMED'
+                                item.location = f'Consumed at {project}'
+                            else:
+                                item.location = f'Warehouse (Partially dispatched to {project})'
+
+                            item.save()
+
+                            # Create history
+                            History.objects.create(
+                                item=item,
+                                action='CONSUMED',
+                                user=request.user,
+                                details=f'{quantity} units dispatched to {project} (Site: {site_location or "N/A"})',
+                                location=f'{project} - {site_location or "N/A"}'
+                            )
+
+                            messages.success(request,
+                                f'Successfully dispatched {quantity} units of {item.name} to {project}. '
+                                f'Remaining stock: {item.quantity}'
+                            )
+
+                        else:  # TOOL
+                            # Tools: Can be dispatched and returned
+                            # If item was assigned, return it first
+                            if item.status == 'ASSIGNED':
+                                active_assignment = Assignment.objects.filter(item=item, return_date__isnull=True).first()
+                                if active_assignment:
+                                    active_assignment.return_date = transfer_date
+                                    active_assignment.save()
+                                    History.objects.create(
+                                        item=item,
+                                        action='RETURNED',
+                                        user=request.user,
+                                        details=f'Returned by {active_assignment.assigned_to.get_full_name() or active_assignment.assigned_to.username} (For Dispatch)',
+                                        location='Warehouse'
+                                    )
+
+                            # Create dispatch record
+                            Dispatch.objects.create(
+                                item=item,
+                                quantity=1,
+                                project=project,
+                                site_location=site_location,
+                                dispatched_by=request.user,
+                                dispatch_date=transfer_date,
+                                expected_return_date=expected_return_date,
+                                notes=notes
+                            )
+
+                            # Update tool status
+                            item.status = 'DISPATCHED'
+                            item.location = f'{project} - {site_location or "N/A"}'
+                            item.save()
+
+                            # Create history
+                            History.objects.create(
+                                item=item,
+                                action='DISPATCHED',
+                                user=request.user,
+                                details=f'Dispatched to {project} (Site: {site_location or "N/A"})',
+                                location=f'{project} - {site_location or "N/A"}'
+                            )
+
+                            messages.success(request,
+                                f'Successfully dispatched {item.name} to {project}'
+                            )
             
-            return redirect('transfer-item')
+            return redirect('inventory-transfer-item')
     else:
         form = UnifiedTransferForm()
     
