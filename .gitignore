@@ -18,6 +18,7 @@ static/vendor/
 staticfiles/
 
 media/
+.claude/
 # Distribution / packaging
 .Python
 build/
