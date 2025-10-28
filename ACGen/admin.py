@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ClusterTemplate, Parameter, StandardString, GenerationLog, ControlLibrary
+from .models import BugReport, ClusterTemplate, Parameter, StandardString, GenerationLog, ControlLibrary, BugReportAttachment
 from import_export.admin import ImportExportModelAdmin
 
 # Register your models here.
@@ -50,3 +50,34 @@ class GenerationLogAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
 
 admin.site.register(GenerationLog, GenerationLogAdmin)
 
+
+class BugReportAttachmentInline(admin.TabularInline):
+    model = BugReportAttachment
+    extra = 0
+    fields = ("original_name", "image", "uploaded_by", "uploaded_at")
+    readonly_fields = ("uploaded_by", "uploaded_at")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+# Register BugReport model
+class BugReportAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    inlines = [BugReportAttachmentInline]
+    list_display = (
+        'id',
+        'title',
+        'status',
+        'application_version',
+        'reported_by',
+        'created_at',
+        'updated_at',
+    )
+    search_fields = ('title', 'steps_to_reproduce', 'reported_by__username')  # Allows searching by title, steps, and the reporter's username
+    list_filter = ('status', 'application_version', 'reported_by')
+    readonly_fields = ('created_at', 'updated_at') # Good practice to make auto-fields read-only
+
+admin.site.register(BugReport, BugReportAdmin)

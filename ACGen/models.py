@@ -1,7 +1,12 @@
 from django.db import models
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.core.cache import cache
+from django.conf import settings
+from django.utils.text import slugify
+from django.utils.timezone import now
+from pathlib import Path
+import uuid
 from IOLGen.models import Segment
 
 from accounts.models import clear_info_cache
@@ -100,6 +105,98 @@ class GenerationLog(models.Model):
 
     def __str__(self):
         return f"Log for {self.project_name} at {self.generation_time}"
+
+
+class BugReport(models.Model):
+    STATUS_OPEN = "open"
+    STATUS_IN_PROGRESS = "in_progress"
+    STATUS_CLOSED = "closed"
+
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Open"),
+        (STATUS_IN_PROGRESS, "In Progress"),
+        (STATUS_CLOSED, "Closed"),
+    ]
+
+    title = models.CharField(max_length=255)
+    screenshot = models.ImageField(upload_to="bug_reports/screenshots/", null=True, blank=True)
+    log_text = models.TextField(blank=True)
+    steps_to_reproduce = models.TextField()
+    application_version = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    current_status_details = models.TextField(blank=True)
+    reported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="bug_reports",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} ({self.get_status_display()})"
+
+
+def bug_report_attachment_upload_to(instance, filename):
+    """Generate a unique, timestamped path for uploaded bug report screenshots."""
+    ext = filename.split('.')[-1]
+    timestamp = now().strftime('%Y%m%d_%H%M%S')
+    unique_name = f"{uuid.uuid4().hex}_{timestamp}.{ext}"
+    return f"bug_reports/{instance.report.id}/{unique_name}"
+
+
+class BugReportAttachment(models.Model):
+    report = models.ForeignKey(
+        BugReport,
+        related_name="attachments",
+        on_delete=models.CASCADE,
+    )
+    image = models.ImageField(upload_to=bug_report_attachment_upload_to)
+    original_name = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="bug_report_attachments",
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return self.original_name or Path(self.image.name).name
+
+
+@receiver(post_delete, sender=BugReportAttachment)
+def delete_bug_report_attachment_file(sender, instance, **kwargs):
+    """Delete file from disk when attachment is deleted."""
+    if instance.image and instance.image.storage.exists(instance.image.name):
+        instance.image.delete(save=False)
+
+
+@receiver(pre_save, sender=BugReportAttachment)
+def auto_delete_old_file_on_change(sender, instance, **kwargs):
+    """Delete old file if a new one is uploaded for same record."""
+    if not instance.pk:
+        return
+    try:
+        old_file = BugReportAttachment.objects.get(pk=instance.pk).image
+    except BugReportAttachment.DoesNotExist:
+        return
+    new_file = instance.image
+    if old_file and old_file != new_file and old_file.storage.exists(old_file.name):
+        old_file.delete(save=False)
+
+
+@receiver(post_delete, sender=BugReport)
+def delete_bug_report_screenshot(sender, instance, **kwargs):
+    if instance.screenshot:
+        instance.screenshot.delete(save=False)
 
 @receiver(post_save, sender=Parameter)
 def update_parameters_count_on_save(sender, instance, created, **kwargs):

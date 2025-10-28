@@ -1,35 +1,46 @@
 from django.dispatch import receiver
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated
-from .models import StandardString, ClusterTemplate, Parameter, GenerationLog
+from .models import (
+    StandardString,
+    ClusterTemplate,
+    Parameter,
+    GenerationLog,
+    BugReport,
+    BugReportAttachment,
+    ControlLibrary,
+)
 from .serializers import (
     StandardStringSerializer,
     ClusterTemplateSerializer,
     ParameterSerializer,
     GenerationLogSerializer,
-    ControlLibrarySerializer
-
+    ControlLibrarySerializer,
 )
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from rest_framework.response import Response
-from rest_framework.decorators import action, permission_classes
+from rest_framework.decorators import permission_classes
 from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.db.models import Count
 from rest_framework.decorators import api_view
 from accounts.models import clear_info_cache
-from .models import ControlLibrary
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 import json
 # from django.db.models import ArrayAgg
 from django.contrib.postgres.aggregates import ArrayAgg
+from django.utils.http import url_has_allowed_host_and_scheme
+from .forms import BugReportForm, BugReportStatusForm
 
 
 _cache_timeout = 60 * 5  # Cache timeout (5 minutes)
@@ -633,3 +644,86 @@ def set_cluster_dependencies(request):
     except Exception as e:
         print(f"Error setting dependencies: {e}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@login_required
+def bug_report_dashboard(request):
+    status_filter = request.GET.get("status")
+
+    bug_reports_qs = (
+        BugReport.objects.select_related("reported_by")
+        .prefetch_related("attachments")
+        .order_by("-created_at")
+    )
+    if status_filter:
+        bug_reports_qs = bug_reports_qs.filter(status=status_filter)
+
+    if request.method == "POST":
+        form = BugReportForm(request.POST, request.FILES)
+        if form.is_valid():
+            bug_report = form.save(commit=False)
+            bug_report.reported_by = request.user
+            bug_report.status = BugReport.STATUS_OPEN
+            bug_report.save()
+            screenshots = form.cleaned_data.get("screenshots") or []
+            for uploaded_file in screenshots:
+                BugReportAttachment.objects.create(
+                    report=bug_report,
+                    image=uploaded_file,
+                    original_name=getattr(uploaded_file, "name", ""),
+                    uploaded_by=request.user,
+                )
+            messages.success(request, "Thank you! Your bug report has been submitted.")
+            return redirect("bug-report-dashboard")
+        messages.error(request, "Please correct the errors below and resubmit your report.")
+    else:
+        form = BugReportForm()
+
+    bug_reports = list(bug_reports_qs)
+    report_entries = []
+    for report in bug_reports:
+        can_update = request.user.is_staff or report.reported_by_id == request.user.id
+        report_entries.append(
+            {
+                "report": report,
+                "status_form": BugReportStatusForm(instance=report),
+                "can_update": can_update,
+            }
+        )
+
+    context = {
+        "form": form,
+        "status_choices": BugReport.STATUS_CHOICES,
+        "status_filter": status_filter or "",
+        "reports": report_entries,
+        "current_path": request.get_full_path(),
+    }
+    return render(request, "ACGen/bug_report_forum.html", context)
+
+
+@login_required
+def update_bug_report_status(request, pk):
+    bug_report = get_object_or_404(BugReport, pk=pk)
+
+    if not (request.user.is_staff or bug_report.reported_by_id == request.user.id):
+        raise PermissionDenied("You do not have permission to modify this bug report.")
+
+    if request.method != "POST":
+        return redirect("bug-report-dashboard")
+
+    form = BugReportStatusForm(request.POST, instance=bug_report)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Bug report status updated successfully.")
+    else:
+        messages.error(request, "Unable to update the bug report status. Please review the form.")
+
+    next_url = request.POST.get("next")
+    if not next_url or not url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        next_url = reverse("bug-report-dashboard")
+
+    return redirect(next_url)

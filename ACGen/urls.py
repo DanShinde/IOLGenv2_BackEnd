@@ -1,13 +1,15 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    StandardStringViewSet, 
-    ClusterTemplateViewSet, 
-    ParameterViewSet, 
-    ParameterBulkViewSet, 
-    DashboardView, 
+    StandardStringViewSet,
+    ClusterTemplateViewSet,
+    ParameterViewSet,
+    ParameterBulkViewSet,
+    DashboardView,
     GenerationLogCreateView,
     ControlLibraryViewSet,
+    bug_report_dashboard,
+    update_bug_report_status,
     bulk_update_parameters,
     set_cluster_dependencies,
 )
@@ -31,4 +33,6 @@ urlpatterns = [
     })),
     path('bulk_update_parameters/', bulk_update_parameters, name='bulk-update-parameters'),
     path('set_cluster_dependencies/', set_cluster_dependencies, name='set-cluster-dependencies'),
+    path('bug-reports/', bug_report_dashboard, name='bug-report-dashboard'),
+    path('bug-reports/<int:pk>/update-status/', update_bug_report_status, name='bug-report-update-status'),
 ]

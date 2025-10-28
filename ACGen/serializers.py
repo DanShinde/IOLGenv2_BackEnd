@@ -1,6 +1,11 @@
 from rest_framework import serializers
-from .models import StandardString, ClusterTemplate, Parameter, GenerationLog, ControlLibrary
-import re
+from .models import (
+    StandardString,
+    ClusterTemplate,
+    Parameter,
+    GenerationLog,
+    ControlLibrary,
+)
 
 
 class ControlLibrarySerializer(serializers.ModelSerializer):
@@ -53,5 +58,3 @@ class GenerationLogSerializer(serializers.ModelSerializer):
         model = GenerationLog
         fields = ['id', 'user', 'generation_time', 'project_name', 'project_file_name', 'Log_Event']
         read_only_fields = ['id', 'user', 'generation_time']
-
-

@@ -208,6 +208,12 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+# URL that handles the media served from MEDIA_ROOT.
+MEDIA_URL = '/media/'
+
+# Absolute path to the directory where uploaded media files will be stored.
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 LOGIN_URL = '/accounts/loginw/'
 LOGIN_REDIRECT_URL = '/'  # or wherever you want to land after login
 LOGOUT_REDIRECT_URL = '/accounts/loginw/'  # or wherever you want to land after logout
