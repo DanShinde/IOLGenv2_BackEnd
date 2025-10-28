@@ -212,7 +212,12 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/media/'
 
 # Absolute path to the directory where uploaded media files will be stored.
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Production: Use separate drive for uploaded content (easier to manage/backup)
+# Development: Use project folder
+if os.environ.get('DJANGO_ENV') == 'production':
+    MEDIA_ROOT = r'C:\media'
+else:
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 LOGIN_URL = '/accounts/loginw/'
 LOGIN_REDIRECT_URL = '/'  # or wherever you want to land after login

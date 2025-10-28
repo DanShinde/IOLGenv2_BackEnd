@@ -17,6 +17,7 @@ static/rest_framework/
 static/vendor/
 staticfiles/
 
+media/
 # Distribution / packaging
 .Python
 build/
