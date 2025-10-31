@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from .models import (
     StandardString,
     ClusterTemplate,
@@ -18,6 +19,7 @@ from .models import (
 from .serializers import (
     StandardStringSerializer,
     ClusterTemplateSerializer,
+    CompactClusterTemplateSerializer,
     ParameterSerializer,
     GenerationLogSerializer,
     ControlLibrarySerializer,
@@ -37,8 +39,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 import json
-# from django.db.models import ArrayAgg
-from django.contrib.postgres.aggregates import ArrayAgg
 from django.utils.http import url_has_allowed_host_and_scheme
 from .forms import BugReportForm, BugReportStatusForm
 
@@ -98,6 +98,29 @@ class StandardStringViewSet(viewsets.ModelViewSet):
         cache.delete(self.get_cache_key())
 
 
+class ClusterTemplatePagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
+    def get_paginated_response(self, data):
+        page_size = self.get_page_size(self.request) or self.page.paginator.per_page
+        return Response(
+            {
+                "data": data,
+                "pagination": {
+                    "page": self.page.number,
+                    "page_size": page_size,
+                    "total_pages": self.page.paginator.num_pages,
+                    "total_items": self.page.paginator.count,
+                    "has_more": self.page.has_next(),
+                    "next": self.get_next_link(),
+                    "next_cursor": None,
+                },
+            }
+        )
+
+
 class ClusterTemplateViewSet(viewsets.ModelViewSet):
     queryset = ClusterTemplate.objects.all()
     serializer_class = ClusterTemplateSerializer
@@ -135,36 +158,27 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         cache_key = self.get_cache_key(**filter_params)
         cached_ids = cache.get(cache_key)
 
+        base_queryset = self.queryset.order_by("cluster_name")
+
         if cached_ids:
             print("Cache HIT")
-            return ClusterTemplate.objects.filter(pk__in=cached_ids).distinct().order_by('cluster_name')
+            return base_queryset.filter(pk__in=cached_ids).prefetch_related("dependencies")
 
-        # Build queryset with filters
-        queryset = self.queryset.all()
-        
-        # Apply filters dynamically
+        filtered_queryset = base_queryset
         for param, value in filter_params.items():
-            if value is not None:
-                queryset = queryset.filter(**{param: value})
-        
-        queryset = queryset.order_by('cluster_name')
-        # queryset_ids = list(queryset.values_list('id', flat=True))
+            if value:
+                filtered_queryset = filtered_queryset.filter(**{param: value})
 
-        queryset_ids = list(queryset.values_list('id', flat=True).distinct())
-        cache.set(cache_key, queryset_ids, self.cache_timeout)
-        # cache.set(cache_key, queryset_ids, self.cache_timeout)
+        filtered_queryset = filtered_queryset.prefetch_related("dependencies")
+        cache.set(cache_key, list(filtered_queryset.values_list("id", flat=True)), self.cache_timeout)
         print("Cache MISS")
-        return queryset
+        return filtered_queryset
 
-    def get_serializer(self, *args, **kwargs):
-        """Override to handle compact parameter"""
-        compact = self.request.query_params.get('compact', '').lower() == 'true'
-        
-        if compact:
-            # Use a custom serializer for compact response or limit fields
-            kwargs['fields'] = ['id','cluster_name', 'cluster_path', 'block_type', 'cluster_config', 'dependencies', 'segment']
-
-        return super().get_serializer(*args, **kwargs)
+    def get_serializer_class(self):
+        request = getattr(self, "request", None)
+        if request and request.query_params.get("compact", "").lower() == "true":
+            return CompactClusterTemplateSerializer
+        return super().get_serializer_class()
 
     def perform_create(self, serializer):
         full_name = self.request.user.get_full_name()
@@ -187,38 +201,21 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         return response
 
     def list(self, request, *args, **kwargs):
-        filter_params = self.get_filter_params()
-        compact = request.query_params.get('compact', '').lower() == 'true'
-        
-        cache_key = self.get_cache_key(**filter_params)
-        cached_ids = cache.get(cache_key)
+        queryset = self.filter_queryset(self.get_queryset())
 
-        if cached_ids:
-            queryset = ClusterTemplate.objects.filter(pk__in=cached_ids).distinct().order_by('cluster_name')
-        else:
-            queryset = self.get_queryset()
-            # Cache the list of IDs
-            cache.set(cache_key, list(queryset.values_list('id', flat=True)), self.cache_timeout)
+        should_paginate = any(
+            request.query_params.get(param)
+            for param in ("page", "page_size", "cursor", "enable_pagination")
+        )
 
-        # Handle compact response
-        if compact:
-            # Option 1: Use values() for efficiency (database level filtering)
-            compact_data = queryset.distinct().values(
-                'id',
-                'cluster_name', 
-                'cluster_path', 
-                'block_type', 
-                'cluster_config',
-                'segment',
-                'control_library'
-                ).annotate(
-                    dependencies=ArrayAgg('dependencies', distinct=True)
-                )
-            return Response(list(compact_data))
-        else:
-            # Standard serialization
-            serializer = self.get_serializer(queryset, many=True)
-            return Response(serializer.data)
+        if should_paginate:
+            paginator = ClusterTemplatePagination()
+            page = paginator.paginate_queryset(queryset, request, view=self)
+            serializer = self.get_serializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def invalidate_all_cache(self):
         """Efficiently invalidate cache using pattern matching or cache versioning"""

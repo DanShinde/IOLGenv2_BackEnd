@@ -214,7 +214,10 @@ MEDIA_URL = '/media/'
 # Absolute path to the directory where uploaded media files will be stored.
 # Production: Use separate drive for uploaded content (easier to manage/backup)
 # Development: Use project folder
-if os.environ.get('DJANGO_ENV') == 'production':
+# Check multiple indicators for production environment
+if (os.environ.get('DJANGO_ENV') == 'production' or
+    os.environ.get('COMPUTERNAME') == 'ACGServer' or
+    not DEBUG):
     MEDIA_ROOT = r'C:\media'
 else:
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

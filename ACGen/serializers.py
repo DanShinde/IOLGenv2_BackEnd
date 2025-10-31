@@ -23,11 +23,26 @@ class StandardStringSerializer(serializers.ModelSerializer):
 # ClusterTemplate Serializer
 class ClusterTemplateSerializer(serializers.ModelSerializer):
     dependencies = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
-    
+
     class Meta:
         model = ClusterTemplate
         fields = '__all__'
         read_only_fields = ['uploaded_by', 'uploaded_at', 'updated_by', 'updated_at']
+
+
+# Compact ClusterTemplate Serializer
+class CompactClusterTemplateSerializer(ClusterTemplateSerializer):
+    class Meta(ClusterTemplateSerializer.Meta):
+        fields = [
+            "id",
+            "cluster_name",
+            "cluster_path",
+            "block_type",
+            "cluster_config",
+            "dependencies",
+            "segment",
+            "control_library",
+        ]
 
 # Parameter Serializer
 class ParameterSerializer(serializers.ModelSerializer):
