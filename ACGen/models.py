@@ -33,7 +33,7 @@ class StandardString(models.Model):
 # ClusterTemplate Model
 class ClusterTemplate(models.Model):
     id = models.AutoField(primary_key=True)
-    cluster_name = models.CharField(max_length=255, unique=True, db_index=True)
+    cluster_name = models.CharField(max_length=255, db_index=True)
     cluster_config = models.TextField(null=True,blank=True)
     cluster_string = models.TextField(null=True, blank=True)
     cluster_path = models.CharField(max_length=512, null=True, blank=True)
@@ -63,6 +63,15 @@ class ClusterTemplate(models.Model):
     )
     
     parameters_count = models.PositiveIntegerField(default=0, null=True,blank=True)  # Field to store the count
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cluster_name', 'control_library'],
+                name='unique_cluster_name_per_library'
+            )
+        ]
+
     def save(self, *args, **kwargs):
     # Store the name of the DeviceType before saving
         if self.segment_con:

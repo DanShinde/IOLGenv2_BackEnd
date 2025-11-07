@@ -330,7 +330,7 @@ JAZZMIN_SETTINGS = {
     'site_brand': "Lives Made Easy",
     'site_logo': "assets/imgs/logo.png",
     'copyright':  "All Right Reserved 2025",
-    "welcome_sign": "Welcome to Armstrong Aurtomation All-In-One tool, Login Now.",
+    "welcome_sign": "Welcome to Armstrong Automation All-In-One tool, Login Now.",
     
     "topmenu_links": [
         {"name": "Home",  "url": "home", "permissions": ["auth.view_user"]},
