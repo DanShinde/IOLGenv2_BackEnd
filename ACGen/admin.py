@@ -16,6 +16,23 @@ class ClusterTemplateAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     search_fields = ('cluster_name',)  # Optional: Allows searching by cluster_name
     list_filter = ('segment', 'control_library','block_type' , 'uploaded_by')
 
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        try:
+            return super().change_view(request, object_id, form_url, extra_context)
+        except Exception as e:
+            import traceback
+            print("\n--- ADMIN CHANGE_VIEW EXCEPTION ---")
+            traceback.print_exc()
+            raise
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user.username
+        if not change:
+            obj.uploaded_by = request.user.username
+        super().save_model(request, obj, form, change)
+
+
+
 admin.site.register(ClusterTemplate, ClusterTemplateAdmin)
 
 

@@ -42,6 +42,7 @@ class CompactClusterTemplateSerializer(ClusterTemplateSerializer):
             "dependencies",
             "segment",
             "control_library",
+            "parameters_count",
         ]
 
 # Parameter Serializer

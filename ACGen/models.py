@@ -39,11 +39,11 @@ class ClusterTemplate(models.Model):
     cluster_path = models.CharField(max_length=512, null=True, blank=True)
     cluster_version = models.CharField(max_length=255, null=True, blank=True)
     block_type = models.CharField(max_length=255)
-    uploaded_by = models.CharField(max_length=255)
+    uploaded_by = models.CharField(max_length=255, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    updated_by = models.CharField(max_length=255)
+    updated_by = models.CharField(max_length=255, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
-    segment = models.CharField(max_length=255)
+    segment = models.CharField(max_length=255, null=True, blank=True)
     is_assignable = models.BooleanField(default=True)
     is_protected = models.BooleanField(default=False)
     dependencies = models.ManyToManyField(
@@ -77,10 +77,12 @@ class ClusterTemplate(models.Model):
         if self.segment_con:
             self.segment = self.segment_con.name
         super(ClusterTemplate, self).save(*args, **kwargs)
+    # def __str__(self):
+    #     return self.cluster_name
     def __str__(self):
+        if self.control_library:
+            return f"{self.cluster_name} ({self.control_library.name})"
         return self.cluster_name
-
-
 
 # Parameter Model
 class Parameter(models.Model):

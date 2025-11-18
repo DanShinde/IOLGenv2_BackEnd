@@ -181,10 +181,16 @@ class ClusterTemplateViewSet(viewsets.ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        full_name = self.request.user.get_full_name()
-        instance = serializer.save(uploaded_by=full_name, updated_by=full_name)
-        self.invalidate_all_cache()
-        return instance
+        try:
+            full_name = self.request.user.get_full_name()
+            if not full_name:  # Handle empty full_name
+                full_name = self.request.user.username
+            instance = serializer.save(uploaded_by=full_name, updated_by=full_name)
+            self.invalidate_all_cache()
+            return instance
+        except Exception as e:
+            print(f"Error creating cluster template: {e}")
+            raise
 
     def perform_update(self, serializer):
         full_name = self.request.user.get_full_name()
