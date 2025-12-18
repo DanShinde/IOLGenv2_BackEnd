@@ -292,37 +292,43 @@ CORS_ALLOWED_ORIGINS = [
 
 
 # Logging configuration
+from datetime import datetime
 
-# LOGGING = {
-#   'version': 1,
-#   'handlers': {
-#     'out_file': {
-#       'class': 'logging.handlers.TimedRotatingFileHandler',
-#       'when': 'midnight',
-#       'backupCount': 30,
-#       'filename': BASE_DIR / 'logs' / 'out.log',
-#       'formatter': 'simple',
-#     },
-#     'err_file': {
-#       'class': 'logging.handlers.TimedRotatingFileHandler',
-#       'when': 'midnight',
-#       'backupCount': 30,
-#       'filename': BASE_DIR / 'logs' / 'err.log',
-#       'formatter': 'simple',
-#     },
-#   },
-#   'loggers': {
-#     '': {
-#       'handlers': ['out_file', 'err_file'],
-#       'level': 'INFO',
-#     },
-#   },
-#   'formatters': {
-#     'simple': {
-#       'format': '%(asctime)s %(levelname)s %(message)s',
-#     },
-#   },
-# }
+# Generate daily log filenames with date
+LOG_DATE = datetime.now().strftime('%Y-%m-%d')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '%(asctime)s %(levelname)s %(message)s',
+        },
+    },
+    'handlers': {
+        'out_file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'when': 'midnight',
+            'backupCount': 30,
+            'filename': BASE_DIR / 'logs' / f'out_{LOG_DATE}.log',
+            'formatter': 'simple',
+        },
+        'err_file': {
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'when': 'midnight',
+            'backupCount': 30,
+            'filename': BASE_DIR / 'logs' / f'err_{LOG_DATE}.log',
+            'formatter': 'simple',
+            'level': 'ERROR',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['out_file', 'err_file'],
+            'level': 'INFO',
+        },
+    },
+}
 
 #Jazzmin settings for Admin panels
 
