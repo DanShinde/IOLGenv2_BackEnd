@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import F
+from employees.models import Employee
 
 
 # Define the Segment model
@@ -11,16 +12,6 @@ class trackerSegment(models.Model):
     def __str__(self):
         return self.name
     
-class Pace(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-
-    class Meta:
-        verbose_name = "PACe"
-        verbose_name_plural = "PACe"
-
-    def __str__(self):
-        return self.name    
-
 class Project(models.Model):
     code = models.CharField(max_length=50, unique=True)
     customer_name = models.CharField(max_length=100)
@@ -35,20 +26,14 @@ class Project(models.Model):
         blank=True,
         related_name="tracker_projects1"
     )
-    pace = models.ForeignKey(
-        Pace,
+    team_lead = models.ForeignKey(
+        Employee,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="projects"
-    )
-
-    pace = models.ForeignKey(
-        Pace,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="projects"
+        limit_choices_to={'designation': 'TEAM_LEAD'},
+        related_name='tracker_projects',
+        verbose_name="Team Lead (PACe)"
     )
 
 

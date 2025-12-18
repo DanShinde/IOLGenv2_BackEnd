@@ -33,13 +33,9 @@ def create_or_update_planner_project(sender, instance, created, **kwargs):
                 segment, _ = Segment.objects.get_or_create(name=instance.segment_con.name)
                 planner_project.segment = segment
 
-            # Sync team lead/pace
-            if instance.pace:
-                try:
-                    employee = Employee.objects.get(tracker_pace=instance.pace)
-                    planner_project.team_lead = employee
-                except Employee.DoesNotExist:
-                    logger.warning(f"No planner employee linked to tracker pace: {instance.pace.name}")
+            # Sync team lead
+            if instance.team_lead:
+                planner_project.team_lead = instance.team_lead
 
             planner_project.save()
             logger.info(f"Updated planner project {planner_project.project_id} from tracker project {instance.code}")
@@ -57,13 +53,8 @@ def create_or_update_planner_project(sender, instance, created, **kwargs):
                 if instance.segment_con:
                     segment, _ = Segment.objects.get_or_create(name=instance.segment_con.name)
 
-                # Get team lead from planner if linked
-                team_lead = None
-                if instance.pace:
-                    try:
-                        team_lead = Employee.objects.get(tracker_pace=instance.pace)
-                    except Employee.DoesNotExist:
-                        logger.warning(f"No planner employee linked to tracker pace: {instance.pace.name}")
+                # Get team lead from tracker project
+                team_lead = instance.team_lead if instance.team_lead else None
 
                 # Create planner project
                 planner_project = PlannerProject.objects.create(

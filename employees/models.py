@@ -23,18 +23,6 @@ class Employee(models.Model):
     designation = models.CharField(max_length=10, choices=DESIGNATION_CHOICES)
     is_active = models.BooleanField(default=True, verbose_name="Active Status")
 
-    # Link to tracker Pace (especially for team leads)
-    # This creates a bridge between the employees app and tracker app
-    tracker_pace = models.OneToOneField(
-        'tracker.Pace',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='employee',
-        verbose_name="Linked Tracker PACe",
-        help_text="Connected PACe from tracker app for team leads"
-    )
-
     # Additional fields for future HR/management features
     email = models.EmailField(blank=True, null=True, help_text="Employee email address")
     phone = models.CharField(max_length=20, blank=True, null=True, help_text="Contact phone number")
