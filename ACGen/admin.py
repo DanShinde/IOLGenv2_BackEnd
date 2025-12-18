@@ -25,6 +25,15 @@ class ClusterTemplateAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
             traceback.print_exc()
             raise
 
+    def _changeform_view(self, request, object_id, form_url, extra_context):
+        try:
+            return super()._changeform_view(request, object_id, form_url, extra_context)
+        except Exception as e:
+            import traceback
+            print("\n--- ADMIN CHANGEFORM EXCEPTION ---")
+            traceback.print_exc()
+            raise
+        
     def save_model(self, request, obj, form, change):
         obj.updated_by = request.user.username
         if not change:
