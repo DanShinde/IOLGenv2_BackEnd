@@ -99,7 +99,7 @@
         
         <div class="breadcrumb">
             <nav class="flex items-center space-x-4 text-sm">
-                <a href="{% url 'project_list' %}" class="text-gray-600 hover:text-indigo-600 font-medium flex items-center">
+                <a href="{% url 'planner_project_list' %}" class="text-gray-600 hover:text-indigo-600 font-medium flex items-center">
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                     </svg>
@@ -108,8 +108,12 @@
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                 </svg>
-                <a href="{% url 'activity_planner' project_pk=activity.project.pk %}" class="text-gray-600 hover:text-indigo-600 font-medium">
-                    {{ activity.project.project_id }}
+                <a href="{{ next_url }}" class="text-gray-600 hover:text-indigo-600 font-medium">
+                    {% if 'all' in next_url %}
+                        Consolidated Planner
+                    {% else %}
+                        {{ activity.project.project_id }}
+                    {% endif %}
                 </a>
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -302,7 +306,7 @@
                     </div>
 
                     <div class="flex justify-end space-x-4 pt-8 border-t border-gray-200">
-                        <a href="{% url 'activity_planner' project_pk=activity.project.pk %}" 
+                        <a href="{{ next_url }}" 
                            class="btn-secondary text-white py-3 px-6 rounded-lg font-semibold flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>

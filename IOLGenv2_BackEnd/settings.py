@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'inventory',
     'planner',
+    'employees',
 ]
 
 MIDDLEWARE = [

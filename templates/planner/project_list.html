@@ -6,230 +6,236 @@
 <style>
     .project-card:hover { transform: translateY(-2px); transition: all 0.3s ease; }
     .stats-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .action-dropdown { transition: all 0.2s ease; }
     .project-row:hover { background-color: #f8fafc; }
+    
+    /* Compact Table Styles */
+    .compact-cell { padding-top: 0.375rem; padding-bottom: 0.375rem; font-size: 0.75rem; }
+    .compact-header { padding-top: 0.5rem; padding-bottom: 0.5rem; font-size: 0.75rem; }
+    .compact-avatar { height: 1.75rem; width: 1.75rem; font-size: 0.7rem; }
+    .compact-avatar-sm { height: 1.5rem; width: 1.5rem; font-size: 0.65rem; }
+    .compact-badge { padding: 0.1rem 0.35rem; font-size: 0.7rem; }
+    .compact-btn { padding: 0.2rem 0.5rem; font-size: 0.7rem; }
+
+    /* Filter Dropdown Styles */
+    .filter-dropdown-menu {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+    .filter-checkbox:checked + span {
+        font-weight: 600;
+        color: #4f46e5;
+    }
 </style>
 
-<header class="bg-white shadow-md">
-    <div class="max-w-screen-2xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+<header class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-screen-2xl mx-auto py-3 px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold tracking-tight text-gray-900">Project Management</h1>
-                <p class="mt-1 text-lg text-gray-600">Manage your projects and track activities across your organization</p>
+                <h1 class="text-xl font-bold tracking-tight text-gray-900">Project Management</h1>
+                <p class="text-xs text-gray-500 mt-0.5">Manage your projects and track activities across your organization</p>
             </div>
-            <div class="flex space-x-3">
-                <a href="{% url 'consolidated_planner' %}" class="bg-purple-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-purple-700 flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex space-x-2">
+                <a href="{% url 'planner_consolidated_planner' %}" class="bg-purple-600 text-white py-1.5 px-3 rounded-md shadow-sm hover:bg-purple-700 flex items-center text-xs font-medium transition-colors">
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                     </svg>
-                    Consolidated Gantt View
+                    Gantt View
                 </a>
-                <button id="openAddProjectModal" class="bg-indigo-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-indigo-700 flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button id="openAddProjectModal" class="bg-indigo-600 text-white py-1.5 px-3 rounded-md shadow-sm hover:bg-indigo-700 flex items-center text-xs font-medium transition-colors">
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
-                    Add New Project
+                    New Project
                 </button>
             </div>
         </div>
     </div>
 </header>
 
-<div class="max-w-screen-2xl mx-auto py-10 sm:px-6 lg:px-8">
+<div class="max-w-screen-2xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
     
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="stats-card text-white p-6 rounded-lg shadow-lg">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <p class="text-2xl font-bold">{{ projects.count }}</p>
-                    <p class="text-sm opacity-90">Total Projects</p>
-                </div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <div class="stats-card text-white p-3 rounded-lg shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xl font-bold leading-none">{{ projects.count }}</p>
+                <p class="text-xs opacity-80 mt-1 font-medium">Total Projects</p>
+            </div>
+            <div class="bg-white bg-opacity-20 p-1.5 rounded-lg">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
             </div>
         </div>
         
-        <div class="bg-green-500 text-white p-6 rounded-lg shadow-lg">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <p class="text-2xl font-bold">{{ active_projects_count|default:0 }}</p>
-                    <p class="text-sm opacity-90">Active Projects</p>
-                </div>
+        <div class="bg-gradient-to-br from-emerald-500 to-green-600 text-white p-3 rounded-lg shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xl font-bold leading-none">{{ active_projects_count|default:0 }}</p>
+                <p class="text-xs opacity-80 mt-1 font-medium">Active</p>
+            </div>
+            <div class="bg-white bg-opacity-20 p-1.5 rounded-lg">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
         </div>
         
-        <div class="bg-blue-500 text-white p-6 rounded-lg shadow-lg">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <p class="text-2xl font-bold">{{ total_activities_count|default:0 }}</p>
-                    <p class="text-sm opacity-90">Total Activities</p>
-                </div>
+        <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-3 rounded-lg shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xl font-bold leading-none">{{ total_activities_count|default:0 }}</p>
+                <p class="text-xs opacity-80 mt-1 font-medium">Activities</p>
+            </div>
+            <div class="bg-white bg-opacity-20 p-1.5 rounded-lg">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
             </div>
         </div>
         
-        <div class="bg-orange-500 text-white p-6 rounded-lg shadow-lg">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <p class="text-2xl font-bold">{{ pending_activities_count|default:0 }}</p>
-                    <p class="text-sm opacity-90">Pending Activities</p>
-                </div>
+        <div class="bg-gradient-to-br from-orange-400 to-red-500 text-white p-3 rounded-lg shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xl font-bold leading-none">{{ pending_activities_count|default:0 }}</p>
+                <p class="text-xs opacity-80 mt-1 font-medium">Pending</p>
+            </div>
+            <div class="bg-white bg-opacity-20 p-1.5 rounded-lg">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
         </div>
     </div>
 
-    <div class="bg-white p-4 rounded-lg shadow-lg mb-6">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div class="flex-1 max-w-lg">
+    <div class="bg-white p-2.5 rounded-lg shadow-sm border border-gray-200 mb-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-2 md:space-y-0">
+            <div class="flex-1 max-w-lg mr-4">
                 <div class="relative">
-                    <input type="text" id="searchInput" placeholder="Search projects by code or customer..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
+                    <input type="text" id="searchInput" placeholder="Search project, customer, segment or team lead..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                        <svg class="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     </div>
                 </div>
             </div>
             <div class="flex space-x-2">
-                <select id="segmentFilter" class="border border-gray-300 rounded-md px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    <option value="">All Segments</option>
-                    </select>
-                <button id="clearFilters" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300">Clear Filters</button>
+                <div class="relative inline-block text-left" id="segmentFilterDropdown">
+                    <button type="button" onclick="toggleFilterMenu('segmentMenu')" class="inline-flex justify-between w-36 rounded-md border border-gray-300 shadow-sm px-2 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+                        <span id="segmentBtnText">Segments (All)</span>
+                        <svg class="-mr-1 ml-2 h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="segmentMenu" class="hidden origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 filter-dropdown-menu">
+                        <div class="p-1 space-y-0.5">
+                            {% for segment in segments %}
+                            <label class="flex items-center space-x-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer">
+                                <input type="checkbox" value="{{ segment.name|lower }}" class="segment-checkbox form-checkbox h-3 w-3 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                                <span class="text-xs text-gray-700">{{ segment.name }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative inline-block text-left" id="leadFilterDropdown">
+                    <button type="button" onclick="toggleFilterMenu('leadMenu')" class="inline-flex justify-between w-36 rounded-md border border-gray-300 shadow-sm px-2 py-1.5 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+                        <span id="leadBtnText">Team Leads (All)</span>
+                        <svg class="-mr-1 ml-2 h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="leadMenu" class="hidden origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 filter-dropdown-menu">
+                        <div class="p-1 space-y-0.5">
+                            {% for lead in team_leads %}
+                            <label class="flex items-center space-x-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer">
+                                <input type="checkbox" value="{{ lead.name|lower }}" class="leader-checkbox form-checkbox h-3 w-3 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                                <span class="text-xs text-gray-700">{{ lead.name }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <button id="clearFilters" class="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-md hover:bg-gray-200 text-xs font-medium border border-gray-200 transition-colors">Clear</button>
             </div>
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h3 class="text-lg font-semibold text-gray-900">Project Portfolio</h3>
-            <p class="text-sm text-gray-600">Manage and track all your active projects</p>
-        </div>
-        
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200" id="projectsTable">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Code</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer & Segment</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Leader</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activities</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">Project Code</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Segment</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">Team Lead</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">Acts</th>
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="projectsTableBody">
+                <tbody class="bg-white divide-y divide-gray-100" id="projectsTableBody">
                     {% for project in projects %}
-                    <tr class="project-row hover:bg-gray-50" data-project-code="{{ project.project_id|lower }}" data-customer="{{ project.customer_name|lower }}" data-segment="{{ project.segment.name|lower|default:'' }}">
-                        <td class="px-6 py-4 whitespace-nowrap">
+                    <tr class="project-row hover:bg-gray-50 transition-colors" 
+                        data-project-code="{{ project.project_id|lower }}" 
+                        data-customer="{{ project.customer_name|lower }}" 
+                        data-segment="{{ project.segment.name|lower|default:'' }}"
+                        data-team-lead="{{ project.team_lead.name|lower|default:'' }}">
+                        <td class="px-3 py-1.5 whitespace-nowrap">
                             <div class="flex items-center">
-                                <div class="flex-shrink-0 h-10 w-10">
-                                    <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                                        <span class="text-sm font-medium text-indigo-600">{{ project.project_id|slice:":2"|upper }}</span>
+                                <div class="flex-shrink-0 compact-avatar">
+                                    <div class="h-full w-full rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                                        <span class="text-indigo-700 font-bold">{{ project.project_id|slice:":2"|upper }}</span>
                                     </div>
                                 </div>
-                                <div class="ml-4">
-                                    <div class="text-sm font-medium text-gray-900">{{ project.project_id }}</div>
+                                <div class="ml-2">
+                                    <div class="text-xs font-semibold text-gray-900">{{ project.project_id }}</div>
                                 </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ project.customer_name }}</div>
+                        <td class="px-3 py-1.5 whitespace-nowrap">
+                            <div class="text-xs font-medium text-gray-900 truncate max-w-[200px]" title="{{ project.customer_name }}">
+                                {{ project.customer_name }}
+                            </div>
+                        </td>
+                        <td class="px-3 py-1.5 whitespace-nowrap">
                             {% if project.segment %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <span class="compact-badge inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                                 {{ project.segment.name }}
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                No Segment
-                            </span>
+                            <span class="text-xs text-gray-400">-</span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-3 py-1.5 whitespace-nowrap">
                             <div class="flex items-center">
-                                <div class="flex-shrink-0 h-8 w-8">
-                                    <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                        <span class="text-xs font-medium text-gray-600">{{ project.team_lead.name|slice:":2"|upper|default:"-" }}</span>
+                                <div class="flex-shrink-0 compact-avatar-sm">
+                                    <div class="h-full w-full rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center">
+                                        <span class="text-gray-600 font-medium">{{ project.team_lead.name|slice:":1"|upper|default:"-" }}</span>
                                     </div>
                                 </div>
-                                <div class="ml-3">
-                                    <div class="text-sm font-medium text-gray-900">{{ project.team_lead.name|default:"Unassigned" }}</div>
+                                <div class="ml-2">
+                                    <div class="text-xs text-gray-700">{{ project.team_lead.name|default:"Unassigned" }}</div>
                                 </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="px-3 py-1.5 whitespace-nowrap">
                             <div class="flex items-center">
-                                <span class="text-sm font-medium text-gray-900">{{ project.activities.count }}</span>
-                                <span class="ml-2 text-xs text-gray-500">activities</span>
+                                <span class="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">{{ project.activities.count }}</span>
                             </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div class="relative inline-block text-left">
-                                <button type="button" class="action-dropdown inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" onclick="toggleDropdown({{ project.pk }})">
-                                    Actions
-                                    <svg class="-mr-1 ml-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
+                        <td class="px-3 py-1.5 whitespace-nowrap text-right text-xs font-medium">
+                            <div class="flex items-center justify-end space-x-1">
+                                <a href="{% url 'planner_activity_planner' project.pk %}" class="text-gray-400 hover:text-indigo-600 transition-colors p-1" title="Manage Activities">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                </a>
+                                <button onclick="editProject({{ project.pk }}, '{{ project.project_id }}', '{{ project.customer_name }}', {{ project.team_lead.pk|default:'null' }}, {{ project.segment.pk|default:'null' }})" class="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Edit Project">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                 </button>
-                                <div id="dropdown-{{ project.pk }}" class="hidden origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                                    <div class="py-1">
-                                        <a href="{% url 'activity_planner' project.pk %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                            <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                            </svg>
-                                            Manage Activities
-                                        </a>
-                                        <a href="#" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="editProject({{ project.pk }}, '{{ project.project_id }}', '{{ project.customer_name }}', {{ project.team_lead.pk|default:'null' }}, {{ project.segment.pk|default:'null' }})">
-                                            <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                            </svg>
-                                            Edit Project
-                                        </a>
-                                        <form method="POST" action="{% url 'planner_delete_project' project.pk %}" class="inline w-full" onsubmit="return confirm('Are you sure you want to delete project {{ project.project_id }}? This action cannot be undone.');">
-                                            {% csrf_token %}
-                                            <button type="submit" class="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50">
-                                                <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                </svg>
-                                                Delete Project
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
+                                <form method="POST" action="{% url 'planner_delete_project' project.pk %}" class="inline" onsubmit="return confirm('Delete project {{ project.project_id }}?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-gray-400 hover:text-red-600 transition-colors p-1" title="Delete Project">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No projects</h3>
-                            <p class="mt-1 text-sm text-gray-500">Get started by creating your first project.</p>
-                            <div class="mt-6">
-                                <button onclick="document.getElementById('openAddProjectModal').click()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                                    <svg class="-ml-1 mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                                    </svg>
-                                    New Project
-                                </button>
-                            </div>
+                        <td colspan="6" class="px-4 py-8 text-center">
+                            <svg class="mx-auto h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                            <h3 class="mt-2 text-xs font-medium text-gray-900">No projects</h3>
+                            <button onclick="document.getElementById('openAddProjectModal').click()" class="mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium">Create Project &rarr;</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -240,45 +246,45 @@
 </div>
 
 <div id="projectModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-    <div class="relative mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+    <div class="relative mx-auto p-5 border w-full max-w-xl shadow-xl rounded-lg bg-white">
         <div class="flex justify-between items-center pb-3 border-b">
-            <h3 class="text-2xl font-semibold text-gray-800" id="modalTitle">Add New Project</h3>
-            <button id="closeModalBtn" type="button" class="text-gray-400 hover:text-gray-600 text-3xl font-bold">&times;</button>
+            <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Add New Project</h3>
+            <button id="closeModalBtn" type="button" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
         </div>
-        <div class="mt-5">
-            <form method="POST" id="projectForm" class="space-y-6">
+        <div class="mt-4">
+            <form method="POST" id="projectForm" class="space-y-3">
                 {% csrf_token %}
-                <input type="hidden" id="projectId" name="project_id_hidden">
+                <input type="hidden" id="projectId" name="project_id_hidden" value="{{ request.POST.project_id_hidden }}">
                 
-                <div>
-                    <h4 class="text-lg font-medium text-gray-700 mb-4">Project Information</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Project Code *</label>
-                            {{ form.project_id }}
-                            <div class="text-red-500 text-sm mt-1" id="project_id_error"></div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Customer Name *</label>
-                            {{ form.customer_name }}
-                            <div class="text-red-500 text-sm mt-1" id="customer_name_error"></div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Segment</label>
-                            {{ form.segment }}
-                            <div class="text-red-500 text-sm mt-1" id="segment_error"></div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Team Lead</label>
-                            {{ form.team_lead }}
-                            <div class="text-red-500 text-sm mt-1" id="team_lead_error"></div>
-                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Project Code *</label>
+                        {{ form.project_id }}
+                        {% if form.project_id.errors %}
+                            <div class="text-red-500 text-xs mt-1">{{ form.project_id.errors.0 }}</div>
+                        {% endif %}
+                        <div class="text-red-500 text-xs mt-1" id="project_id_error"></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Customer Name *</label>
+                        {{ form.customer_name }}
+                        <div class="text-red-500 text-xs mt-1" id="customer_name_error"></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Segment</label>
+                        {{ form.segment }}
+                        <div class="text-red-500 text-xs mt-1" id="segment_error"></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Team Lead</label>
+                        {{ form.team_lead }}
+                        <div class="text-red-500 text-xs mt-1" id="team_lead_error"></div>
                     </div>
                 </div>
                 
-                <div class="mt-6 pt-4 border-t flex justify-end space-x-4">
-                    <button id="cancelModalBtn" type="button" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700" id="saveProjectBtn">Save Project</button>
+                <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
+                    <button id="cancelModalBtn" type="button" class="bg-gray-100 text-gray-700 py-1.5 px-4 rounded-md hover:bg-gray-200 text-xs font-medium transition-colors">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 text-white py-1.5 px-4 rounded-md hover:bg-indigo-700 text-xs font-medium transition-colors" id="saveProjectBtn">Save</button>
                 </div>
             </form>
         </div>
@@ -286,63 +292,97 @@
 </div>
 
 <script>
+// Filter toggle logic
+function toggleFilterMenu(menuId) {
+    const menu = document.getElementById(menuId);
+    const isHidden = menu.classList.contains('hidden');
+    document.querySelectorAll('.filter-dropdown-menu').forEach(m => m.classList.add('hidden'));
+    if (isHidden) {
+        menu.classList.remove('hidden');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('projectModal');
     const openBtn = document.getElementById('openAddProjectModal');
     const closeBtn = document.getElementById('closeModalBtn');
     const cancelBtn = document.getElementById('cancelModalBtn');
     const searchInput = document.getElementById('searchInput');
-    const segmentFilter = document.getElementById('segmentFilter');
     const clearFiltersBtn = document.getElementById('clearFilters');
     
+    // Auto-open modal if there are form errors (server-side validation)
+    {% if form.errors %}
+        modal.classList.remove('hidden');
+        const hiddenId = document.getElementById('projectId').value;
+        if (hiddenId) {
+            document.getElementById('modalTitle').textContent = 'Edit Project';
+            document.getElementById('saveProjectBtn').textContent = 'Update';
+        } else {
+            document.getElementById('modalTitle').textContent = 'Add New Project';
+        }
+        {% if form.project_id.errors %}
+            setTimeout(() => {
+                alert("{{ form.project_id.errors.0|escapejs }}");
+            }, 100);
+        {% endif %}
+    {% endif %}
+
     if (modal && openBtn && closeBtn && cancelBtn) {
         openBtn.onclick = function() { 
             resetForm();
             document.getElementById('modalTitle').textContent = 'Add New Project';
-            document.getElementById('saveProjectBtn').textContent = 'Save Project';
+            document.getElementById('saveProjectBtn').textContent = 'Save';
             modal.classList.remove('hidden'); 
         }
         closeBtn.onclick = function() { modal.classList.add('hidden'); }
         cancelBtn.onclick = function() { modal.classList.add('hidden'); }
-        
         window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.classList.add('hidden');
-            }
+            if (event.target == modal) { modal.classList.add('hidden'); }
         }
     }
 
-    if (searchInput) {
-        searchInput.addEventListener('keyup', filterProjects);
-    }
-    
-    if (segmentFilter) {
-        segmentFilter.addEventListener('change', filterProjects);
-    }
-    
-    if (clearFiltersBtn) {
-        clearFiltersBtn.addEventListener('click', function() {
-            searchInput.value = '';
-            segmentFilter.value = '';
-            filterProjects();
-        });
-    }
+    // Filter Logic
+    const segmentCheckboxes = document.querySelectorAll('.segment-checkbox');
+    const leaderCheckboxes = document.querySelectorAll('.leader-checkbox');
 
     function filterProjects() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedSegment = segmentFilter.value.toLowerCase();
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const selectedSegments = Array.from(segmentCheckboxes)
+                                      .filter(cb => cb.checked)
+                                      .map(cb => cb.value);
+        const selectedLeaders = Array.from(leaderCheckboxes)
+                                     .filter(cb => cb.checked)
+                                     .map(cb => cb.value);
+
+        // Update button text
+        document.getElementById('segmentBtnText').textContent = selectedSegments.length > 0 
+            ? `Segments (${selectedSegments.length})` 
+            : 'Segments (All)';
+        
+        document.getElementById('leadBtnText').textContent = selectedLeaders.length > 0 
+            ? `Team Leads (${selectedLeaders.length})` 
+            : 'Team Leads (All)';
+
         const rows = document.querySelectorAll('.project-row');
         
         rows.forEach(row => {
             const projectCode = row.dataset.projectCode || '';
             const customer = row.dataset.customer || '';
             const segment = row.dataset.segment || '';
+            const teamLead = row.dataset.teamLead || '';
             
-            const matchesSearch = projectCode.includes(searchTerm) || 
-                                customer.includes(searchTerm);
-            const matchesSegment = !selectedSegment || segment.includes(selectedSegment);
+            // Search Match
+            const matchesSearch = !searchTerm || 
+                                  projectCode.includes(searchTerm) || 
+                                  customer.includes(searchTerm) || 
+                                  segment.includes(searchTerm) || 
+                                  teamLead.includes(searchTerm);
             
-            if (matchesSearch && matchesSegment) {
+            // Filter Matches
+            const matchesSegment = selectedSegments.length === 0 || selectedSegments.includes(segment);
+            const matchesLeader = selectedLeaders.length === 0 || selectedLeaders.includes(teamLead);
+            
+            if (matchesSearch && matchesSegment && matchesLeader) {
                 row.style.display = '';
             } else {
                 row.style.display = 'none';
@@ -350,53 +390,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (searchInput) {
+        searchInput.addEventListener('keyup', filterProjects);
+    }
+    
+    segmentCheckboxes.forEach(cb => cb.addEventListener('change', filterProjects));
+    leaderCheckboxes.forEach(cb => cb.addEventListener('change', filterProjects));
+    
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            segmentCheckboxes.forEach(cb => cb.checked = false);
+            leaderCheckboxes.forEach(cb => cb.checked = false);
+            filterProjects();
+        });
+    }
+
     document.addEventListener('click', function(event) {
-        if (!event.target.closest('.action-dropdown')) {
-            document.querySelectorAll('[id^="dropdown-"]').forEach(dropdown => {
-                dropdown.classList.add('hidden');
-            });
+        const dropdowns = document.querySelectorAll('.filter-dropdown-menu');
+        const triggers = document.querySelectorAll('[onclick^="toggleFilterMenu"]');
+        let clickedInside = false;
+        dropdowns.forEach(d => { if (d.contains(event.target)) clickedInside = true; });
+        triggers.forEach(t => { if (t.contains(event.target)) clickedInside = true; });
+        if (!clickedInside) {
+            dropdowns.forEach(d => d.classList.add('hidden'));
         }
     });
 });
 
-function toggleDropdown(projectId) {
-    const dropdown = document.getElementById(`dropdown-${projectId}`);
-    document.querySelectorAll('[id^="dropdown-"]').forEach(d => {
-        if (d !== dropdown) d.classList.add('hidden');
-    });
-    dropdown.classList.toggle('hidden');
-}
-
-// --- MODIFIED ---
-// Removed the 'name' parameter from the function.
 function editProject(id, projectId, customerName, teamLeadId, segmentId) {
     document.getElementById('modalTitle').textContent = 'Edit Project';
-    document.getElementById('saveProjectBtn').textContent = 'Update Project';
+    document.getElementById('saveProjectBtn').textContent = 'Update';
     document.getElementById('projectId').value = id;
     document.getElementById('id_project_id').value = projectId;
     document.getElementById('id_customer_name').value = customerName;
-    
     const teamLeadSelect = document.getElementById('id_team_lead');
-    if (teamLeadSelect) {
-        teamLeadSelect.value = teamLeadId || '';
-    }
-    
+    if (teamLeadSelect) teamLeadSelect.value = teamLeadId || '';
     const segmentSelect = document.getElementById('id_segment');
-    if (segmentSelect && segmentId) {
-        segmentSelect.value = segmentId;
-    } else if (segmentSelect) {
-        segmentSelect.value = '';
-    }
-    
+    if (segmentSelect && segmentId) segmentSelect.value = segmentId;
+    else if (segmentSelect) segmentSelect.value = '';
     document.getElementById('projectModal').classList.remove('hidden');
 }
 
 function resetForm() {
     document.getElementById('projectForm').reset();
     document.getElementById('projectId').value = '';
-    document.querySelectorAll('[id$="_error"]').forEach(error => {
-        error.textContent = '';
-    });
+    document.querySelectorAll('[id$="_error"]').forEach(error => { error.textContent = ''; });
+    const backendErrors = document.querySelectorAll('.text-red-500.text-xs');
+    backendErrors.forEach(el => { if (!el.id.endsWith('_error')) el.innerHTML = ''; });
 }
 </script>
 {% endblock %}

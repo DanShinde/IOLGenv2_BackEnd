@@ -1,10 +1,10 @@
 from django.apps import AppConfig
 
 
-class PlannerConfig(AppConfig):
+class EmployeesConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'planner'
+    name = 'employees'
 
     def ready(self):
         # Import signals to ensure they're registered
-        import planner.signals
+        import employees.signals
