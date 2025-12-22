@@ -2,72 +2,166 @@
 
 {% block title %}Reports{% endblock %}
 
-{% block content %}
-<div class="bg-white shadow rounded-lg p-6">
-    <h2 class="text-2xl font-bold mb-6">Inventory Reports</h2>
+{% block extra_css %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 2rem;
+    }
 
-    <!-- Inventory Summary -->
-    <div class="mb-8">
-        <h3 class="text-xl font-semibold mb-4">Inventory Summary</h3>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {% for summary in inventory_summary %}
-            <div class="bg-white border rounded-lg p-4 shadow-sm">
-                <h4 class="font-medium mb-2">{{ summary.item_type }}</h4>
-                <div class="space-y-1">
-                    <p class="text-sm">Total: {{ summary.total }}</p>
-                    <p class="text-sm text-green-600">Available: {{ summary.available }}</p>
-                    <p class="text-sm text-yellow-600">Assigned: {{ summary.assigned }}</p>
-                    <p class="text-sm text-red-600">Dispatched: {{ summary.dispatched }}</p>
-                </div>
-            </div>
-            {% endfor %}
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .report-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-900">Inventory Reports & Analytics</h2>
+            <p class="text-gray-600 mt-1">Comprehensive insights into your inventory</p>
         </div>
+        <a href="?export=pdf" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
+            <i class="fas fa-download mr-2"></i>Export PDF
+        </a>
     </div>
 
-    <!-- Category Distribution -->
-    <div class="mb-8">
-        <h3 class="text-xl font-semibold mb-4">Category Distribution</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for category in category_distribution %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {{ category.category|default:"Uncategorized" }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ category.count }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ category.percentage|floatformat:1 }}%
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {% for summary in inventory_summary %}
+        <div class="stat-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-white text-opacity-80 text-sm font-medium uppercase">{{ summary.item_type }}</p>
+                    <h3 class="text-4xl font-bold mt-2">{{ summary.total }}</h3>
+                </div>
+                <div class="bg-white bg-opacity-20 rounded-full p-4">
+                    <i class="fas {% if summary.item_type == 'TOOL' %}fa-tools{% else %}fa-boxes{% endif %} text-3xl"></i>
+                </div>
             </div>
-            <div class="flex items-center justify-center">
-                <div class="w-64 h-64">
-                    <!-- Placeholder for chart (would be implemented with Chart.js or similar) -->
-                    <div class="bg-gray-100 rounded-full w-full h-full flex items-center justify-center text-gray-400">
-                        <span>Pie Chart</span>
+            <div class="mt-4 pt-4 border-t border-white border-opacity-20">
+                <div class="grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                        <span class="text-white text-opacity-60">Available</span>
+                        <p class="font-semibold">{{ summary.available }}</p>
+                    </div>
+                    <div>
+                        <span class="text-white text-opacity-60">Assigned</span>
+                        <p class="font-semibold">{{ summary.assigned }}</p>
+                    </div>
+                    <div>
+                        <span class="text-white text-opacity-60">Dispatched</span>
+                        <p class="font-semibold">{{ summary.dispatched }}</p>
                     </div>
                 </div>
             </div>
         </div>
+        {% endfor %}
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Status Distribution Chart -->
+        <div class="report-card">
+            <h3 class="text-xl font-semibold mb-4 flex items-center">
+                <i class="fas fa-chart-pie text-blue-600 mr-2"></i>
+                Status Distribution
+            </h3>
+            <div class="chart-container">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Category Distribution Chart -->
+        <div class="report-card">
+            <h3 class="text-xl font-semibold mb-4 flex items-center">
+                <i class="fas fa-chart-doughnut text-purple-600 mr-2"></i>
+                Category Distribution
+            </h3>
+            <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Type Comparison Bar Chart -->
+    <div class="report-card">
+        <h3 class="text-xl font-semibold mb-4 flex items-center">
+            <i class="fas fa-chart-bar text-green-600 mr-2"></i>
+            Inventory Type Comparison
+        </h3>
+        <div class="chart-container" style="height: 400px;">
+            <canvas id="typeComparisonChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Category Distribution Table -->
+    <div class="report-card">
+        <h3 class="text-xl font-semibold mb-6 flex items-center">
+            <i class="fas fa-table text-indigo-600 mr-2"></i>
+            Detailed Category Breakdown
+        </h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for category in category_distribution %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="font-medium text-gray-900">
+                                {{ category.category|default:"Uncategorized" }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">{{ category.count }}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ category.percentage|floatformat:1 }}%
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: {{ category.percentage }}%"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- User Assignments -->
-    <div>
-        <h3 class="text-xl font-semibold mb-4">User Assignments</h3>
+    <div class="report-card">
+        <h3 class="text-xl font-semibold mb-6 flex items-center">
+            <i class="fas fa-users text-teal-600 mr-2"></i>
+            Active User Assignments
+        </h3>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -75,29 +169,52 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Tools</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Assignment</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for user in user_assignments %}
-                    <tr>
+                    <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="font-medium">{{ user.get_full_name|default:user.username }}</div>
-                            <div class="text-sm text-gray-500">{{ user.email }}</div>
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10">
+                                    <div class="h-10 w-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold">
+                                        {{ user.get_full_name.0|default:user.username.0|upper }}
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="font-medium text-gray-900">{{ user.get_full_name|default:user.username }}</div>
+                                    <div class="text-sm text-gray-500">{{ user.email }}</div>
+                                </div>
+                            </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ user.tool_count }}
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
+                                {{ user.tool_count }} tool{{ user.tool_count|pluralize }}
+                            </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {% if user.last_assignment %}
-                            {{ user.last_assignment.assignment_date|date:"M d, Y" }}
+                            <div class="flex items-center">
+                                <i class="fas fa-calendar-alt text-gray-400 mr-2"></i>
+                                {{ user.last_assignment.assignment_date|date:"M d, Y" }}
+                            </div>
                             {% else %}
-                            Never
+                            <span class="text-gray-400">Never</span>
                             {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
+                                <i class="fas fa-check-circle mr-1"></i>Active
+                            </span>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">No user assignments found</td>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+                            <p>No user assignments found</p>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -105,4 +222,186 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Chart.js Global Configuration
+Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+Chart.defaults.color = '#6b7280';
+
+// Prepare data for charts
+const inventorySummary = {{ inventory_summary|safe }};
+const categoryData = {{ category_distribution|safe }};
+
+// Status Distribution Pie Chart
+const statusCtx = document.getElementById('statusChart').getContext('2d');
+const statusLabels = [];
+const statusValues = [];
+const statusColors = ['#10b981', '#f59e0b', '#ef4444'];
+
+inventorySummary.forEach(item => {
+    statusLabels.push('Available', 'Assigned', 'Dispatched');
+    statusValues.push(item.available, item.assigned, item.dispatched);
+});
+
+// Calculate totals by status across all item types
+const statusTotals = {
+    available: inventorySummary.reduce((sum, item) => sum + item.available, 0),
+    assigned: inventorySummary.reduce((sum, item) => sum + item.assigned, 0),
+    dispatched: inventorySummary.reduce((sum, item) => sum + item.dispatched, 0)
+};
+
+new Chart(statusCtx, {
+    type: 'pie',
+    data: {
+        labels: ['Available', 'Assigned', 'Dispatched'],
+        datasets: [{
+            data: [statusTotals.available, statusTotals.assigned, statusTotals.dispatched],
+            backgroundColor: statusColors,
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 15,
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                        return `${context.label}: ${context.parsed} (${percentage}%)`;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Category Distribution Doughnut Chart
+const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+const categoryLabels = categoryData.map(c => c.category || 'Uncategorized');
+const categoryValues = categoryData.map(c => c.count);
+const categoryColors = [
+    '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe',
+    '#00f2fe', '#43e97b', '#38f9d7', '#fa709a', '#fee140'
+];
+
+new Chart(categoryCtx, {
+    type: 'doughnut',
+    data: {
+        labels: categoryLabels,
+        datasets: [{
+            data: categoryValues,
+            backgroundColor: categoryColors.slice(0, categoryLabels.length),
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 15,
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const percentage = categoryData[context.dataIndex].percentage.toFixed(1);
+                        return `${context.label}: ${context.parsed} (${percentage}%)`;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Type Comparison Bar Chart
+const typeCtx = document.getElementById('typeComparisonChart').getContext('2d');
+const typeLabels = inventorySummary.map(item => item.item_type);
+
+new Chart(typeCtx, {
+    type: 'bar',
+    data: {
+        labels: typeLabels,
+        datasets: [
+            {
+                label: 'Available',
+                data: inventorySummary.map(item => item.available),
+                backgroundColor: '#10b981',
+                borderRadius: 8
+            },
+            {
+                label: 'Assigned',
+                data: inventorySummary.map(item => item.assigned),
+                backgroundColor: '#f59e0b',
+                borderRadius: 8
+            },
+            {
+                label: 'Dispatched',
+                data: inventorySummary.map(item => item.dispatched),
+                backgroundColor: '#ef4444',
+                borderRadius: 8
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    padding: 15,
+                    font: {
+                        size: 13
+                    }
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: {
+                    size: 14
+                },
+                bodyFont: {
+                    size: 13
+                }
+            }
+        },
+        scales: {
+            x: {
+                grid: {
+                    display: false
+                }
+            },
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    precision: 0
+                }
+            }
+        }
+    }
+});
+</script>
 {% endblock %}

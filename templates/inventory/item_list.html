@@ -2,17 +2,68 @@
 
 {% block title %}Inventory Items{% endblock %}
 
+{% block extra_css %}
+<style>
+    .bulk-actions-bar {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem 2rem;
+        border-radius: 50px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        display: none;
+        align-items: center;
+        gap: 1rem;
+        z-index: 100;
+        animation: slideUp 0.3s ease-out;
+    }
+
+    .bulk-actions-bar.active {
+        display: flex;
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateX(-50%) translateY(100px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+    }
+
+    tr.selected {
+        background-color: #eff6ff !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="bg-white shadow rounded-lg p-6">
     <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-900">Inventory Items</h2>
-        <a href="{% url 'inventory-item-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
-            <i class="fas fa-plus mr-2"></i>Add Item
-        </a>
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900">Inventory Items</h2>
+            <p class="text-sm text-gray-500 mt-1">
+                Showing {{ items|length }} of {{ paginator.count }} items
+                {% if is_paginated %} (Page {{ items.number }} of {{ paginator.num_pages }}){% endif %}
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a href="?export=csv{% for key, value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+               class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md inline-flex items-center">
+                <i class="fas fa-file-csv mr-2"></i>Export CSV
+            </a>
+            <a href="{% url 'inventory-item-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
+                <i class="fas fa-plus mr-2"></i>Add Item
+            </a>
+        </div>
     </div>
 
     <!-- Search and filter form -->
-    <form method="get" class="mb-6">
+    <form method="get" class="mb-6" id="filterForm">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             {% for field in form %}
                 <div>
@@ -21,21 +72,30 @@
                 </div>
             {% endfor %}
         </div>
-        <div class="mt-4 flex justify-end">
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
-                <i class="fas fa-filter mr-2"></i>Filter
-            </button>
-            <a href="{% url 'inventory-item-list' %}" class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
-                <i class="fas fa-sync-alt mr-2"></i>Reset
-            </a>
+        <div class="mt-4 flex justify-between items-center">
+            <div class="text-sm text-gray-600">
+                <i class="fas fa-keyboard mr-1"></i>
+                <span>Tip: Press <kbd class="px-2 py-1 bg-gray-100 border rounded">Ctrl+K</kbd> to focus search</span>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
+                    <i class="fas fa-filter mr-2"></i>Filter
+                </button>
+                <a href="{% url 'inventory-item-list' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md inline-flex items-center">
+                    <i class="fas fa-sync-alt mr-2"></i>Reset
+                </a>
+            </div>
         </div>
     </form>
 
     <!-- Items table -->
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-gray-200" id="itemsTable">
             <thead class="bg-gray-50">
                 <tr>
+                    <th class="px-6 py-3 text-left">
+                        <input type="checkbox" id="selectAll" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial</th>
@@ -46,13 +106,16 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for item in items %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50 item-row" data-item-id="{{ item.pk }}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="checkbox" class="item-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="{{ item.pk }}">
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="font-medium text-gray-900">{{ item.name }}</div>
                         <div class="text-sm text-gray-500">{{ item.make }} {{ item.model }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 py-1 text-xs rounded-full 
+                        <span class="px-2 py-1 text-xs rounded-full
                             {% if item.item_type == 'TOOL' %}bg-blue-100 text-blue-800
                             {% else %}bg-green-100 text-green-800{% endif %}">
                             {{ item.get_item_type_display }}
@@ -60,7 +123,7 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.serial_number }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 py-1 text-xs rounded-full 
+                        <span class="px-2 py-1 text-xs rounded-full
                             {% if item.needs_reorder %}bg-red-100 text-red-800
                             {% else %}bg-gray-100 text-gray-800{% endif %}">
                             {{ item.quantity }}
@@ -82,11 +145,216 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">No items found</td>
+                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                        <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+                        <p>No items found</p>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="mt-6 flex justify-between items-center">
+        <div class="text-sm text-gray-700">
+            Showing page {{ items.number }} of {{ paginator.num_pages }}
+        </div>
+        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+            {% if items.has_previous %}
+            <a href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+               class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                <i class="fas fa-angle-double-left"></i>
+            </a>
+            <a href="?page={{ items.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+               class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                <i class="fas fa-angle-left"></i>
+            </a>
+            {% endif %}
+
+            {% for num in paginator.page_range %}
+                {% if items.number == num %}
+                <span class="relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-50 text-sm font-medium text-blue-600">
+                    {{ num }}
+                </span>
+                {% elif num > items.number|add:'-3' and num < items.number|add:'3' %}
+                <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    {{ num }}
+                </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if items.has_next %}
+            <a href="?page={{ items.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+               class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                <i class="fas fa-angle-right"></i>
+            </a>
+            <a href="?page={{ paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+               class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                <i class="fas fa-angle-double-right"></i>
+            </a>
+            {% endif %}
+        </nav>
+        <div class="text-sm text-gray-700">
+            <select id="pageSizeSelect" class="border-gray-300 rounded-md">
+                <option value="20" {% if request.GET.page_size == '20' %}selected{% endif %}>20 per page</option>
+                <option value="50" {% if request.GET.page_size == '50' %}selected{% endif %}>50 per page</option>
+                <option value="100" {% if request.GET.page_size == '100' %}selected{% endif %}>100 per page</option>
+            </select>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+<!-- Bulk Actions Bar -->
+<div class="bulk-actions-bar" id="bulkActionsBar">
+    <span class="text-white font-semibold" id="selectedCount">0 selected</span>
+    <button onclick="bulkRetire()" class="bg-white text-purple-600 px-4 py-2 rounded-full hover:bg-gray-100 transition">
+        <i class="fas fa-ban mr-1"></i> Retire
+    </button>
+    <button onclick="bulkDelete()" class="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition">
+        <i class="fas fa-trash mr-1"></i> Delete
+    </button>
+    <button onclick="clearSelection()" class="text-white hover:text-gray-200">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Bulk Selection Management
+const selectAllCheckbox = document.getElementById('selectAll');
+const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+const bulkActionsBar = document.getElementById('bulkActionsBar');
+const selectedCountSpan = document.getElementById('selectedCount');
+
+selectAllCheckbox?.addEventListener('change', function() {
+    itemCheckboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+        checkbox.closest('tr').classList.toggle('selected', this.checked);
+    });
+    updateBulkActionsBar();
+});
+
+itemCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        this.closest('tr').classList.toggle('selected', this.checked);
+        updateBulkActionsBar();
+
+        // Update select all checkbox
+        const allChecked = Array.from(itemCheckboxes).every(cb => cb.checked);
+        const someChecked = Array.from(itemCheckboxes).some(cb => cb.checked);
+        selectAllCheckbox.checked = allChecked;
+        selectAllCheckbox.indeterminate = someChecked && !allChecked;
+    });
+});
+
+function updateBulkActionsBar() {
+    const selectedItems = Array.from(itemCheckboxes).filter(cb => cb.checked);
+    const count = selectedItems.length;
+
+    if (count > 0) {
+        bulkActionsBar.classList.add('active');
+        selectedCountSpan.textContent = `${count} selected`;
+    } else {
+        bulkActionsBar.classList.remove('active');
+    }
+}
+
+function getSelectedIds() {
+    return Array.from(itemCheckboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+}
+
+function clearSelection() {
+    itemCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        checkbox.closest('tr').classList.remove('selected');
+    });
+    selectAllCheckbox.checked = false;
+    updateBulkActionsBar();
+}
+
+async function bulkRetire() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+
+    if (!confirm(`Are you sure you want to retire ${ids.length} item(s)?`)) return;
+
+    Loading.show();
+    try {
+        const response = await fetch("{% url 'inventory-bulk-update' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                item_ids: ids,
+                action: 'retire'
+            })
+        });
+
+        const data = await response.json();
+        Loading.hide();
+
+        if (data.success) {
+            Toast.success(data.message);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            Toast.error(data.message);
+        }
+    } catch (error) {
+        Loading.hide();
+        Toast.error('An error occurred');
+    }
+}
+
+async function bulkDelete() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+
+    if (!confirm(`Are you sure you want to DELETE ${ids.length} item(s)? This action cannot be undone!`)) return;
+
+    Loading.show();
+    try {
+        const response = await fetch("{% url 'inventory-bulk-update' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                item_ids: ids,
+                action: 'delete'
+            })
+        });
+
+        const data = await response.json();
+        Loading.hide();
+
+        if (data.success) {
+            Toast.success(data.message);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            Toast.error(data.message);
+        }
+    } catch (error) {
+        Loading.hide();
+        Toast.error('An error occurred');
+    }
+}
+
+// Page Size Selector
+document.getElementById('pageSizeSelect')?.addEventListener('change', function() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('page_size', this.value);
+    url.searchParams.set('page', '1');  // Reset to page 1
+    window.location.href = url.toString();
+});
+</script>
 {% endblock %}

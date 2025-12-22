@@ -1,0 +1,322 @@
+{% extends 'base.html' %}
+
+{% block title %}Community Forum{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Category Cards with Gradient */
+    .category-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-left: 4px solid;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .category-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 150px;
+        height: 150px;
+        opacity: 0.05;
+        transform: rotate(-15deg);
+    }
+
+    .category-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .category-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: white;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, var(--category-color) 0%, var(--category-color-dark) 100%);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Stats Cards */
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+    }
+
+    /* Thread Card */
+    .thread-card {
+        background: white;
+        padding: 1.25rem;
+        border-radius: 0.75rem;
+        border-left: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+    .thread-card:hover {
+        border-left-color: #667eea;
+        background: linear-gradient(to right, rgba(102, 126, 234, 0.03), white);
+        transform: translateX(4px);
+    }
+
+    /* Badges */
+    .badge-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-open {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        color: #1e40af;
+    }
+
+    .badge-in-progress {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        color: #92400e;
+    }
+
+    .badge-resolved {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        color: #065f46;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fadeInUp {
+        animation: fadeInUp 0.5s ease-out;
+    }
+
+    .stagger-1 { animation-delay: 0.1s; }
+    .stagger-2 { animation-delay: 0.2s; }
+    .stagger-3 { animation-delay: 0.3s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8 animate-fadeInUp">
+    <!-- Header Section -->
+    <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-xl">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div>
+                <h1 class="text-4xl font-bold mb-2">
+                    <i class="fas fa-comments mr-3"></i>Community Forum
+                </h1>
+                <p class="text-purple-100 text-lg">
+                    Share ideas, report bugs, and help each other succeed
+                </p>
+            </div>
+            <a href="{% url 'forum-thread-create' %}"
+               class="mt-4 md:mt-0 bg-white text-purple-600 px-6 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 inline-flex items-center">
+                <i class="fas fa-plus mr-2"></i>New Thread
+            </a>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div class="bg-white bg-opacity-20 backdrop-blur rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-purple-100 text-sm font-medium">Total Threads</p>
+                        <p class="text-3xl font-bold mt-1">{{ total_threads }}</p>
+                    </div>
+                    <div class="bg-white bg-opacity-20 rounded-full p-3">
+                        <i class="fas fa-layer-group text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white bg-opacity-20 backdrop-blur rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-purple-100 text-sm font-medium">Total Posts</p>
+                        <p class="text-3xl font-bold mt-1">{{ total_posts }}</p>
+                    </div>
+                    <div class="bg-white bg-opacity-20 rounded-full p-3">
+                        <i class="fas fa-comment-dots text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white bg-opacity-20 backdrop-blur rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-purple-100 text-sm font-medium">Active Users</p>
+                        <p class="text-3xl font-bold mt-1">{{ total_users }}</p>
+                    </div>
+                    <div class="bg-white bg-opacity-20 rounded-full p-3">
+                        <i class="fas fa-users text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories Section -->
+    <div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+            <span class="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Categories</span>
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for category in categories %}
+            <a href="{% url 'forum-category' category.slug %}"
+               class="category-card stagger-{{ forloop.counter }} animate-fadeInUp"
+               style="--category-color: {{ category.color }}; --category-color-dark: {{ category.color }}dd; border-left-color: {{ category.color }};">
+
+                <div class="category-icon" style="background: linear-gradient(135deg, {{ category.color }} 0%, {{ category.color }}dd 100%);">
+                    <i class="{{ category.icon }}"></i>
+                </div>
+
+                <h3 class="text-xl font-bold text-gray-900 mb-2">{{ category.name }}</h3>
+                <p class="text-gray-600 text-sm mb-4">{{ category.description }}</p>
+
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center text-gray-500">
+                        <i class="fas fa-layer-group mr-2"></i>
+                        <span>{{ category.thread_count }} thread{{ category.thread_count|pluralize }}</span>
+                    </div>
+                    <div class="flex items-center text-gray-500">
+                        <i class="fas fa-comment mr-2"></i>
+                        <span>{{ category.post_count }} post{{ category.post_count|pluralize }}</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center text-purple-600 font-semibold text-sm">
+                    View Threads
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </div>
+            </a>
+            {% empty %}
+            <div class="col-span-full text-center py-12">
+                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">No categories available yet</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent Threads Section -->
+    <div class="bg-white rounded-2xl p-6 shadow-lg">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <span class="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Recent Activity</span>
+            </h2>
+            <span class="text-sm text-gray-500">Last 10 threads</span>
+        </div>
+
+        <div class="space-y-3">
+            {% for thread in recent_threads %}
+            <a href="{% url 'forum-thread-detail' thread.slug %}" class="thread-card block">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="px-2 py-1 text-xs rounded-lg font-semibold"
+                                  style="background-color: {{ thread.category.color }}20; color: {{ thread.category.color }};">
+                                <i class="{{ thread.category.icon }} mr-1"></i>{{ thread.category.name }}
+                            </span>
+
+                            <span class="badge-status badge-{{ thread.status }}">
+                                {{ thread.get_status_display }}
+                            </span>
+
+                            {% if thread.priority == 'high' or thread.priority == 'critical' %}
+                            <span class="px-2 py-1 text-xs rounded-lg bg-red-100 text-red-800 font-semibold">
+                                <i class="fas fa-exclamation-circle mr-1"></i>{{ thread.get_priority_display }}
+                            </span>
+                            {% endif %}
+
+                            {% if thread.is_pinned %}
+                            <i class="fas fa-thumbtack text-purple-600"></i>
+                            {% endif %}
+
+                            {% if thread.best_answer %}
+                            <i class="fas fa-check-circle text-green-600" title="Has solution"></i>
+                            {% endif %}
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-gray-900 mb-1 hover:text-purple-600 transition-colors">
+                            {{ thread.title }}
+                        </h3>
+
+                        <div class="flex items-center text-sm text-gray-500">
+                            <div class="flex items-center mr-4">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold mr-2">
+                                    {{ thread.author.get_full_name.0|default:thread.author.username.0|upper }}
+                                </div>
+                                <span>{{ thread.author.get_full_name|default:thread.author.username }}</span>
+                            </div>
+                            <span class="mx-2">•</span>
+                            <span>{{ thread.created_at|timesince }} ago</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col items-end text-sm text-gray-500 ml-4">
+                        <div class="flex items-center mb-1">
+                            <i class="fas fa-comment mr-1"></i>
+                            <span>{{ thread.reply_count }}</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-eye mr-1"></i>
+                            <span>{{ thread.views }}</span>
+                        </div>
+                    </div>
+                </div>
+            </a>
+            {% empty %}
+            <div class="text-center py-8">
+                <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-500">No threads yet. Be the first to start a discussion!</p>
+                <a href="{% url 'forum-thread-create' %}"
+                   class="mt-4 inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Create First Thread
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-purple-100">
+        <div class="flex items-start">
+            <div class="bg-gradient-to-br from-purple-500 to-pink-500 rounded-full p-3 mr-4">
+                <i class="fas fa-lightbulb text-white text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">Forum Guidelines</h3>
+                <ul class="text-gray-600 text-sm space-y-1">
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>Be respectful and constructive</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>Search before posting to avoid duplicates</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>Use clear, descriptive titles</li>
+                    <li><i class="fas fa-check text-green-600 mr-2"></i>Mark solutions to help others</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
