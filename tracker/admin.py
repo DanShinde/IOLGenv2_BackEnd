@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Project, Stage,trackerSegment, Pace, ContactPerson  
+from .models import Project, Stage, trackerSegment, ContactPerson
 from import_export.admin import ImportExportModelAdmin
 
 
@@ -7,10 +7,9 @@ from import_export.admin import ImportExportModelAdmin
 @admin.register(Project)
 class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
-    # ✅ Add pace_contact to the display list
-    list_display = ('id', 'code', 'customer_name', 'value', 'so_punch_date', 'segment_con', 'pace')
-    search_fields = ('code', 'customer_name', 'segment_con__name', 'pace__name') # ✅ Add pace_contact to search
-    list_filter = ('segment_con', 'pace',) # ✅ Add pace_contact to filter
+    list_display = ('id', 'code', 'customer_name', 'value', 'so_punch_date', 'segment_con', 'team_lead')
+    search_fields = ('code', 'customer_name', 'segment_con__name', 'team_lead__name')
+    list_filter = ('segment_con', 'team_lead',)
 
 
 
@@ -27,12 +26,7 @@ class SegmentAdmin(admin.ModelAdmin):
 
     search_fields = ('name',)  # Add search functionality for the name field
 
-@admin.register(Pace)
-class PaceAdmin(ImportExportModelAdmin, admin.ModelAdmin):
-    list_display = ('id', 'name')
-    search_fields = ('name',)    
-
-# ✅ NEW: Register the ContactPerson model
+# ✅ Register the ContactPerson model
 @admin.register(ContactPerson)
 class ContactPersonAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')

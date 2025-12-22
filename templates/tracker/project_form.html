@@ -83,18 +83,18 @@
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label for="pace" class="form-label"><i class="fas fa-user-check me-2 text-muted"></i>PACe</label>
-                            <select name="pace" id="pace" class="form-select">
-                                <option value="">-- Select a Person --</option>
-                                {% for pace in paces %}
-                                    <option value="{{ pace.id }}"
-                                        {% if project and project.pace and project.pace.id == pace.id %}selected{% endif %}>
-                                        {{ pace.name }}
+                            <label for="team_lead" class="form-label"><i class="fas fa-user-check me-2 text-muted"></i>Team Lead (PACe)</label>
+                            <select name="team_lead" id="team_lead" class="form-select">
+                                <option value="">-- Select Team Lead --</option>
+                                {% for employee in team_leads %}
+                                    <option value="{{ employee.id }}"
+                                        {% if project and project.team_lead and project.team_lead.id == employee.id %}selected{% endif %}>
+                                        {{ employee.name }}
                                     </option>
                                 {% endfor %}
                             </select>
                             <div class="invalid-feedback">
-                                Please select a PACe.
+                                Please select a Team Lead.
                             </div>
                         </div>
                     </div>

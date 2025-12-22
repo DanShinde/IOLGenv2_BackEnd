@@ -6,7 +6,8 @@ from django.utils.dateparse import parse_date
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, Pace, UpdateRemark, Project, ContactPerson
+from employees.models import Employee
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson
 
 from django.db.models import Q, F, Sum, Count
 from django.utils import timezone
@@ -77,26 +78,25 @@ def new_project(request):
         code = request.POST['code']
         if Project.objects.filter(code=code).exists():
             messages.error(request, "Project code already exists.")
-            # ✅ Pass paces to context on error
             return render(request, 'tracker/project_form.html', {
                 'segments': trackerSegment.objects.all(),
-                'paces': Pace.objects.all()
+                'team_leads': Employee.objects.filter(designation='TEAM_LEAD')
                 })
-        
+
         segment_id = request.POST.get('segment')
         segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
-        
-        # ✅ Get the Pace contact
-        pace_id = request.POST.get('pace')
-        pace = Pace.objects.get(id=pace_id) if pace_id else None
+
+        # Get the Team Lead
+        team_lead_id = request.POST.get('team_lead')
+        team_lead = Employee.objects.get(id=team_lead_id) if team_lead_id else None
 
         project = Project.objects.create(
             code=code, customer_name=request.POST['customer_name'],
             value=request.POST['value'], so_punch_date=parse_date(request.POST['so_punch_date']),
             segment_con=segment_con,
-            pace=pace # ✅ Save the Pace contact
+            team_lead=team_lead
         )
-        
+
         # ... stage creation logic is unchanged ...
         for stage_name, _ in Stage.AUTOMATION_STAGES:
             Stage.objects.create(project=project, name=stage_name, stage_type='Automation')
@@ -105,11 +105,11 @@ def new_project(request):
 
         messages.success(request, "Project created successfully!")
         return redirect('tracker_project_detail', project_id=project.id)
-    
-    # ✅ Pass paces to context for the GET request
+
+    # Pass team leads to context for the GET request
     context = {
         'segments': trackerSegment.objects.all(),
-        'paces': Pace.objects.all()
+        'team_leads': Employee.objects.filter(designation='TEAM_LEAD')
     }
     return render(request, 'tracker/project_form.html', context)
 
@@ -126,8 +126,8 @@ def edit_project(request, project_id):
         segment_id = request.POST.get('segment')
         project.segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
 
-        pace_id = request.POST.get('pace')
-        project.pace = Pace.objects.get(id=pace_id) if pace_id else None
+        team_lead_id = request.POST.get('team_lead')
+        project.team_lead = Employee.objects.get(id=team_lead_id) if team_lead_id else None
 
         project.save()
         messages.success(request, f"Project '{project.code}' updated successfully!")
@@ -137,7 +137,7 @@ def edit_project(request, project_id):
     context = {
         'project': project,
         'segments': trackerSegment.objects.all(),
-        'paces': Pace.objects.all()
+        'team_leads': Employee.objects.filter(designation='TEAM_LEAD')
     }
     return render(request, 'tracker/project_form.html', context)
 
@@ -437,7 +437,7 @@ def project_reports(request):
     query_params = request.GET or request.session.get('report_filters', {})
     
     # --- The FIX is in this line: We add select_related and prefetch_related ---
-    projects_qs = Project.objects.select_related('segment_con', 'pace').prefetch_related('stages').all()
+    projects_qs = Project.objects.select_related('segment_con', 'team_lead').prefetch_related('stages').all()
 
     # --- Check for the 'hide_completed' filter ---
     hide_completed = query_params.get('hide_completed') == '1'
@@ -453,7 +453,7 @@ def project_reports(request):
     params_for_getlist = QueryDict(mutable=True)
     params_for_getlist.update(query_params)
     selected_segment_ids = params_for_getlist.getlist('segments')
-    selected_pace_ids = params_for_getlist.getlist('paces')
+    selected_team_lead_ids = params_for_getlist.getlist('team_leads')
 
     start_date = query_params.get('start_date')
     end_date = query_params.get('end_date')
@@ -462,9 +462,9 @@ def project_reports(request):
 
     if selected_segment_ids:
         projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
-        
-    if selected_pace_ids:
-        projects_qs = projects_qs.filter(pace__id__in=selected_pace_ids)
+
+    if selected_team_lead_ids:
+        projects_qs = projects_qs.filter(team_lead__id__in=selected_team_lead_ids)
 
     if start_date and end_date:
         projects_qs = projects_qs.filter(so_punch_date__range=[start_date, end_date])
@@ -536,9 +536,9 @@ def project_reports(request):
         'total_portfolio_value': total_portfolio_value,
         'average_completion': average_completion,
         'all_segments': trackerSegment.objects.all(),
-        'all_paces': Pace.objects.all(),
+        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD'),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
-        'selected_pace_ids': [int(i) for i in selected_pace_ids],
+        'selected_team_lead_ids': [int(i) for i in selected_team_lead_ids],
         'start_date': start_date, 'end_date': end_date,
         'min_value': min_value, 'max_value': max_value,
         'status_labels': status_labels, 'status_data': status_data,

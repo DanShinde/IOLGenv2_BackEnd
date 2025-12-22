@@ -2,7 +2,9 @@
 
 from django.db import models
 from django.utils import timezone
+from datetime import timedelta
 from .utils import calculate_end_date
+from employees.models import Employee
 
 class Segment(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -26,18 +28,26 @@ class ProjectType(models.Model):
 
 class Project(models.Model):
     project_id = models.CharField(max_length=100, unique=True, verbose_name="Project Code")
-    # --- REMOVED ---
-    # name = models.CharField(max_length=200, blank=True, verbose_name="Project Name")
     customer_name = models.CharField(max_length=200)
     segment = models.ForeignKey(Segment, on_delete=models.SET_NULL, null=True, blank=True)
     team_lead = models.ForeignKey(
-        'Employee',
+        'employees.Employee',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         limit_choices_to={'designation': 'TEAM_LEAD'},
         related_name='led_projects',
         verbose_name="Team Lead"
+    )
+    # Link to tracker project - won't delete planner project if tracker project is deleted
+    tracker_project = models.OneToOneField(
+        'tracker.Project',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='planner_project',
+        verbose_name="Linked Tracker Project",
+        help_text="Connected project from tracker app"
     )
 
     class Meta:
@@ -49,30 +59,49 @@ class Activity(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='activities')
     activity_name = models.CharField(max_length=200)
     project_type = models.ForeignKey(ProjectType, on_delete=models.SET_NULL, null=True, blank=True)
-    assignee = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True)
+    assignee = models.ForeignKey('employees.Employee', on_delete=models.SET_NULL, null=True, blank=True)
     remark = models.TextField(blank=True)
     start_date = models.DateField(default=timezone.now)
     duration = models.PositiveIntegerField(default=1, help_text="Duration in working days")
     end_date = models.DateField(blank=True, null=True)
+    
     def __str__(self):
         return f"{self.project.project_id} - {self.activity_name}"
+        
     def save(self, *args, **kwargs):
+        # 1. Get Global Holidays
         holidays = list(Holiday.objects.values_list('date', flat=True))
-        self.end_date = calculate_end_date(self.start_date, self.duration, holidays)
+        
+        # 2. Get Assignee Leaves (if assigned)
+        assignee_leaves = []
+        if self.assignee:
+            # We only care about leaves that happen on or after the activity start
+            relevant_leaves = self.assignee.leaves.filter(end_date__gte=self.start_date)
+            for leave in relevant_leaves:
+                # Expand range to individual dates
+                curr = leave.start_date
+                while curr <= leave.end_date:
+                    assignee_leaves.append(curr)
+                    curr += timedelta(days=1)
+        
+        # 3. Calculate End Date considering both
+        self.end_date = calculate_end_date(self.start_date, self.duration, holidays, assignee_leaves)
         super().save(*args, **kwargs)
+        
     class Meta:
         ordering = ['start_date']
 
-class Employee(models.Model):
-    DESIGNATION_CHOICES = [
-        ('ENGINEER', 'Engineer'),
-        ('TEAM_LEAD', 'Team Lead'),
-        ('MANAGER', 'Manager'),
-    ]
-    name = models.CharField(max_length=100)
-    designation = models.CharField(max_length=10, choices=DESIGNATION_CHOICES)
-    def __str__(self): return self.name
-    class Meta: ordering = ['name']
+class Leave(models.Model):
+    employee = models.ForeignKey('employees.Employee', on_delete=models.CASCADE, related_name='planner_leaves')
+    start_date = models.DateField()
+    end_date = models.DateField()
+    reason = models.CharField(max_length=200, blank=True)
+
+    def __str__(self):
+        return f"{self.employee.name} ({self.start_date} to {self.end_date})"
+    
+    class Meta:
+        ordering = ['-start_date']
 
 class Holiday(models.Model):
     date = models.DateField(unique=True)

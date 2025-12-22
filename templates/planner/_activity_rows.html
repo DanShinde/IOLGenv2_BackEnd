@@ -1,0 +1,72 @@
+{% load planner_extras %}
+
+{% for activity in activities %}
+{% comment %} 
+    The 'hidden' class is only applied when grouping is active (group_name is present) 
+    AND the view is not in 'none' (ungrouped) mode.
+{% endcomment %}
+<tr class="h-10 project-row gantt-activity-row {% if group_name and grouping_method != 'none' %}hidden{% endif %} cursor-pointer hover:bg-indigo-50 transition-colors" 
+    {% if group_name %}data-group-id="{{ group_name }}"{% endif %}
+    data-activity-pk="{{ activity.pk }}"
+    data-project-code="{{ activity.project.project_id|lower }}"
+    data-customer="{{ activity.project.customer_name|lower }}"
+    data-segment="{{ activity.project.segment.name|lower|default:'' }}"
+    data-team-lead="{{ activity.project.team_lead.name|lower|default:'' }}"
+    data-assignee="{{ activity.assignee.name|lower|default:'unassigned' }}"
+    data-activity-name="{{ activity.activity_name|lower }}">
+    
+    {% comment %} --- STICKY CELLS WITH DATA ATTRIBUTES FOR FILTERING --- {% endcomment %}
+    {% if not project and grouping_method != 'engineer' %}
+    <td class="sticky-cell col-project px-2 py-1 text-xs font-medium text-indigo-600 border-r" data-filter-column="project">
+        <div class="truncate w-full" title="{{ activity.project.project_id }}">{{ activity.project.project_id }}</div>
+    </td>
+    {% endif %}
+    
+    <td class="sticky-cell col-activity px-2 py-1 text-xs text-gray-900 font-medium border-r" data-filter-column="activity">
+        <div class="truncate w-full" title="{{ activity.activity_name }}">{{ activity.activity_name }}</div>
+    </td>
+    
+    <td class="sticky-cell col-assignee px-2 py-1 text-xs text-gray-600 border-r" data-filter-column="assignee">
+        {% if activity.assignee %}
+            <div class="flex items-center" title="{{ activity.assignee.name }}">
+                <div class="w-6 h-6 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm hover:scale-110 transition-transform">
+                    {{ activity.assignee.name|first|upper }}
+                </div>
+                <span class="hidden">{{ activity.assignee.name }}</span>
+            </div>
+        {% else %}
+            <span class="text-gray-400 italic text-[10px]">N/A</span>
+            <span class="hidden">Unassigned</span>
+        {% endif %}
+    </td>
+
+    <td class="sticky-cell col-start px-2 py-1 text-xs text-gray-600 border-r whitespace-nowrap" data-filter-column="start">{{ activity.start_date|date:"M d" }}</td>
+    <td class="sticky-cell col-end px-2 py-1 text-xs text-gray-600 border-r whitespace-nowrap" data-filter-column="end">{{ activity.end_date|date:"M d" }}</td>
+    
+    <td class="sticky-cell col-actions px-2 py-1 text-xs font-medium border-r">
+        <div class="relative inline-block text-left action-dropdown">
+            <button type="button" class="action-btn inline-flex justify-center w-full px-1 py-0.5 text-xs font-medium text-gray-700 rounded-md hover:bg-gray-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+            </button>
+            <div class="action-menu hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md z-50 shadow-lg border border-gray-100">
+                <div class="py-1">
+                    <a href="{% url 'planner_edit_activity' activity.pk %}?next={{ request.path }}" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>Edit Activity</a>
+                    <form method="POST" action="{% url 'planner_delete_activity' activity.pk %}" class="inline" onsubmit="return confirm('Delete this activity?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <button type="submit" class="text-red-700 block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>Delete Activity</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </td>
+
+    {% for d in gantt_data.header_dates %}
+        <td class="gantt-cell p-0 {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}"
+            data-date="{{ d|date:'Y-m-d' }}"
+            title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% endif %}">
+            {% comment %} --- JS will inject bars here --- {% endcomment %}
+        </td>
+    {% endfor %}
+</tr>
+{% endfor %}

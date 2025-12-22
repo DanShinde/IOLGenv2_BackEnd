@@ -1,666 +1,456 @@
 {% extends 'planner/_base.html' %}
 
-{% block title %}Help & Documentation{% endblock %}
+{% block title %}Comprehensive User Manual{% endblock %}
 
 {% block content %}
+<div class="container-fluid px-4 py-6" x-data="{ activeSection: 'intro' }">
+    <div class="flex flex-col lg:flex-row gap-8">
+        
+        <aside class="lg:w-1/5 shrink-0">
+            <div class="glass rounded-xl shadow-lg p-4 sticky top-24 border border-white/20 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                <h3 class="font-bold text-gray-800 mb-4 px-2 text-lg border-b pb-2">User Manual</h3>
+                
+                <nav class="space-y-1 text-sm">
+                    <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Getting Started</p>
+                    <a href="#intro" @click="activeSection = 'intro'" 
+                       :class="activeSection === 'intro' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
+                       class="block px-3 py-2 rounded transition-colors">1. Core Concepts</a>
+                    
+                    <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Setup & Admin</p>
+                    <a href="#config-general" @click="activeSection = 'config-general'"
+                       :class="activeSection === 'config-general' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
+                       class="block px-3 py-2 rounded transition-colors">2. Configuration</a>
+                    <a href="#workforce" @click="activeSection = 'workforce'"
+                       :class="activeSection === 'workforce' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
+                       class="block px-3 py-2 rounded transition-colors">3. Workforce & Leaves</a>
+
+                    <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Execution</p>
+                    <a href="#project-list" @click="activeSection = 'project-list'"
+                       :class="activeSection === 'project-list' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
+                       class="block px-3 py-2 rounded transition-colors">4. Project Management</a>
+                    <a href="#activity-planner" @click="activeSection = 'activity-planner'"
+                       :class="activeSection === 'activity-planner' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
+                       class="block px-3 py-2 rounded transition-colors">5. The Gantt Chart</a>
+                    
+                    <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Planning</p>
+                    <a href="#sales-forecast" @click="activeSection = 'sales-forecast'"
+                       :class="activeSection === 'sales-forecast' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
+                       class="block px-3 py-2 rounded transition-colors">6. Sales Forecast</a>
+                    <a href="#capacity-report" @click="activeSection = 'capacity-report'"
+                       :class="activeSection === 'capacity-report' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
+                       class="block px-3 py-2 rounded transition-colors">7. Capacity Report</a>
+                </nav>
+            </div>
+        </aside>
+
+        <main class="lg:w-4/5 space-y-12 pb-24">
+
+            <section id="intro" class="scroll-mt-24">
+                <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-4">1. Core Concepts & Logic</h1>
+                    <p class="text-gray-600 mb-6 text-lg">
+                        The Capacity Planner is a decision-support tool that calculates resource sufficiency. 
+                        It answers: <em>"Do I have enough staff to survive the busiest week of the month?"</em>
+                    </p>
+
+                    <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-6">
+                        <h3 class="font-bold text-indigo-800 mb-2">The "Weekly Max" Calculation Engine</h3>
+                        <p class="text-sm text-gray-700 mb-4">
+                            Unlike Excel sheets that average hours over a month, this system breaks every month into weeks.
+                        </p>
+                        <div class="grid md:grid-cols-3 gap-4 text-center">
+                            <div class="bg-white p-4 rounded shadow-sm">
+                                <div class="text-xs text-gray-500 uppercase font-bold">Step 1</div>
+                                <div class="font-bold text-gray-800 mt-1">Daily Scan</div>
+                                <p class="text-xs text-gray-500 mt-2">System iterates through every single date (Mon-Sun) to find active tasks.</p>
+                            </div>
+                            <div class="bg-white p-4 rounded shadow-sm">
+                                <div class="text-xs text-gray-500 uppercase font-bold">Step 2</div>
+                                <div class="font-bold text-gray-800 mt-1">Weekly Bucket</div>
+                                <p class="text-xs text-gray-500 mt-2">Sums up demand for Week 1, Week 2, Week 3, Week 4 individually.</p>
+                            </div>
+                            <div class="bg-white p-4 rounded shadow-sm ring-2 ring-indigo-500">
+                                <div class="text-xs text-indigo-500 uppercase font-bold">Step 3</div>
+                                <div class="font-bold text-indigo-700 mt-1">Peak Detection</div>
+                                <p class="text-xs text-gray-500 mt-2">The <strong>Highest</strong> weekly requirement becomes the requirement for the whole month.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="config-general" class="scroll-mt-24">
+                <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">2. Configuration (Admin)</h2>
+                        <span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Global Settings</span>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="text-lg font-bold text-gray-700 mb-3 border-l-4 border-blue-500 pl-3">A. General Settings Form</h3>
+                        <table class="w-full text-sm border rounded-lg overflow-hidden">
+                            <thead class="bg-gray-50 text-gray-700 font-bold">
+                                <tr>
+                                    <th class="px-4 py-3 border-b">Field</th>
+                                    <th class="px-4 py-3 border-b">Data Type</th>
+                                    <th class="px-4 py-3 border-b">Detailed Impact</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-white hover:bg-gray-50">
+                                    <td class="px-4 py-3 border-b font-mono text-blue-600">Working Hours Per Day</td>
+                                    <td class="px-4 py-3 border-b">Float (e.g., 8.0)</td>
+                                    <td class="px-4 py-3 border-b">
+                                        The fundamental multiplier. <br>
+                                        • Used to convert <strong>Activity Duration (Days)</strong> into <strong>Hours</strong>.<br>
+                                        • Used to calculate <strong>Supply</strong> (e.g., 20 days * 8 hours = 160 capacity).
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="text-lg font-bold text-gray-700 mb-3 border-l-4 border-purple-500 pl-3">B. Capacity Settings (Efficiency)</h3>
+                        <p class="text-sm text-gray-600 mb-3">These settings are defined per Designation (Engineer, Team Lead, Manager).</p>
+                        <table class="w-full text-sm border rounded-lg overflow-hidden">
+                            <thead class="bg-gray-50 text-gray-700 font-bold">
+                                <tr>
+                                    <th class="px-4 py-3 border-b">Field</th>
+                                    <th class="px-4 py-3 border-b">Detailed Impact</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-white hover:bg-gray-50">
+                                    <td class="px-4 py-3 border-b font-mono text-blue-600">Monthly Meeting Hours</td>
+                                    <td class="px-4 py-3 border-b">
+                                        <strong>Deduction.</strong> Subtracted directly from the gross monthly capacity.<br>
+                                        <em>Example:</em> If set to 4.0, every Engineer has 4 hours less per month available for projects.
+                                    </td>
+                                </tr>
+                                <tr class="bg-white hover:bg-gray-50">
+                                    <td class="px-4 py-3 border-b font-mono text-blue-600">Monthly Leave Hours</td>
+                                    <td class="px-4 py-3 border-b">
+                                        <strong>Deduction.</strong> A buffer for "Unknown" leaves (sick days). <br>
+                                        Does NOT replace the specific "Leaves" calendar. This is just a statistical buffer.
+                                    </td>
+                                </tr>
+                                <tr class="bg-white hover:bg-gray-50">
+                                    <td class="px-4 py-3 border-b font-mono text-blue-600">Efficiency Loss Factor (%)</td>
+                                    <td class="px-4 py-3 border-b">
+                                        <strong>Multiplier.</strong> <br>
+                                        Formula: <code>Net = Gross * (1 - (Efficiency/100))</code>.<br>
+                                        If set to 20%, an 8-hour day counts as only 6.4 productive hours.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-700 mb-3 border-l-4 border-green-500 pl-3">C. Project Types & Brackets</h3>
+                        <p class="text-sm text-gray-600 mb-3">This controls the "Sales Forecast" auto-calculation logic.</p>
+                        
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-gray-50 p-4 rounded border">
+                                <h4 class="font-bold text-gray-800 text-sm mb-2">Project Type Fields</h4>
+                                <ul class="text-xs text-gray-700 space-y-2">
+                                    <li><strong>Segment/Category:</strong> Keys used to match imported Excel rows.</li>
+                                    <li><strong>Involvement %:</strong> How much of the total project duration requires this role?
+                                        <br><span class="text-gray-500">Ex: 20% means for a 10-day project, we need 2 days of effort from this role.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded border">
+                                <h4 class="font-bold text-gray-800 text-sm mb-2">Effort Brackets (Interpolation)</h4>
+                                <ul class="text-xs text-gray-700 space-y-2">
+                                    <li><strong>Project Value (₹):</strong> The monetary size of a deal.</li>
+                                    <li><strong>Effort Days:</strong> The estimated man-days required.</li>
+                                    <li><strong>Logic:</strong> If a deal value falls between two brackets, the system calculates the effort mathematically (Linear Interpolation).</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="workforce" class="scroll-mt-24">
+                <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">3. Workforce & Leaves</h2>
+                    
+                    <div class="grid lg:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="font-bold text-gray-700 mb-3">Adding a Team Member</h3>
+                            <div class="bg-white border rounded p-4">
+                                <div class="mb-3">
+                                    <span class="text-xs font-bold text-gray-500 uppercase">Field: Name</span>
+                                    <p class="text-sm">Unique identifier. Creating a duplicate name will trigger an error.</p>
+                                </div>
+                                <div class="mb-3">
+                                    <span class="text-xs font-bold text-gray-500 uppercase">Field: Designation</span>
+                                    <p class="text-sm">Crucial. Determines which "Supply Pool" they belong to (Engineer, Lead, Manager).</p>
+                                </div>
+                                <div>
+                                    <span class="text-xs font-bold text-gray-500 uppercase">Field: Is Active</span>
+                                    <p class="text-sm">
+                                        <span class="text-green-600 font-bold">True:</span> Counted in capacity.<br>
+                                        <span class="text-red-600 font-bold">False:</span> Ignored. Use for past employees to preserve historical data without affecting future plans.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-gray-700 mb-3">Adding a Leave</h3>
+                            <div class="bg-white border rounded p-4">
+                                <p class="text-sm text-gray-600 mb-3">Leaves are specific dates where an employee contributes <strong>0 hours</strong>.</p>
+                                <ul class="list-disc list-inside text-sm text-gray-700 space-y-1">
+                                    <li><strong>Start/End Date:</strong> Inclusive range.</li>
+                                    <li><strong>Impact:</strong> 
+                                        If John is on leave Mon-Wed (3 days):
+                                        <br>1. His Weekly Capacity drops by (3 * 8hrs).
+                                        <br>2. The "Available Hours" in the report drops.
+                                        <br>3. This might turn the Variance <strong>Red</strong>.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="project-list" class="scroll-mt-24">
+                <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">4. Project Management</h2>
+                    
+                    <h3 class="font-bold text-gray-700 mb-3">The Project Form</h3>
+                    <table class="w-full text-sm border rounded-lg overflow-hidden mb-6">
+                        <thead class="bg-gray-50 text-gray-700 font-bold">
+                            <tr>
+                                <th class="px-4 py-3 border-b">Field</th>
+                                <th class="px-4 py-3 border-b">Detail</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="bg-white border-b">
+                                <td class="px-4 py-3 font-mono text-blue-600">Project Code</td>
+                                <td class="px-4 py-3">Must be unique (e.g., "AXXXX"). Used in URLs and Lookups.</td>
+                            </tr>
+                            <tr class="bg-white border-b">
+                                <td class="px-4 py-3 font-mono text-blue-600">Customer Name</td>
+                                <td class="px-4 py-3">Descriptive label.</td>
+                            </tr>
+                            <tr class="bg-white border-b">
+                                <td class="px-4 py-3 font-mono text-blue-600">Team Lead</td>
+                                <td class="px-4 py-3">
+                                    Filters the dropdown to only show employees with designation 'TEAM_LEAD'.
+                                    Used for filtering the dashboard.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
+                        <strong>Feature:</strong> Clicking the <span class="bg-indigo-600 text-white px-1 rounded text-xs">Plan</span> button takes you to the Activity Planner (Gantt) for that specific project.
+                    </div>
+                </div>
+            </section>
+
+            <section id="activity-planner" class="scroll-mt-24">
+                <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">5. The Activity Planner (Gantt)</h2>
+                        <span class="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Core Feature</span>
+                    </div>
+
+                    <p class="text-gray-600 mb-6">This is where demand is created. Every bar on this chart represents hours subtracted from your supply.</p>
+
+                    <div class="grid lg:grid-cols-2 gap-8 mb-8">
+                        <div>
+                            <h3 class="font-bold text-gray-700 mb-3">Add Activity Form</h3>
+                            <ul class="space-y-3 text-sm">
+                                <li class="bg-white p-3 rounded border shadow-sm">
+                                    <span class="font-bold text-gray-800 block">Assignee</span>
+                                    <span class="text-gray-600">Who does the work? If left blank ("Unassigned"), the demand is tracked separately and will appear as "Unassigned" in reports.</span>
+                                </li>
+                                <li class="bg-white p-3 rounded border shadow-sm">
+                                    <span class="font-bold text-gray-800 block">Start Date</span>
+                                    <span class="text-gray-600">The calendar date work begins.</span>
+                                </li>
+                                <li class="bg-white p-3 rounded border shadow-sm">
+                                    <span class="font-bold text-gray-800 block">Duration (Days)</span>
+                                    <span class="text-gray-600">
+                                        <strong>CRITICAL:</strong> This is <em>Working Days</em>, not Calendar Days.
+                                        <br>Inputting "5" means "5 Working Days".
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-700 mb-3">Smart Date Logic</h3>
+                            <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 h-full">
+                                <p class="text-sm text-blue-800 font-bold mb-2">How End Date is Calculated:</p>
+                                <p class="text-xs text-blue-700 mb-4 font-mono">
+                                    current_date = start_date<br>
+                                    days_counted = 0<br>
+                                    while days_counted < duration:<br>
+                                    &nbsp;&nbsp;if current_date is not Weekend AND not Holiday:<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;days_counted += 1<br>
+                                    &nbsp;&nbsp;current_date += 1
+                                </p>
+                                <p class="text-sm text-blue-800">
+                                    <strong>Result:</strong> If you start a 3-day task on Friday:<br>
+                                    • Fri: Work (Day 1)<br>
+                                    • Sat: Skip<br>
+                                    • Sun: Skip<br>
+                                    • Mon: Work (Day 2)<br>
+                                    • Tue: Work (Day 3) -> <strong>End Date</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="sales-forecast" class="scroll-mt-24">
+                <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">6. Sales Forecast & Import</h2>
+                    
+                    <p class="text-gray-600 mb-6">
+                        This module generates "Shadow Demand" based on your sales pipeline. It converts money (₹) into estimated hours.
+                    </p>
+
+                    <h3 class="font-bold text-gray-700 mb-3">JSON Import Schema</h3>
+                    <p class="text-sm text-gray-500 mb-3">Copy-paste this structure into the import box.</p>
+                    
+                    <div class="overflow-x-auto bg-gray-900 rounded-lg p-4 mb-6">
+<pre class="text-xs text-green-400 font-mono">
+[
+  {
+    "Opportunity": "Bank Alpha Upgrade",   // Unique Name
+    "Segment": "Banking",                  // Must match a Configured Segment
+    "Category": "Implementation",          // Must match a Configured Category
+    "Total Amount": "75000",               // Deal Value (used for sizing)
+    "Start Date": "2023-11-01",            // Expected Start
+    "End Date": "2024-02-28",              // Expected End
+    "Probability(%)": "80"                 // (Currently informational)
+  }
+]
+</pre>
+                    </div>
+
+                    <h3 class="font-bold text-gray-700 mb-3">The Calculation Chain</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700 bg-white p-4 rounded border">
+                        <li><strong>Match:</strong> System finds the Project Type via Segment + Category.</li>
+                        <li><strong>Size:</strong> System uses "Total Amount" (₹75,000) to find the Effort Bracket.
+                            <ul class="list-disc list-inside pl-6 text-gray-500 text-xs mt-1">
+                                <li>Bracket A: ₹50k = 40 days</li>
+                                <li>Bracket B: ₹100k = 80 days</li>
+                                <li>Result: ₹75k = 60 days (Interpolated)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Spread:</strong> It calculates <code>Daily Effort = 60 days / Total Project Duration</code>.</li>
+                        <li><strong>Assign:</strong> It applies the Project Type's "Involvement %" (e.g., Engineer 100%, Lead 20%) to create daily demand for each role.</li>
+                    </ol>
+                </div>
+            </section>
+
+            <section id="capacity-report" class="scroll-mt-24">
+                <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">7. Capacity Plan Report</h2>
+                    
+                    <p class="text-gray-600 mb-6">
+                        The final output. A matrix of <strong>Time Periods (Columns)</strong> vs <strong>Designations (Rows)</strong>.
+                    </p>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm border rounded-lg">
+                            <thead class="bg-indigo-600 text-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">Column</th>
+                                    <th class="px-4 py-3 text-left">Formula / Source</th>
+                                    <th class="px-4 py-3 text-left">Meaning</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-white border-b">
+                                    <td class="px-4 py-3 font-bold">Available HC</td>
+                                    <td class="px-4 py-3">Count of "Active" employees with this designation.</td>
+                                    <td class="px-4 py-3">How many bodies you have.</td>
+                                </tr>
+                                <tr class="bg-gray-50 border-b">
+                                    <td class="px-4 py-3 font-bold">Available Hours</td>
+                                    <td class="px-4 py-3">
+                                        <code>(HC * Days * Hours) - Deductions - Efficiency</code>
+                                    </td>
+                                    <td class="px-4 py-3">The net productive hours available for project work.</td>
+                                </tr>
+                                <tr class="bg-white border-b">
+                                    <td class="px-4 py-3 font-bold text-indigo-600">Required HC</td>
+                                    <td class="px-4 py-3 font-mono text-xs">
+                                        MAX(Weekly_Demand / Weekly_Capacity_Per_Person)
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        The headcount needed to safely handle the <strong>busiest week</strong> of this period.
+                                    </td>
+                                </tr>
+                                <tr class="bg-gray-50 border-b">
+                                    <td class="px-4 py-3 font-bold">Required Hours</td>
+                                    <td class="px-4 py-3">
+                                        <code>Required_HC * Monthly_Capacity_Per_Person</code>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        Normalized demand. Used to make the Variance calculation comparable.
+                                    </td>
+                                </tr>
+                                <tr class="bg-white border-b">
+                                    <td class="px-4 py-3 font-bold">Variance</td>
+                                    <td class="px-4 py-3"><code>Available_Hours - Required_Hours</code></td>
+                                    <td class="px-4 py-3">
+                                        <span class="text-green-600 font-bold">+ Positive:</span> Bench/Buffer available.<br>
+                                        <span class="text-red-600 font-bold">- Negative:</span> Staffing shortage predicted.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-6 bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                        <h4 class="font-bold text-amber-800 text-sm flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            FAQ: Why is Variance negative even if Total Hours look fine?
+                        </h4>
+                        <p class="text-sm text-amber-900 mt-1">
+                            Because of the <strong>Weekly Max</strong> logic. If you need 200 hours in Week 1, and 0 hours in Week 2, 3, 4:
+                            <br>• The average demand is low (50 hrs/week).
+                            <br>• But Week 1 requires 5 people.
+                            <br>• The report calculates required headcount based on that Week 1 spike (5 people), likely causing a negative variance if you only have 3 people, even if they sit idle for the rest of the month.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+</div>
+
 <style>
-    .header-gradient {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
     }
-    .help-card {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
-        overflow: hidden;
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(0,0,0,0.05);
     }
-    .help-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.2);
+        border-radius: 10px;
     }
-    .step-card {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        transition: all 0.3s ease;
+    .glass {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
     }
-    .step-card:hover {
-        border-color: #4f46e5;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.1);
-    }
-    .feature-highlight {
-        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-        border: 2px solid #10b981;
-        border-radius: 12px;
-    }
-    .calculation-table {
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-    .table-header {
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        color: white;
-    }
-    .table-row:nth-child(even) {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    }
-    .icon {
-        width: 1.5rem;
-        height: 1.5rem;
-    }
-    .large-icon {
-        width: 3rem;
-        height: 3rem;
-    }
-    .xl-icon {
-        width: 4rem;
-        height: 4rem;
-    }
-    .nav-card {
-        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-        border: 2px solid #3b82f6;
-        border-radius: 12px;
-        transition: all 0.2s ease;
-    }
-    .nav-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
-    }
-    .toc-item {
-        transition: all 0.2s ease;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-    }
-    .toc-item:hover {
-        background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-        transform: translateX(4px);
+    html {
+        scroll-behavior: smooth;
     }
 </style>
-
-<header class="header-gradient shadow-xl">
-    <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center">
-            <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <div>
-                <h1 class="text-4xl font-bold text-white">Help & Documentation</h1>
-                <p class="text-indigo-100 mt-2">Complete guide to using the Capacity Planning System</p>
-            </div>
-        </div>
-    </div>
-</header>
-
-<main class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
-    
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-        <a href="#getting-started" class="nav-card p-6 block">
-            <div class="flex items-center mb-3">
-                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                </svg>
-                <h3 class="font-bold text-blue-900">Getting Started</h3>
-            </div>
-            <p class="text-blue-800 text-sm">Step-by-step setup guide</p>
-        </a>
-        
-        <a href="#capacity-calculations" class="nav-card p-6 block">
-            <div class="flex items-center mb-3">
-                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
-                </svg>
-                <h3 class="font-bold text-blue-900">Capacity Calculations</h3>
-            </div>
-            <p class="text-blue-800 text-sm">How the math works</p>
-        </a>
-        
-        <a href="#features" class="nav-card p-6 block">
-            <div class="flex items-center mb-3">
-                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                </svg>
-                <h3 class="font-bold text-blue-900">Key Features</h3>
-            </div>
-            <p class="text-blue-800 text-sm">Explore capabilities</p>
-        </a>
-        
-        <a href="#best-practices" class="nav-card p-6 block">
-            <div class="flex items-center mb-3">
-                <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                </svg>
-                <h3 class="font-bold text-blue-900">Best Practices</h3>
-            </div>
-            <p class="text-blue-800 text-sm">Tips and recommendations</p>
-        </a>
-    </div>
-
-    <section id="getting-started" class="help-card mb-12">
-        <div class="bg-gradient-to-r from-green-500 to-emerald-600 px-8 py-6">
-            <div class="flex items-center">
-                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                </svg>
-                <div>
-                    <h2 class="text-3xl font-bold text-white">Getting Started Guide</h2>
-                    <p class="text-green-100 mt-2">Follow these steps to set up your capacity planning system</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="p-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">1</div>
-                        <h3 class="text-xl font-bold text-gray-800">Initial Configuration</h3>
-                    </div>
-                    <p class="text-gray-600 mb-4">Set up the core parameters before adding data.</p>
-                    <ul class="space-y-2">
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>General Settings:</strong> Working hours per day</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>Capacity Settings:</strong> Meeting/leave hours, efficiency factors</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>Holidays:</strong> Company non-working days</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-green-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>Project Types:</strong> Segment + Category with involvement %</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">2</div>
-                        <h3 class="text-xl font-bold text-gray-800">Add Your Data</h3>
-                    </div>
-                    <p class="text-gray-600 mb-4">Populate the system with your team and workload.</p>
-                    <ul class="space-y-2">
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>Workforce:</strong> Add employees with designations</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>Projects:</strong> Create project entries</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>Activities:</strong> Schedule tasks with assignments</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-blue-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700"><strong>Sales Forecast:</strong> Import Excel pipeline data</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">3</div>
-                        <h3 class="text-xl font-bold text-gray-800">Set Up Benchmarks</h3>
-                    </div>
-                    <p class="text-gray-600 mb-4">Configure effort estimation for automatic calculations.</p>
-                    <ul class="space-y-2">
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-purple-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700">Define project value → effort day mappings</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-purple-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700">System uses linear interpolation between points</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-purple-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700">Enables automatic forecast effort calculation</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold mr-3">4</div>
-                        <h3 class="text-xl font-bold text-gray-800">Analyze Results</h3>
-                    </div>
-                    <p class="text-gray-600 mb-4">Review capacity planning reports and insights.</p>
-                    <ul class="space-y-2">
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-amber-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700">View monthly supply vs demand analysis</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-amber-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700">Identify resource shortages and surpluses</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-4 h-4 text-amber-500 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
-                            </svg>
-                            <span class="text-sm text-gray-700">Plan hiring and resource allocation</span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="capacity-calculations" class="help-card mb-12">
-        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 px-8 py-6">
-            <div class="flex items-center">
-                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
-                </svg>
-                <div>
-                    <h2 class="text-3xl font-bold text-white">Capacity Calculation Details</h2>
-                    <p class="text-blue-100 mt-2">Understanding how the system calculates supply and demand</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="p-8">
-            <div class="calculation-table overflow-hidden">
-                <table class="w-full">
-                    <thead class="table-header">
-                        <tr>
-                            <th class="px-6 py-4 text-left font-semibold">Metric</th>
-                            <th class="px-6 py-4 text-left font-semibold">Description</th>
-                            <th class="px-6 py-4 text-left font-semibold">Calculation Formula</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <tr class="table-row">
-                            <td class="px-6 py-4 font-semibold text-green-700">Supply (Available Hours)</td>
-                            <td class="px-6 py-4 text-gray-700">Net productive hours your team has available in a month</td>
-                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
-                                GrossHours - NonProjectHours - EfficiencyLoss
-                            </td>
-                        </tr>
-                        <tr class="table-row">
-                            <td class="px-6 py-4 font-semibold text-amber-700">Demand (Required Hours)</td>
-                            <td class="px-6 py-4 text-gray-700">Total hours needed from confirmed + potential projects</td>
-                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
-                                SUM(LiveProject Hours) + SUM(Forecast Hours)
-                            </td>
-                        </tr>
-                        <tr class="table-row">
-                            <td class="px-6 py-4 font-semibold text-blue-700">Variance</td>
-                            <td class="px-6 py-4 text-gray-700">Monthly surplus (positive) or deficit (negative)</td>
-                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
-                                Supply - Demand
-                            </td>
-                        </tr>
-                        <tr class="table-row">
-                            <td class="px-6 py-4 font-semibold text-purple-700">Required Headcount</td>
-                            <td class="px-6 py-4 text-gray-700">Estimated people needed vs available</td>
-                            <td class="px-6 py-4 font-mono text-sm bg-gray-50 rounded">
-                                RequiredHours / (AvailableHours / CurrentHeadcount)
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="feature-highlight p-6">
-                    <h4 class="font-bold text-green-800 mb-3 flex items-center">
-                        <svg class="icon mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                        </svg>
-                        Supply Calculation Details
-                    </h4>
-                    <ul class="text-sm text-green-700 space-y-2">
-                        <li><strong>Gross Hours:</strong> Employees × Working Days × Hours/Day</li>
-                        <li><strong>Non-Project Hours:</strong> Meetings + Leave (monthly)</li>
-                        <li><strong>Efficiency Loss:</strong> Percentage of productivity loss</li>
-                        <li><strong>Working Days:</strong> Excludes weekends and holidays</li>
-                    </ul>
-                </div>
-
-                <div class="feature-highlight p-6">
-                    <h4 class="font-bold text-green-800 mb-3 flex items-center">
-                        <svg class="icon mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                        </svg>
-                        Demand Calculation Details
-                    </h4>
-                    <ul class="text-sm text-green-700 space-y-2">
-                        <li><strong>Live Projects:</strong> Scheduled activities × daily hours</li>
-                        <li><strong>Sales Forecast:</strong> Value → Effort (via benchmarks)</li>
-                        <li><strong>Role Involvement:</strong> Engineer/TL/Manager percentages</li>
-                        <li><strong>Time Distribution:</strong> Spread across project duration</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="features" class="help-card mb-12">
-        <div class="bg-gradient-to-r from-purple-500 to-pink-600 px-8 py-6">
-            <div class="flex items-center">
-                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
-                </svg>
-                <div>
-                    <h2 class="text-3xl font-bold text-white">Key Features & Capabilities</h2>
-                    <p class="text-purple-100 mt-2">Explore what the system can do for your organization</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="p-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        <h4 class="font-bold text-gray-800">Interactive Gantt Charts</h4>
-                    </div>
-                    <p class="text-gray-600 text-sm">Visual timeline with hover tooltips, overlap detection, and holiday highlighting</p>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                        <h4 class="font-bold text-gray-800">Automatic Effort Estimation</h4>
-                    </div>
-                    <p class="text-gray-600 text-sm">Linear interpolation between benchmark points for accurate project sizing</p>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <h4 class="font-bold text-gray-800">Smart Date Calculation</h4>
-                    </div>
-                    <p class="text-gray-600 text-sm">Automatically excludes weekends and holidays from all scheduling calculations</p>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        <h4 class="font-bold text-gray-800">Excel Integration</h4>
-                    </div>
-                    <p class="text-gray-600 text-sm">Import sales forecasts directly from Excel with drag-and-drop support</p>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <h4 class="font-bold text-gray-800">Overlap Detection</h4>
-                    </div>
-                    <p class="text-gray-600 text-sm">Visual alerts when team members are assigned to multiple activities simultaneously</p>
-                </div>
-
-                <div class="step-card p-6">
-                    <div class="flex items-center mb-4">
-                        <svg class="icon mr-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
-                        </svg>
-                        <h4 class="font-bold text-gray-800">Comprehensive Reporting</h4>
-                    </div>
-                    <p class="text-gray-600 text-sm">Monthly capacity analysis with supply/demand variance and headcount planning</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="best-practices" class="help-card mb-12">
-        <div class="bg-gradient-to-r from-amber-500 to-orange-600 px-8 py-6">
-            <div class="flex items-center">
-                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                </svg>
-                <div>
-                    <h2 class="text-3xl font-bold text-white">Best Practices & Tips</h2>
-                    <p class="text-amber-100 mt-2">Recommendations for optimal system usage</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="p-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                <div class="space-y-6">
-                    <div class="step-card p-6">
-                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
-                            <svg class="icon mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Data Accuracy
-                        </h4>
-                        <ul class="text-sm text-gray-700 space-y-2">
-                            <li>• Update capacity settings quarterly to reflect reality</li>
-                            <li>• Regularly review and adjust efficiency loss factors</li>
-                            <li>• Keep project types and benchmarks current</li>
-                            <li>• Maintain accurate employee designations</li>
-                        </ul>
-                    </div>
-
-                    <div class="step-card p-6">
-                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
-                            <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                            Planning Workflow
-                        </h4>
-                        <ul class="text-sm text-gray-700 space-y-2">
-                            <li>• Schedule activities with realistic buffer time</li>
-                            <li>• Review Gantt charts for resource conflicts</li>
-                            <li>• Use consolidated view to balance workloads</li>
-                            <li>• Plan activities at least 2 weeks in advance</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="space-y-6">
-                    <div class="step-card p-6">
-                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
-                            <svg class="icon mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            Forecasting Tips
-                        </h4>
-                        <ul class="text-sm text-gray-700 space-y-2">
-                            <li>• Include probability percentages in sales data</li>
-                            <li>• Set up multiple benchmarks per project type</li>
-                            <li>• Update forecasts monthly for accuracy</li>
-                            <li>• Consider seasonal variations in planning</li>
-                        </ul>
-                    </div>
-
-                    <div class="step-card p-6">
-                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
-                            <svg class="icon mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.054 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                            </svg>
-                            Common Pitfalls
-                        </h4>
-                        <ul class="text-sm text-gray-700 space-y-2">
-                            <li>• Don't ignore efficiency loss factors</li>
-                            <li>• Avoid over-optimistic activity durations</li>
-                            <li>• Don't forget to account for holidays</li>
-                            <li>• Review overlaps before finalizing schedules</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-300">
-                <h4 class="font-bold text-gray-800 mb-4 flex items-center">
-                    <svg class="icon mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Quick Reference - Key Actions
-                </h4>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-indigo-600">📊</div>
-                        <p class="text-sm font-medium text-gray-800 mt-1">Check Capacity Plan monthly</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-green-600">📈</div>
-                        <p class="text-sm font-medium text-gray-800 mt-1">Update forecasts regularly</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-blue-600">🎯</div>
-                        <p class="text-sm font-medium text-gray-800 mt-1">Monitor overlaps weekly</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-2xl font-bold text-purple-600">⚙️</div>
-                        <p class="text-sm font-medium text-gray-800 mt-1">Review settings quarterly</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <div class="help-card">
-        <div class="bg-gradient-to-r from-gray-600 to-gray-800 px-8 py-6">
-            <div class="flex items-center">
-                <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                </svg>
-                <div>
-                    <h2 class="text-3xl font-bold text-white">Need Additional Help?</h2>
-                    <p class="text-gray-200 mt-2">Resources for getting the most out of your capacity planning system</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="p-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="text-center">
-                    <div class="xl-icon mx-auto text-blue-500 mb-4">📚</div>
-                    <h4 class="font-bold text-gray-800 mb-2">Documentation</h4>
-                    <p class="text-gray-600 text-sm">Comprehensive guides and tutorials for advanced features and configuration options.</p>
-                </div>
-                
-                <div class="text-center">
-                    <div class="xl-icon mx-auto text-green-500 mb-4">💬</div>
-                    <h4 class="font-bold text-gray-800 mb-2">Community</h4>
-                    <p class="text-gray-600 text-sm">Connect with other users to share best practices and troubleshooting tips.</p>
-                </div>
-                
-                <div class="text-center">
-                    <div class="xl-icon mx-auto text-purple-500 mb-4">🛠️</div>
-                    <h4 class="font-bold text-gray-800 mb-2">Support</h4>
-                    <p class="text-gray-600 text-sm">Technical assistance and custom configuration help for enterprise deployments.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</main>
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Smooth scrolling for navigation links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
-        });
-    });
-
-    // Add intersection observer for active section highlighting
-    const sections = document.querySelectorAll('section[id]');
-    const navLinks = document.querySelectorAll('a[href^="#"]');
-    
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                // Remove active class from all nav items
-                navLinks.forEach(link => {
-                    link.classList.remove('border-indigo-500', 'border-2');
-                    link.classList.add('border-blue-200', 'border-2');
-                });
-                
-                // Add active class to current section's nav item
-                const currentNavLink = document.querySelector(`a[href="#${entry.target.id}"]`);
-                if (currentNavLink) {
-                    currentNavLink.classList.remove('border-blue-200');
-                    currentNavLink.classList.add('border-indigo-500');
-                }
-            }
-        });
-    }, {
-        rootMargin: '-20% 0px -70% 0px'
-    });
-
-    sections.forEach(section => {
-        observer.observe(section);
-    });
-
-    // Add animation to cards on scroll
-    const cards = document.querySelectorAll('.help-card, .step-card');
-    const cardObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
-        });
-    }, {
-        threshold: 0.1
-    });
-
-    cards.forEach(card => {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
-        card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-        cardObserver.observe(card);
-    });
-});
-</script>
 {% endblock %}

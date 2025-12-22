@@ -2,30 +2,38 @@
 
 from datetime import date, timedelta
 
-def calculate_end_date(start_date, duration_days, holidays):
+def calculate_end_date(start_date, duration_days, holidays, assignee_leaves=None):
     """
-    Calculates the end date for a project, skipping weekends and holidays.
+    Calculates the end date for a project, skipping weekends, holidays, 
+    and specific assignee leaves.
     
     Args:
-        start_date (date): The starting date of the project.
-        duration_days (int): The number of working days the project will take.
-        holidays (list): A list of date objects representing company holidays.
-    
-    Returns:
-        date: The calculated end date.
+        start_date (date): The starting date.
+        duration_days (int): Number of working days required.
+        holidays (list): List of company holiday dates.
+        assignee_leaves (list, optional): List of dates where the assignee is on leave.
     """
     if duration_days <= 0:
         return start_date
+
+    # Convert to sets for faster lookup
+    holidays_set = set(holidays) if holidays else set()
+    leaves_set = set(assignee_leaves) if assignee_leaves else set()
 
     work_days_counted = 0
     current_date = start_date
     
     while work_days_counted < duration_days:
-        # Monday is 0 and Sunday is 6
-        if current_date.weekday() < 5 and current_date not in holidays:
+        # Check conditions: Weekend (Sat=5, Sun=6) OR Holiday OR Leave
+        is_weekend = current_date.weekday() >= 5
+        is_holiday = current_date in holidays_set
+        is_leave = current_date in leaves_set
+        
+        # Only count as a "working day" if none of the above are true
+        if not is_weekend and not is_holiday and not is_leave:
             work_days_counted += 1
         
-        # Move to the next day unless we've found the end date
+        # If we haven't reached the duration yet, move to next day
         if work_days_counted < duration_days:
             current_date += timedelta(days=1)
             
@@ -38,8 +46,10 @@ def count_working_days(start_date, end_date, holidays):
     
     working_days = 0
     current_date = start_date
+    holidays_set = set(holidays)
+    
     while current_date <= end_date:
-        if current_date.weekday() < 5 and current_date not in holidays:
+        if current_date.weekday() < 5 and current_date not in holidays_set:
             working_days += 1
         current_date += timedelta(days=1)
     return working_days
@@ -102,3 +112,13 @@ def calculate_effort_from_value(value, brackets):
     
     # Fallback if something goes wrong
     return 0
+
+def calculate_overlap_working_days(leave_start, leave_end, period_start, period_end, holidays):
+    """
+    Calculates number of working days a leave takes within a specific period.
+    """
+    # Find intersection of leave and period
+    actual_start = max(leave_start, period_start)
+    actual_end = min(leave_end, period_end)
+    
+    return count_working_days(actual_start, actual_end, holidays)

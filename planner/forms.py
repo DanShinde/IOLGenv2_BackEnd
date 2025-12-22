@@ -1,13 +1,12 @@
 # planner/forms.py
 
 from django import forms
-from .models import Project, Activity, Employee
+from employees.models import Employee
+from .models import Project, Activity, Leave
 
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        # --- MODIFIED ---
-        # Removed 'name' from the fields list.
         fields = ['project_id', 'customer_name', 'segment', 'team_lead']
 
     def __init__(self, *args, **kwargs):
@@ -17,14 +16,9 @@ class ProjectForm(forms.ModelForm):
                 'class': 'form-input w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all duration-200'
             })
         
-        # Add specific placeholders
         self.fields['project_id'].widget.attrs.update({
             'placeholder': 'Enter unique project code (e.g., PROJ-001)'
         })
-        # --- REMOVED ---
-        # self.fields['name'].widget.attrs.update({
-        #     'placeholder': 'Enter descriptive project name'
-        # })
         self.fields['customer_name'].widget.attrs.update({
             'placeholder': 'Enter client or customer name'
         })
@@ -60,3 +54,20 @@ class ActivityForm(forms.ModelForm):
             
             if isinstance(field.widget, forms.Textarea):
                 field.widget.attrs['rows'] = 3
+
+class LeaveForm(forms.ModelForm):
+    class Meta:
+        model = Leave
+        fields = ['employee', 'start_date', 'end_date', 'reason']
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Apply standard styling
+        for field in self.fields.values():
+            field.widget.attrs.update({
+                'class': 'form-input w-full px-3 py-2 text-xs rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:outline-none'
+            })

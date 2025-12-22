@@ -91,9 +91,9 @@
                                 <small class="text-muted">Hold Ctrl or Cmd to select multiple.</small>
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="form-label">PACEs</label>
-                                <select name="paces" class="form-select" multiple size="4">
-                                    {% for pace in all_paces %}<option value="{{ pace.id }}" {% if pace.id in selected_pace_ids %}selected{% endif %}>{{ pace.name }}</option>{% endfor %}
+                                <label class="form-label">Team Leads (PACe)</label>
+                                <select name="team_leads" class="form-select" multiple size="4">
+                                    {% for employee in all_team_leads %}<option value="{{ employee.id }}" {% if employee.id in selected_team_lead_ids %}selected{% endif %}>{{ employee.name }}</option>{% endfor %}
                                 </select>
                                 <small class="text-muted">Hold Ctrl or Cmd to select multiple.</small>
                             </div>
@@ -169,7 +169,7 @@
                             <th>Code</th>
                             <th>Customer</th>
                             <th>Segment</th>
-                            <th>PACE</th>
+                            <th>Team Lead</th>
                             <th>Value in Cr.</th>
                             <th>Completion</th>
                             <th>Status</th>
@@ -180,7 +180,7 @@
                             <th><input type="text" class="form-control form-control-sm" placeholder="Filter Code..." onkeyup="filterTable()"></th>
                             <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterTable()"></th>
                             <th><input type="text" class="form-control form-control-sm" placeholder="Filter Segment..." onkeyup="filterTable()"></th>
-                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter PACE..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Team Lead..." onkeyup="filterTable()"></th>
                             <th></th> {# No filter for Value #}
                             <th></th> {# No filter for Completion #}
                             <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterTable()"></th>
@@ -201,7 +201,7 @@
                                 {{ project.segment_con.name|default:'N/A' }}
                             </td>
                             <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
-                                {{ project.pace.name|default:'N/A' }}
+                                {{ project.team_lead.name|default:'N/A' }}
                             </td>
                             <td data-bs-toggle="collapse" data-bs-target="#details-{{ project.id }}" style="cursor: pointer;">
                                 ₹{{ project.value|floatformat:2|intcomma }}
@@ -414,9 +414,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const filterValues = {
             code: document.querySelector('.table-filter-row th:nth-child(1) input').value.toUpperCase(),
 
-            customer: document.querySelector('.table-filter-row th:n-child(2) input').value.toUpperCase(),
+            customer: document.querySelector('.table-filter-row th:nth-child(2) input').value.toUpperCase(),
             segment: document.querySelector('.table-filter-row th:nth-child(3) input').value.toUpperCase(),
-            pace: document.querySelector('.table-filter-row th:nth-child(4) input').value.toUpperCase(),
+            teamLead: document.querySelector('.table-filter-row th:nth-child(4) input').value.toUpperCase(),
             status: document.querySelector('.table-filter-row th:nth-child(7) input').value.toUpperCase()
 
         };
@@ -438,14 +438,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 customer: row.cells[1]?.textContent.toUpperCase() || '',
                 segment: row.cells[2]?.textContent.toUpperCase() || '',
 
-                pace: row.cells[3]?.textContent.toUpperCase() || '',
+                teamLead: row.cells[3]?.textContent.toUpperCase() || '',
                 status: row.cells[6]?.textContent.toUpperCase() || ''
 
             };
             const isMatch = rowData.code.includes(filterValues.code) &&
                             rowData.customer.includes(filterValues.customer) &&
                             rowData.segment.includes(filterValues.segment) &&
-                            rowData.pace.includes(filterValues.pace) &&
+                            rowData.teamLead.includes(filterValues.teamLead) &&
 
                             rowData.status.includes(filterValues.status);
             if (isMatch) {

@@ -67,16 +67,16 @@
         color: #92400e;
     }
     .icon {
-        width: 1.5rem;
-        height: 1.5rem;
+        width: 1.25rem;
+        height: 1.25rem;
     }
     .large-icon {
-        width: 3rem;
-        height: 3rem;
+        width: 2rem;
+        height: 2rem;
     }
     .xl-icon {
-        width: 4rem;
-        height: 4rem;
+        width: 3rem;
+        height: 3rem;
     }
     .stats-grid {
         display: grid;
@@ -86,82 +86,82 @@
 </style>
 
 <header class="header-gradient shadow-xl">
-    <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
         <div class="flex items-center">
             <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
             </svg>
             <div>
-                <h1 class="text-4xl font-bold text-white">Sales Forecast</h1>
-                <p class="text-indigo-100 mt-2">Import and manage your pipeline to predict future capacity needs</p>
+                <h1 class="text-xl font-bold text-white">Sales Forecast</h1>
+                <p class="text-indigo-100 mt-1 text-xs">Import and manage your pipeline to predict future capacity needs</p>
             </div>
         </div>
     </div>
 </header>
 
-<main class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+<main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
 
     {% if forecast_data %}
-    <div class="stats-grid mb-8">
-        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
+    <div class="stats-grid mb-6">
+        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl shadow-lg border-l-4 border-blue-500">
             <div class="flex items-center">
-                <svg class="large-icon text-blue-600 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="large-icon text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path>
                 </svg>
                 <div>
-                    <p class="text-3xl font-bold text-gray-800">{{ forecast_data|length }}</p>
-                    <p class="text-sm font-medium text-gray-600">Opportunities</p>
+                    <p class="text-2xl font-bold text-gray-800">{{ forecast_data|length }}</p>
+                    <p class="text-xs font-medium text-gray-600">Opportunities</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl shadow-lg border-l-4 border-green-500">
+        <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl shadow-lg border-l-4 border-green-500">
             <div class="flex items-center">
-                <svg class="large-icon text-green-600 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="large-icon text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
                 </svg>
                 <div>
-                    <p class="text-3xl font-bold text-gray-800">₹{{ forecast_data|length|floatformat:0 }}Cr+</p>
-                    <p class="text-sm font-medium text-gray-600">Pipeline Value</p>
+                    <p class="text-2xl font-bold text-gray-800">₹{{ forecast_data|length|floatformat:0 }}Cr+</p>
+                    <p class="text-xs font-medium text-gray-600">Pipeline Value</p>
                 </div>
             </div>
         </div>
         
-        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
+        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl shadow-lg border-l-4 border-purple-500">
             <div class="flex items-center">
-                <svg class="large-icon text-purple-600 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="large-icon text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
                 <div>
-                    <p class="text-3xl font-bold text-gray-800">Auto</p>
-                    <p class="text-sm font-medium text-gray-600">Effort Calculation</p>
+                    <p class="text-2xl font-bold text-gray-800">{{ total_forecasted_effort|floatformat:0 }} Days</p>
+                    <p class="text-xs font-medium text-gray-600">Total Est. Effort</p>
                 </div>
             </div>
         </div>
     </div>
     {% endif %}
 
-    <div class="forecast-card bg-white p-6 rounded-xl shadow-lg mb-8">
+    <div class="forecast-card bg-white p-4 rounded-xl shadow-lg mb-6">
         <div class="flex flex-col lg:flex-row items-center justify-between space-y-4 lg:space-y-0 lg:space-x-6">
             
             <div class="flex-1 w-full lg:w-auto">
-                <div class="upload-zone p-6 rounded-lg text-center cursor-pointer" id="upload-zone">
+                <div class="upload-zone p-4 rounded-lg text-center cursor-pointer" id="upload-zone">
                     <input id="file-upload" type="file" class="hidden" accept=".xlsx, .xls">
-                    <svg class="xl-icon mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="xl-icon mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                     </svg>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Import Excel Forecast</h3>
-                    <p class="text-gray-600 mb-4">Drop your Excel file here or click to browse</p>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p class="text-blue-700 text-sm">📋 <strong>Required columns:</strong> Opportunity, Total Amount, Probability(%), Segment, Category, Start Date, End date</p>
+                    <h3 class="text-sm font-semibold text-gray-800 mb-1">Import Excel Forecast</h3>
+                    <p class="text-xs text-gray-600 mb-2">Drop your Excel file here or click to browse</p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                        <p class="text-blue-700 text-[10px]">📋 <strong>Required columns:</strong> Opportunity, Total Amount, Probability(%), Segment, Category, Start Date, End date</p>
                     </div>
                 </div>
             </div>
             
-            <div class="flex flex-col space-y-3">
+            <div class="flex flex-col space-y-2">
                 <button id="save-button" disabled
-                        class="btn-success text-white py-3 px-6 rounded-lg font-semibold flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
-                    <svg class="icon mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="btn-success text-white py-2 px-4 rounded-lg font-semibold text-xs flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="icon mr-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
                     Save Changes
@@ -170,8 +170,8 @@
                 <form method="POST" onsubmit="return confirm('⚠️ This will permanently delete all forecast data. Are you sure?');" class="inline">
                     {% csrf_token %}
                     <button type="submit" name="delete_all" 
-                            class="btn-danger text-white py-3 px-6 rounded-lg font-semibold flex items-center w-full">
-                        <svg class="icon mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="btn-danger text-white py-2 px-4 rounded-lg font-semibold text-xs flex items-center w-full">
+                        <svg class="icon mr-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
                         Clear All Data
@@ -182,19 +182,19 @@
     </div>
 
     <div class="forecast-card bg-white rounded-xl shadow-lg overflow-hidden">
-        <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-8 py-6 border-b border-gray-200">
+        <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
-                    <svg class="large-icon text-gray-600 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="large-icon text-gray-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z"></path>
                     </svg>
                     <div>
-                        <h2 class="text-2xl font-bold text-gray-800">Sales Pipeline</h2>
-                        <p class="text-gray-600">Manage opportunities and view calculated effort estimates</p>
+                        <h2 class="text-lg font-bold text-gray-800">Sales Pipeline</h2>
+                        <p class="text-xs text-gray-600">Manage opportunities and view calculated effort estimates</p>
                     </div>
                 </div>
                 {% if forecast_data %}
-                <div class="bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full text-sm font-semibold">
+                <div class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-xs font-semibold">
                     {{ forecast_data|length }} Record{{ forecast_data|length|pluralize }}
                 </div>
                 {% endif %}
@@ -205,42 +205,42 @@
             <table id="forecast-table" class="w-full">
                 <thead class="bg-gray-50 sticky top-0 z-10">
                     <tr id="table-header">
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600"><div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>Opportunity</div></th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600"><div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path></svg>Value (₹Cr)</div></th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600"><div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path></svg>Probability %</div></th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600"><div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>Segment</div></th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600"><div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>Category</div></th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600 bg-amber-50"><div class="flex items-center"><svg class="w-4 h-4 mr-2 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>Effort (Days)</div></th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600"><div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>Start Date</div></th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600"><div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>End Date</div></th>
-                        <th class="px-6 py-4 text-center text-sm font-semibold text-gray-600"><div class="flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>Actions</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>Opportunity</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path></svg>Value (₹Cr)</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"></path></svg>Prob %</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>Segment</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>Category</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 bg-amber-50"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>Effort</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>Start Date</div></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600"><div class="flex items-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>End Date</div></th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600"><div class="flex items-center justify-center"><svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0 3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>Act</div></th>
                     </tr>
                 </thead>
-                <tbody id="table-body" class="divide-y divide-gray-100">
+                <tbody id="table-body" class="divide-y divide-gray-100 text-xs">
                     {% for item in forecast_data %}
                         <tr class="hover:bg-gray-50 transition-colors duration-150">
-                            <td class="px-6 py-4 editable-cell" contenteditable="true"><div>{{ item.opportunity }}</div></td>
-                            <td class="px-6 py-4 editable-cell" contenteditable="true"><div>{{ item.total_amount|floatformat:2 }}</div></td>
-                            <td class="px-6 py-4 editable-cell" contenteditable="true"><div>{{ item.probability }}%</div></td>
-                            <td class="px-6 py-4 editable-cell" contenteditable="true"><div>{{ item.segment }}</div></td>
-                            <td class="px-6 py-4 editable-cell" contenteditable="true"><div>{{ item.category }}</div></td>
-                            <td class="px-6 py-4 calculated-cell"><div>{{ item.calculated_effort|floatformat:1 }}</div></td>
-                            <td class="px-6 py-4 editable-cell" contenteditable="true"><div>{{ item.start_date|date:"Y-m-d"|default:'' }}</div></td>
-                            <td class="px-6 py-4 editable-cell" contenteditable="true"><div>{{ item.end_date|date:"Y-m-d"|default:'' }}</div></td>
-                            <td class="px-6 py-4 text-center">
+                            <td class="px-3 py-1.5 editable-cell" contenteditable="true"><div>{{ item.opportunity }}</div></td>
+                            <td class="px-3 py-1.5 editable-cell" contenteditable="true"><div>{{ item.total_amount|floatformat:2 }}</div></td>
+                            <td class="px-3 py-1.5 editable-cell" contenteditable="true"><div>{{ item.probability }}%</div></td>
+                            <td class="px-3 py-1.5 editable-cell" contenteditable="true"><div>{{ item.segment }}</div></td>
+                            <td class="px-3 py-1.5 editable-cell" contenteditable="true"><div>{{ item.category }}</div></td>
+                            <td class="px-3 py-1.5 calculated-cell"><div>{{ item.calculated_effort|floatformat:1 }}</div></td>
+                            <td class="px-3 py-1.5 editable-cell" contenteditable="true"><div>{{ item.start_date|date:"Y-m-d"|default:'' }}</div></td>
+                            <td class="px-3 py-1.5 editable-cell" contenteditable="true"><div>{{ item.end_date|date:"Y-m-d"|default:'' }}</div></td>
+                            <td class="px-3 py-1.5 text-center">
                                 <button class="text-red-500 hover:text-red-700 transition-colors" onclick="deleteRow(this)" title="Delete Row">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="9" class="px-6 py-12 text-center">
-                                <svg class="w-24 h-24 mx-auto text-gray-300 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
-                                <h3 class="text-xl font-semibold text-gray-800 mb-2">No Forecast Data</h3>
-                                <p class="text-gray-600 mb-6">Import an Excel file with your sales pipeline to begin capacity planning.</p>
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-                                    <p class="text-blue-700 text-sm">💡 <strong>Tip:</strong> The system will automatically calculate effort estimates based on your configured project types and benchmarks.</p>
+                            <td colspan="9" class="px-4 py-8 text-center">
+                                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
+                                <h3 class="text-lg font-semibold text-gray-800 mb-1">No Forecast Data</h3>
+                                <p class="text-xs text-gray-600 mb-4">Import an Excel file with your sales pipeline to begin capacity planning.</p>
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-md mx-auto">
+                                    <p class="text-blue-700 text-xs">💡 <strong>Tip:</strong> The system will automatically calculate effort estimates based on your configured project types and benchmarks.</p>
                                 </div>
                             </td>
                         </tr>
@@ -251,27 +251,27 @@
     </div>
 
     {% if not forecast_data %}
-    <div class="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-            <svg class="icon mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    <div class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+        <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+            <svg class="icon mr-1.5 w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             How to Use Sales Forecast
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white rounded-lg p-4 border border-blue-100">
-                <h4 class="font-semibold text-gray-800 mb-2">1. Prepare Your Excel File</h4>
-                <p class="text-sm text-gray-600">Create an Excel file with columns: Opportunity, Total Amount, Probability(%), Segment, Category, Start Date, End date</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <h4 class="font-semibold text-gray-800 mb-1 text-xs">1. Prepare Your Excel File</h4>
+                <p class="text-[10px] text-gray-600">Create an Excel file with columns: Opportunity, Total Amount, Probability(%), Segment, Category, Start Date, End date</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-blue-100">
-                <h4 class="font-semibold text-gray-800 mb-2">2. Import & Edit</h4>
-                <p class="text-sm text-gray-600">Upload your file and make any necessary edits directly in the table. Click any cell to modify values.</p>
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <h4 class="font-semibold text-gray-800 mb-1 text-xs">2. Import & Edit</h4>
+                <p class="text-[10px] text-gray-600">Upload your file and make any necessary edits directly in the table. Click any cell to modify values.</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-blue-100">
-                <h4 class="font-semibold text-gray-800 mb-2">3. Automatic Calculations</h4>
-                <p class="text-sm text-gray-600">The system calculates effort estimates based on your configured project types and value benchmarks.</p>
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <h4 class="font-semibold text-gray-800 mb-1 text-xs">3. Automatic Calculations</h4>
+                <p class="text-[10px] text-gray-600">The system calculates effort estimates based on your configured project types and benchmarks.</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-blue-100">
-                <h4 class="font-semibold text-gray-800 mb-2">4. Capacity Planning</h4>
-                <p class="text-sm text-gray-600">Visit the Capacity Plan page to see how forecast data affects your future resource requirements.</p>
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <h4 class="font-semibold text-gray-800 mb-1 text-xs">4. Capacity Planning</h4>
+                <p class="text-[10px] text-gray-600">Visit the Capacity Plan page to see how forecast data affects your future resource requirements.</p>
             </div>
         </div>
     </div>
@@ -382,17 +382,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             displayHeaders.forEach((headerText) => {
                 const td = document.createElement('td');
-                td.className = 'px-6 py-4';
+                td.className = 'px-3 py-1.5';
                 
                 const excelHeaderKey = findKeyByKeyword(headerText, headerMapping);
 
-                if (headerText.includes('Effort (Days)')) {
+                if (headerText.includes('Effort')) {
                     td.className += ' calculated-cell';
                     td.innerHTML = `<div>Will be calculated after save</div>`;
-                } else if (headerText.includes('Actions')) {
+                } else if (headerText.includes('Act')) {
                     // NEW: Add delete button cell when populating from Excel
                     td.className += ' text-center';
-                    td.innerHTML = `<button class="text-red-500 hover:text-red-700 transition-colors" onclick="deleteRow(this)" title="Delete Row"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
+                    td.innerHTML = `<button class="text-red-500 hover:text-red-700 transition-colors" onclick="deleteRow(this)" title="Delete Row"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
                 } else if (excelHeaderKey) {
                     td.className += ' editable-cell';
                     td.setAttribute('contenteditable', 'true');
@@ -476,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveButton.disabled = true;
         saveButton.innerHTML = `<svg class="icon mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Saving...`;
 
-        fetch("{% url 'sales_forecast' %}", {
+        fetch("{% url 'planner_sales_forecast' %}", {
             method: 'POST',
             body: formData,
             headers: { 'X-CSRFToken': csrftoken }

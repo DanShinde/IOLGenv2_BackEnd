@@ -238,6 +238,7 @@
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_upcoming_milestones' %}active{% endif %}" href="{% url 'tracker_upcoming_milestones' %}"><i class="fas fa-calendar-alt"></i>Upcoming Milestones</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'all_push_pull_content' %}active{% endif %}" href="{% url 'all_push_pull_content' %}"><i class="fas fa-arrows-alt-h"></i>Push-Pull Content</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'help_page' %}active{% endif %}" href="{% url 'help_page' %}"><i class="fas fa-question-circle"></i>Help</a></li>
+                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}"><i class="fas fa-home"></i>Home</a></li>
                     {% endif %}
                 </ul>
 
