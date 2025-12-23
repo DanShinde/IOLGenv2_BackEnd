@@ -111,7 +111,9 @@ class ForumPaginator:
 def forum_home(request):
     """Forum homepage showing all categories and recent threads"""
     categories = ForumCategory.objects.filter(is_active=True).prefetch_related(
-        Prefetch('threads', queryset=ForumThread.objects.select_related('author')[:5])
+        Prefetch('threads',
+                queryset=ForumThread.objects.select_related('author').order_by('-last_activity_at'),
+                to_attr='recent_threads_list')
     )
 
     recent_threads = ForumThread.objects.select_related(
@@ -144,12 +146,12 @@ def forum_category(request, slug):
         'status': request.GET.get('status', ''),
         'priority': request.GET.get('priority', ''),
         'search': request.GET.get('search', ''),
-        'sort_by': request.GET.get('sort_by', 'recent'),
+        'sort_by': request.GET.get('sort', '-last_activity_at'),
     }
 
     threads = ForumThread.objects.filter(category=category).select_related(
         'author', 'best_answer'
-    ).annotate(
+    ).prefetch_related('tags').annotate(
         reply_count=Count('posts')
     )
 
@@ -165,23 +167,31 @@ def forum_category(request, slug):
             Q(content__icontains=filter_params['search'])
         )
 
-    sort_by = filter_params['sort_by']
-    if sort_by == 'recent':
+    # Handle sorting
+    sort = filter_params['sort_by']
+    if sort == '-last_activity_at' or sort == 'recent':
         threads = threads.order_by('-is_pinned', '-last_activity_at')
-    elif sort_by == 'created':
+    elif sort == '-created_at':
         threads = threads.order_by('-is_pinned', '-created_at')
-    elif sort_by == 'views':
+    elif sort == 'created_at':
+        threads = threads.order_by('-is_pinned', 'created_at')
+    elif sort == '-views':
         threads = threads.order_by('-is_pinned', '-views')
-    elif sort_by == 'posts':
-        threads = threads.order_by('-is_pinned', '-reply_count')
+    elif sort == '-is_pinned,-last_activity_at':
+        threads = threads.order_by('-is_pinned', '-last_activity_at')
+    else:
+        threads = threads.order_by('-is_pinned', '-last_activity_at')
 
     paginated_threads, paginator = ForumPaginator.paginate_queryset(threads, request)
 
     context = {
         'category': category,
         'threads': paginated_threads,
+        'threads_count': threads.count(),
         'paginator': paginator,
         'filter_form': filter_form,
+        'status_filter': filter_params['status'],
+        'sort': sort,
         'is_paginated': paginator.num_pages > 1,
     }
     return render(request, 'home/forum_category.html', context)
@@ -200,8 +210,6 @@ def thread_detail(request, slug):
 
     posts = thread.posts.select_related('author').prefetch_related(
         'upvotes', 'attachments', 'replies__author'
-    ).annotate(
-        upvote_count=Count('upvotes')
     )
 
     if request.method == 'POST':
@@ -275,9 +283,13 @@ def thread_create(request):
     else:
         form = ThreadCreateForm()
 
+    # Get all categories for visual selection
+    categories = ForumCategory.objects.filter(is_active=True).order_by('order', 'name')
+
     context = {
         'form': form,
-        'title': 'Create New Thread'
+        'title': 'Create New Thread',
+        'categories': categories,
     }
     return render(request, 'home/thread_form.html', context)
 
@@ -301,12 +313,55 @@ def thread_update(request, slug):
     else:
         form = ThreadUpdateForm(instance=thread)
 
+    # Get all categories for visual selection
+    categories = ForumCategory.objects.filter(is_active=True).order_by('order', 'name')
+
     context = {
         'form': form,
         'thread': thread,
-        'title': 'Edit Thread'
+        'title': 'Edit Thread',
+        'categories': categories,
     }
     return render(request, 'home/thread_form.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def post_create(request, slug):
+    """Create a new post/reply in a thread"""
+    thread = get_object_or_404(ForumThread, slug=slug)
+
+    if thread.is_locked and not request.user.is_staff:
+        messages.error(request, 'This thread is locked.')
+        return redirect('forum-thread-detail', slug=thread.slug)
+
+    content = request.POST.get('content', '').strip()
+    parent_id = request.POST.get('parent_id')
+
+    if not content:
+        messages.error(request, 'Reply content cannot be empty.')
+        return redirect('forum-thread-detail', slug=thread.slug)
+
+    with transaction.atomic():
+        post = ForumPost.objects.create(
+            thread=thread,
+            author=request.user,
+            content=content
+        )
+
+        if parent_id:
+            try:
+                parent_post = ForumPost.objects.get(id=parent_id, thread=thread)
+                post.parent = parent_post
+                post.save(update_fields=['parent'])
+            except ForumPost.DoesNotExist:
+                pass
+
+        thread.last_activity_at = datetime.now()
+        thread.save(update_fields=['last_activity_at'])
+
+    messages.success(request, 'Your reply has been posted!')
+    return redirect('forum-thread-detail', slug=thread.slug)
 
 
 # ============================================================================
@@ -321,15 +376,15 @@ def post_upvote(request, post_id):
 
     if request.user in post.upvotes.all():
         post.upvotes.remove(request.user)
-        action = 'removed'
+        upvoted = False
     else:
         post.upvotes.add(request.user)
-        action = 'added'
+        upvoted = True
 
     return JsonResponse({
         'success': True,
-        'action': action,
-        'count': post.upvote_count
+        'upvoted': upvoted,
+        'upvote_count': post.upvotes.count()
     })
 
 

@@ -13,7 +13,8 @@ urlpatterns = [
     path('forum/category/<slug:slug>/', views.forum_category, name='forum-category'),
     path('forum/thread/create/', views.thread_create, name='forum-thread-create'),
     path('forum/thread/<slug:slug>/', views.thread_detail, name='forum-thread-detail'),
-    path('forum/thread/<slug:slug>/edit/', views.thread_update, name='forum-thread-update'),
+    path('forum/thread/<slug:slug>/edit/', views.thread_update, name='forum-thread-edit'),
+    path('forum/thread/<slug:slug>/reply/', views.post_create, name='forum-post-create'),
 
     # Forum AJAX Endpoints - all under /forum/
     path('forum/post/<int:post_id>/upvote/', views.post_upvote, name='forum-post-upvote'),

@@ -1,0 +1,1250 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ thread.title }} - Forum{% endblock %}
+
+{% block styles %}
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<style>
+    /* Override base template styles */
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        min-height: 100vh;
+        position: relative;
+        color: #1f2937 !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background:
+            radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(249, 168, 212, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 20%, rgba(167, 139, 250, 0.2) 0%, transparent 50%);
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .forum-container {
+        position: relative;
+        z-index: 1;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    }
+
+    .forum-container * {
+        font-family: inherit;
+    }
+
+    /* Override Bootstrap container styles at all breakpoints */
+    .forum-container .container,
+    .forum-container .container-fluid,
+    .forum-container .container-sm,
+    .forum-container .container-md,
+    .forum-container .container-lg,
+    .forum-container .container-xl,
+    .forum-container .container-xxl {
+        max-width: 95% !important;
+        width: 95% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    @media (min-width: 1200px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 90% !important;
+        }
+    }
+
+    @media (min-width: 1400px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 1600px !important;
+        }
+    }
+
+    @media (min-width: 1536px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 1700px !important;
+        }
+    }
+
+    @media (min-width: 1920px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 1800px !important;
+        }
+    }
+
+    main {
+        flex: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Breadcrumb */
+    .breadcrumb {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        padding: 1rem 1.5rem;
+        border-radius: 15px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .breadcrumb a {
+        color: white;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .breadcrumb a:hover {
+        color: #fbbf24;
+    }
+
+    .breadcrumb-separator {
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Thread Header */
+    .thread-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        border-radius: 25px;
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .thread-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+        animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(10deg); }
+    }
+
+    /* Main Post Card (OP) */
+    .main-post {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        border: 3px solid rgba(102, 126, 234, 0.3);
+        position: relative;
+    }
+
+    .main-post::before {
+        content: 'ORIGINAL POST';
+        position: absolute;
+        top: -12px;
+        left: 2rem;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 0.35rem 1rem;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 1px;
+    }
+
+    /* Reply Cards */
+    .reply-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 18px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.08);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .reply-card:hover {
+        box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
+        transform: translateX(5px);
+        border-color: rgba(102, 126, 234, 0.4);
+    }
+
+    .reply-card.nested {
+        margin-left: 4rem;
+        border-left: 4px solid #667eea;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.03), rgba(255, 255, 255, 0.95));
+    }
+
+    .reply-card.best-answer {
+        border: 3px solid #10b981;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(255, 255, 255, 0.98));
+        box-shadow: 0 10px 40px rgba(16, 185, 129, 0.2);
+    }
+
+    .reply-card.best-answer::before {
+        content: '✓ BEST ANSWER';
+        position: absolute;
+        top: -12px;
+        left: 2rem;
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        padding: 0.35rem 1rem;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 1px;
+    }
+
+    /* Author Section */
+    .author-section {
+        display: flex;
+        align-items: start;
+        gap: 1.25rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .author-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 800;
+        font-size: 1.5rem;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        flex-shrink: 0;
+        position: relative;
+    }
+
+    .author-avatar.staff::after {
+        content: '⭐';
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        border: 2px solid white;
+    }
+
+    .author-info {
+        flex: 1;
+    }
+
+    .author-name {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 0.25rem;
+    }
+
+    .author-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-right: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .badge-staff {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: white;
+    }
+
+    .badge-author {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+
+    /* Post Content */
+    .post-content {
+        color: #374151;
+        line-height: 1.8;
+        font-size: 1.05rem;
+        margin: 1.5rem 0;
+    }
+
+    .post-content p {
+        margin-bottom: 1rem;
+    }
+
+    .post-content code {
+        background: rgba(102, 126, 234, 0.1);
+        padding: 0.2rem 0.5rem;
+        border-radius: 5px;
+        font-family: 'Courier New', monospace;
+        color: #667eea;
+    }
+
+    /* Upvote Section */
+    .upvote-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        margin-right: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .upvote-btn {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background: white;
+        border: 2px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.25rem;
+    }
+
+    .upvote-btn:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border-color: #667eea;
+        transform: translateY(-2px);
+    }
+
+    .upvote-btn.active {
+        background: linear-gradient(135deg, #10b981, #059669);
+        border-color: #10b981;
+        color: white;
+        transform: scale(1.1);
+    }
+
+    .upvote-count {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #667eea;
+    }
+
+    /* Actions Bar */
+    .actions-bar {
+        display: flex;
+        gap: 1rem;
+        padding-top: 1.5rem;
+        border-top: 2px solid rgba(0, 0, 0, 0.05);
+        flex-wrap: wrap;
+    }
+
+    .action-btn {
+        padding: 0.6rem 1.25rem;
+        border-radius: 12px;
+        border: 2px solid #e5e7eb;
+        background: white;
+        color: #6b7280;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .action-btn:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border-color: #667eea;
+        color: #667eea;
+        transform: translateY(-2px);
+    }
+
+    .action-btn.primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-color: #667eea;
+        color: white;
+    }
+
+    .action-btn.primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .action-btn.success {
+        background: linear-gradient(135deg, #10b981, #059669);
+        border-color: #10b981;
+        color: white;
+    }
+
+    .action-btn.danger {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        border-color: #ef4444;
+        color: white;
+    }
+
+    /* Reply Form */
+    .reply-form-container {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2.5rem;
+        margin-top: 2rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        border: 2px solid rgba(102, 126, 234, 0.2);
+    }
+
+    .reply-form-container h3 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .form-textarea {
+        width: 100%;
+        min-height: 150px;
+        padding: 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 1rem;
+        resize: vertical;
+        transition: all 0.3s ease;
+        font-family: inherit;
+        line-height: 1.6;
+    }
+
+    .form-textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+
+    /* Status Badges */
+    .badge-status {
+        padding: 0.5rem 1.25rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 800;
+        display: inline-block;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-open {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-in_progress {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-resolved {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-closed {
+        background: linear-gradient(135deg, #6b7280, #4b5563);
+        color: white;
+    }
+
+    /* Sidebar */
+    .thread-sidebar {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 2rem;
+    }
+
+    .sidebar-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .sidebar-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .sidebar-title {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: #1f2937;
+        margin-bottom: 1rem;
+    }
+
+    .stat-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        font-size: 0.95rem;
+    }
+
+    .stat-label {
+        color: #6b7280;
+        font-weight: 600;
+    }
+
+    .stat-value {
+        font-weight: 800;
+        color: #1f2937;
+    }
+
+    /* Tags */
+    .tag {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+        color: #667eea;
+        padding: 0.5rem 1rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        display: inline-block;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fadeInUp {
+        animation: fadeInUp 0.6s ease-out backwards;
+    }
+
+    .stagger-1 { animation-delay: 0.1s; }
+    .stagger-2 { animation-delay: 0.2s; }
+    .stagger-3 { animation-delay: 0.3s; }
+
+    /* Quick Reply Inline */
+    .quick-reply {
+        display: none;
+        margin-top: 1rem;
+        padding: 1rem;
+        background: rgba(102, 126, 234, 0.05);
+        border-radius: 12px;
+        border: 2px dashed rgba(102, 126, 234, 0.3);
+    }
+
+    .quick-reply.show {
+        display: block;
+        animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            max-height: 0;
+        }
+        to {
+            opacity: 1;
+            max-height: 500px;
+        }
+    }
+
+    /* Locked Thread Warning */
+    .locked-warning {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1));
+        border: 2px solid rgba(239, 68, 68, 0.3);
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+        text-align: center;
+    }
+
+    .locked-warning i {
+        font-size: 3rem;
+        color: #ef4444;
+        margin-bottom: 1rem;
+    }
+
+    /* Back button */
+    .back-btn {
+        color: white;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 15px;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        margin-bottom: 1rem;
+    }
+
+    .back-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: white;
+        transform: translateX(-5px);
+        text-decoration: none;
+    }
+
+    /* Attachments */
+    .attachment-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .attachment-item {
+        background: rgba(102, 126, 234, 0.05);
+        padding: 1rem;
+        border-radius: 12px;
+        border: 2px solid rgba(102, 126, 234, 0.2);
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: #667eea;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .attachment-item:hover {
+        background: rgba(102, 126, 234, 0.1);
+        border-color: #667eea;
+        transform: translateY(-2px);
+        color: #667eea;
+        text-decoration: none;
+    }
+
+    .attachment-item i {
+        font-size: 1.5rem;
+    }
+
+    /* CRITICAL: Final Bootstrap override - must be at end */
+    /* Ultra-specific selectors to override Bootstrap at ALL screen sizes */
+    body .forum-container .container,
+    body .forum-container .container-fluid,
+    body .forum-container .container-sm,
+    body .forum-container .container-md,
+    body .forum-container .container-lg,
+    body .forum-container .container-xl,
+    body .forum-container .container-xxl,
+    .forum-container > .container,
+    .forum-container > .container-fluid,
+    .forum-container > .container-sm,
+    .forum-container > .container-md,
+    .forum-container > .container-lg,
+    .forum-container > .container-xl,
+    .forum-container > .container-xxl {
+        max-width: 95% !important;
+        width: 95% !important;
+    }
+
+    @media (min-width: 576px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        .forum-container > .container,
+        .forum-container > .container-sm {
+            max-width: 95% !important;
+        }
+    }
+
+    @media (min-width: 768px) {
+        body .forum-container .container,
+        body .forum-container .container-md,
+        body .forum-container .container-sm,
+        .forum-container > .container,
+        .forum-container > .container-md,
+        .forum-container > .container-sm {
+            max-width: 95% !important;
+        }
+    }
+
+    @media (min-width: 992px) {
+        body .forum-container .container,
+        body .forum-container .container-lg,
+        body .forum-container .container-md,
+        body .forum-container .container-sm,
+        .forum-container > .container,
+        .forum-container > .container-lg,
+        .forum-container > .container-md,
+        .forum-container > .container-sm {
+            max-width: 90% !important;
+        }
+    }
+
+    @media (min-width: 1200px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 90% !important;
+        }
+    }
+
+    @media (min-width: 1400px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 1600px !important;
+        }
+    }
+
+    @media (min-width: 1536px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 1700px !important;
+        }
+    }
+
+    @media (min-width: 1920px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 1800px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="forum-container">
+<div class="container mx-auto px-4 py-8">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb animate-fadeInUp">
+        <a href="{% url 'forum-home' %}">
+            <i class="fas fa-home"></i> Forum
+        </a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="{% url 'forum-category' thread.category.slug %}">
+            {{ thread.category.name }}
+        </a>
+        <span class="breadcrumb-separator">/</span>
+        <span class="text-white">{{ thread.title|truncatewords:8 }}</span>
+    </nav>
+
+    <!-- Thread Header -->
+    <div class="thread-header animate-fadeInUp text-white relative z-10">
+        <div class="flex justify-between items-start gap-4 flex-wrap">
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-3 flex-wrap">
+                    <span class="badge-status badge-{{ thread.status }}">
+                        {{ thread.get_status_display }}
+                    </span>
+                    {% if thread.is_pinned %}
+                        <span class="badge-status" style="background: linear-gradient(135deg, #fbbf24, #f59e0b);">
+                            <i class="fas fa-thumbtack mr-1"></i> Pinned
+                        </span>
+                    {% endif %}
+                    {% if thread.is_locked %}
+                        <span class="badge-status badge-closed">
+                            <i class="fas fa-lock mr-1"></i> Locked
+                        </span>
+                    {% endif %}
+                    {% if thread.best_answer %}
+                        <span class="badge-status" style="background: linear-gradient(135deg, #10b981, #059669);">
+                            <i class="fas fa-check-circle mr-1"></i> Solved
+                        </span>
+                    {% endif %}
+                </div>
+                <h1 class="text-5xl font-black mb-4">{{ thread.title }}</h1>
+                <div class="flex items-center gap-6 text-lg">
+                    <span><i class="fas fa-eye mr-2"></i> {{ thread.views }} views</span>
+                    <span><i class="fas fa-comments mr-2"></i> {{ posts.count }} replies</span>
+                    <span><i class="fas fa-clock mr-2"></i> {{ thread.last_activity_at|timesince }} ago</span>
+                </div>
+            </div>
+            {% if user == thread.author or user.is_staff %}
+            <a href="{% url 'forum-thread-edit' thread.slug %}" class="action-btn primary">
+                <i class="fas fa-edit"></i> Edit Thread
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Content -->
+        <div class="lg:col-span-2">
+            <!-- Original Post -->
+            <div class="main-post animate-fadeInUp stagger-1">
+                <div class="flex gap-4">
+                    <div class="upvote-section">
+                        <div class="upvote-btn" title="Upvote">
+                            <i class="fas fa-arrow-up"></i>
+                        </div>
+                        <div class="upvote-count">{{ posts.count }}</div>
+                        <div class="upvote-btn" title="Bookmark">
+                            <i class="fas fa-bookmark"></i>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="author-section">
+                            <div class="author-avatar {% if thread.author.is_staff %}staff{% endif %}">
+                                {{ thread.author.username.0|upper }}
+                            </div>
+                            <div class="author-info">
+                                <div class="author-name">{{ thread.author.get_full_name|default:thread.author.username }}</div>
+                                <div class="flex items-center gap-2 flex-wrap mt-1">
+                                    {% if thread.author.is_staff %}
+                                        <span class="author-badge badge-staff">
+                                            <i class="fas fa-shield-alt mr-1"></i> Staff
+                                        </span>
+                                    {% endif %}
+                                    <span class="author-badge badge-author">
+                                        <i class="fas fa-user-circle mr-1"></i> Thread Author
+                                    </span>
+                                    <span class="text-gray-500 text-sm">
+                                        <i class="fas fa-calendar mr-1"></i> Posted {{ thread.created_at|timesince }} ago
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="post-content">
+                            {{ thread.content|linebreaks }}
+                        </div>
+
+                        {% if thread.tags.exists %}
+                        <div class="mt-4">
+                            {% for tag in thread.tags.all %}
+                            <span class="tag">
+                                <i class="fas fa-tag mr-1"></i> {{ tag.name }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if thread.attachments.exists %}
+                        <div class="attachment-grid">
+                            {% for attachment in thread.attachments.all %}
+                            <a href="{{ attachment.file.url }}" class="attachment-item" target="_blank">
+                                <i class="fas fa-paperclip"></i>
+                                <div class="flex-1 overflow-hidden">
+                                    <div class="truncate font-bold">{{ attachment.file.name|truncatechars:20 }}</div>
+                                    <small class="text-gray-500">{{ attachment.file.size|filesizeformat }}</small>
+                                </div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Replies Section -->
+            <div class="mt-8 mb-6">
+                <h2 class="text-3xl font-black mb-4" style="background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                    <i class="fas fa-comments mr-2"></i> {{ posts.count }} Repl{{ posts.count|pluralize:"y,ies" }}
+                </h2>
+            </div>
+
+            <!-- Reply Cards -->
+            {% for post in posts %}
+            <div class="reply-card {% if post.parent %}nested{% endif %} {% if post == thread.best_answer %}best-answer{% endif %} animate-fadeInUp stagger-{{ forloop.counter|add:1 }}" id="post-{{ post.id }}">
+                <div class="flex gap-4">
+                    <div class="upvote-section">
+                        <button class="upvote-btn {% if user in post.upvotes.all %}active{% endif %}"
+                                onclick="toggleUpvote({{ post.id }})"
+                                data-post-id="{{ post.id }}"
+                                title="Upvote this reply">
+                            <i class="fas fa-thumbs-up"></i>
+                        </button>
+                        <div class="upvote-count" id="upvote-count-{{ post.id }}">{{ post.upvote_count }}</div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="author-section">
+                            <div class="author-avatar {% if post.author.is_staff %}staff{% endif %}">
+                                {{ post.author.username.0|upper }}
+                            </div>
+                            <div class="author-info">
+                                <div class="author-name">{{ post.author.get_full_name|default:post.author.username }}</div>
+                                <div class="flex items-center gap-2 flex-wrap mt-1">
+                                    {% if post.author.is_staff %}
+                                        <span class="author-badge badge-staff">
+                                            <i class="fas fa-shield-alt mr-1"></i> Staff
+                                        </span>
+                                    {% endif %}
+                                    {% if post.author == thread.author %}
+                                        <span class="author-badge badge-author">
+                                            <i class="fas fa-user-circle mr-1"></i> OP
+                                        </span>
+                                    {% endif %}
+                                    <span class="text-gray-500 text-sm">
+                                        <i class="fas fa-clock mr-1"></i> {{ post.created_at|timesince }} ago
+                                        {% if post.created_at != post.updated_at %}
+                                            <span class="ml-1">(edited)</span>
+                                        {% endif %}
+                                    </span>
+                                    {% if post.parent %}
+                                        <span class="text-purple-600 text-sm font-semibold">
+                                            <i class="fas fa-reply mr-1"></i> Reply to {{ post.parent.author.username }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="post-content">
+                            {{ post.content|linebreaks }}
+                        </div>
+
+                        <div class="actions-bar">
+                            {% if not thread.is_locked %}
+                            <button class="action-btn" onclick="toggleQuickReply({{ post.id }})">
+                                <i class="fas fa-reply"></i> Reply
+                            </button>
+                            {% endif %}
+
+                            {% if user == thread.author and not thread.best_answer and post != thread.best_answer %}
+                            <button class="action-btn success" onclick="markAsSolution({{ post.id }})">
+                                <i class="fas fa-check-circle"></i> Mark as Solution
+                            </button>
+                            {% endif %}
+
+                            {% if user == post.author or user.is_staff %}
+                            <button class="action-btn">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            {% endif %}
+
+                            <button class="action-btn">
+                                <i class="fas fa-flag"></i> Report
+                            </button>
+                        </div>
+
+                        <!-- Quick Reply Form -->
+                        {% if not thread.is_locked %}
+                        <div class="quick-reply" id="quick-reply-{{ post.id }}">
+                            <form method="post" action="{% url 'forum-post-create' thread.slug %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="parent_id" value="{{ post.id }}">
+                                <textarea name="content" class="form-textarea" placeholder="Write your reply to {{ post.author.username }}..." required></textarea>
+                                <div class="flex gap-2 mt-3">
+                                    <button type="submit" class="action-btn primary">
+                                        <i class="fas fa-paper-plane"></i> Post Reply
+                                    </button>
+                                    <button type="button" class="action-btn" onclick="toggleQuickReply({{ post.id }})">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="reply-card text-center">
+                <div class="text-6xl text-gray-300 mb-4">
+                    <i class="fas fa-inbox"></i>
+                </div>
+                <p class="text-gray-500 text-xl font-semibold">No replies yet. Be the first to reply!</p>
+            </div>
+            {% endfor %}
+
+            <!-- Main Reply Form -->
+            {% if not thread.is_locked %}
+            <div class="reply-form-container animate-fadeInUp">
+                <h3>
+                    <i class="fas fa-comment-dots mr-2"></i> Post Your Reply
+                </h3>
+                <form method="post" action="{% url 'forum-post-create' thread.slug %}">
+                    {% csrf_token %}
+                    <textarea name="content" class="form-textarea" placeholder="Share your thoughts, solutions, or questions..." required></textarea>
+                    <div class="mt-4">
+                        <button type="submit" class="action-btn primary text-lg px-8 py-3">
+                            <i class="fas fa-paper-plane mr-2"></i> Post Reply
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% else %}
+            <div class="locked-warning">
+                <i class="fas fa-lock"></i>
+                <h3 class="text-2xl font-black text-gray-900 mb-2">This Thread is Locked</h3>
+                <p class="text-gray-600">No new replies can be posted to this thread.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="lg:col-span-1">
+            <div class="thread-sidebar animate-fadeInUp stagger-2">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-info-circle text-purple-600 mr-2"></i>
+                        Thread Info
+                    </h3>
+                    <div class="stat-item">
+                        <span class="stat-label">Category</span>
+                        <span class="stat-value">{{ thread.category.name }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Priority</span>
+                        <span class="stat-value text-capitalize">{{ thread.get_priority_display }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value">{{ thread.get_status_display }}</span>
+                    </div>
+                </div>
+
+                {% if thread.bug_severity or thread.bug_module or thread.bug_version %}
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-bug text-red-600 mr-2"></i>
+                        Bug Details
+                    </h3>
+                    {% if thread.bug_severity %}
+                    <div class="stat-item">
+                        <span class="stat-label">Severity</span>
+                        <span class="stat-value">{{ thread.get_bug_severity_display }}</span>
+                    </div>
+                    {% endif %}
+                    {% if thread.bug_module %}
+                    <div class="stat-item">
+                        <span class="stat-label">Module</span>
+                        <span class="stat-value">{{ thread.bug_module }}</span>
+                    </div>
+                    {% endif %}
+                    {% if thread.bug_version %}
+                    <div class="stat-item">
+                        <span class="stat-label">Version</span>
+                        <span class="stat-value">{{ thread.bug_version }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-chart-line text-blue-600 mr-2"></i>
+                        Activity
+                    </h3>
+                    <div class="stat-item">
+                        <span class="stat-label">Created</span>
+                        <span class="stat-value">{{ thread.created_at|date:"M d, Y" }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Last Activity</span>
+                        <span class="stat-value">{{ thread.last_activity_at|timesince }} ago</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Views</span>
+                        <span class="stat-value">{{ thread.views }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Replies</span>
+                        <span class="stat-value">{{ posts.count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function toggleQuickReply(postId) {
+        const replyForm = document.getElementById(`quick-reply-${postId}`);
+        replyForm.classList.toggle('show');
+        if (replyForm.classList.contains('show')) {
+            replyForm.querySelector('textarea').focus();
+        }
+    }
+
+    async function toggleUpvote(postId) {
+        try {
+            const response = await fetch(`/forum/post/${postId}/upvote/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const btn = document.querySelector(`[data-post-id="${postId}"]`);
+                const countEl = document.getElementById(`upvote-count-${postId}`);
+                countEl.textContent = data.upvote_count;
+
+                if (data.upvoted) {
+                    btn.classList.add('active');
+                    showToast('Upvoted! 👍', 'success');
+                } else {
+                    btn.classList.remove('active');
+                    showToast('Upvote removed', 'info');
+                }
+            }
+        } catch (error) {
+            showToast('Error toggling upvote', 'error');
+        }
+    }
+
+    async function markAsSolution(postId) {
+        if (!confirm('Mark this post as the solution to your thread?')) return;
+
+        try {
+            const response = await fetch(`/forum/post/${postId}/mark-solution/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('Marked as solution! ✓', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(data.error || 'Error marking solution', 'error');
+            }
+        } catch (error) {
+            showToast('Error marking solution', 'error');
+        }
+    }
+
+    function showToast(message, type) {
+        const backgrounds = {
+            success: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            error: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            info: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        };
+
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            style: {
+                background: backgrounds[type] || backgrounds.info,
+                borderRadius: '12px',
+                padding: '1rem 1.5rem',
+                fontSize: '1rem',
+                fontWeight: '700'
+            }
+        }).showToast();
+    }
+</script>
+{% endblock %}

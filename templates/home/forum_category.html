@@ -1,0 +1,828 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ category.name }} - Forum{% endblock %}
+
+{% block styles %}
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+<style>
+    /* Override base template styles */
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        min-height: 100vh;
+        position: relative;
+        color: #1f2937 !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background:
+            radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(249, 168, 212, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 20%, rgba(167, 139, 250, 0.2) 0%, transparent 50%);
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    /* Forum-specific container resets */
+    .forum-container {
+        position: relative;
+        z-index: 1;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    }
+
+    .forum-container * {
+        font-family: inherit;
+    }
+
+    /* Override any base container styles - Bootstrap override */
+    .forum-container .container,
+    .forum-container .container-fluid,
+    .forum-container .container-sm,
+    .forum-container .container-md,
+    .forum-container .container-lg,
+    .forum-container .container-xl,
+    .forum-container .container-xxl {
+        max-width: 95% !important;
+        width: 95% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    @media (min-width: 1200px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 90% !important;
+        }
+    }
+
+    @media (min-width: 1400px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 1600px !important;
+        }
+    }
+
+    @media (min-width: 1536px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 1700px !important;
+        }
+    }
+
+    @media (min-width: 1920px) {
+        .forum-container .container,
+        .forum-container .container-sm,
+        .forum-container .container-md,
+        .forum-container .container-lg,
+        .forum-container .container-xl,
+        .forum-container .container-xxl {
+            max-width: 1800px !important;
+        }
+    }
+
+    main {
+        flex: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .category-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        border-radius: 30px;
+        padding: 3rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
+        margin-bottom: 2rem;
+    }
+
+    .category-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+        animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(10deg); }
+    }
+
+    .category-icon {
+        width: 100px;
+        height: 100px;
+        background: rgba(255, 255, 255, 0.25);
+        backdrop-filter: blur(10px);
+        border-radius: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3.5rem;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+    }
+
+    .category-icon:hover {
+        transform: rotate(10deg) scale(1.1);
+    }
+
+    .filter-bar {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        padding: 1.5rem;
+        border-radius: 20px;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .filter-btn {
+        padding: 0.75rem 1.5rem;
+        border: 2px solid #e2e8f0;
+        background: white;
+        border-radius: 15px;
+        margin-right: 0.75rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        font-weight: 600;
+        color: #4b5563;
+    }
+
+    .filter-btn:hover {
+        border-color: #667eea;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        color: #667eea;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+
+    .filter-btn.active {
+        border-color: #667eea;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .thread-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .thread-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 5px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        transform: scaleY(0);
+        transition: transform 0.3s ease;
+    }
+
+    .thread-card:hover::before {
+        transform: scaleY(1);
+    }
+
+    .thread-card:hover {
+        transform: translateX(10px) translateY(-5px);
+        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.25);
+        border-color: #667eea;
+    }
+
+    .thread-card.pinned {
+        border-left: 5px solid #fbbf24;
+        background: linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(254, 243, 199, 0.95));
+    }
+
+    .thread-card.locked {
+        opacity: 0.85;
+        background: rgba(247, 250, 252, 0.95);
+    }
+
+    .badge-status {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        display: inline-block;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-open {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-in_progress {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-resolved {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-closed {
+        background: linear-gradient(135deg, #6b7280, #4b5563);
+        color: white;
+    }
+
+    .badge-priority {
+        padding: 0.4rem 0.9rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .priority-critical {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        animation: glow-pulse 2s ease-in-out infinite;
+    }
+
+    .priority-high {
+        background: linear-gradient(135deg, #f97316, #ea580c);
+        color: white;
+        box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+    }
+
+    .priority-medium {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+    }
+
+    .priority-low {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+
+    @keyframes glow-pulse {
+        0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+        50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); }
+    }
+
+    .tag {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+        color: #667eea;
+        padding: 0.4rem 1rem;
+        border-radius: 15px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: 1px solid rgba(102, 126, 234, 0.3);
+    }
+
+    .author-avatar {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 1.1rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .create-thread-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 15px;
+        border: none;
+        font-weight: 700;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .create-thread-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .create-thread-btn:hover::before {
+        left: 100%;
+    }
+
+    .create-thread-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+        color: white;
+        text-decoration: none;
+    }
+
+    .back-btn {
+        color: white;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 15px;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .back-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: white;
+        transform: translateX(-5px);
+        text-decoration: none;
+    }
+
+    .pagination {
+        margin-top: 2rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .pagination a, .pagination span {
+        padding: 0.75rem 1.25rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        text-decoration: none;
+        color: #4b5563;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .pagination a:hover {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .pagination .current {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 5rem 2rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 25px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .empty-state i {
+        font-size: 5rem;
+        color: #cbd5e0;
+        margin-bottom: 1.5rem;
+    }
+
+    .sort-dropdown {
+        padding: 0.75rem 1.25rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        background: white;
+        cursor: pointer;
+        font-weight: 600;
+        color: #4b5563;
+        transition: all 0.3s ease;
+    }
+
+    .sort-dropdown:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fadeInUp {
+        animation: fadeInUp 0.6s ease-out backwards;
+    }
+
+    .stagger-1 { animation-delay: 0.1s; }
+    .stagger-2 { animation-delay: 0.2s; }
+    .stagger-3 { animation-delay: 0.3s; }
+
+    /* Floating Action Button */
+    .fab {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        text-decoration: none;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .fab:hover {
+        transform: scale(1.1) rotate(90deg);
+        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.6);
+        color: white;
+    }
+
+    .fab:active {
+        transform: scale(1.05) rotate(90deg);
+    }
+
+    @media (max-width: 768px) {
+        .fab {
+            bottom: 1.5rem;
+            right: 1.5rem;
+            width: 56px;
+            height: 56px;
+            font-size: 1.25rem;
+        }
+    }
+
+    /* CRITICAL: Final Bootstrap override - must be at end */
+    /* Ultra-specific selectors to override Bootstrap at ALL screen sizes */
+    body .forum-container .container,
+    body .forum-container .container-fluid,
+    body .forum-container .container-sm,
+    body .forum-container .container-md,
+    body .forum-container .container-lg,
+    body .forum-container .container-xl,
+    body .forum-container .container-xxl,
+    .forum-container > .container,
+    .forum-container > .container-fluid,
+    .forum-container > .container-sm,
+    .forum-container > .container-md,
+    .forum-container > .container-lg,
+    .forum-container > .container-xl,
+    .forum-container > .container-xxl {
+        max-width: 95% !important;
+        width: 95% !important;
+    }
+
+    @media (min-width: 576px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        .forum-container > .container,
+        .forum-container > .container-sm {
+            max-width: 95% !important;
+        }
+    }
+
+    @media (min-width: 768px) {
+        body .forum-container .container,
+        body .forum-container .container-md,
+        body .forum-container .container-sm,
+        .forum-container > .container,
+        .forum-container > .container-md,
+        .forum-container > .container-sm {
+            max-width: 95% !important;
+        }
+    }
+
+    @media (min-width: 992px) {
+        body .forum-container .container,
+        body .forum-container .container-lg,
+        body .forum-container .container-md,
+        body .forum-container .container-sm,
+        .forum-container > .container,
+        .forum-container > .container-lg,
+        .forum-container > .container-md,
+        .forum-container > .container-sm {
+            max-width: 90% !important;
+        }
+    }
+
+    @media (min-width: 1200px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 90% !important;
+        }
+    }
+
+    @media (min-width: 1400px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 1600px !important;
+        }
+    }
+
+    @media (min-width: 1536px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 1700px !important;
+        }
+    }
+
+    @media (min-width: 1920px) {
+        body .forum-container .container,
+        body .forum-container .container-sm,
+        body .forum-container .container-md,
+        body .forum-container .container-lg,
+        body .forum-container .container-xl,
+        body .forum-container .container-xxl,
+        .forum-container > .container,
+        .forum-container > .container-sm,
+        .forum-container > .container-md,
+        .forum-container > .container-lg,
+        .forum-container > .container-xl,
+        .forum-container > .container-xxl {
+            max-width: 1800px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="forum-container">
+<div class="container mx-auto px-4 py-8">
+    <!-- Category Header -->
+    <div class="category-header animate-fadeInUp text-white relative z-10">
+        <a href="{% url 'forum-home' %}" class="back-btn mb-4">
+            <i class="fas fa-arrow-left"></i> Back to Forum
+        </a>
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mt-4">
+            <div class="flex items-start gap-6">
+                <div class="category-icon">
+                    <i class="{{ category.icon }}"></i>
+                </div>
+                <div>
+                    <h1 class="text-5xl font-black mb-3">{{ category.name }}</h1>
+                    <p class="text-xl text-purple-100 mb-4">{{ category.description }}</p>
+                    <div class="flex items-center gap-6 text-lg">
+                        <span><i class="fas fa-layer-group mr-2"></i> {{ threads_count }} Thread{{ threads_count|pluralize }}</span>
+                        <span><i class="fas fa-users mr-2"></i> Active Community</span>
+                    </div>
+                </div>
+            </div>
+            <a href="{% url 'forum-thread-create' %}?category={{ category.slug }}" class="create-thread-btn">
+                <i class="fas fa-plus-circle mr-2"></i> New Thread
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar animate-fadeInUp stagger-1">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-gray-700 mr-2">Filter:</span>
+                <button class="filter-btn {% if not status_filter %}active{% endif %}" onclick="window.location.href='?'">
+                    <i class="fas fa-border-all mr-1"></i> All
+                </button>
+                <button class="filter-btn {% if status_filter == 'open' %}active{% endif %}" onclick="window.location.href='?status=open'">
+                    <i class="fas fa-folder-open mr-1"></i> Open
+                </button>
+                <button class="filter-btn {% if status_filter == 'in_progress' %}active{% endif %}" onclick="window.location.href='?status=in_progress'">
+                    <i class="fas fa-spinner mr-1"></i> In Progress
+                </button>
+                <button class="filter-btn {% if status_filter == 'resolved' %}active{% endif %}" onclick="window.location.href='?status=resolved'">
+                    <i class="fas fa-check-circle mr-1"></i> Resolved
+                </button>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-gray-700">Sort:</span>
+                <select class="sort-dropdown" onchange="window.location.href='?sort=' + this.value">
+                    <option value="-last_activity_at" {% if sort == '-last_activity_at' %}selected{% endif %}>Latest Activity</option>
+                    <option value="-created_at" {% if sort == '-created_at' %}selected{% endif %}>Newest First</option>
+                    <option value="created_at" {% if sort == 'created_at' %}selected{% endif %}>Oldest First</option>
+                    <option value="-views" {% if sort == '-views' %}selected{% endif %}>Most Viewed</option>
+                    <option value="-is_pinned,-last_activity_at" {% if sort == '-is_pinned,-last_activity_at' %}selected{% endif %}>Pinned First</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Threads List -->
+    {% if threads %}
+        {% for thread in threads %}
+        <div class="thread-card {% if thread.is_pinned %}pinned{% endif %} {% if thread.is_locked %}locked{% endif %} animate-fadeInUp stagger-{{ forloop.counter|add:1 }}">
+            <div class="flex justify-between items-start gap-4">
+                <div class="flex-grow-1 flex-1">
+                    <div class="flex items-center gap-3 mb-3 flex-wrap">
+                        {% if thread.is_pinned %}
+                            <i class="fas fa-thumbtack text-yellow-500 text-2xl transform rotate-45" title="Pinned"></i>
+                        {% endif %}
+                        {% if thread.is_locked %}
+                            <i class="fas fa-lock text-gray-500 text-xl" title="Locked"></i>
+                        {% endif %}
+                        {% if thread.priority != 'low' %}
+                            <span class="badge-priority priority-{{ thread.priority }}">
+                                <i class="fas fa-exclamation-circle mr-1"></i>{{ thread.get_priority_display }}
+                            </span>
+                        {% endif %}
+                        <span class="badge-status badge-{{ thread.status }}">
+                            {{ thread.get_status_display }}
+                        </span>
+                    </div>
+
+                    <a href="{% url 'forum-thread-detail' thread.slug %}" class="block group">
+                        <h3 class="text-2xl font-black text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">
+                            {{ thread.title }}
+                        </h3>
+                    </a>
+
+                    {% if thread.content %}
+                    <p class="text-gray-600 mb-3 leading-relaxed">
+                        {{ thread.content|truncatewords:30|striptags }}
+                    </p>
+                    {% endif %}
+
+                    {% if thread.tags.exists %}
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        {% for tag in thread.tags.all %}
+                        <span class="tag">
+                            <i class="fas fa-tag mr-1"></i> {{ tag.name }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="flex items-center gap-6 text-sm font-semibold text-gray-600">
+                        <div class="flex items-center gap-2">
+                            <div class="author-avatar">
+                                {{ thread.author.username.0|upper }}
+                            </div>
+                            <div>
+                                <div class="font-bold text-gray-900">{{ thread.author.get_full_name|default:thread.author.username }}</div>
+                                <small class="text-gray-500">{{ thread.created_at|timesince }} ago</small>
+                            </div>
+                        </div>
+                        <span class="flex items-center gap-1">
+                            <i class="fas fa-eye text-gray-400"></i> {{ thread.views }}
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <i class="fas fa-comments text-purple-500"></i> {{ thread.reply_count|default:0 }}
+                        </span>
+                        {% if thread.best_answer %}
+                            <span class="flex items-center gap-1 text-green-600 font-bold">
+                                <i class="fas fa-check-circle"></i> Solved
+                            </span>
+                        {% endif %}
+                        {% if thread.last_activity_at %}
+                            <span class="flex items-center gap-1 text-gray-500">
+                                <i class="fas fa-clock"></i> {{ thread.last_activity_at|timesince }} ago
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Pagination -->
+        {% if threads.has_other_pages %}
+        <div class="pagination">
+            {% if threads.has_previous %}
+                <a href="?page=1{% if status_filter %}&status={{ status_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                    <i class="fas fa-angle-double-left mr-1"></i> First
+                </a>
+                <a href="?page={{ threads.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                    <i class="fas fa-angle-left mr-1"></i> Previous
+                </a>
+            {% endif %}
+
+            <span class="current">
+                Page {{ threads.number }} of {{ threads.paginator.num_pages }}
+            </span>
+
+            {% if threads.has_next %}
+                <a href="?page={{ threads.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                    Next <i class="fas fa-angle-right ml-1"></i>
+                </a>
+                <a href="?page={{ threads.paginator.num_pages }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">
+                    Last <i class="fas fa-angle-double-right ml-1"></i>
+                </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h3 class="text-3xl font-black text-gray-900 mb-3">No Threads Yet</h3>
+            <p class="text-gray-600 text-lg mb-6">Be the first to start a discussion in this category!</p>
+            <a href="{% url 'forum-thread-create' %}?category={{ category.slug }}" class="create-thread-btn">
+                <i class="fas fa-plus-circle mr-2"></i> Create First Thread
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Floating Action Button -->
+<a href="{% url 'forum-thread-create' %}?category={{ category.slug }}" class="fab" title="Create New Thread">
+    <i class="fas fa-plus"></i>
+</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+{% endblock %}

@@ -1,0 +1,1697 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}{% if form.instance.pk %}Edit Thread{% else %}Create New Thread{% endif %} - Forum{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        --dark-bg: #1a1f36;
+        --card-bg: #ffffff;
+        --text-primary: #2d3748;
+        --text-secondary: #718096;
+        --border-color: #e2e8f0;
+    }
+
+    /* Override base template styles */
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        min-height: 100vh;
+        position: relative;
+        color: #1f2937 !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background:
+            radial-gradient(circle at 20% 50%, rgba(240, 147, 251, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 20%, rgba(245, 87, 108, 0.1) 0%, transparent 50%);
+        animation: gradientShift 15s ease infinite;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    @keyframes gradientShift {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.8; transform: scale(1.1); }
+    }
+
+    .form-wrapper {
+        position: relative;
+        z-index: 1;
+    }
+
+    main {
+        flex: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .form-header {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        color: white;
+        padding: 2.5rem 0;
+        margin-bottom: 2.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-header h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .form-header h1 i {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        filter: drop-shadow(0 2px 4px rgba(251, 191, 36, 0.3));
+    }
+
+    .form-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 2.5rem;
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        animation: fadeInUp 0.5s ease;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .section-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 3px solid transparent;
+        border-image: linear-gradient(90deg, #667eea, #764ba2, transparent) 1;
+    }
+
+    .section-title i {
+        font-size: 1.5rem;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        display: block;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    .form-label.required::after {
+        content: ' *';
+        color: #dc2626;
+    }
+
+    .form-control, .form-select, .form-textarea {
+        width: 100%;
+        padding: 0.95rem 1.25rem;
+        border: 2px solid rgba(226, 232, 240, 0.8);
+        border-radius: 12px;
+        font-size: 0.95rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #1f2937;
+    }
+
+    .form-control:hover, .form-select:hover, .form-textarea:hover {
+        border-color: rgba(102, 126, 234, 0.5);
+        background: rgba(255, 255, 255, 1);
+    }
+
+    .form-control:focus, .form-select:focus, .form-textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15), 0 4px 12px rgba(102, 126, 234, 0.1);
+        background: white;
+        transform: translateY(-1px);
+    }
+
+    .form-textarea {
+        min-height: 220px;
+        resize: vertical;
+        font-family: inherit;
+        line-height: 1.7;
+    }
+
+    .char-counter {
+        float: right;
+        font-size: 0.8rem;
+        color: #718096;
+        font-weight: 500;
+    }
+
+    .char-counter.warning {
+        color: #f59e0b;
+    }
+
+    .char-counter.danger {
+        color: #dc2626;
+    }
+
+    .form-help {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+        display: block;
+    }
+
+    .form-error {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        display: block;
+    }
+
+    .file-upload-area {
+        border: 3px dashed rgba(102, 126, 234, 0.3);
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        text-align: center;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .file-upload-area::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+    }
+
+    .file-upload-area:hover {
+        border-color: #667eea;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+    }
+
+    .file-upload-area:hover::before {
+        opacity: 0.05;
+    }
+
+    .file-upload-area.dragover {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.15);
+        transform: scale(1.02);
+    }
+
+    .file-upload-area.dragover::before {
+        opacity: 0.1;
+    }
+
+    .file-upload-icon {
+        font-size: 3.5rem;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .file-upload-area p,
+    .file-upload-area small {
+        position: relative;
+        z-index: 1;
+    }
+
+    .file-list {
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .file-item {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 2px solid rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.3s ease;
+        animation: slideInRight 0.3s ease;
+    }
+
+    .file-item:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        transform: translateX(4px);
+    }
+
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .file-item-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .file-item-info i {
+        color: #667eea;
+        font-size: 1.25rem;
+    }
+
+    .file-item-remove {
+        background: linear-gradient(135deg, #fecaca, #dc2626);
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 0.4rem 0.75rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+
+    .file-item-remove:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 2.5rem;
+        border-radius: 12px;
+        border: none;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        font-size: 1.05rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-primary::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .btn-primary:hover::before {
+        left: 100%;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:active {
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+        background: rgba(226, 232, 240, 0.8);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #1f2937;
+        padding: 1rem 2.5rem;
+        border-radius: 12px;
+        border: 2px solid rgba(148, 163, 184, 0.3);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.05rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-secondary:hover {
+        background: rgba(203, 213, 225, 0.9);
+        border-color: #667eea;
+        color: #1f2937;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        padding-top: 2rem;
+        border-top: 2px solid var(--border-color);
+    }
+
+    /* Tags Wrapper */
+    .tags-wrapper {
+        position: relative;
+        z-index: 100;
+    }
+
+    /* Select2 Tags Styling */
+    .select2-container--default .select2-selection--multiple {
+        border: 2px solid rgba(226, 232, 240, 0.8) !important;
+        border-radius: 12px !important;
+        padding: 0.75rem !important;
+        min-height: 50px !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    .select2-container--default.select2-container--focus .select2-selection--multiple {
+        border-color: #667eea !important;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15), 0 4px 12px rgba(102, 126, 234, 0.1) !important;
+        background: white !important;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+        padding: 0 !important;
+        width: 100% !important;
+        align-items: center !important;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        border: none !important;
+        color: white !important;
+        padding: 0.5rem 0.75rem !important;
+        border-radius: 20px !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        margin: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.35rem !important;
+        float: none !important;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        color: white !important;
+        margin-right: 0 !important;
+        font-size: 1.1rem !important;
+        display: inline-block !important;
+        line-height: 1 !important;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+        color: rgba(255, 255, 255, 0.8) !important;
+        background: none !important;
+    }
+
+    .select2-dropdown {
+        border: 2px solid rgba(102, 126, 234, 0.3) !important;
+        border-radius: 12px !important;
+        background: white !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+    }
+
+    .select2-search--inline {
+        display: inline-block !important;
+    }
+
+    .select2-search--inline .select2-search__field {
+        margin-top: 0 !important;
+        font-size: 0.95rem !important;
+        padding: 0.25rem !important;
+        min-width: 120px !important;
+    }
+
+    .back-btn {
+        color: white;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.65rem 1.25rem;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-weight: 500;
+    }
+
+    .back-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        transform: translateX(-4px);
+        border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .tips-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.95)) !important;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 20px;
+        padding: 1.75rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 2rem;
+    }
+
+    .tips-card h5 {
+        font-weight: 700 !important;
+        color: #1f2937 !important;
+        margin-bottom: 1.25rem !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        font-size: 1.1rem !important;
+        background: none !important;
+    }
+
+    .tips-card h5 i {
+        font-size: 1.5rem !important;
+    }
+
+    .tips-card h5 i.text-warning {
+        color: #fbbf24 !important;
+    }
+
+    .tips-card ul {
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+    }
+
+    .tips-card li {
+        margin-bottom: 1rem !important;
+        display: flex !important;
+        align-items: start !important;
+        gap: 0.75rem !important;
+        padding: 0.75rem !important;
+        border-radius: 10px !important;
+        transition: all 0.3s ease !important;
+        background: transparent !important;
+    }
+
+    .tips-card li:hover {
+        background: rgba(102, 126, 234, 0.08) !important;
+        transform: translateX(4px);
+    }
+
+    .tips-card li i {
+        flex-shrink: 0 !important;
+        font-size: 1.1rem !important;
+        margin-top: 0.1rem !important;
+    }
+
+    .tips-card li i.text-success {
+        color: #10b981 !important;
+    }
+
+    .tips-card li i.text-info {
+        color: #3b82f6 !important;
+    }
+
+    .tips-card li small {
+        color: #374151 !important;
+        font-size: 0.9rem !important;
+        line-height: 1.5 !important;
+        background: transparent !important;
+    }
+
+    .checkbox-group {
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .checkbox-item label {
+        cursor: pointer;
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .collapsible-section {
+        overflow: hidden;
+        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .section-toggle {
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .section-toggle:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.12));
+        transform: translateX(4px);
+    }
+
+    .section-toggle .toggle-icon {
+        transition: transform 0.3s ease;
+        color: #667eea;
+        font-size: 1.2rem;
+    }
+
+    .section-toggle.active .toggle-icon {
+        transform: rotate(180deg);
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: white;
+        margin-left: 0.5rem;
+    }
+
+    /* Category Cards */
+    .category-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .category-card-option {
+        position: relative;
+        cursor: pointer;
+        border: 3px solid rgba(226, 232, 240, 0.8);
+        border-radius: 16px;
+        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.9);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-align: center;
+    }
+
+    .category-card-option:hover {
+        border-color: #667eea;
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+        background: white;
+    }
+
+    .category-card-option.selected {
+        border-color: #667eea;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    }
+
+    .category-card-option.selected::before {
+        content: '✓';
+        position: absolute;
+        top: -12px;
+        right: -12px;
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .category-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+        display: block;
+    }
+
+    .category-name {
+        font-weight: 700;
+        color: #1f2937;
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .category-desc {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+
+    /* Rich Text Editor Toolbar */
+    .ql-toolbar {
+        background: white;
+        border: 2px solid rgba(226, 232, 240, 0.8) !important;
+        border-bottom: none !important;
+        border-radius: 12px 12px 0 0 !important;
+        padding: 1rem !important;
+    }
+
+    .ql-container {
+        border: 2px solid rgba(226, 232, 240, 0.8) !important;
+        border-radius: 0 0 12px 12px !important;
+        font-size: 0.95rem !important;
+        min-height: 250px;
+    }
+
+    .ql-editor {
+        min-height: 250px;
+        padding: 1.25rem !important;
+        line-height: 1.7 !important;
+    }
+
+    .ql-editor:focus {
+        outline: none;
+    }
+
+    /* Preview Panel */
+    .preview-panel {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        max-height: 600px;
+        overflow-y: auto;
+        position: sticky;
+        top: 2rem;
+        transition: all 0.3s ease;
+    }
+
+    .preview-panel.updating {
+        border-color: #667eea;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+    }
+
+    .preview-panel h4 {
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .preview-panel h4 i {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .preview-content {
+        padding: 1rem;
+        background: rgba(249, 250, 251, 0.5);
+        border-radius: 12px;
+        min-height: 200px;
+    }
+
+    .preview-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 1rem;
+        word-wrap: break-word;
+    }
+
+    .preview-body {
+        color: #374151;
+        line-height: 1.7;
+        word-wrap: break-word;
+    }
+
+    .preview-empty {
+        color: #9ca3af;
+        font-style: italic;
+        text-align: center;
+        padding: 2rem;
+    }
+
+    /* Tag Pills */
+    .tag-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .tag-pill {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 0.4rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        animation: slideInRight 0.3s ease;
+    }
+
+    /* Tooltip */
+    .tooltip-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: help;
+        margin-left: 0.5rem;
+        position: relative;
+    }
+
+    .tooltip-trigger:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1f2937;
+        color: white;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        white-space: nowrap;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        animation: fadeIn 0.2s ease;
+    }
+
+    .tooltip-trigger:hover::before {
+        content: '';
+        position: absolute;
+        bottom: calc(100% + 4px);
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: #1f2937;
+        z-index: 1000;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(-5px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* Form Progress Indicator */
+    .form-progress {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 12px;
+    }
+
+    .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .progress-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #cbd5e0;
+        transition: all 0.3s ease;
+    }
+
+    .progress-dot.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        box-shadow: 0 0 12px rgba(102, 126, 234, 0.5);
+        transform: scale(1.3);
+    }
+
+    .progress-dot.completed {
+        background: #10b981;
+    }
+
+    /* Hidden original category select */
+    #id_category {
+        display: none;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .category-grid {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        }
+
+        .preview-panel {
+            position: static;
+            margin-top: 2rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-wrapper">
+    <div class="form-header">
+        <div class="container">
+            <a href="{% if form.instance.pk %}{% url 'forum-thread-detail' form.instance.slug %}{% else %}{% url 'forum-home' %}{% endif %}" class="back-btn">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <h1 class="mt-3">
+                {% if form.instance.pk %}
+                    <i class="fas fa-edit"></i> Edit Thread
+                {% else %}
+                    <i class="fas fa-plus-circle"></i> Create New Thread
+                {% endif %}
+            </h1>
+        </div>
+    </div>
+
+    <div class="container" style="max-width: 1400px; margin: 0 auto;">
+    <div class="row" style="display: flex; gap: 2rem; justify-content: center;">
+        <div class="col-lg-9" style="flex: 1; max-width: 900px;">
+            <form method="post" enctype="multipart/form-data" id="thread-form">
+                {% csrf_token %}
+
+                <div class="form-container">
+                    <!-- Form Progress Indicator -->
+                    <div class="form-progress">
+                        <div class="progress-step">
+                            <span class="progress-dot" id="progress-category"></span>
+                            <span style="font-size: 0.85rem; color: #6b7280; font-weight: 600;">Category</span>
+                        </div>
+                        <div class="progress-step">
+                            <span class="progress-dot" id="progress-title"></span>
+                            <span style="font-size: 0.85rem; color: #6b7280; font-weight: 600;">Title</span>
+                        </div>
+                        <div class="progress-step">
+                            <span class="progress-dot" id="progress-content"></span>
+                            <span style="font-size: 0.85rem; color: #6b7280; font-weight: 600;">Content</span>
+                        </div>
+                        <div class="progress-step">
+                            <span class="progress-dot" id="progress-ready"></span>
+                            <span style="font-size: 0.85rem; color: #6b7280; font-weight: 600;">Ready</span>
+                        </div>
+                    </div>
+
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-info-circle"></i>
+                            Basic Information
+                        </h3>
+
+                        <div class="form-group">
+                            <label class="form-label required">
+                                Category
+                                <span class="tooltip-trigger" data-tooltip="Choose the category that best fits your thread">?</span>
+                            </label>
+
+                            <!-- Visual Category Cards -->
+                            <div class="category-grid" id="category-grid">
+                                {% for category in categories %}
+                                <div class="category-card-option"
+                                     data-category-id="{{ category.id }}"
+                                     onclick="selectCategory({{ category.id }})"
+                                     {% if form.category.value == category.id|stringformat:"s" %}class="selected"{% endif %}>
+                                    <i class="fas {{ category.icon }} category-icon" style="color: {{ category.color }};"></i>
+                                    <div class="category-name">{{ category.name }}</div>
+                                    <div class="category-desc">{{ category.description|truncatewords:8 }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Hidden select field -->
+                            {{ form.category }}
+
+                            {% if form.category.errors %}
+                                <span class="form-error">{{ form.category.errors.0 }}</span>
+                            {% endif %}
+                            <small class="form-help">Click on a category card to select it</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.title.id_for_label }}" class="form-label required">
+                                Title
+                                <span class="char-counter" id="title-counter">0/200</span>
+                            </label>
+                            {{ form.title|add_class:"form-control"|attr:"placeholder:Enter a descriptive title for your thread"|attr:"maxlength:200" }}
+                            {% if form.title.errors %}
+                                <span class="form-error">{{ form.title.errors.0 }}</span>
+                            {% endif %}
+                            <small class="form-help">Make it clear and concise</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.content.id_for_label }}" class="form-label required">
+                                Content
+                                <span class="char-counter" id="content-counter">0 characters</span>
+                                <span class="tooltip-trigger" data-tooltip="Use rich formatting to make your post clear and readable">?</span>
+                            </label>
+
+                            <!-- Rich Text Editor -->
+                            <div id="quill-editor" style="background: white;"></div>
+
+                            <!-- Hidden textarea for form submission -->
+                            <textarea name="content" id="id_content" style="display: none;">{{ form.content.value|default:'' }}</textarea>
+
+                            {% if form.content.errors %}
+                                <span class="form-error">{{ form.content.errors.0 }}</span>
+                            {% endif %}
+                            <small class="form-help">Use the toolbar to format your content with bold, italic, lists, and more</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.tags.id_for_label }}" class="form-label">
+                                Tags
+                                <span class="tooltip-trigger" data-tooltip="Tags help others find your thread more easily">?</span>
+                            </label>
+                            <div class="tags-wrapper">
+                                {{ form.tags }}
+                            </div>
+                            {% if form.tags.errors %}
+                                <span class="form-error">{{ form.tags.errors.0 }}</span>
+                            {% endif %}
+                            <small class="form-help">Select multiple tags to help categorize your thread</small>
+                        </div>
+                    </div>
+
+                    <!-- Bug Report Details (Optional) -->
+                    <div class="form-section">
+                        <div class="section-toggle" onclick="toggleSection('bug-details')">
+                            <div>
+                                <i class="fas fa-bug"></i>
+                                <strong style="font-size: 1.1rem; color: #1f2937;">Bug Report Details</strong>
+                                <span class="badge">Optional</span>
+                            </div>
+                            <i class="fas fa-chevron-down toggle-icon"></i>
+                        </div>
+
+                        <div class="collapsible-section" id="bug-details" style="max-height: 0; margin-top: 0;">
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.bug_severity.id_for_label }}" class="form-label">Severity</label>
+                                    {{ form.bug_severity|add_class:"form-select" }}
+                                    {% if form.bug_severity.errors %}
+                                        <span class="form-error">{{ form.bug_severity.errors.0 }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.bug_version.id_for_label }}" class="form-label">Version</label>
+                                    {{ form.bug_version|add_class:"form-control"|attr:"placeholder:e.g., 2.1.0" }}
+                                    {% if form.bug_version.errors %}
+                                        <span class="form-error">{{ form.bug_version.errors.0 }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.bug_module.id_for_label }}" class="form-label">Module/Component</label>
+                            {{ form.bug_module|add_class:"form-control"|attr:"placeholder:e.g., Inventory, Planner, Tracker" }}
+                            {% if form.bug_module.errors %}
+                                <span class="form-error">{{ form.bug_module.errors.0 }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.bug_steps_to_reproduce.id_for_label }}" class="form-label">Steps to Reproduce</label>
+                            {{ form.bug_steps_to_reproduce|add_class:"form-textarea"|attr:"placeholder:1. Go to...\n2. Click on...\n3. See error..." }}
+                            {% if form.bug_steps_to_reproduce.errors %}
+                                <span class="form-error">{{ form.bug_steps_to_reproduce.errors.0 }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.bug_expected_behavior.id_for_label }}" class="form-label">Expected Behavior</label>
+                            {{ form.bug_expected_behavior|add_class:"form-textarea"|attr:"placeholder:What should happen..." }}
+                            {% if form.bug_expected_behavior.errors %}
+                                <span class="form-error">{{ form.bug_expected_behavior.errors.0 }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.bug_actual_behavior.id_for_label }}" class="form-label">Actual Behavior</label>
+                            {{ form.bug_actual_behavior|add_class:"form-textarea"|attr:"placeholder:What actually happens..." }}
+                            {% if form.bug_actual_behavior.errors %}
+                                <span class="form-error">{{ form.bug_actual_behavior.errors.0 }}</span>
+                            {% endif %}
+                        </div>
+
+                        </div><!-- End collapsible section -->
+                    </div>
+
+                    <!-- Thread Settings -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-cog"></i>
+                            Thread Settings
+                        </h3>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.priority.id_for_label }}" class="form-label">Priority</label>
+                                    {{ form.priority|add_class:"form-select" }}
+                                    {% if form.priority.errors %}
+                                        <span class="form-error">{{ form.priority.errors.0 }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.status.id_for_label }}" class="form-label">Status</label>
+                                    {{ form.status|add_class:"form-select" }}
+                                    {% if form.status.errors %}
+                                        <span class="form-error">{{ form.status.errors.0 }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if user.is_staff %}
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                {{ form.is_pinned }}
+                                <label for="{{ form.is_pinned.id_for_label }}">
+                                    <i class="fas fa-thumbtack"></i> Pin this thread
+                                </label>
+                            </div>
+                            <div class="checkbox-item">
+                                {{ form.is_locked }}
+                                <label for="{{ form.is_locked.id_for_label }}">
+                                    <i class="fas fa-lock"></i> Lock this thread
+                                </label>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Attachments -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-paperclip"></i>
+                            Attachments
+                        </h3>
+
+                        <div class="file-upload-area" id="file-upload-area">
+                            <div class="file-upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <p class="mb-2" style="font-weight: 600; font-size: 1.05rem; color: #1f2937;">
+                                <strong style="background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Click to upload</strong> or drag and drop files here
+                            </p>
+                            <small class="form-help" style="color: #6b7280;">Supported formats: Images, PDFs, Documents (Max 10MB per file)</small>
+                            <input type="file" name="attachments" id="file-input" multiple style="display: none;">
+                        </div>
+
+                        <div id="file-list" class="file-list"></div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-save"></i>
+                            {% if form.instance.pk %}Update Thread{% else %}Create Thread{% endif %}
+                        </button>
+                        <a href="{% if form.instance.pk %}{% url 'forum-thread-detail' form.instance.slug %}{% else %}{% url 'forum-home' %}{% endif %}" class="btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Sidebar with Preview and Tips -->
+        <div class="col-lg-3" style="flex: 0 0 350px; max-width: 350px;">
+            <!-- Live Preview Panel -->
+            <div class="preview-panel mb-4">
+                <h4>
+                    <i class="fas fa-eye"></i>
+                    Live Preview
+                </h4>
+                <div class="preview-content">
+                    <div class="preview-title" id="preview-title">Your thread title...</div>
+                    <div class="preview-body" id="preview-body">
+                        <p class="preview-empty">Your content will appear here as you type...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tips Card -->
+            <div class="tips-card">
+                <h5><i class="fas fa-lightbulb text-warning"></i> Posting Tips</h5>
+                <ul>
+                    <li>
+                        <i class="fas fa-check-circle text-success"></i>
+                        <small>Use a clear, descriptive title</small>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle text-success"></i>
+                        <small>Provide detailed information</small>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle text-success"></i>
+                        <small>Add relevant tags for better visibility</small>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle text-success"></i>
+                        <small>Include screenshots if applicable</small>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle text-success"></i>
+                        <small>For bugs, provide steps to reproduce</small>
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle text-info"></i>
+                        <small>Be respectful and follow guidelines</small>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script>
+    let quill; // Global quill instance
+    let titleInput; // Global title input reference
+
+    // Initialize everything when DOM is ready
+    $(document).ready(function() {
+        // Get title input element
+        titleInput = document.querySelector('[name="title"]');
+
+        // Initialize Select2 for tags
+        $('#{{ form.tags.id_for_label }}').select2({
+            placeholder: 'Select tags...',
+            allowClear: true
+        });
+
+        // Initialize Quill rich text editor
+        initializeQuill();
+
+        // Set up title input listener
+        if (titleInput) {
+            titleInput.addEventListener('input', function() {
+                updateTitleCounter();
+                updatePreview();
+            });
+        }
+
+        // Initialize character counters
+        updateTitleCounter();
+        updateContentCounter();
+
+        // Initialize live preview after everything is set up
+        setTimeout(function() {
+            updatePreview();
+        }, 500);
+    });
+
+    // Initialize Quill Editor
+    function initializeQuill() {
+        const toolbarOptions = [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ 'header': 1 }, { 'header': 2 }],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'indent': '-1'}, { 'indent': '+1' }],
+            ['link', 'image'],
+            ['clean']
+        ];
+
+        quill = new Quill('#quill-editor', {
+            modules: {
+                toolbar: toolbarOptions
+            },
+            theme: 'snow',
+            placeholder: 'Write your thread content here...\n\nTip: Use formatting tools above to make your post clear and readable.'
+        });
+
+        // Load existing content if editing
+        const existingContent = document.getElementById('id_content').value;
+        if (existingContent) {
+            quill.root.innerHTML = existingContent;
+        }
+
+        // Sync Quill content with hidden textarea on change
+        quill.on('text-change', function() {
+            const html = quill.root.innerHTML;
+            document.getElementById('id_content').value = html;
+            updateContentCounter();
+            updatePreview();
+        });
+    }
+
+    // Category Selection Function
+    function selectCategory(categoryId) {
+        // Remove selected class from all cards
+        document.querySelectorAll('.category-card-option').forEach(card => {
+            card.classList.remove('selected');
+        });
+
+        // Add selected class to clicked card
+        const selectedCard = document.querySelector(`[data-category-id="${categoryId}"]`);
+        if (selectedCard) {
+            selectedCard.classList.add('selected');
+        }
+
+        // Update hidden select field
+        document.getElementById('id_category').value = categoryId;
+    }
+
+    // Character counter for title
+    function updateTitleCounter() {
+        const titleCounter = document.getElementById('title-counter');
+        if (!titleInput || !titleCounter) return;
+
+        const length = titleInput.value.length;
+        const max = 200;
+        titleCounter.textContent = `${length}/${max}`;
+
+        if (length > max * 0.9) {
+            titleCounter.classList.add('danger');
+            titleCounter.classList.remove('warning');
+        } else if (length > max * 0.7) {
+            titleCounter.classList.add('warning');
+            titleCounter.classList.remove('danger');
+        } else {
+            titleCounter.classList.remove('warning', 'danger');
+        }
+    }
+
+    // Character counter for content (works with Quill)
+    const contentCounter = document.getElementById('content-counter');
+
+    function updateContentCounter() {
+        if (!quill || !contentCounter) return;
+
+        const text = quill.getText();
+        const length = text.trim().length;
+        contentCounter.textContent = `${length.toLocaleString()} characters`;
+
+        if (length > 5000) {
+            contentCounter.classList.add('warning');
+        } else {
+            contentCounter.classList.remove('warning');
+        }
+    }
+
+    // Live Preview Function
+    function updatePreview() {
+        const previewPanel = document.querySelector('.preview-panel');
+        const previewTitle = document.getElementById('preview-title');
+        const previewBody = document.getElementById('preview-body');
+
+        if (!previewTitle || !previewBody) {
+            console.log('Preview elements not found');
+            return;
+        }
+
+        // Add visual feedback that preview is updating
+        if (previewPanel) {
+            previewPanel.classList.add('updating');
+            setTimeout(() => previewPanel.classList.remove('updating'), 300);
+        }
+
+        // Update title
+        const title = titleInput ? titleInput.value.trim() : '';
+        if (title) {
+            previewTitle.textContent = title;
+            previewTitle.style.color = '#1f2937';
+        } else {
+            previewTitle.textContent = 'Your thread title...';
+            previewTitle.style.color = '#9ca3af';
+        }
+
+        // Update content
+        if (quill) {
+            const content = quill.root.innerHTML;
+            const text = quill.getText().trim();
+
+            if (text) {
+                previewBody.innerHTML = content;
+                // Style the preview content
+                previewBody.style.color = '#374151';
+            } else {
+                previewBody.innerHTML = '<p class="preview-empty">Your content will appear here as you type...</p>';
+            }
+        } else {
+            previewBody.innerHTML = '<p class="preview-empty">Loading editor...</p>';
+        }
+    }
+
+    // File upload handling
+    const fileUploadArea = document.getElementById('file-upload-area');
+    const fileInput = document.getElementById('file-input');
+    const fileList = document.getElementById('file-list');
+    let selectedFiles = [];
+
+    fileUploadArea.addEventListener('click', () => fileInput.click());
+
+    fileUploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.add('dragover');
+    });
+
+    fileUploadArea.addEventListener('dragleave', () => {
+        fileUploadArea.classList.remove('dragover');
+    });
+
+    fileUploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    function handleFiles(files) {
+        for (let file of files) {
+            if (file.size > 10 * 1024 * 1024) {
+                showToast(`File ${file.name} is too large (max 10MB)`, 'error');
+                continue;
+            }
+            selectedFiles.push(file);
+        }
+        updateFileList();
+    }
+
+    function updateFileList() {
+        fileList.innerHTML = '';
+        selectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <div class="file-item-info">
+                    <i class="fas fa-file"></i>
+                    <span>${file.name}</span>
+                    <small class="text-muted">(${formatFileSize(file.size)})</small>
+                </div>
+                <button type="button" class="file-item-remove" onclick="removeFile(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            fileList.appendChild(fileItem);
+        });
+
+        // Update the file input
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        fileInput.files = dataTransfer.files;
+    }
+
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        updateFileList();
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    function showToast(message, type) {
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            style: {
+                background: type === 'success' ?
+                    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' :
+                    type === 'error' ?
+                    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' :
+                    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+            }
+        }).showToast();
+    }
+
+    // Form validation
+    document.getElementById('thread-form').addEventListener('submit', function(e) {
+        const title = document.querySelector('[name="title"]').value.trim();
+        const content = document.querySelector('[name="content"]').value.trim();
+        const category = document.querySelector('[name="category"]').value;
+
+        if (!title || !content || !category) {
+            e.preventDefault();
+            showToast('Please fill in all required fields', 'error');
+            return false;
+        }
+    });
+
+    // Toggle collapsible sections
+    function toggleSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        const toggle = event.currentTarget;
+
+        if (section.style.maxHeight === '0px' || section.style.maxHeight === '') {
+            section.style.maxHeight = section.scrollHeight + 'px';
+            section.style.marginTop = '1rem';
+            toggle.classList.add('active');
+            setTimeout(() => {
+                section.style.maxHeight = '2000px'; // Allow for dynamic content
+            }, 300);
+        } else {
+            section.style.maxHeight = '0';
+            section.style.marginTop = '0';
+            toggle.classList.remove('active');
+        }
+    }
+
+    // Auto-expand bug details if any bug field has a value (for edit mode)
+    window.addEventListener('DOMContentLoaded', () => {
+        const bugFields = [
+            '[name="bug_severity"]',
+            '[name="bug_version"]',
+            '[name="bug_module"]',
+            '[name="bug_steps_to_reproduce"]',
+            '[name="bug_expected_behavior"]',
+            '[name="bug_actual_behavior"]'
+        ];
+
+        const hasBugData = bugFields.some(selector => {
+            const field = document.querySelector(selector);
+            return field && field.value && field.value.trim() !== '';
+        });
+
+        if (hasBugData) {
+            const bugSection = document.getElementById('bug-details');
+            const toggle = document.querySelector('[onclick*="bug-details"]');
+            if (bugSection && toggle) {
+                bugSection.style.maxHeight = '2000px';
+                bugSection.style.marginTop = '1rem';
+                toggle.classList.add('active');
+            }
+        }
+    });
+
+    // Update Form Progress Indicators
+    function updateFormProgress() {
+        const categoryDot = document.getElementById('progress-category');
+        const titleDot = document.getElementById('progress-title');
+        const contentDot = document.getElementById('progress-content');
+        const readyDot = document.getElementById('progress-ready');
+
+        // Check category
+        const category = document.getElementById('id_category').value;
+        if (category) {
+            categoryDot.classList.add('completed');
+        } else {
+            categoryDot.classList.remove('completed');
+        }
+
+        // Check title
+        const title = titleInput ? titleInput.value.trim() : '';
+        if (title && title.length >= 10) {
+            titleDot.classList.add('completed');
+        } else {
+            titleDot.classList.remove('completed');
+        }
+
+        // Check content
+        const contentText = quill ? quill.getText().trim() : '';
+        if (contentText && contentText.length >= 20) {
+            contentDot.classList.add('completed');
+        } else {
+            contentDot.classList.remove('completed');
+        }
+
+        // Check if ready (all required fields filled)
+        if (category && title && title.length >= 10 && contentText && contentText.length >= 20) {
+            readyDot.classList.add('completed');
+        } else {
+            readyDot.classList.remove('completed');
+        }
+    }
+
+    // Call progress update on any change
+    setInterval(updateFormProgress, 500);
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + Enter to submit form
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            const form = document.getElementById('thread-form');
+            if (form) {
+                showToast('Submitting thread...', 'success');
+                form.submit();
+            }
+        }
+
+        // Ctrl/Cmd + P to toggle preview
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            e.preventDefault();
+            const previewPanel = document.querySelector('.preview-panel');
+            if (previewPanel) {
+                previewPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    });
+
+    // Show keyboard shortcuts hint on first visit
+    setTimeout(() => {
+        const hasSeenHint = localStorage.getItem('forum_shortcuts_hint');
+        if (!hasSeenHint) {
+            showToast('💡 Tip: Use Ctrl+Enter to submit quickly!', 'info');
+            localStorage.setItem('forum_shortcuts_hint', 'true');
+        }
+    }, 3000);
+</script>
+{% endblock %}
