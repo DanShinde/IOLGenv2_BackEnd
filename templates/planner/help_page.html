@@ -3,7 +3,7 @@
 {% block title %}Comprehensive User Manual{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4 py-6" x-data="{ activeSection: 'intro' }">
+<div class="container-fluid px-4 py-6 bg-gray-50/50 min-h-screen" x-data="{ activeSection: 'intro' }">
     <div class="flex flex-col lg:flex-row gap-8">
         
         <aside class="lg:w-1/5 shrink-0">
@@ -13,32 +13,53 @@
                 <nav class="space-y-1 text-sm">
                     <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Getting Started</p>
                     <a href="#intro" @click="activeSection = 'intro'" 
-                       :class="activeSection === 'intro' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
-                       class="block px-3 py-2 rounded transition-colors">1. Core Concepts</a>
+                       :class="activeSection === 'intro' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                       class="group flex items-center px-3 py-2 rounded transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        1. Core Concepts
+                    </a>
                     
                     <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Setup & Admin</p>
                     <a href="#config-general" @click="activeSection = 'config-general'"
-                       :class="activeSection === 'config-general' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
-                       class="block px-3 py-2 rounded transition-colors">2. Configuration</a>
+                       :class="activeSection === 'config-general' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                       class="group flex items-center px-3 py-2 rounded transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        2. Configuration
+                    </a>
                     <a href="#workforce" @click="activeSection = 'workforce'"
-                       :class="activeSection === 'workforce' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
-                       class="block px-3 py-2 rounded transition-colors">3. Workforce & Leaves</a>
+                       :class="activeSection === 'workforce' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                       class="group flex items-center px-3 py-2 rounded transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        3. Workforce & Leaves
+                    </a>
 
                     <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Execution</p>
                     <a href="#project-list" @click="activeSection = 'project-list'"
-                       :class="activeSection === 'project-list' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
-                       class="block px-3 py-2 rounded transition-colors">4. Project Management</a>
+                       :class="activeSection === 'project-list' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                       class="group flex items-center px-3 py-2 rounded transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        4. Project Management
+                    </a>
                     <a href="#activity-planner" @click="activeSection = 'activity-planner'"
-                       :class="activeSection === 'activity-planner' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
-                       class="block px-3 py-2 rounded transition-colors">5. The Gantt Chart</a>
+                       :class="activeSection === 'activity-planner' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                       class="group flex items-center px-3 py-2 rounded transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        5. The Gantt Chart
+                    </a>
                     
                     <p class="px-2 text-xs font-bold text-gray-400 uppercase mt-4 mb-2">Planning</p>
                     <a href="#sales-forecast" @click="activeSection = 'sales-forecast'"
-                       :class="activeSection === 'sales-forecast' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
-                       class="block px-3 py-2 rounded transition-colors">6. Sales Forecast</a>
+                       :class="activeSection === 'sales-forecast' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                       class="group flex items-center px-3 py-2 rounded transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        6. Sales Forecast
+                    </a>
                     <a href="#capacity-report" @click="activeSection = 'capacity-report'"
-                       :class="activeSection === 'capacity-report' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'"
-                       class="block px-3 py-2 rounded transition-colors">7. Capacity Report</a>
+                       :class="activeSection === 'capacity-report' ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                       class="group flex items-center px-3 py-2 rounded transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9 2 2 4-4"></path></svg>
+                        7. Capacity Report
+                    </a>
                 </nav>
             </div>
         </aside>
@@ -47,7 +68,10 @@
 
             <section id="intro" class="scroll-mt-24">
                 <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
-                    <h1 class="text-3xl font-bold text-gray-800 mb-4">1. Core Concepts & Logic</h1>
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg></div>
+                        <h1 class="text-3xl font-bold text-gray-800">1. Core Concepts & Logic</h1>
+                    </div>
                     <p class="text-gray-600 mb-6 text-lg">
                         The Capacity Planner is a decision-support tool that calculates resource sufficiency. 
                         It answers: <em>"Do I have enough staff to survive the busiest week of the month?"</em>
@@ -59,17 +83,18 @@
                             Unlike Excel sheets that average hours over a month, this system breaks every month into weeks.
                         </p>
                         <div class="grid md:grid-cols-3 gap-4 text-center">
-                            <div class="bg-white p-4 rounded shadow-sm">
+                            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                 <div class="text-xs text-gray-500 uppercase font-bold">Step 1</div>
                                 <div class="font-bold text-gray-800 mt-1">Daily Scan</div>
                                 <p class="text-xs text-gray-500 mt-2">System iterates through every single date (Mon-Sun) to find active tasks.</p>
                             </div>
-                            <div class="bg-white p-4 rounded shadow-sm">
+                            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                 <div class="text-xs text-gray-500 uppercase font-bold">Step 2</div>
                                 <div class="font-bold text-gray-800 mt-1">Weekly Bucket</div>
                                 <p class="text-xs text-gray-500 mt-2">Sums up demand for Week 1, Week 2, Week 3, Week 4 individually.</p>
                             </div>
-                            <div class="bg-white p-4 rounded shadow-sm ring-2 ring-indigo-500">
+                            <div class="bg-white p-4 rounded-lg shadow-sm ring-2 ring-indigo-500 relative">
+                                <span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">KEY</span>
                                 <div class="text-xs text-indigo-500 uppercase font-bold">Step 3</div>
                                 <div class="font-bold text-indigo-700 mt-1">Peak Detection</div>
                                 <p class="text-xs text-gray-500 mt-2">The <strong>Highest</strong> weekly requirement becomes the requirement for the whole month.</p>
@@ -82,7 +107,10 @@
             <section id="config-general" class="scroll-mt-24">
                 <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
                     <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">2. Configuration (Admin)</h2>
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-blue-100 rounded-lg text-blue-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div>
+                            <h2 class="text-2xl font-bold text-gray-800">2. Configuration (Admin)</h2>
+                        </div>
                         <span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Global Settings</span>
                     </div>
 
@@ -176,7 +204,10 @@
 
             <section id="workforce" class="scroll-mt-24">
                 <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6">3. Workforce & Leaves</h2>
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2 bg-green-100 rounded-lg text-green-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg></div>
+                        <h2 class="text-2xl font-bold text-gray-800">3. Workforce & Leaves</h2>
+                    </div>
                     
                     <div class="grid lg:grid-cols-2 gap-8">
                         <div>
@@ -221,7 +252,10 @@
 
             <section id="project-list" class="scroll-mt-24">
                 <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6">4. Project Management</h2>
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2 bg-purple-100 rounded-lg text-purple-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg></div>
+                        <h2 class="text-2xl font-bold text-gray-800">4. Project Management</h2>
+                    </div>
                     
                     <h3 class="font-bold text-gray-700 mb-3">The Project Form</h3>
                     <table class="w-full text-sm border rounded-lg overflow-hidden mb-6">
@@ -259,7 +293,10 @@
             <section id="activity-planner" class="scroll-mt-24">
                 <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
                     <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-bold text-gray-800">5. The Activity Planner (Gantt)</h2>
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-pink-100 rounded-lg text-pink-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></div>
+                            <h2 class="text-2xl font-bold text-gray-800">5. The Activity Planner (Gantt)</h2>
+                        </div>
                         <span class="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Core Feature</span>
                     </div>
 
@@ -314,7 +351,10 @@
 
             <section id="sales-forecast" class="scroll-mt-24">
                 <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6">6. Sales Forecast & Import</h2>
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2 bg-yellow-100 rounded-lg text-yellow-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        <h2 class="text-2xl font-bold text-gray-800">6. Sales Forecast & Import</h2>
+                    </div>
                     
                     <p class="text-gray-600 mb-6">
                         This module generates "Shadow Demand" based on your sales pipeline. It converts money (₹) into estimated hours.
@@ -357,7 +397,10 @@
 
             <section id="capacity-report" class="scroll-mt-24">
                 <div class="glass rounded-xl shadow-lg p-8 border border-white/20">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6">7. Capacity Plan Report</h2>
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-2 bg-teal-100 rounded-lg text-teal-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9 2 2 4-4"></path></svg></div>
+                        <h2 class="text-2xl font-bold text-gray-800">7. Capacity Plan Report</h2>
+                    </div>
                     
                     <p class="text-gray-600 mb-6">
                         The final output. A matrix of <strong>Time Periods (Columns)</strong> vs <strong>Designations (Rows)</strong>.
