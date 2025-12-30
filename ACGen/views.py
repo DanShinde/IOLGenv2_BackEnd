@@ -394,14 +394,35 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        cluster_id = self.request.query_params.get("id", None)
         cluster_name = self.request.query_params.get("cluster_name", None)
         serializer = self.get_serializer(queryset, many=True)
-        config = ClusterTemplate.objects.get(cluster_name=cluster_name).cluster_config if cluster_name else None
-        if cluster_name:
+
+        # If filtering by cluster (either by id or name), return structured response
+        if cluster_id or cluster_name:
+            config = None
+
+            # Get cluster info by cluster_id
+            if cluster_id:
+                try:
+                    cluster = ClusterTemplate.objects.get(id=cluster_id)
+                    config = cluster.cluster_config
+                    cluster_name = cluster.cluster_name
+                except ClusterTemplate.DoesNotExist:
+                    config = None
+
+            # Get cluster info by cluster_name
+            elif cluster_name:
+                try:
+                    cluster = ClusterTemplate.objects.get(cluster_name=cluster_name)
+                    config = cluster.cluster_config
+                except ClusterTemplate.DoesNotExist:
+                    config = None
+
             return Response({
                 "cluster_name": cluster_name,
                 "parameters": serializer.data,
-                "cluster_config" : config
+                "cluster_config": config
             })
 
         return Response(serializer.data)
