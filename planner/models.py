@@ -76,7 +76,7 @@ class Activity(models.Model):
         assignee_leaves = []
         if self.assignee:
             # We only care about leaves that happen on or after the activity start
-            relevant_leaves = self.assignee.leaves.filter(end_date__gte=self.start_date)
+            relevant_leaves = self.assignee.planner_leaves.filter(end_date__gte=self.start_date)
             for leave in relevant_leaves:
                 # Expand range to individual dates
                 curr = leave.start_date
