@@ -69,80 +69,248 @@
 
 <div class="card">
 
-    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-list me-2"></i>Content Summary</h5></div>
+    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-table me-2"></i>Content Summary</h5></div>
 
     <div class="card-body">
-        <div class="d-flex flex-wrap gap-3 mb-3">
+        <div class="d-flex flex-wrap gap-3 mb-4">
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small fw-bold">Category:</span>
-                <ul class="nav nav-pills">
+                <ul class="nav nav-pills nav-sm">
                     <li class="nav-item">
-                        <a class="nav-link {% if not filter or filter == 'all' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=all">All</a>
+                        <a class="nav-link py-1 px-3 small {% if not filter or filter == 'all' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=all">All</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if filter == 'project' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=project">Project</a>
+                        <a class="nav-link py-1 px-3 small {% if filter == 'project' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=project">Project</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if filter == 'general' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=general">Non-Project</a>
+                        <a class="nav-link py-1 px-3 small {% if filter == 'general' %}active{% endif %}" href="{% url 'all_push_pull_content' %}?filter=general">Non-Project</a>
                     </li>
                 </ul>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small fw-bold">Type:</span>
-                <ul class="nav nav-pills">
+                <ul class="nav nav-pills nav-sm">
                     <li class="nav-item">
-                        <a class="nav-link {% if not push_pull_filter or push_pull_filter == 'all' %}active{% endif %}" href="?push_pull_filter=all&status_filter={{ status_filter|default:'all' }}">All Types</a>
+                        <a class="nav-link py-1 px-3 small {% if not push_pull_filter or push_pull_filter == 'all' %}active{% endif %}" href="?push_pull_filter=all&status_filter={{ status_filter|default:'all' }}">All</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if push_pull_filter == 'push' %}active{% endif %}" href="?push_pull_filter=push&status_filter={{ status_filter|default:'all' }}">Push</a>
+                        <a class="nav-link py-1 px-3 small {% if push_pull_filter == 'push' %}active{% endif %}" href="?push_pull_filter=push&status_filter={{ status_filter|default:'all' }}">Push</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if push_pull_filter == 'pull' %}active{% endif %}" href="?push_pull_filter=pull&status_filter={{ status_filter|default:'all' }}">Pull</a>
+                        <a class="nav-link py-1 px-3 small {% if push_pull_filter == 'pull' %}active{% endif %}" href="?push_pull_filter=pull&status_filter={{ status_filter|default:'all' }}">Pull</a>
                     </li>
                 </ul>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small fw-bold">Status:</span>
-                <ul class="nav nav-pills">
+                <ul class="nav nav-pills nav-sm">
                     <li class="nav-item">
-                        <a class="nav-link {% if not status_filter or status_filter == 'all' %}active{% endif %}" href="?status_filter=all&push_pull_filter={{ push_pull_filter|default:'all' }}">All Status</a>
+                        <a class="nav-link py-1 px-3 small {% if not status_filter or status_filter == 'all' %}active{% endif %}" href="?status_filter=all&push_pull_filter={{ push_pull_filter|default:'all' }}">All</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if status_filter == 'open' %}active{% endif %}" href="?status_filter=open&push_pull_filter={{ push_pull_filter|default:'all' }}">Open</a>
+                        <a class="nav-link py-1 px-3 small {% if status_filter == 'open' %}active{% endif %}" href="?status_filter=open&push_pull_filter={{ push_pull_filter|default:'all' }}">Open</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if status_filter == 'closed' %}active{% endif %}" href="?status_filter=closed&push_pull_filter={{ push_pull_filter|default:'all' }}">Closed</a>
+                        <a class="nav-link py-1 px-3 small {% if status_filter == 'closed' %}active{% endif %}" href="?status_filter=closed&push_pull_filter={{ push_pull_filter|default:'all' }}">Closed</a>
                     </li>
                 </ul>
             </div>
         </div>
-        <div class="accordion" id="updateAccordion">
-            {% for update in updates %}
-                {% if is_public_view %}
-                    {% include 'tracker/partials/public_update_item.html' with update=update %}
-                {% else %}
-                    {% include 'tracker/partials/project_update_item.html' with update=update contact_persons=contact_persons %}
-                {% endif %}
-            {% empty %}
-                <p class="text-muted text-center py-3">No push-pull content found.</p>
-            {% endfor %}
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle" id="pushPullTable">
+                <thead class="table-light text-muted small text-uppercase">
+                    <tr>
+                        <th style="width: 10%;">Source</th>
+                        <th style="width: 10%;">Type</th>
+                        <th style="width: 25%;">Description</th>
+                        <th style="width: 15%;">Who</th>
+                        <th style="width: 10%;">ETA</th>
+                        <th style="width: 10%;">Status</th>
+                        <th style="width: 15%;">Remarks</th>
+                        {% if not is_public_view %}
+                        <th style="width: 5%;">Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody class="small">
+                    {% for update in updates %}
+                    <tr data-update-id="{{ update.id }}">
+                        <td class="fw-bold text-nowrap">
+                            {% if update.project %}
+                                <a href="{% url 'tracker_project_detail' update.project.id %}" class="text-decoration-none text-dark">
+                                    <i class="fas fa-folder text-primary me-1"></i> {{ update.project.code }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted"><i class="fas fa-globe me-1"></i> General</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if not is_public_view %}
+                                <select class="form-select form-select-sm border-0 bg-transparent shadow-none ps-0" onchange="updateField({{ update.id }}, 'push_pull_type', this.value)">
+                                    <option value="Push" {% if update.push_pull_type == 'Push' %}selected{% endif %}>Push</option>
+                                    <option value="Pull" {% if update.push_pull_type == 'Pull' %}selected{% endif %}>Pull</option>
+                                </select>
+                            {% else %}
+                                {% if update.push_pull_type == 'Push' %}
+                                    <span class="badge bg-info bg-opacity-10 text-info border border-info">Push</span>
+                                {% else %}
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">Pull</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if not is_public_view %}
+                                <textarea class="form-control form-control-sm border-0 bg-transparent shadow-none px-0" rows="2" onblur="updateField({{ update.id }}, 'text', this.value)">{{ update.text }}</textarea>
+                            {% else %}
+                                <div class="text-truncate-3" title="{{ update.text }}">
+                                    {{ update.text|linebreaksbr }}
+                                </div>
+                            {% endif %}
+                            <div class="text-muted mt-1" style="font-size: 0.75rem;">
+                                By {{ update.author.get_full_name|default:update.author.username }} • {{ update.created_at|naturaltime }}
+                            </div>
+                        </td>
+
+                        <td>
+                            {% if not is_public_view %}
+                                <select class="who-select-inline" multiple data-id="{{ update.id }}" style="width: 100%;">
+                                    {% for person in contact_persons %}
+                                        <option value="{{ person.id }}" 
+                                            {% if person in update.who_contact.all %}selected{% endif %}>
+                                            {{ person.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                {% for person in update.who_contact.all %}
+                                    <span class="badge bg-secondary mb-1">{{ person.name }}</span>
+                                {% empty %}
+                                    <span class="text-muted">-</span>
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if not is_public_view %}
+                                <input type="date" class="form-control form-control-sm border-0 bg-transparent shadow-none px-0" 
+                                       value="{{ update.eta|date:'Y-m-d' }}" 
+                                       onchange="updateField({{ update.id }}, 'eta', this.value)">
+                            {% else %}
+                                {% if update.eta %}
+                                    <span class="text-dark">{{ update.eta|date:"d M Y" }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if not is_public_view %}
+                                <select class="form-select form-select-sm border-0 bg-transparent shadow-none ps-0 fw-bold 
+                                    {% if update.status == 'Open' %}text-success{% elif update.status == 'In Progress' %}text-warning{% else %}text-secondary{% endif %}" 
+                                    onchange="updateField({{ update.id }}, 'status', this.value)">
+                                    <option value="Open" {% if update.status == 'Open' %}selected{% endif %}>Open</option>
+                                    <option value="In Progress" {% if update.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="Closed" {% if update.status == 'Closed' %}selected{% endif %}>Closed</option>
+                                </select>
+                            {% else %}
+                                <span class="badge {% if update.status == 'Open' %}bg-success{% elif update.status == 'In Progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                    {{ update.status }}
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-start">
+                            {% if update.remarks.exists %}
+                                <ul class="list-unstyled mb-2">
+                                    {% for remark in update.remarks.all %}
+                                        <li class="mb-1 border-bottom pb-1 last-no-border" style="font-size: 0.8rem;">
+                                            <span class="fw-bold text-dark">{{ remark.added_by.username }}:</span>
+                                            <span class="text-secondary">{{ remark.text }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            
+                            <form action="{% url 'add_update_remark' update.id %}" method="post" class="d-flex gap-1">
+                                {% csrf_token %}
+                                <input type="hidden" name="redirect_to" value="all_push_pull">
+                                <input type="text" name="remark_text" class="form-control form-control-sm py-0" placeholder="Add remark..." style="font-size: 0.8rem;" required>
+                                <button type="submit" class="btn btn-sm btn-light border py-0 px-2 text-primary">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </form>
+                        </td>
+
+                        {% if not is_public_view %}
+                        <td class="text-center">
+                            {% if user == update.author or user.is_staff %}
+                                <form action="{% url 'delete_project_update' update.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this item?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-link text-danger p-0" title="Delete">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if not is_public_view %}8{% else %}7{% endif %}" class="text-center py-4 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                            <p class="mb-0">No push-pull content found matching your filters.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
-
-
-{% if not is_public_view %}
-    {% include 'tracker/partials/project_update_modals.html' with updates=updates contact_persons=contact_persons %}
-{% endif %}
 
 {% endblock %}
 
 {% block scripts %}
 {{ block.super }}
+<style>
+    .last-no-border:last-child { border-bottom: none !important; padding-bottom: 0 !important; }
+    /* Remove outline for inline edit feel */
+    textarea:focus, select:focus, input:focus { box-shadow: none !important; border-color: #ced4da !important; }
+    /* Make select2 inline look cleaner */
+    .select2-container--bootstrap-5 .select2-selection { border: none; background-color: transparent; padding-left: 0; }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+    // General AJAX Update Function
+    function updateField(id, field, value) {
+        fetch("{% url 'update_project_update_ajax' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                id: id,
+                field: field,
+                value: value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status !== 'success') {
+                alert('Error updating: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => console.error(err));
+    }
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Select2 initialization for the "add new general update" form
+    
+    // Initialize Top Bar "Who" Select2 (For adding new items)
     $('#who_contact').select2({
         tags: true,
         tokenSeparators: [','],
@@ -151,167 +319,78 @@ document.addEventListener('DOMContentLoaded', function() {
         width: '100%',
         createTag: function(params) {
             const term = $.trim(params.term);
-            if (term === '' || $.isNumeric(term)) {
-                return null;
-            }
-            const existingOptions = $('#who_contact').find('option');
-            const isExisting = existingOptions.filter(function() {
-                return $.trim($(this).text()).toLowerCase() === term.toLowerCase();
-            }).length > 0;
-            
-            if (isExisting) {
-                return null;
-            }
-            return {
-                id: term,
-                text: term,
-                new: true
-            };
+            if (term === '' || $.isNumeric(term)) { return null; }
+            return { id: term, text: term, new: true };
         },
         templateResult: function (data) {
-            if (data.new) {
-                var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
-                return $result;
-            }
-            return data.text;
+            return data.new ? $('<span><b>(New)</b> ' + data.text + '</span>') : data.text;
         }
     });
 
-    // Handle new tags (persons) being added via AJAX for the "Add" form
+    // Handle creation of new contacts via top bar Select2
     $('#who_contact').on('select2:select', function (e) {
+        handleNewContactAjax(e, $(this));
+    });
+
+    // --- INLINE TABLE EDITING FOR "WHO" ---
+    $('.who-select-inline').each(function() {
+        $(this).select2({
+            tags: true,
+            theme: 'bootstrap-5',
+            placeholder: "-",
+            width: '100%',
+            createTag: function(params) {
+                const term = $.trim(params.term);
+                if (term === '' || $.isNumeric(term)) { return null; }
+                return { id: term, text: term, new: true };
+            },
+            templateResult: function (data) {
+                return data.new ? $('<span><b>(New)</b> ' + data.text + '</span>') : data.text;
+            }
+        });
+
+        // 1. Handle selection change -> Save to DB
+        $(this).on('change', function(e) {
+            const updateId = $(this).data('id');
+            const values = $(this).val(); // Array of IDs
+            updateField(updateId, 'who_contact', values);
+        });
+
+        // 2. Handle creation of new contacts via inline Select2
+        $(this).on('select2:select', function (e) {
+            handleNewContactAjax(e, $(this));
+        });
+    });
+
+    // Reusable function to create contact via AJAX if tag is new
+    function handleNewContactAjax(e, $selectElement) {
         const data = e.params.data;
         if (data.new) {
-            const $select = $(this);
             $.ajax({
                 url: "{% url 'add_contact_person_ajax' %}",
                 method: 'POST',
                 data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
                 success: function(response) {
                     if(response.status === 'success') {
+                        // Replace temp tag with real ID option
                         const newOption = new Option(response.name, response.id, false, false);
-                        $select.find(`option[value="${data.id}"]`).remove();
-                        $select.append(newOption).trigger('change');
-                        const currentSelection = $select.val() || [];
-                        currentSelection.push(response.id);
-                        $select.val(currentSelection).trigger('change');
+                        $selectElement.find(`option[value="${data.id}"]`).remove();
+                        $selectElement.append(newOption);
+                        
+                        // Reselect with real ID
+                        const currentSelection = $selectElement.val() || [];
+                        // Filter out the temp ID if it stuck (select2 might keep it in val() sometimes)
+                        const cleanSelection = currentSelection.filter(id => id !== data.id);
+                        cleanSelection.push(response.id);
+                        
+                        $selectElement.val(cleanSelection).trigger('change');
                     } else {
                         alert('Error creating new contact.');
-                        const currentSelection = $select.val() || [];
-                        const updatedSelection = currentSelection.filter(item => item !== data.id);
-                        $select.val(updatedSelection).trigger('change');
                     }
-                },
-                error: function() {
-                    alert('Error creating new contact.');
-                    const currentSelection = $select.val() || [];
-                    const updatedSelection = currentSelection.filter(item => item !== data.id);
-                    $select.val(updatedSelection).trigger('change');
                 }
             });
         }
-    });
-
-    // Initialize Select2 for the edit modals when they are shown
-    $('.select2-multiple-edit').each(function() {
-        if (!$(this).data('select2')) { // Check if Select2 is already initialized
-            $(this).select2({
-                tags: true,
-                tokenSeparators: [','],
-                theme: 'bootstrap-5',
-                placeholder: "Select or type person(s)",
-                width: '100%',
-                createTag: function(params) {
-                    const term = $.trim(params.term);
-                    if (term === '' || $.isNumeric(term)) {
-                        return null;
-                    }
-                    return { id: term, text: term, new: true };
-                },
-                templateResult: function (data) {
-                    if (data.new) {
-                        var $result = $('<span><b>(New)</b> ' + data.text + '</span>');
-                        return $result;
-                    }
-                    return data.text;
-                }
-            });
-            
-            // Add the AJAX handler for new tags in edit modals as well
-            $(this).on('select2:select', function(e) {
-                const data = e.params.data;
-                if (data.new) {
-                    const $select = $(this);
-                    $.ajax({
-                        url: "{% url 'add_contact_person_ajax' %}",
-                        method: 'POST',
-                        data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
-                        success: function(response) {
-                            if(response.status === 'success') {
-                                const newOption = new Option(response.name, response.id, false, false);
-                                $select.find(`option[value="${data.id}"]`).remove();
-                                $select.append(newOption).trigger('change');
-                                const currentSelection = $select.val() || [];
-                                currentSelection.push(response.id);
-                                $select.val(currentSelection).trigger('change');
-                            } else {
-                                alert('Error creating new contact.');
-                                const currentSelection = $select.val() || [];
-                                const updatedSelection = currentSelection.filter(item => item !== data.id);
-                                $select.val(updatedSelection).trigger('change');
-                            }
-                        },
-                        error: function() {
-                            alert('Error creating new contact.');
-                            const currentSelection = $select.val() || [];
-                            const updatedSelection = currentSelection.filter(item => item !== data.id);
-                            $select.val(updatedSelection).trigger('change');
-                        }
-                    });
-                }
-            });
-        }
-    });
-
-    const table = document.getElementById('pushPullTable');
-    if (table) {
-        const filters = document.querySelectorAll('.filter-input');
-        const rows = table.querySelectorAll('tbody tr');
-
-
-        filters.forEach(filter => {
-            filter.addEventListener('keyup', function() {
-                const filterValue = this.value.toLowerCase();
-                const columnIndex = this.dataset.column;
-
-                rows.forEach(row => {
-                    const cell = row.querySelectorAll('td')[columnIndex];
-                    if (cell) {
-                        const cellText = cell.textContent || cell.innerText;
-                        if (cellText.toLowerCase().indexOf(filterValue) > -1) {
-                            row.style.display = "";
-                        } else {
-                            row.style.display = "none";
-                        }
-                    }
-                });
-            });
-        });
-
-
-        rows.forEach(row => {
-            row.addEventListener('click', function(event) {
-                if (!event.target.closest('a')) {
-                    const updateId = this.dataset.updateId;
-                    const modalElement = document.getElementById(`editUpdateModal${updateId}`);
-                    if (modalElement) {
-                        const modal = new bootstrap.Modal(modalElement);
-                        modal.show();
-                    }
-                }
-            });
-        });
     }
-
 });
 </script>
 {% endblock %}

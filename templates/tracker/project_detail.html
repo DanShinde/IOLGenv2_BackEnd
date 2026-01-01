@@ -118,56 +118,6 @@
         padding: 10px;
         margin-top: 10px;
     }
-
-    /* --- NEW INLINE EDIT TABLE STYLES --- */
-    .editable-cell {
-        cursor: pointer;
-        position: relative;
-        transition: background-color 0.2s;
-    }
-    .editable-cell:hover {
-        background-color: #f0f7ff !important;
-    }
-    /* Pencil icon on hover */
-    .editable-cell:hover::after {
-        content: '\f303'; /* FontAwesome pencil */
-        font-family: 'Font Awesome 5 Free';
-        font-weight: 900;
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        font-size: 0.7rem;
-        color: #0d6efd;
-        opacity: 0.5;
-    }
-    .table-input-minimal {
-        border: 1px solid transparent;
-        background: transparent;
-        padding: 4px 8px;
-        width: 100%;
-        border-radius: 4px;
-        font-size: 0.9rem;
-    }
-    .table-input-minimal:focus {
-        border-color: #0d6efd;
-        background: #fff;
-        outline: none;
-        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-    }
-    /* Table Header styling */
-    .push-pull-table thead th {
-        background-color: #f8f9fa;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 0.5px;
-        font-weight: 700;
-        color: #495057;
-    }
-    /* Row status colors */
-    .push-pull-row-open { border-left: 4px solid var(--warning); }
-    .push-pull-row-inprogress { border-left: 4px solid var(--info); }
-    .push-pull-row-closed { border-left: 4px solid var(--success); opacity: 0.8; background-color: #fcfcfc; }
 </style>
 {% endblock %}
 
@@ -484,80 +434,59 @@
 
 <div class="row mt-4">
     <div class="col-12">
-        <div class="card shadow-sm border-0" id="push-pull-contents">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-bullhorn text-warning me-2"></i>Push-Pull Content (Inline Edit)</h5>
-                <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" onclick="document.getElementById('new-update-form').style.display = (document.getElementById('new-update-form').style.display === 'none' ? 'block' : 'none');">
-                    <i class="fas fa-plus me-1"></i> Add Entry
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="new-update-form" class="mb-4 p-4 border rounded bg-light" style="display:none;">
-                    <form action="{% url 'add_project_update' project.id %}" method="post">
-                        {% csrf_token %}
-                        <div class="row g-3">
-                            <div class="col-md-6"><label class="form-label small fw-bold">Description</label><input type="text" name="update_text" class="form-control" required placeholder="Describe the item..."></div>
-                            <div class="col-md-2"><label class="form-label small fw-bold">Type</label><select name="push_pull_type" class="form-select"><option value="Push">Push</option><option value="Pull">Pull</option></select></div>
-                            <div class="col-md-2"><label class="form-label small fw-bold">ETA</label><input type="date" name="eta_date" class="form-control"></div>
-                            <div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-primary w-100">Save</button></div>
-                            <div class="col-12 mt-2">
-                                <label class="form-label small fw-bold">Who (Contact)</label>
-                                <select name="who_contact" id="who_contact" class="form-control form-control-sm select2-multiple" multiple="multiple">
-                                    {% for person in contact_persons %}
-                                        <option value="{{ person.id }}">{{ person.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </form>
-                </div>
 
-                <div class="table-responsive">
-                    <table class="table align-middle table-hover push-pull-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 80px;">Type</th>
-                                <th style="width: 50%;">Description / Action</th>
-                                <th style="width: 100px;">Who</th>
-                                <th style="width: 110px;">ETA</th>
-                                <th style="width: 110px;">Status</th>
-                                <th style="width: 50px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for update in updates %}
-                            <tr class="{% if update.status == 'Closed' %}push-pull-row-closed{% elif update.status == 'In Progress' %}push-pull-row-inprogress{% else %}push-pull-row-open{% endif %}" id="row-{{ update.id }}">
-                                <td class="editable-cell">
-                                    <select class="table-input-minimal inline-save" data-update-id="{{ update.id }}" data-field="push_pull_type">
-                                        <option value="Push" {% if update.push_pull_type == 'Push' %}selected{% endif %}>Push</option>
-                                        <option value="Pull" {% if update.push_pull_type == 'Pull' %}selected{% endif %}>Pull</option>
-                                    </select>
-                                </td>
-                                <td class="editable-cell">
-                                    <input type="text" class="table-input-minimal inline-save fw-bold" value="{{ update.text }}" data-update-id="{{ update.id }}" data-field="update_text">
-                                </td>
-                                <td><div class="small text-muted">{% for person in update.who_contact.all %}{{ person.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</div></td>
-                                <td class="editable-cell">
-                                    <input type="date" class="table-input-minimal inline-save" value="{{ update.eta|date:'Y-m-d' }}" data-update-id="{{ update.id }}" data-field="eta_date">
-                                </td>
-                                <td class="editable-cell">
-                                    <select class="table-input-minimal inline-save fw-bold" data-update-id="{{ update.id }}" data-field="update_status">
-                                        <option value="Open" {% if update.status == 'Open' %}selected{% endif %}>Open</option>
-                                        <option value="In Progress" {% if update.status == 'In Progress' %}selected{% endif %}>In Progress</option>
-                                        <option value="Closed" {% if update.status == 'Closed' %}selected{% endif %}>Closed</option>
-                                    </select>
-                                </td>
-                                <td class="text-center">
-                                    <div class="d-flex align-items-center justify-content-end">
-                                        <span class="autosave-indicator me-2" id="update-indicator-{{ update.id }}"></span>
-                                        <a href="{% url 'delete_project_update' update.id %}" class="text-danger small" onclick="return confirm('Delete this content?')" title="Delete"><i class="fas fa-trash-alt"></i></a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% empty %}<tr><td colspan="6" class="text-center py-4 text-muted">No push-pull contents found.</td></tr>{% endfor %}
-                        </tbody>
-                    </table>
+        <div class="card" id="push-pull-contents">
+
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-bullhorn me-2"></i>Push-Pull Contents</h5></div>
+            <div class="card-body">
+                <form action="{% url 'add_project_update' project.id %}" method="post" class="mb-4 p-3 bg-light rounded">
+                    {% csrf_token %}
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="push_pull_type" class="form-label">Type</label>
+                            <select name="push_pull_type" id="push_pull_type" class="form-select">
+                                <option value="Push">Push Content</option>
+                                <option value="Pull">Pull Content</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="who_contact" class="form-label">Who</label>
+                            <select name="who_contact" id="who_contact" class="form-control select2-multiple" multiple="multiple">
+                                {% for person in contact_persons %}
+                                    <option value="{{ person.id }}">{{ person.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="eta_date" class="form-label">ETA</label>
+                            <input type="date" name="eta_date" id="eta_date" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="update_text" class="form-label">Description</label>
+                        <textarea name="update_text" id="update_text" rows="5" class="form-control" placeholder="Share a new update on the project's progress, risks, or actions needed..." required></textarea>
+                    </div>
+
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save</button>
+                    </div>
+                </form>
+                <hr>
+                <h5 class="mt-4">Push Pull Content Summary</h5>
+                <div class="update-feed mt-3 accordion" id="updateAccordion">
+                    {% for update in updates %}
+                        {% include 'tracker/partials/project_update_item.html' with update=update user=user contact_persons=contact_persons redirect_to='project_detail' %}
+                    {% empty %}
+                        <p class="text-muted text-center py-3">No push pull contents have been added yet.</p>
+                    {% endfor %}
                 </div>
+                {% if updates_count > 5 %}
+                <div class="text-center mt-3">
+                    <a href="{% url 'all_project_updates' project.id %}">View all {{ updates_count }} updates...</a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -779,57 +708,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const autosaveInputs = document.querySelectorAll('.autosave-input');
     autosaveInputs.forEach(input => {
         input.addEventListener('change', handleStageUpdate);
-    });
-
-    // -----------------------------------------------------
-    // NEW: Inline Update Logic for Push Pull Content Table
-    // -----------------------------------------------------
-    const inlineInputs = document.querySelectorAll('.inline-save');
-    inlineInputs.forEach(input => {
-        input.addEventListener('change', async function() {
-            const updateId = this.dataset.updateId;
-            const field = this.dataset.field;
-            const value = this.value;
-            const indicator = document.getElementById(`update-indicator-${updateId}`);
-            
-            indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
-
-            try {
-                // We reuse the existing view. It might redirect, but fetch follows it.
-                const url = "{% url 'edit_project_update' 0 %}".replace('0', updateId);
-                const formData = new FormData();
-                formData.append(field, value);
-                formData.append('csrfmiddlewaretoken', csrftoken);
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-
-                if (response.ok) {
-                    indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
-                    
-                    // Update Row Styling dynamically if status changed
-                    if (field === 'update_status') {
-                        const row = document.getElementById(`row-${updateId}`);
-                        if (value === 'Closed') {
-                            row.className = 'push-pull-row-closed';
-                        } else if (value === 'In Progress') {
-                            row.className = 'push-pull-row-inprogress';
-                        } else {
-                            row.className = 'push-pull-row-open';
-                        }
-                    }
-                } else {
-                    indicator.innerHTML = '<i class="fas fa-times-circle text-danger"></i>';
-                }
-            } catch (error) {
-                indicator.innerHTML = '<i class="fas fa-times-circle text-danger"></i>';
-            }
-            
-            setTimeout(() => { indicator.innerHTML = ''; }, 2000);
-        });
     });
 
     // New script to scroll to the push-pull contents section on load

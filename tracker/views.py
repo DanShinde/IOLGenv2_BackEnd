@@ -1420,3 +1420,41 @@ def public_push_pull_content(request, access_token):
     }
     return render(request, 'tracker/all_push_pull_content.html', context)
 
+
+@login_required
+def update_project_update_ajax(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            update_id = data.get('id')
+            field = data.get('field')
+            value = data.get('value')
+            
+            update = ProjectUpdate.objects.get(id=update_id)
+            
+            # Simple Authorization Check
+            if request.user != update.author and not request.user.groups.filter(name='Trackers').exists() and not request.user.is_staff:
+                 return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+            # Handle the specific fields
+            if field == 'who_contact':
+                # Expecting a list of IDs for Many-to-Many
+                update.who_contact.set(value)
+            elif field == 'eta':
+                update.eta = parse_date(value) if value else None
+            elif field == 'push_pull_type':
+                update.push_pull_type = value
+            elif field == 'status':
+                update.status = value
+                if value == 'Closed' and update.closed_at is None:
+                    update.closed_at = timezone.now()
+                elif value != 'Closed':
+                    update.closed_at = None
+            elif field == 'text':
+                update.text = value
+            
+            update.save()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Bad Request'}, status=400)
