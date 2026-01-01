@@ -439,7 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
         modalTableBody.innerHTML = '<tr><td colspan="3" class="text-center p-4">Loading...</td></tr>';
         modal.classList.remove('hidden');
 
-        fetch(`/api/project-type/${projectTypeId}/brackets/`)
+        // UPDATED: Added /planner prefix
+        fetch(`/planner/api/project-type/${projectTypeId}/brackets/`)
             .then(response => response.json())
             .then(data => renderTable(data.brackets));
     };
@@ -473,7 +474,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const valueInput = document.getElementById('new_project_value');
         const daysInput = document.getElementById('new_effort_days');
         
-        fetch(`/api/project-type/${currentProjectTypeId}/add-bracket/`, {
+        // UPDATED: Added /planner prefix
+        fetch(`/planner/api/project-type/${currentProjectTypeId}/add-bracket/`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
             body: JSON.stringify({project_value: valueInput.value, effort_days: daysInput.value})
@@ -481,7 +483,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                fetch(`/api/project-type/${currentProjectTypeId}/brackets/`).then(res => res.json()).then(d => renderTable(d.brackets));
+                // UPDATED: Added /planner prefix
+                fetch(`/planner/api/project-type/${currentProjectTypeId}/brackets/`).then(res => res.json()).then(d => renderTable(d.brackets));
                 addForm.reset();
             } else {
                 alert(`Error: ${data.message}`);
@@ -493,7 +496,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.classList.contains('delete-benchmark-btn')) {
             const bracketId = e.target.dataset.id;
             if (confirm('Are you sure you want to delete this benchmark?')) {
-                fetch(`/effort-bracket/${bracketId}/delete/`, {
+                // UPDATED: Added /planner prefix
+                fetch(`/planner/effort-bracket/${bracketId}/delete/`, {
                     method: 'POST',
                     headers: { 'X-CSRFToken': getCsrfToken() }
                 })

@@ -441,33 +441,36 @@
             <div class="card-body">
                 <form action="{% url 'add_project_update' project.id %}" method="post" class="mb-4 p-3 bg-light rounded">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="update_text" class="form-label fw-bold">Add a New Push/Pull Content</label>
-                        <textarea name="update_text" id="update_text" rows="3" class="form-control" placeholder="Share a new update on the project's progress, risks, or actions needed..." required></textarea>
-                    </div>
-                    <div class="row g-3 align-items-center">
-                        <div class="col-md-3">
-                            <label for="push_pull_type" class="form-label small mb-0">Type</label>
-                            <select name="push_pull_type" id="push_pull_type" class="form-select form-select-sm">
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="push_pull_type" class="form-label">Type</label>
+                            <select name="push_pull_type" id="push_pull_type" class="form-select">
                                 <option value="Push">Push Content</option>
                                 <option value="Pull">Pull Content</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label for="who_contact" class="form-label small mb-0">Who</label>
-                            <select name="who_contact" id="who_contact" class="form-control form-control-sm select2-multiple" multiple="multiple">
+                        <div class="col-md-4">
+                            <label for="who_contact" class="form-label">Who</label>
+                            <select name="who_contact" id="who_contact" class="form-control select2-multiple" multiple="multiple">
                                 {% for person in contact_persons %}
                                     <option value="{{ person.id }}">{{ person.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label for="eta_date" class="form-label small mb-0">ETA</label>
-                            <input type="date" name="eta_date" id="eta_date" class="form-control form-control-sm">
+                        <div class="col-md-4">
+                            <label for="eta_date" class="form-label">ETA</label>
+                            <input type="date" name="eta_date" id="eta_date" class="form-control">
                         </div>
-                        <div class="col-12 text-end">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save</button>
-                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="update_text" class="form-label">Description</label>
+                        <textarea name="update_text" id="update_text" rows="5" class="form-control" placeholder="Share a new update on the project's progress, risks, or actions needed..." required></textarea>
+                    </div>
+
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save</button>
                     </div>
                 </form>
                 <hr>
