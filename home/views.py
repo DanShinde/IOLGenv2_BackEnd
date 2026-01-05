@@ -306,10 +306,18 @@ def thread_update(request, slug):
     if request.method == 'POST':
         form = ThreadUpdateForm(request.POST, instance=thread)
         if form.is_valid():
-            form.save()
-            invalidate_cache('forum_threads')
-            messages.success(request, 'Thread updated successfully!')
-            return redirect('forum-thread-detail', slug=thread.slug)
+            with transaction.atomic():
+                updated_thread = form.save()
+
+                # Update tags
+                tags = form.cleaned_data.get('tags', [])
+                updated_thread.tags.set(tags)
+
+                invalidate_cache('forum_threads')
+                messages.success(request, 'Thread updated successfully!')
+                return redirect('forum-thread-detail', slug=updated_thread.slug)
+        else:
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = ThreadUpdateForm(instance=thread)
 

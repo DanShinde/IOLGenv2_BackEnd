@@ -34,7 +34,10 @@ class ThreadCreateForm(forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=ForumTag.objects.all(),
         required=False,
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control',
+            'id': 'id_tags'
+        }),
         help_text="Select relevant tags"
     )
 
@@ -103,18 +106,55 @@ class ThreadCreateForm(forms.ModelForm):
 class ThreadUpdateForm(forms.ModelForm):
     """Form for updating thread status and details"""
 
+    tags = forms.ModelMultipleChoiceField(
+        queryset=ForumTag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control',
+            'id': 'id_tags'
+        }),
+        help_text="Select relevant tags"
+    )
+
     class Meta:
         model = ForumThread
-        fields = ['status', 'priority', 'content']
+        fields = [
+            'category',
+            'title',
+            'content',
+            'application_version',
+            'steps_to_reproduce',
+            'log_text',
+            'priority',
+        ]
         widgets = {
-            'status': forms.Select(attrs={
+            'category': forms.Select(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
             }),
-            'priority': forms.Select(attrs={
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
+            'title': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
+                'placeholder': 'Brief, descriptive title...'
             }),
             'content': forms.Textarea(attrs={
                 'rows': 6,
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
+                'placeholder': 'Describe your issue, question, or idea in detail...'
+            }),
+            'application_version': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
+                'placeholder': 'e.g., v2.0.1'
+            }),
+            'steps_to_reproduce': forms.Textarea(attrs={
+                'rows': 4,
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
+                'placeholder': '1. Go to...\n2. Click on...\n3. See error...'
+            }),
+            'log_text': forms.Textarea(attrs={
+                'rows': 4,
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm bg-gray-50',
+                'placeholder': 'Paste error logs or stack traces here...'
+            }),
+            'priority': forms.Select(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
             }),
         }
