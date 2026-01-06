@@ -10,6 +10,7 @@ from employees.models import Employee
 from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson
 
 from django.db.models import Q, F, Sum, Count
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
@@ -583,6 +584,62 @@ def project_reports(request):
     stage_delay_labels = [item['name'] for item in delayed_stages_qs[:10]] # Top 10 bottlenecks
     stage_delay_data = [item['count'] for item in delayed_stages_qs[:10]]
 
+    # --- NEW: Monthly Planned vs Actual Trends per Stage ---
+    stage_trend_data = {}
+    
+    # Aggregate Planned Counts by Month
+    planned_qs = Stage.objects.filter(
+        project__in=distinct_projects,
+        planned_date__isnull=False
+    ).annotate(
+        month=TruncMonth('planned_date')
+    ).values('name', 'month').annotate(count=Count('id')).order_by('month')
+
+    # Aggregate Actual Counts by Month
+    actual_qs = Stage.objects.filter(
+        project__in=distinct_projects,
+        actual_date__isnull=False
+    ).annotate(
+        month=TruncMonth('actual_date')
+    ).values('name', 'month').annotate(count=Count('id')).order_by('month')
+
+    # Process into dictionary structure for Chart.js
+    temp_trends = defaultdict(lambda: defaultdict(lambda: {'p': 0, 'a': 0}))
+
+    for item in planned_qs:
+        if item['month']:
+            temp_trends[item['name']][item['month']]['p'] = item['count']
+            
+    for item in actual_qs:
+        if item['month']:
+            temp_trends[item['name']][item['month']]['a'] = item['count']
+            
+    for stage_name, month_data in temp_trends.items():
+        sorted_months = sorted(month_data.keys())
+        labels = [m.strftime('%b %Y') for m in sorted_months]
+        years = [m.year for m in sorted_months]
+        months = [m.month for m in sorted_months]
+        
+        financial_years = []
+        for m in sorted_months:
+            if m.month >= 4:
+                fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+            else:
+                fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+            financial_years.append(fy_str)
+
+        p_data = [month_data[m]['p'] for m in sorted_months]
+        a_data = [month_data[m]['a'] for m in sorted_months]
+        
+        stage_trend_data[stage_name] = {
+            'labels': labels,
+            'years': years,
+            'financial_years': financial_years,
+            'months': months,
+            'planned': p_data,
+            'actual': a_data
+        }
+
     context = {
 
         'projects_with_details': projects_with_details,
@@ -605,6 +662,7 @@ def project_reports(request):
         'stage_filters': stage_filters_from_request,
         'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
+        'stage_trend_data': json.dumps(stage_trend_data),
     }
     return render(request, 'tracker/project_report.html', context)
 

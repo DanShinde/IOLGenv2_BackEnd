@@ -334,6 +334,35 @@
             </div>
         </div>
     </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-header-title mb-0"><i class="fas fa-chart-line me-2"></i>Stage Performance Trends (Planned vs Actual)</h5>
+                    <div class="d-flex gap-2">
+                        <select id="trendViewSelector" class="form-select form-select-sm w-auto" onchange="updateTrendChart()">
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                        </select>
+                        <select id="trendYearSelector" class="form-select form-select-sm w-auto" style="display: none;" onchange="updateTrendChart()">
+                            <!-- Options populated by JS -->
+                        </select>
+                        <select id="stageTrendSelector" class="form-select form-select-sm w-auto" onchange="handleStageChange()">
+                            {% for stage_key, stage_display in stage_names %}
+                                <option value="{{ stage_key }}">{{ stage_display }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="height: 350px;">
+                        <canvas id="stageTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     
 </div>
 {% endblock %}
@@ -487,6 +516,165 @@ document.addEventListener('DOMContentLoaded', function() {
     // Optional: Re-run when the window is resized
     window.addEventListener('resize', equalizeChartCardHeights);
 });
+
+// Stage Trend Chart Logic
+const trendCtx = document.getElementById('stageTrendChart');
+const allTrendData = JSON.parse('{{ stage_trend_data|escapejs }}');
+let trendChart = null;
+
+function handleStageChange() {
+    populateYearSelector();
+    updateTrendChart();
+}
+
+function populateYearSelector() {
+    const stageSelector = document.getElementById('stageTrendSelector');
+    const yearSelector = document.getElementById('trendYearSelector');
+    
+    // Store current selection before clearing
+    const currentSelection = yearSelector.value;
+
+    const selectedStage = stageSelector.value;
+    const data = allTrendData[selectedStage];
+
+    yearSelector.innerHTML = '';
+    
+    if (!data || !data.financial_years || data.financial_years.length === 0) {
+        yearSelector.style.display = 'none';
+        return;
+    }
+
+    // Extract unique FYs and sort descending
+    const uniqueFYs = [...new Set(data.financial_years)].sort().reverse();
+    
+    // Only show selector if we have data
+    if (uniqueFYs.length > 0) {
+        yearSelector.style.display = 'block';
+        uniqueFYs.forEach(fy => {
+            const option = document.createElement('option');
+            option.value = fy;
+            option.text = fy;
+            yearSelector.appendChild(option);
+        });
+        
+        // Try to retain selection, otherwise default to latest
+        if (currentSelection && uniqueFYs.includes(currentSelection)) {
+            yearSelector.value = currentSelection;
+        } else {
+            yearSelector.value = uniqueFYs[0];
+        }
+    } else {
+        yearSelector.style.display = 'none';
+    }
+}
+
+function updateTrendChart() {
+    if (!trendCtx) return;
+    
+    const stageSelector = document.getElementById('stageTrendSelector');
+    const viewSelector = document.getElementById('trendViewSelector');
+    const yearSelector = document.getElementById('trendYearSelector');
+    const selectedStage = stageSelector.value;
+    const viewType = viewSelector ? viewSelector.value : 'monthly';
+    const selectedFY = yearSelector.value;
+    
+    const rawData = allTrendData[selectedStage] || { labels: [], years: [], financial_years: [], months: [], planned: [], actual: [] };
+    
+    // Filter data based on selected year
+    let filteredLabels = [];
+    let filteredPlanned = [];
+    let filteredActual = [];
+
+    if (viewType === 'monthly') {
+        if (rawData.financial_years) {
+            for (let i = 0; i < rawData.financial_years.length; i++) {
+                if (rawData.financial_years[i] === selectedFY) {
+                    filteredLabels.push(rawData.labels[i]);
+                    filteredPlanned.push(rawData.planned[i]);
+                    filteredActual.push(rawData.actual[i]);
+                }
+            }
+        }
+    } else {
+        // Quarterly Aggregation
+        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
+        filteredPlanned = [0, 0, 0, 0];
+        filteredActual = [0, 0, 0, 0];
+        
+        if (rawData.financial_years) {
+            for (let i = 0; i < rawData.financial_years.length; i++) {
+                if (rawData.financial_years[i] === selectedFY) {
+                    const month = rawData.months[i]; // 1-12
+                    
+                    // Indian Financial Year Logic: Q1=Apr-Jun
+                    let quarterIndex;
+                    if (month >= 4) {
+                        quarterIndex = Math.floor((month - 4) / 3); // 4-6->0, 7-9->1, 10-12->2
+                    } else {
+                        quarterIndex = 3; // 1-3 -> 3 (Q4)
+                    }
+                    
+                    filteredPlanned[quarterIndex] += rawData.planned[i];
+                    filteredActual[quarterIndex] += rawData.actual[i];
+                }
+            }
+        }
+    }
+
+    if (trendChart) {
+        trendChart.destroy();
+    }
+
+    trendChart = new Chart(trendCtx, {
+        type: 'bar',
+        data: {
+            labels: filteredLabels,
+            datasets: [
+                {
+                    label: 'Planned Completion',
+                    data: filteredPlanned,
+                    borderColor: '#0d6efd', // Bootstrap Primary
+                    backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                },
+                {
+                    label: 'Actual Completion',
+                    data: filteredActual,
+                    borderColor: '#198754', // Bootstrap Success
+                    backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return context[0].label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 },
+                    title: { display: true, text: 'Number of Projects' }
+                }
+            }
+        }
+    });
+}
+
+// Initialize the trend chart
+if (document.getElementById('stageTrendSelector')) {
+    handleStageChange();
+}
 
 // Function to clear inputs for a specific stage row
 function clearStageRow(btn) {
