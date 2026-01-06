@@ -73,6 +73,9 @@
     </div>
 
     <form method="get">
+        {% if hide_completed_active %}
+        <input type="hidden" name="hide_completed" value="1">
+        {% endif %}
         <div class="card mb-4">
             <a href="#filterCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button">
                 <h5 class="card-header-title mb-0"><i class="fas fa-sliders-h me-2"></i>Filter Options</h5>
