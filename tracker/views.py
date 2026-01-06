@@ -565,6 +565,24 @@ def project_reports(request):
     segment_labels = [item['segment_con__name'] for item in segment_counts if item['segment_con__name']]
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
+    # --- NEW: Team Lead Distribution ---
+    team_lead_counts = Counter(p.team_lead.name if p.team_lead else 'Unassigned' for p in distinct_projects)
+    team_lead_labels = list(team_lead_counts.keys())
+    team_lead_data = list(team_lead_counts.values())
+
+    # --- NEW: Stage Bottleneck Analysis (Top Delayed Stages) ---
+    # Count stages where Actual > Planned OR (Status is active AND Today > Planned)
+    today = timezone.now().date()
+    delayed_stages_qs = Stage.objects.filter(
+        project__in=distinct_projects
+    ).filter(
+        Q(actual_date__gt=F('planned_date')) | 
+        Q(status__in=['Not started', 'In Progress'], planned_date__lt=today)
+    ).values('name').annotate(count=Count('id')).order_by('-count')
+    
+    stage_delay_labels = [item['name'] for item in delayed_stages_qs[:10]] # Top 10 bottlenecks
+    stage_delay_data = [item['count'] for item in delayed_stages_qs[:10]]
+
     context = {
 
         'projects_with_details': projects_with_details,
@@ -579,6 +597,8 @@ def project_reports(request):
         'min_value': min_value, 'max_value': max_value,
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
+        'team_lead_labels': team_lead_labels, 'team_lead_data': team_lead_data,
+        'stage_delay_labels': stage_delay_labels, 'stage_delay_data': stage_delay_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'automation_stage_names': Stage.AUTOMATION_STAGES,
         'emulation_stage_names': Stage.EMULATION_STAGES,

@@ -307,6 +307,25 @@
             </div>
         </div>
     </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-users me-2"></i>Projects by Team Lead</h5></div>
+                <div class="card-body">
+                    <canvas id="teamLeadChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-exclamation-triangle me-2"></i>Top Process Bottlenecks (Delayed Stages)</h5></div>
+                <div class="card-body">
+                    <canvas id="stageDelayChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
     
 </div>
 {% endblock %}
@@ -412,6 +431,46 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             }
+        });
+    }
+
+    // Team Lead Bar Chart
+    const teamLeadCtx = document.getElementById('teamLeadChart');
+    const teamLeadData = {{ team_lead_data|safe }};
+    if (teamLeadCtx && teamLeadData.length > 0) {
+        new Chart(teamLeadCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ team_lead_labels|safe }},
+                datasets: [{
+                    label: 'Active Projects',
+                    data: teamLeadData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+    }
+
+    // Stage Delay Bar Chart
+    const stageDelayCtx = document.getElementById('stageDelayChart');
+    const stageDelayData = {{ stage_delay_data|safe }};
+    if (stageDelayCtx && stageDelayData.length > 0) {
+        new Chart(stageDelayCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ stage_delay_labels|safe }},
+                datasets: [{
+                    label: 'Delayed Projects',
+                    data: stageDelayData,
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
         });
     }
     
