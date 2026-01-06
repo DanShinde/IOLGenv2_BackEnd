@@ -494,20 +494,39 @@ def project_reports(request):
         end = query_params.get(f'stage_{stage_key}_end')
         planned_start = query_params.get(f'stage_{stage_key}_planned_start')
         planned_end = query_params.get(f'stage_{stage_key}_planned_end')
+        schedule_statuses = params_for_getlist.getlist(f'stage_{stage_key}_schedule_status')
 
-        if status or (start and end) or (planned_start and planned_end):
+        if status or (start and end) or (planned_start and planned_end) or schedule_statuses:
             stage_filters_from_request[stage_key] = {
                 'status': status, 
                 'start': start, 
                 'end': end,
                 'planned_start': planned_start,
-                'planned_end': planned_end
+                'planned_end': planned_end,
+                'schedule_status': schedule_statuses
             }
-            stage_query_filters = {'stages__name': stage_key}
+            
+            # Base filter for the specific stage name
+            stage_q = Q(stages__name=stage_key)
+
+            # Apply Schedule Logic (Planned vs Actual)
+            if schedule_statuses:
+                schedule_q = Q()
+                if 'delayed' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__gt=F('stages__planned_date'))
+                if 'on_time' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__lte=F('stages__planned_date'))
+                if 'overdue' in schedule_statuses:
+                    schedule_q |= Q(stages__status__in=['Not started', 'In Progress'], stages__planned_date__lt=timezone.now().date())
+                stage_q &= schedule_q
+
+            stage_query_filters = {}
             if status: stage_query_filters['stages__status'] = status
             if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
             if planned_start and planned_end: stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
-            projects_qs = projects_qs.filter(**stage_query_filters)
+            
+            # Combine Q object with standard kwargs
+            projects_qs = projects_qs.filter(stage_q, **stage_query_filters)
 
     distinct_projects = projects_qs.distinct()
 
@@ -561,6 +580,8 @@ def project_reports(request):
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
+        'automation_stage_names': Stage.AUTOMATION_STAGES,
+        'emulation_stage_names': Stage.EMULATION_STAGES,
         'stage_filters': stage_filters_from_request,
         'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
@@ -738,16 +759,30 @@ def export_report_pdf(request):
         end = request.GET.get(f'stage_{stage_key}_end')
         planned_start = request.GET.get(f'stage_{stage_key}_planned_start')
         planned_end = request.GET.get(f'stage_{stage_key}_planned_end')
+        schedule_statuses = request.GET.getlist(f'stage_{stage_key}_schedule_status')
 
-        if status or (start and end) or (planned_start and planned_end):
-            stage_query_filters = {'stages__name': stage_key}
+        if status or (start and end) or (planned_start and planned_end) or schedule_statuses:
+            stage_q = Q(stages__name=stage_key)
+
+            if schedule_statuses:
+                schedule_q = Q()
+                if 'delayed' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__gt=F('stages__planned_date'))
+                if 'on_time' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__lte=F('stages__planned_date'))
+                if 'overdue' in schedule_statuses:
+                    schedule_q |= Q(stages__status__in=['Not started', 'In Progress'], stages__planned_date__lt=timezone.now().date())
+                stage_q &= schedule_q
+
+            stage_query_filters = {}
             if status:
                 stage_query_filters['stages__status'] = status
             if start and end:
                 stage_query_filters['stages__actual_date__range'] = [start, end]
             if planned_start and planned_end:
                 stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
-            projects = projects.filter(**stage_query_filters)
+            
+            projects = projects.filter(stage_q, **stage_query_filters)
     
     distinct_projects = projects.distinct()
 

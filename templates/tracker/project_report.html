@@ -125,19 +125,32 @@
                     </a>
 
                     <div class="collapse" id="advancedFilterCollapse">
-                        <fieldset class="border p-3 pt-2">
-                            <legend class="h6 w-auto px-2 fs-sm">Stage Specific Filters</legend>
-                            {% for stage_key, stage_display in stage_names %}
-                            {% with stage_values=stage_filters|get_item:stage_key %}
-                            <div class="row gx-2 gy-2 align-items-center mb-2">
-                                <div class="col-md-2"><label class="form-label mb-0">{{ stage_display }}</label></div>
-                                <div class="col-md-2"><select name="stage_{{ stage_key }}_status" class="form-select form-select-sm" aria-label="{{ stage_display }} Status"><option value="">-- Status --</option>{% for status_key, status_display in status_choices %}<option value="{{ status_key }}" {% if stage_values and stage_values.status == status_key %}selected{% endif %}>{{ status_display }}</option>{% endfor %}</select></div>
-                                <div class="col-md-4"><div class="input-group input-group-sm"><span class="input-group-text">Planned</span><input type="date" name="stage_{{ stage_key }}_planned_start" class="form-control" value="{{ stage_values.planned_start|default:'' }}" aria-label="{{ stage_display }} Planned Start"><span class="input-group-text">to</span><input type="date" name="stage_{{ stage_key }}_planned_end" class="form-control" value="{{ stage_values.planned_end|default:'' }}" aria-label="{{ stage_display }} Planned End"></div></div>
-                                <div class="col-md-4"><div class="input-group input-group-sm"><span class="input-group-text">Actual</span><input type="date" name="stage_{{ stage_key }}_start" class="form-control" value="{{ stage_values.start|default:'' }}" aria-label="{{ stage_display }} Actual Start"><span class="input-group-text">to</span><input type="date" name="stage_{{ stage_key }}_end" class="form-control" value="{{ stage_values.end|default:'' }}" aria-label="{{ stage_display }} Actual End"></div></div>
+                        <div class="card card-body bg-light border-0 p-3">
+                            <ul class="nav nav-tabs mb-3" id="stageFilterTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="auto-tab" data-bs-toggle="tab" data-bs-target="#auto-filters" type="button" role="tab"><i class="fas fa-robot me-2"></i>Automation Stages</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="emu-tab" data-bs-toggle="tab" data-bs-target="#emu-filters" type="button" role="tab"><i class="fas fa-laptop-code me-2"></i>Emulation Stages</button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="stageFilterContent">
+                                <!-- Automation Tab -->
+                                <div class="tab-pane fade show active" id="auto-filters" role="tabpanel">
+                                    {% for stage_key, stage_display in automation_stage_names %}
+                                        {% include "tracker/partials/stage_filter_row.html" with stage_key=stage_key stage_display=stage_display stage_values=stage_filters|get_item:stage_key %}
+                                    {% endfor %}
+                                </div>
+                                
+                                <!-- Emulation Tab -->
+                                <div class="tab-pane fade" id="emu-filters" role="tabpanel">
+                                    {% for stage_key, stage_display in emulation_stage_names %}
+                                        {% include "tracker/partials/stage_filter_row.html" with stage_key=stage_key stage_display=stage_display stage_values=stage_filters|get_item:stage_key %}
+                                    {% endfor %}
+                                </div>
                             </div>
-                            {% endwith %}
-                            {% endfor %}
-                        </fieldset>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -407,6 +420,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Optional: Re-run when the window is resized
     window.addEventListener('resize', equalizeChartCardHeights);
 });
+
+// Function to clear inputs for a specific stage row
+function clearStageRow(btn) {
+    const row = btn.closest('.row');
+    row.querySelectorAll('input, select').forEach(el => {
+        if (el.tagName === 'SELECT' && el.multiple) {
+             Array.from(el.options).forEach(opt => opt.selected = false);
+        } else {
+            el.value = '';
+        }
+    });
+}
 </script>
 
 <script>
