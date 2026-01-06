@@ -226,8 +226,15 @@ def project_detail(request, project_id):
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
+    # Filter stages based on status if provided
+    status_filter = request.GET.get('status_filter')
+
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
+    
+    if status_filter:
+        automation_stages_qs = automation_stages_qs.filter(status=status_filter)
+        emulation_stages_qs = emulation_stages_qs.filter(status=status_filter)
     
     automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
     emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
@@ -291,6 +298,8 @@ def project_detail(request, project_id):
         'emulation_remarks': emulation_remarks,
 
         'contact_persons': contact_persons,
+        'status_choices': Stage.STATUS_CHOICES,
+        'selected_status_filter': status_filter,
 
     }
     
@@ -483,13 +492,21 @@ def project_reports(request):
         status = query_params.get(f'stage_{stage_key}_status')
         start = query_params.get(f'stage_{stage_key}_start')
         end = query_params.get(f'stage_{stage_key}_end')
+        planned_start = query_params.get(f'stage_{stage_key}_planned_start')
+        planned_end = query_params.get(f'stage_{stage_key}_planned_end')
 
-
-        if status or (start and end):
-            stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
+        if status or (start and end) or (planned_start and planned_end):
+            stage_filters_from_request[stage_key] = {
+                'status': status, 
+                'start': start, 
+                'end': end,
+                'planned_start': planned_start,
+                'planned_end': planned_end
+            }
             stage_query_filters = {'stages__name': stage_key}
             if status: stage_query_filters['stages__status'] = status
             if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
+            if planned_start and planned_end: stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
             projects_qs = projects_qs.filter(**stage_query_filters)
 
     distinct_projects = projects_qs.distinct()
@@ -719,12 +736,17 @@ def export_report_pdf(request):
         status = request.GET.get(f'stage_{stage_key}_status')
         start = request.GET.get(f'stage_{stage_key}_start')
         end = request.GET.get(f'stage_{stage_key}_end')
-        if status or (start and end):
+        planned_start = request.GET.get(f'stage_{stage_key}_planned_start')
+        planned_end = request.GET.get(f'stage_{stage_key}_planned_end')
+
+        if status or (start and end) or (planned_start and planned_end):
             stage_query_filters = {'stages__name': stage_key}
             if status:
                 stage_query_filters['stages__status'] = status
             if start and end:
                 stage_query_filters['stages__actual_date__range'] = [start, end]
+            if planned_start and planned_end:
+                stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
             projects = projects.filter(**stage_query_filters)
     
     distinct_projects = projects.distinct()
