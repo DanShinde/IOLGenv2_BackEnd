@@ -363,6 +363,38 @@
             </div>
         </div>
     </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-header-title mb-0"><i class="fas fa-percentage me-2"></i>Stage OTIF Trends (On Time In Full)</h5>
+                    <div class="d-flex gap-2">
+                        <select id="otifViewSelector" class="form-select form-select-sm w-auto" onchange="updateOtifChart()">
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                        </select>
+                        <select id="otifYearSelector" class="form-select form-select-sm w-auto" style="display: none;" onchange="updateOtifChart()">
+                            <!-- Options populated by JS -->
+                        </select>
+                        <select id="stageOtifSelector" class="form-select form-select-sm w-auto" onchange="handleOtifStageChange()">
+                            <optgroup label="Automation">
+                                {% for stage_key, stage_display in automation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
+                            </optgroup>
+                            <optgroup label="Emulation">
+                                {% for stage_key, stage_display in emulation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="height: 350px;">
+                        <canvas id="stageOtifChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     
 </div>
 {% endblock %}
@@ -674,6 +706,191 @@ function updateTrendChart() {
 // Initialize the trend chart
 if (document.getElementById('stageTrendSelector')) {
     handleStageChange();
+}
+
+// --- Stage OTIF Chart Logic ---
+const otifCtx = document.getElementById('stageOtifChart');
+const allOtifData = JSON.parse('{{ stage_otif_data|escapejs }}');
+let otifChart = null;
+
+function handleOtifStageChange() {
+    populateOtifYearSelector();
+    updateOtifChart();
+}
+
+function populateOtifYearSelector() {
+    const stageSelector = document.getElementById('stageOtifSelector');
+    const yearSelector = document.getElementById('otifYearSelector');
+    const currentSelection = yearSelector.value;
+    const selectedStage = stageSelector.value;
+    const data = allOtifData[selectedStage];
+
+    yearSelector.innerHTML = '';
+    
+    if (!data || !data.financial_years || data.financial_years.length === 0) {
+        yearSelector.style.display = 'none';
+        return;
+    }
+
+    const uniqueFYs = [...new Set(data.financial_years)].sort().reverse();
+    
+    if (uniqueFYs.length > 0) {
+        yearSelector.style.display = 'block';
+        uniqueFYs.forEach(fy => {
+            const option = document.createElement('option');
+            option.value = fy;
+            option.text = fy;
+            yearSelector.appendChild(option);
+        });
+        
+        if (currentSelection && uniqueFYs.includes(currentSelection)) {
+            yearSelector.value = currentSelection;
+        } else {
+            yearSelector.value = uniqueFYs[0];
+        }
+    } else {
+        yearSelector.style.display = 'none';
+    }
+}
+
+function updateOtifChart() {
+    if (!otifCtx) return;
+    
+    const stageSelector = document.getElementById('stageOtifSelector');
+    const viewSelector = document.getElementById('otifViewSelector');
+    const yearSelector = document.getElementById('otifYearSelector');
+    const selectedStage = stageSelector.value;
+    const viewType = viewSelector ? viewSelector.value : 'monthly';
+    const selectedFY = yearSelector.value;
+    
+    const rawData = allOtifData[selectedStage] || { labels: [], financial_years: [], months: [], total: [], on_time: [] };
+    
+    let filteredLabels = [];
+    let filteredData = [];
+    let filteredTotal = [];
+    let filteredOnTime = [];
+
+    if (viewType === 'monthly') {
+        if (rawData.financial_years) {
+            for (let i = 0; i < rawData.financial_years.length; i++) {
+                if (rawData.financial_years[i] === selectedFY) {
+                    filteredLabels.push(rawData.labels[i]);
+                    const total = rawData.total[i];
+                    const onTime = rawData.on_time[i];
+                    const percentage = total > 0 ? (onTime / total) * 100 : 0;
+                    filteredData.push(percentage);
+                    filteredTotal.push(total);
+                    filteredOnTime.push(onTime);
+                }
+            }
+        }
+    } else {
+        // Quarterly Aggregation (IFY)
+        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
+        let qTotal = [0, 0, 0, 0];
+        let qOnTime = [0, 0, 0, 0];
+        
+        if (rawData.financial_years) {
+            for (let i = 0; i < rawData.financial_years.length; i++) {
+                if (rawData.financial_years[i] === selectedFY) {
+                    const month = rawData.months[i];
+                    let quarterIndex;
+                    if (month >= 4) {
+                        quarterIndex = Math.floor((month - 4) / 3);
+                    } else {
+                        quarterIndex = 3;
+                    }
+                    qTotal[quarterIndex] += rawData.total[i];
+                    qOnTime[quarterIndex] += rawData.on_time[i];
+                }
+            }
+        }
+        
+        // Calculate percentages for quarters
+        filteredData = qTotal.map((total, index) => total > 0 ? (qOnTime[index] / total) * 100 : 0);
+        filteredTotal = qTotal;
+        filteredOnTime = qOnTime;
+    }
+
+    if (otifChart) {
+        otifChart.destroy();
+    }
+
+    // Create target line data (80%)
+    const targetData = new Array(filteredLabels.length).fill(80);
+
+    otifChart = new Chart(otifCtx, {
+        type: 'line',
+        data: {
+            labels: filteredLabels,
+            datasets: [{
+                label: 'OTIF %',
+                data: filteredData,
+                totalData: filteredTotal,
+                onTimeData: filteredOnTime,
+                backgroundColor: 'rgba(111, 66, 193, 0.2)', // Purple with transparency
+                borderColor: '#6c757d',
+                segment: {
+                    borderColor: ctx => ctx.p1.parsed.y >= 80 ? '#198754' : '#dc3545'
+                },
+                pointBackgroundColor: ctx => ctx.parsed.y >= 80 ? '#198754' : '#dc3545',
+                pointBorderColor: ctx => ctx.parsed.y >= 80 ? '#198754' : '#dc3545',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            },
+            {
+                label: 'Target (80%)',
+                data: targetData,
+                borderColor: '#dc3545', // Bootstrap Danger (Red)
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false,
+                datalabels: { display: false }
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const percentage = context.parsed.y.toFixed(2) + '%';
+                            const index = context.dataIndex;
+                            const dataset = context.dataset;
+                            const onTime = dataset.onTimeData[index];
+                            const total = dataset.totalData[index];
+                            return `OTIF: ${percentage} (${onTime}/${total})`;
+                        }
+                    }
+                },
+                datalabels: {
+                    align: 'top',
+                    anchor: 'center',
+                    color: '#333',
+                    font: { weight: 'bold', size: 11 },
+                    formatter: function(value) {
+                        return value.toFixed(2) + '%';
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: { display: true, text: 'Percentage (%)' }
+                }
+            }
+        }
+    });
+}
+
+// Initialize the OTIF chart
+if (document.getElementById('stageOtifSelector')) {
+    handleOtifStageChange();
 }
 
 // Function to clear inputs for a specific stage row

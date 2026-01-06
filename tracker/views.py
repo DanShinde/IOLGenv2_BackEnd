@@ -640,6 +640,52 @@ def project_reports(request):
             'actual': a_data
         }
 
+    # --- NEW: OTIF Trends per Stage ---
+    stage_otif_data = {}
+    
+    otif_qs = Stage.objects.filter(
+        project__in=distinct_projects,
+        actual_date__isnull=False
+    ).annotate(
+        month=TruncMonth('actual_date')
+    ).values('name', 'month').annotate(
+        total=Count('id'),
+        on_time=Count('id', filter=Q(actual_date__lte=F('planned_date')))
+    ).order_by('month')
+
+    temp_otif = defaultdict(lambda: defaultdict(lambda: {'total': 0, 'on_time': 0}))
+
+    for item in otif_qs:
+        if item['month']:
+            temp_otif[item['name']][item['month']]['total'] = item['total']
+            temp_otif[item['name']][item['month']]['on_time'] = item['on_time']
+
+    for stage_name, month_data in temp_otif.items():
+        sorted_months = sorted(month_data.keys())
+        labels = [m.strftime('%b %Y') for m in sorted_months]
+        years = [m.year for m in sorted_months]
+        months = [m.month for m in sorted_months]
+        
+        financial_years = []
+        for m in sorted_months:
+            if m.month >= 4:
+                fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+            else:
+                fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+            financial_years.append(fy_str)
+
+        total_data = [month_data[m]['total'] for m in sorted_months]
+        on_time_data = [month_data[m]['on_time'] for m in sorted_months]
+        
+        stage_otif_data[stage_name] = {
+            'labels': labels,
+            'years': years,
+            'financial_years': financial_years,
+            'months': months,
+            'total': total_data,
+            'on_time': on_time_data
+        }
+
     context = {
 
         'projects_with_details': projects_with_details,
@@ -663,6 +709,7 @@ def project_reports(request):
         'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
         'stage_trend_data': json.dumps(stage_trend_data),
+        'stage_otif_data': json.dumps(stage_otif_data),
     }
     return render(request, 'tracker/project_report.html', context)
 
