@@ -8,17 +8,14 @@ urlpatterns = [
     path('downloads/', views.downloads, name='downloads'),
     path('cacheclear/', views.clear_cache, name='cache-clear'),
 
-    # Forum URLs - all under /forum/ prefix
+    # Knowledge Base / Forum URLs
     path('forum/', views.forum_home, name='forum-home'),
-    path('forum/category/<slug:slug>/', views.forum_category, name='forum-category'),
-    path('forum/thread/create/', views.thread_create, name='forum-thread-create'),
-    path('forum/thread/<slug:slug>/', views.thread_detail, name='forum-thread-detail'),
-    path('forum/thread/<slug:slug>/edit/', views.thread_update, name='forum-thread-edit'),
-    path('forum/thread/<slug:slug>/reply/', views.post_create, name='forum-post-create'),
-
-    # Forum AJAX Endpoints - all under /forum/
-    path('forum/post/<int:post_id>/upvote/', views.post_upvote, name='forum-post-upvote'),
-    path('forum/post/<int:post_id>/mark-solution/', views.mark_solution, name='forum-mark-solution'),
-    path('forum/thread/<slug:slug>/lock/', views.thread_lock_toggle, name='forum-thread-lock'),
-    path('forum/thread/<slug:slug>/pin/', views.thread_pin_toggle, name='forum-thread-pin'),
+    path('forum/category/<slug:slug>/', views.article_category, name='kb-category'),
+    path('forum/create/', views.kb_create, name='kb-create'),
+    path('forum/wiki/<slug:slug>/', views.article_detail, name='kb-article-detail'),
+    path('forum/wiki/<slug:slug>/edit/', views.article_update, name='kb-article-edit'),
+    path('forum/questions/<int:pk>/', views.question_detail, name='kb-question-detail'),
+    path('forum/questions/<int:pk>/edit/', views.question_update, name='kb-question-edit'),
+    path('forum/reports/<int:pk>/', views.report_detail, name='kb-report-detail'),
+    path('forum/reports/<int:pk>/edit/', views.report_update, name='kb-report-edit'),
 ]

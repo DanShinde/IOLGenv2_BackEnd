@@ -2,7 +2,7 @@
 {% load static %}
 {% load widget_tweaks %}
 
-{% block title %}{% if form.instance.pk %}Edit Thread{% else %}Create New Thread{% endif %} - Forum{% endblock %}
+{% block title %}{% if form.instance.pk %}Edit Thread{% else %}Create New Thread{% endif %} - Knowledge Base{% endblock %}
 
 {% block styles %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
@@ -972,7 +972,7 @@
 <div class="form-wrapper">
     <div class="form-header">
         <div class="container">
-            <a href="{% if form.instance.pk %}{% url 'forum-thread-detail' form.instance.slug %}{% else %}{% url 'forum-home' %}{% endif %}" class="back-btn">
+            <a href="{% if form.instance.pk %}{% url 'Knowledge Base-thread-detail' form.instance.slug %}{% else %}{% url 'Knowledge Base-home' %}{% endif %}" class="back-btn">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
             <h1 class="mt-3">
@@ -1181,7 +1181,7 @@
                             <i class="fas fa-save"></i>
                             {% if form.instance.pk %}Update Thread{% else %}Create Thread{% endif %}
                         </button>
-                        <a href="{% if form.instance.pk %}{% url 'forum-thread-detail' form.instance.slug %}{% else %}{% url 'forum-home' %}{% endif %}" class="btn-secondary">
+                        <a href="{% if form.instance.pk %}{% url 'Knowledge Base-thread-detail' form.instance.slug %}{% else %}{% url 'Knowledge Base-home' %}{% endif %}" class="btn-secondary">
                             <i class="fas fa-times"></i> Cancel
                         </a>
                     </div>
@@ -1739,10 +1739,10 @@
 
     // Show keyboard shortcuts hint on first visit
     setTimeout(() => {
-        const hasSeenHint = localStorage.getItem('forum_shortcuts_hint');
+        const hasSeenHint = localStorage.getItem('Knowledge Base_shortcuts_hint');
         if (!hasSeenHint) {
             showToast('💡 Tip: Use Ctrl+Enter to submit quickly!', 'info');
-            localStorage.setItem('forum_shortcuts_hint', 'true');
+            localStorage.setItem('Knowledge Base_shortcuts_hint', 'true');
         }
     }, 3000);
 </script>

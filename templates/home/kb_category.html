@@ -1,0 +1,64 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}{{ category.name }} Articles{% endblock %}
+
+{% block styles %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+  body {
+    background: linear-gradient(135deg, #0f0f12 0%, #1a1a24 50%, #0f0f12 100%) !important;
+    color: #e8e8ed !important;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .kb-wrap {
+    padding: 32px;
+  }
+  .kb-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 12px;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  .kb-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .kb-meta {
+    display: flex;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .kb-link {
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: none;
+    font-size: 13px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kb-wrap">
+  <a class="kb-link" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
+  <h1 style="margin: 16px 0 8px; font-family: 'Space Grotesk', sans-serif;">{{ category.name }}</h1>
+  <p style="color: rgba(255, 255, 255, 0.6); margin-bottom: 20px;">{{ category.description }}</p>
+
+  {% for article in articles %}
+    <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}">
+      <div class="kb-meta" style="margin-bottom: 8px;">
+        <span>Updated {{ article.updated_at|timesince }} ago</span>
+        <span>{{ article.views }} views</span>
+      </div>
+      <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
+      <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+    </a>
+  {% empty %}
+    <p style="color: rgba(255, 255, 255, 0.6);">No articles in this category yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

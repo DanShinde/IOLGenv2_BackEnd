@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{{ category.name }} - Forum{% endblock %}
+{% block title %}{{ category.name }} - Knowledge Base{% endblock %}
 
 {% block styles %}
 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -33,25 +33,25 @@
         pointer-events: none;
     }
 
-    /* Forum-specific container resets */
-    .forum-container {
+    /* Knowledge Base-specific container resets */
+    .Knowledge Base-container {
         position: relative;
         z-index: 1;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
     }
 
-    .forum-container * {
+    .Knowledge Base-container * {
         font-family: inherit;
     }
 
     /* Override any base container styles - Bootstrap override */
-    .forum-container .container,
-    .forum-container .container-fluid,
-    .forum-container .container-sm,
-    .forum-container .container-md,
-    .forum-container .container-lg,
-    .forum-container .container-xl,
-    .forum-container .container-xxl {
+    .Knowledge Base-container .container,
+    .Knowledge Base-container .container-fluid,
+    .Knowledge Base-container .container-sm,
+    .Knowledge Base-container .container-md,
+    .Knowledge Base-container .container-lg,
+    .Knowledge Base-container .container-xl,
+    .Knowledge Base-container .container-xxl {
         max-width: 95% !important;
         width: 95% !important;
         margin-left: auto !important;
@@ -61,45 +61,45 @@
     }
 
     @media (min-width: 1200px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 90% !important;
         }
     }
 
     @media (min-width: 1400px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 1600px !important;
         }
     }
 
     @media (min-width: 1536px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 1700px !important;
         }
     }
 
     @media (min-width: 1920px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 1800px !important;
         }
     }
@@ -520,121 +520,121 @@
 
     /* CRITICAL: Final Bootstrap override - must be at end */
     /* Ultra-specific selectors to override Bootstrap at ALL screen sizes */
-    body .forum-container .container,
-    body .forum-container .container-fluid,
-    body .forum-container .container-sm,
-    body .forum-container .container-md,
-    body .forum-container .container-lg,
-    body .forum-container .container-xl,
-    body .forum-container .container-xxl,
-    .forum-container > .container,
-    .forum-container > .container-fluid,
-    .forum-container > .container-sm,
-    .forum-container > .container-md,
-    .forum-container > .container-lg,
-    .forum-container > .container-xl,
-    .forum-container > .container-xxl {
+    body .Knowledge Base-container .container,
+    body .Knowledge Base-container .container-fluid,
+    body .Knowledge Base-container .container-sm,
+    body .Knowledge Base-container .container-md,
+    body .Knowledge Base-container .container-lg,
+    body .Knowledge Base-container .container-xl,
+    body .Knowledge Base-container .container-xxl,
+    .Knowledge Base-container > .container,
+    .Knowledge Base-container > .container-fluid,
+    .Knowledge Base-container > .container-sm,
+    .Knowledge Base-container > .container-md,
+    .Knowledge Base-container > .container-lg,
+    .Knowledge Base-container > .container-xl,
+    .Knowledge Base-container > .container-xxl {
         max-width: 95% !important;
         width: 95% !important;
     }
 
     @media (min-width: 576px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-sm {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm {
             max-width: 95% !important;
         }
     }
 
     @media (min-width: 768px) {
-        body .forum-container .container,
-        body .forum-container .container-md,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-md,
-        .forum-container > .container-sm {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-sm,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-sm {
             max-width: 95% !important;
         }
     }
 
     @media (min-width: 992px) {
-        body .forum-container .container,
-        body .forum-container .container-lg,
-        body .forum-container .container-md,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-lg,
-        .forum-container > .container-md,
-        .forum-container > .container-sm {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-sm,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-sm {
             max-width: 90% !important;
         }
     }
 
     @media (min-width: 1200px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 90% !important;
         }
     }
 
     @media (min-width: 1400px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 1600px !important;
         }
     }
 
     @media (min-width: 1536px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 1700px !important;
         }
     }
 
     @media (min-width: 1920px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 1800px !important;
         }
     }
@@ -642,12 +642,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="forum-container">
+<div class="Knowledge Base-container">
 <div class="container mx-auto px-4 py-8">
     <!-- Category Header -->
     <div class="category-header animate-fadeInUp text-white relative z-10">
-        <a href="{% url 'forum-home' %}" class="back-btn mb-4">
-            <i class="fas fa-arrow-left"></i> Back to Forum
+        <a href="{% url 'Knowledge Base-home' %}" class="back-btn mb-4">
+            <i class="fas fa-arrow-left"></i> Back to Knowledge Base
         </a>
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mt-4">
             <div class="flex items-start gap-6">
@@ -663,7 +663,7 @@
                     </div>
                 </div>
             </div>
-            <a href="{% url 'forum-thread-create' %}?category={{ category.slug }}" class="create-thread-btn">
+            <a href="{% url 'Knowledge Base-thread-create' %}?category={{ category.slug }}" class="create-thread-btn">
                 <i class="fas fa-plus-circle mr-2"></i> New Thread
             </a>
         </div>
@@ -723,7 +723,7 @@
                         </span>
                     </div>
 
-                    <a href="{% url 'forum-thread-detail' thread.slug %}" class="block group">
+                    <a href="{% url 'Knowledge Base-thread-detail' thread.slug %}" class="block group">
                         <h3 class="text-2xl font-black text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">
                             {{ thread.title }}
                         </h3>
@@ -809,7 +809,7 @@
             <i class="fas fa-inbox"></i>
             <h3 class="text-3xl font-black text-gray-900 mb-3">No Threads Yet</h3>
             <p class="text-gray-600 text-lg mb-6">Be the first to start a discussion in this category!</p>
-            <a href="{% url 'forum-thread-create' %}?category={{ category.slug }}" class="create-thread-btn">
+            <a href="{% url 'Knowledge Base-thread-create' %}?category={{ category.slug }}" class="create-thread-btn">
                 <i class="fas fa-plus-circle mr-2"></i> Create First Thread
             </a>
         </div>
@@ -817,7 +817,7 @@
 </div>
 
 <!-- Floating Action Button -->
-<a href="{% url 'forum-thread-create' %}?category={{ category.slug }}" class="fab" title="Create New Thread">
+<a href="{% url 'Knowledge Base-thread-create' %}?category={{ category.slug }}" class="fab" title="Create New Thread">
     <i class="fas fa-plus"></i>
 </a>
 </div>

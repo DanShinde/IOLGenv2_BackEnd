@@ -1,0 +1,74 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}{{ article.title }}{% endblock %}
+
+{% block styles %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+  body {
+    background: linear-gradient(135deg, #0f0f12 0%, #1a1a24 50%, #0f0f12 100%) !important;
+    color: #e8e8ed !important;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .kb-wrap {
+    padding: 32px;
+  }
+  .kb-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 28px;
+  }
+  .kb-meta {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+  .kb-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: #a5b4fc;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .kb-link {
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: none;
+    font-size: 13px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kb-wrap">
+  <a class="kb-link" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
+  <div class="kb-card" style="margin-top: 16px;">
+    <div class="kb-meta" style="margin-bottom: 12px;">
+      <span>{{ article.category.name }}</span>
+      <span>Updated {{ article.updated_at|timesince }} ago</span>
+      <span>{{ article.views }} views</span>
+    </div>
+    <h1 style="margin: 0 0 16px; font-family: 'Space Grotesk', sans-serif;">{{ article.title }}</h1>
+    <p style="color: rgba(255, 255, 255, 0.7); margin: 0 0 24px;">{{ article.excerpt }}</p>
+    <div style="line-height: 1.8; white-space: pre-wrap;">
+      {{ article.content }}
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px;">
+      {% for tag in article.tags.all %}
+      <span class="kb-tag">{{ tag.name }}</span>
+      {% endfor %}
+    </div>
+    <div class="kb-meta" style="margin-top: 20px;">
+      <span>Author: {{ article.author.get_full_name|default:article.author.username }}</span>
+      {% if request.user == article.author or request.user.is_staff %}
+      <a class="kb-link" href="{% url 'kb-article-edit' article.slug %}">Edit article</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

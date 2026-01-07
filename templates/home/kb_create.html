@@ -1,0 +1,393 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}Create Knowledge Base Entry{% endblock %}
+
+{% block styles %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+
+  :root {
+    --kb-bg: #0f0f12;
+    --kb-card: rgba(255, 255, 255, 0.04);
+    --kb-card-hover: rgba(255, 255, 255, 0.08);
+    --kb-border: rgba(255, 255, 255, 0.1);
+    --kb-text: #e8e8ed;
+    --kb-muted: rgba(255, 255, 255, 0.55);
+    --kb-accent: #6366f1;
+    --kb-accent-2: #8b5cf6;
+  }
+
+  body {
+    background: linear-gradient(135deg, #0f0f12 0%, #1a1a24 50%, #0f0f12 100%) !important;
+    color: var(--kb-text) !important;
+  }
+
+  .kb-page {
+    min-height: 100vh;
+    padding: 32px;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .kb-panel {
+    background: var(--kb-card);
+    border: 1px solid var(--kb-border);
+    border-radius: 18px;
+    padding: 28px;
+  }
+
+  .kb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+
+  .kb-card {
+    padding: 18px;
+    border-radius: 16px;
+    background: var(--kb-card);
+    border: 1px solid var(--kb-border);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+
+  .kb-card:hover {
+    background: var(--kb-card-hover);
+    transform: translateY(-2px);
+  }
+
+  .kb-input,
+  .kb-textarea,
+  .kb-select {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--kb-border);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--kb-text);
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .kb-textarea {
+    resize: vertical;
+  }
+
+  .kb-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--kb-muted);
+  }
+
+  .kb-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--kb-accent) 0%, var(--kb-accent-2) 100%);
+    color: #fff;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+  }
+
+  .kb-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .kb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .kb-back {
+    color: var(--kb-muted);
+    text-decoration: none;
+    font-size: 13px;
+  }
+
+  @media (max-width: 900px) {
+    .kb-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kb-page">
+  <div class="kb-panel">
+    <div class="kb-header">
+      <div>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Contribute</h1>
+        <p style="margin: 4px 0 0; color: var(--kb-muted);">Create a wiki article, ask a question, or file a report.</p>
+      </div>
+      <a class="kb-back" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
+    </div>
+
+    {% if not content_type %}
+      <div class="kb-grid">
+        <a class="kb-card" href="{% url 'kb-create' %}?type=wiki">
+          <h3 style="margin: 0 0 8px;">Write a Wiki Article</h3>
+          <p style="margin: 0; color: var(--kb-muted);">Document processes, guides, and internal knowledge.</p>
+        </a>
+        <a class="kb-card" href="{% url 'kb-create' %}?type=qa">
+          <h3 style="margin: 0 0 8px;">Ask a Question</h3>
+          <p style="margin: 0; color: var(--kb-muted);">Get help from peers and share solutions.</p>
+        </a>
+        <a class="kb-card" href="{% url 'kb-create' %}?type=report">
+          <h3 style="margin: 0 0 8px;">Submit a Report</h3>
+          <p style="margin: 0; color: var(--kb-muted);">Log bugs or feature requests with priority.</p>
+        </a>
+      </div>
+    {% else %}
+      <form method="post" enctype="multipart/form-data" class="kb-form" style="display: flex; flex-direction: column; gap: 16px;">
+        {% csrf_token %}
+        <input type="hidden" name="content_type" value="{{ content_type }}">
+
+        {% if form.errors %}
+          <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); padding: 12px 16px; border-radius: 12px;">
+            <strong style="display: block; margin-bottom: 6px;">Please fix the highlighted fields:</strong>
+            <ul style="margin: 0; padding-left: 18px;">
+              {% for field, errors in form.errors.items %}
+                <li>{{ field|capfirst }}: {{ errors|join:", " }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        {% if content_type == 'wiki' %}
+          <label class="kb-label">Title</label>
+          {{ form.title }}
+          {{ form.title.errors }}
+          <label class="kb-label">Excerpt</label>
+          {{ form.excerpt }}
+          {{ form.excerpt.errors }}
+          <label class="kb-label">Content</label>
+          {{ form.content }}
+          {{ form.content.errors }}
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Category</label>
+              {{ form.category }}
+              {{ form.category.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Tags</label>
+              {{ form.tags }}
+              {{ form.tags.errors }}
+            </div>
+          </div>
+        {% elif content_type == 'qa' %}
+          <label class="kb-label">Question</label>
+          {{ form.title }}
+          {{ form.title.errors }}
+          <label class="kb-label">Details</label>
+          {{ form.body }}
+          {{ form.body.errors }}
+          <label class="kb-label">Tags</label>
+          {{ form.tags }}
+          {{ form.tags.errors }}
+        {% elif content_type == 'report' %}
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Type</label>
+              {{ form.type }}
+              {{ form.type.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Priority</label>
+              {{ form.priority }}
+              {{ form.priority.errors }}
+            </div>
+          </div>
+          <label class="kb-label">Title</label>
+          {{ form.title }}
+          {{ form.title.errors }}
+          <label class="kb-label">Description</label>
+          {{ form.description }}
+          {{ form.description.errors }}
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Application</label>
+              {{ form.application }}
+              {{ form.application.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Assignee</label>
+              {{ form.assignee }}
+              {{ form.assignee.errors }}
+            </div>
+          </div>
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Status</label>
+              {{ form.status }}
+              {{ form.status.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Tags</label>
+              {{ form.tags }}
+              {{ form.tags.errors }}
+            </div>
+          </div>
+          <div>
+            <label class="kb-label">Screenshots</label>
+            {{ form.attachments }}
+            {{ form.attachments.errors }}
+            <div id="kb-upload-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+        {% endif %}
+
+        <div style="display: flex; justify-content: flex-end;">
+          <button class="kb-action" type="submit">Save</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const input = document.getElementById('id_attachments');
+    const list = document.getElementById('kb-upload-list');
+    if (!input || !list) {
+      return;
+    }
+
+    let lightbox = document.getElementById('kb-lightbox');
+    let lightboxImg = document.getElementById('kb-lightbox-image');
+    let closeBtn = document.getElementById('kb-lightbox-close');
+
+    if (!lightbox) {
+      lightbox = document.createElement('div');
+      lightbox.id = 'kb-lightbox';
+      lightbox.style.position = 'fixed';
+      lightbox.style.inset = '0';
+      lightbox.style.background = 'rgba(6, 6, 12, 0.9)';
+      lightbox.style.display = 'none';
+      lightbox.style.alignItems = 'center';
+      lightbox.style.justifyContent = 'center';
+      lightbox.style.zIndex = '9999';
+      lightbox.style.padding = '5vh 5vw';
+
+      closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.id = 'kb-lightbox-close';
+      closeBtn.setAttribute('aria-label', 'Close preview');
+      closeBtn.textContent = '×';
+      closeBtn.style.position = 'absolute';
+      closeBtn.style.top = '20px';
+      closeBtn.style.right = '24px';
+      closeBtn.style.width = '40px';
+      closeBtn.style.height = '40px';
+      closeBtn.style.borderRadius = '50%';
+      closeBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+      closeBtn.style.background = 'rgba(0, 0, 0, 0.4)';
+      closeBtn.style.color = '#fff';
+      closeBtn.style.fontSize = '20px';
+      closeBtn.style.lineHeight = '1';
+
+      lightboxImg = document.createElement('img');
+      lightboxImg.id = 'kb-lightbox-image';
+      lightboxImg.alt = 'Screenshot preview';
+      lightboxImg.style.width = '80vw';
+      lightboxImg.style.height = '80vh';
+      lightboxImg.style.objectFit = 'contain';
+      lightboxImg.style.borderRadius = '16px';
+      lightboxImg.style.boxShadow = '0 20px 60px rgba(0,0,0,0.6)';
+
+      lightbox.appendChild(closeBtn);
+      lightbox.appendChild(lightboxImg);
+      document.body.appendChild(lightbox);
+    }
+
+    function isImage(file) {
+      return file && file.type && file.type.startsWith('image/');
+    }
+
+    function openLightbox(src) {
+      lightboxImg.src = src;
+      lightbox.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.style.display = 'none';
+      lightboxImg.src = '';
+      document.body.style.overflow = '';
+    }
+
+    function renderFiles(files) {
+      list.innerHTML = '';
+      if (!files || files.length === 0) {
+        return;
+      }
+
+      Array.from(files).forEach(file => {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.gap = '12px';
+        item.style.padding = '10px 12px';
+        item.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+        item.style.borderRadius = '12px';
+        item.style.background = 'rgba(0, 0, 0, 0.2)';
+
+        const name = document.createElement('div');
+        name.textContent = file.name;
+        name.style.fontSize = '13px';
+        name.style.color = 'rgba(255, 255, 255, 0.8)';
+
+        item.appendChild(name);
+
+        if (isImage(file)) {
+          const img = document.createElement('img');
+          img.alt = file.name;
+          img.style.width = '64px';
+          img.style.height = '64px';
+          img.style.objectFit = 'cover';
+          img.style.borderRadius = '10px';
+          img.style.border = '1px solid rgba(255, 255, 255, 0.12)';
+          item.appendChild(img);
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            img.src = event.target.result;
+            img.style.cursor = 'pointer';
+            img.addEventListener('click', () => openLightbox(event.target.result));
+          };
+          reader.readAsDataURL(file);
+        }
+
+        list.appendChild(item);
+      });
+    }
+
+    input.addEventListener('change', () => {
+      renderFiles(input.files);
+    });
+
+    closeBtn.addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeLightbox();
+      }
+    });
+  })();
+</script>
+{% endblock %}
