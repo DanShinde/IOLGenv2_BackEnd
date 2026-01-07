@@ -185,6 +185,7 @@ def project_detail(request, project_id):
 
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
+            new_completion_percentage = request.POST.get(f'completion_percentage_{stage.id}')
             
 
 
@@ -193,6 +194,7 @@ def project_detail(request, project_id):
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
+            new_completion = int(new_completion_percentage) if new_completion_percentage else 0
 
 
 
@@ -206,11 +208,14 @@ def project_detail(request, project_id):
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Status", old_value=stage.status, new_value=new_status)
             if stage.actual_date != new_actual:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Finish Date", old_value=str(stage.actual_date), new_value=str(new_actual))
+            if stage.completion_percentage != new_completion:
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="% Completion", old_value=str(stage.completion_percentage), new_value=str(new_completion))
             
             stage.planned_start_date = new_planned_start
             stage.planned_date = new_planned
             stage.status = new_status
             stage.actual_date = new_actual
+            stage.completion_percentage = new_completion
             stage.save()
 
         if 'save_all_automation' in request.POST:
@@ -1422,6 +1427,7 @@ def update_stage_ajax(request, stage_id):
                 'planned_date': 'Planned Finish Date',
                 'status': 'Status',
                 'actual_date': 'Actual Finish Date',
+                'completion_percentage': '% Completion',
             }
             history_field_name = field_map.get(field_name, field_name.replace('_', ' ').title())
 

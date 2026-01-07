@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.db.models import F
+from django.db.models import F, Sum
 from employees.models import Employee
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 # Define the Segment model
@@ -43,8 +44,10 @@ class Project(models.Model):
     def get_completion_percentage(self):
         stages = self.stages.exclude(status="Not Applicable")
         total = stages.count()
-        completed = stages.filter(status="Completed").count()
-        return round((completed / total) * 100) if total > 0 else 0
+        if total > 0:
+            total_progress = stages.aggregate(total=Sum('completion_percentage'))['total'] or 0
+            return round(total_progress / total)
+        return 0
 
     from datetime import timedelta
 
@@ -141,6 +144,7 @@ class Stage(models.Model):
     planned_date = models.DateField(null=True, blank=True)
     actual_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="Not started")
+    completion_percentage = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
 
     def __str__(self):
         return f"{self.project.code} - {self.name}"

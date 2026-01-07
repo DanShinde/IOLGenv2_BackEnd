@@ -1,0 +1,86 @@
+﻿# ================================
+# PostgreSQL Backup & Restore Script
+# ================================
+
+# ---- PostgreSQL BIN PATH ----
+$PG_BIN = "C:\Program Files\PostgreSQL\17\bin"
+
+# ---- SOURCE DATABASE (REMOTE) ----
+$SRC_HOST = "10.10.11.218"
+$SRC_PORT = "5432"
+$SRC_DB   = "Auto-AD"
+$SRC_USER = "avnadmin"
+$env:PGPASSWORD = "Pravin@321$"
+
+# ---- TARGET DATABASE (LOCAL) ----
+$TGT_HOST = "localhost"
+$TGT_PORT = "5432"
+$TGT_DB   = "newdb"
+$TGT_USER = "postgres"
+$TGT_PASSWORD = "mvs"
+
+# ---- BACKUP FILE ----
+$BACKUP_FILE = "D:\Postgres_Backups\auto_ad.dump"
+
+# Create backup directory if not exists
+$backupDir = Split-Path $BACKUP_FILE
+if (!(Test-Path $backupDir)) {
+    New-Item -ItemType Directory -Path $backupDir | Out-Null
+}
+
+Write-Host "=== Starting PostgreSQL Backup ===" -ForegroundColor Cyan
+
+# ---- PG_DUMP ----
+& "$PG_BIN\pg_dump.exe" `
+    -h $SRC_HOST `
+    -p $SRC_PORT `
+    -U $SRC_USER `
+    -F c `
+    -b `
+    -v `
+    -f $BACKUP_FILE `
+    "$SRC_DB"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Backup failed!" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "✅ Backup completed successfully." -ForegroundColor Green
+
+# ---- SWITCH PASSWORD FOR TARGET ----
+$env:PGPASSWORD = $TGT_PASSWORD
+
+Write-Host "=== Creating Target Database (if not exists) ===" -ForegroundColor Cyan
+
+& "$PG_BIN\createdb.exe" `
+    -h $TGT_HOST `
+    -p $TGT_PORT `
+    -U $TGT_USER `
+    $TGT_DB 2>$null
+
+Write-Host "=== Starting Restore ===" -ForegroundColor Cyan
+
+# ---- PG_RESTORE ----
+& "$PG_BIN\pg_restore.exe" `
+    -h $TGT_HOST `
+    -p $TGT_PORT `
+    -U $TGT_USER `
+    -d $TGT_DB `
+    -v `
+    --clean `
+    --if-exists `
+    --no-owner `
+    $BACKUP_FILE
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Restore failed!" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "✅ Restore completed successfully." -ForegroundColor Green
+
+# ---- CLEAN PASSWORD ----
+Remove-Item Env:\PGPASSWORD
+
+Write-Host "=== Backup & Restore Process Finished ===" -ForegroundColor Cyan

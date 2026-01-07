@@ -246,7 +246,7 @@
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
 
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
 
                         {% for stage in automation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
@@ -266,6 +266,15 @@
 
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;">
+                                    <span class="text-muted small">%</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ stage.completion_percentage|default:0 }}%;" aria-valuenow="{{ stage.completion_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </td>
                             <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
 
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
@@ -301,7 +310,7 @@
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
 
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
 
                         {% for stage in emulation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
@@ -321,6 +330,15 @@
 
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;">
+                                    <span class="text-muted small">%</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ stage.completion_percentage|default:0 }}%;" aria-valuenow="{{ stage.completion_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </td>
                             <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
 
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
@@ -663,7 +681,20 @@ document.addEventListener('DOMContentLoaded', function () {
         const input = event.target;
         const stageId = input.dataset.stageId;
         const fieldName = input.dataset.fieldName;
-        const newValue = input.value;
+        let newValue = input.value;
+
+        // Sanitize completion_percentage to prevent 400 errors on empty/invalid input
+        if (fieldName === 'completion_percentage') {
+            if (newValue === '' || newValue === null) {
+                newValue = '0';
+            } else if (parseInt(newValue) > 100) {
+                newValue = '100';
+                input.value = '100'; // Clamp visual input
+            } else if (parseInt(newValue) < 0) {
+                newValue = '0';
+                input.value = '0'; // Clamp visual input
+            }
+        }
         
         const indicator = document.getElementById(`autosave-indicator-${stageId}`);
         indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
@@ -708,6 +739,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const autosaveInputs = document.querySelectorAll('.autosave-input');
     autosaveInputs.forEach(input => {
         input.addEventListener('change', handleStageUpdate);
+    });
+
+    // Update progress bar visually on input for completion percentage
+    document.addEventListener('input', function(event) {
+        if (event.target.classList.contains('autosave-input') && event.target.dataset.fieldName === 'completion_percentage') {
+            const val = event.target.value;
+            const progressBar = event.target.closest('td').querySelector('.progress-bar');
+            if (progressBar) {
+                progressBar.style.width = val + '%';
+                progressBar.setAttribute('aria-valuenow', val);
+            }
+        }
     });
 
     // New script to scroll to the push-pull contents section on load

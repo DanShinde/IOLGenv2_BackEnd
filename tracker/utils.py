@@ -4,8 +4,9 @@ import datetime
 def get_completion_percentage(stages):
     stages = [s for s in stages if s.status != "Not Applicable"]
     total = len(stages)
-    completed = sum(1 for s in stages if s.status == "Completed")
-    return round((completed / total) * 100) if total > 0 else 0
+    if total == 0: return 0
+    total_progress = sum(s.completion_percentage for s in stages)
+    return round(total_progress / total)
 
 def get_otif_percentage(stages):
     completed = [s for s in stages if s.status == 'Completed']

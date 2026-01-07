@@ -15,7 +15,7 @@ class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
 @admin.register(Stage)
 class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'project', 'planned_date', 'actual_date', 'status')
+    list_display = ('id', 'name', 'project', 'planned_date', 'actual_date', 'status', 'completion_percentage')
     search_fields = ('name', 'project__code')
     # list_filter = ('status')
 
