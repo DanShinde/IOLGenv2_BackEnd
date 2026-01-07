@@ -118,6 +118,70 @@
         padding: 10px;
         margin-top: 10px;
     }
+
+    /* Professional Table Styling */
+    .table-card {
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+        background: #fff;
+    }
+    .stage-table {
+        margin-bottom: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .stage-table thead th {
+        background-color: #f8f9fa;
+        color: #4b5563;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+    }
+    .stage-table tbody td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        color: #1f2937;
+        font-size: 0.875rem;
+    }
+    .stage-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .stage-table tbody tr:hover {
+        background-color: #f9fafb;
+    }
+    
+    /* Form controls inside table */
+    .stage-table .form-control-sm, 
+    .stage-table .form-select-sm {
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        padding: 6px 10px;
+        font-size: 0.8125rem;
+        transition: all 0.2s ease;
+    }
+    .stage-table .form-control-sm:focus, 
+    .stage-table .form-select-sm:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Progress bar styling */
+    .stage-table .progress {
+        height: 6px !important;
+        background-color: #e5e7eb;
+        border-radius: 9999px;
+        margin-top: 8px;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .stage-table .progress-bar {
+        border-radius: 9999px;
+    }
 </style>
 {% endblock %}
 
@@ -246,7 +310,7 @@
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
 
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
 
                         {% for stage in automation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
@@ -310,7 +374,7 @@
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
 
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
 
                         {% for stage in emulation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
