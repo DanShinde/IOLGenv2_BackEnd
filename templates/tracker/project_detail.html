@@ -182,6 +182,90 @@
     .stage-table .progress-bar {
         border-radius: 9999px;
     }
+
+    /* Project Notes Styling */
+    .project-notes-feed {
+        height: 500px; /* Fixed height window */
+        overflow-y: auto;
+        padding: 15px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .project-notes-feed::-webkit-scrollbar {
+        width: 6px;
+    }
+    .project-notes-feed::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+    }
+    .project-notes-feed::-webkit-scrollbar-thumb {
+        background: #d1d5db; 
+        border-radius: 3px;
+    }
+    .note-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        transition: all 0.2s ease;
+        position: relative;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .note-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transform: translateY(-1px);
+    }
+    .note-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 12px;
+        bottom: 12px;
+        width: 4px;
+        background-color: #3b82f6;
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }
+    .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .note-author {
+        font-weight: 600;
+        color: #111827;
+        font-size: 0.9rem;
+    }
+    .note-time {
+        font-size: 0.75rem;
+        color: #6b7280;
+        background-color: #f3f4f6;
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+    .note-content {
+        color: #374151;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        padding-left: 10px; 
+    }
+    .note-avatar-small {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        margin-right: 10px;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 </style>
 {% endblock %}
 
@@ -430,6 +514,40 @@
     </div>
 </div>
 
+<div class="card mb-4" id="project-notes">
+    <div class="card-header bg-white">
+        <h5 class="card-header-title mb-0"><i class="far fa-sticky-note me-2 text-primary"></i>Project Notes</h5>
+    </div>
+    <div class="card-body bg-light">
+        <div class="project-notes-feed">
+            {% for comment in project_comments %}
+                <div class="note-card">
+                    <div class="note-header">
+                        <div class="d-flex align-items-center">
+                            <div class="note-avatar-small">{{ comment.added_by.username|slice:":2"|upper }}</div>
+                            <span class="note-author">{{ comment.added_by.username|default:'Unknown' }}</span>
+                        </div>
+                        <span class="note-time"><i class="far fa-clock me-1"></i>{{ comment.created_at|naturaltime }}</span>
+                    </div>
+                    <div class="note-content">{{ comment.text|linebreaksbr }}</div>
+                </div>
+            {% empty %}
+                <div class="text-center text-muted p-4">
+                    <i class="far fa-clipboard fa-2x mb-3 text-secondary opacity-50"></i>
+                    <p>No notes added yet.</p>
+                </div>
+            {% endfor %}
+        </div>
+        <form method="POST" action="{% url 'tracker_project_detail' project.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="active_tab" value="{{ request.GET.active_tab|default:'automation' }}">
+            <div class="d-flex gap-2">
+                <textarea name="note_text" class="form-control shadow-sm border-0" rows="2" placeholder="Type a note here..." required style="resize: none;"></textarea>
+                <button type="submit" name="add_project_comment" value="1" class="btn btn-primary px-4 align-self-end"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="row mt-4">
     <div class="col-lg-6 d-flex">
@@ -871,6 +989,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (targetElement) {
             targetElement.scrollIntoView({ behavior: 'smooth' });
         }
+    }
+
+    // Scroll notes feed to bottom on load
+    const notesFeed = document.querySelector('.project-notes-feed');
+    if (notesFeed) {
+        notesFeed.scrollTop = notesFeed.scrollHeight;
     }
 });
 </script>

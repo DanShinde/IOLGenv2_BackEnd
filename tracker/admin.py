@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Project, Stage, trackerSegment, ContactPerson
+from .models import Project, Stage, trackerSegment, ContactPerson, ProjectComment
 from import_export.admin import ImportExportModelAdmin
 
 
@@ -31,3 +31,8 @@ class SegmentAdmin(admin.ModelAdmin):
 class ContactPersonAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
+
+@admin.register(ProjectComment)
+class ProjectCommentAdmin(admin.ModelAdmin):
+    list_display = ('project', 'added_by', 'text', 'created_at')
+    search_fields = ('project__code', 'added_by__username', 'text')

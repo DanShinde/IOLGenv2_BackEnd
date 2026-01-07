@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
 from employees.models import Employee
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson, ProjectComment
 
 from django.db.models import Q, F, Sum, Count
 from django.db.models.functions import TruncMonth
@@ -150,9 +150,24 @@ def project_detail(request, project_id):
 
 
     if request.method == 'POST':
-        stages_to_save = []
         active_tab = request.POST.get('active_tab', 'automation')
-        
+
+        # --- Handle Note/Remark Addition First ---
+        if 'add_project_comment' in request.POST:
+            note_text = request.POST.get('note_text')
+            
+            if note_text:
+                ProjectComment.objects.create(project=project, text=note_text, added_by=request.user)
+                messages.success(request, "Note added successfully.")
+            else:
+                messages.error(request, "Please enter a note to save.")
+            
+            base_url = reverse('tracker_project_detail', args=[project.id])
+            # Redirect with a hash to scroll to the notes section
+            redirect_url = f'{base_url}?active_tab={active_tab}#project-notes'
+            return HttpResponseRedirect(redirect_url)
+
+        stages_to_save = []
         if 'save_all_automation' in request.POST:
             stages_to_save = project.stages.filter(stage_type='Automation')
         elif 'save_all_emulation' in request.POST:
@@ -274,14 +289,8 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    automation_remarks = StageRemark.objects.filter(
-        stage__project=project, stage__stage_type='Automation'
-    ).select_related('stage', 'added_by').order_by('-created_at')
-
-    emulation_remarks = StageRemark.objects.filter(
-        stage__project=project, stage__stage_type='Emulation'
-    ).select_related('stage', 'added_by').order_by('-created_at')
-
+    project_comments = project.comments.select_related('added_by').order_by('created_at')
+    
     context = {
         'project': project,
         'automation_stages': automation_stages,
@@ -300,8 +309,7 @@ def project_detail(request, project_id):
         'next_emulation_milestone': get_next_milestone(emulation_stages),
         'last_update_time': last_update_time,
         'recent_activity': recent_activity,
-        'automation_remarks': automation_remarks,
-        'emulation_remarks': emulation_remarks,
+        'project_comments': project_comments,
 
         'contact_persons': contact_persons,
         'status_choices': Stage.STATUS_CHOICES,

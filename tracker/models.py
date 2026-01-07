@@ -169,6 +169,20 @@ class StageRemark(models.Model):
     def __str__(self):
         return f"Remark for {self.stage.name} at {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
+# General project-level comments/chat
+class ProjectComment(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='comments')
+    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Comment by {self.added_by} on {self.project.code} at {self.created_at}"
+
+
 # ✅ NEW MODEL: ContactPerson
 class ContactPerson(models.Model):
     name = models.CharField(max_length=100, unique=True)
