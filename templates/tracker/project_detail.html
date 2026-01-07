@@ -268,7 +268,7 @@
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;">
+                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;" {% if stage.status != 'In Progress' %}disabled{% endif %}>
                                     <span class="text-muted small">%</span>
                                 </div>
                                 <div class="progress mt-1" style="height: 4px;">
@@ -332,7 +332,7 @@
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;">
+                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;" {% if stage.status != 'In Progress' %}disabled{% endif %}>
                                     <span class="text-muted small">%</span>
                                 </div>
                                 <div class="progress mt-1" style="height: 4px;">
@@ -739,6 +739,54 @@ document.addEventListener('DOMContentLoaded', function () {
     const autosaveInputs = document.querySelectorAll('.autosave-input');
     autosaveInputs.forEach(input => {
         input.addEventListener('change', handleStageUpdate);
+
+        // Prevent form submission on Enter key
+        input.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                input.blur(); // This triggers the change event handler defined above
+            }
+        });
+    });
+
+    // Handle status changes to update percentage behavior
+    function handleStatusChangeForPercentage(event) {
+        const statusSelect = event.target;
+        const stageId = statusSelect.dataset.stageId;
+        const status = statusSelect.value;
+        const percentInput = document.querySelector(`input[name="completion_percentage_${stageId}"]`);
+        const progressBar = percentInput.closest('td').querySelector('.progress-bar');
+        
+        if (!percentInput) return;
+
+        // 1. If the stage inprogress then only user should be allowed to add %.
+        if (status === 'In Progress') {
+            percentInput.disabled = false;
+        } else {
+            percentInput.disabled = true;
+        }
+
+        let newPercent = null;
+        // 2. If user selected it as completed, then by default progress bar becomes 100%.
+        if (status === 'Completed') {
+            newPercent = 100;
+        } else if (status === 'Not started') {
+            newPercent = 0;
+        }
+
+        if (newPercent !== null && percentInput.value != newPercent) {
+            percentInput.value = newPercent;
+            if (progressBar) {
+                progressBar.style.width = newPercent + '%';
+                progressBar.setAttribute('aria-valuenow', newPercent);
+            }
+            // Trigger autosave for the percentage input
+            percentInput.dispatchEvent(new Event('change'));
+        }
+    }
+
+    document.querySelectorAll('.status-select').forEach(select => {
+        select.addEventListener('change', handleStatusChangeForPercentage);
     });
 
     // Update progress bar visually on input for completion percentage
