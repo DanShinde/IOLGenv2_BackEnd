@@ -186,21 +186,66 @@
     margin-bottom: 20px;
   }
 
-  .kb-filter button {
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    padding: 8px 14px;
-    color: var(--kb-muted);
-    font-size: 13px;
-    text-align: left;
-    cursor: pointer;
+  .kb-tree-list {
+    list-style: none;
+    margin: 0;
+    padding-left: 14px;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .kb-filter button.active {
-    background: rgba(99, 102, 241, 0.2);
+  .kb-tree-item {
+    margin: 6px 0;
+  }
+
+  .kb-tree-details {
+    margin: 0;
+  }
+
+  .kb-tree-summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--kb-muted);
+    font-size: 13px;
+  }
+
+  .kb-tree-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .kb-tree-summary::before {
+    content: '+';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    color: var(--kb-muted);
+    flex-shrink: 0;
+  }
+
+  details[open] > .kb-tree-summary::before {
+    content: '-';
+  }
+
+  .kb-tree-link {
+    color: var(--kb-muted);
+    text-decoration: none;
+  }
+
+  .kb-tree-link:hover {
     color: #c4b5fd;
-    border-color: rgba(99, 102, 241, 0.3);
+  }
+
+  .kb-tree-leaf {
+    display: inline-block;
+    padding-left: 24px;
+    font-size: 13px;
   }
 
   .kb-select {
@@ -352,12 +397,24 @@
 
   <div class="kb-main">
     <aside class="kb-glass kb-sidebar kb-tab-sidebar active" data-tab-sidebar="wiki">
-      <h3>Categories</h3>
-      <div class="kb-filter" data-filter="wiki-category">
-        <button class="active" data-value="all">All</button>
-        {% for category in categories %}
-        <button data-value="{{ category.slug }}">{{ category.name }}</button>
-        {% endfor %}
+      <h3>Hierarchy</h3>
+      <div class="kb-filter">
+        {% if hierarchy_tree %}
+          {% include 'home/_wiki_tree.html' with nodes=hierarchy_tree %}
+        {% else %}
+          <div class="kb-meta">No hierarchy yet.</div>
+        {% endif %}
+      </div>
+
+      <h3 style="margin-top: 20px;">Other articles</h3>
+      <div class="kb-filter">
+        {% if other_articles_sidebar %}
+          {% for article in other_articles_sidebar %}
+            <a class="kb-tree-link kb-tree-leaf" href="{% url 'kb-article-detail' article.slug %}">{{ article.title }}</a>
+          {% endfor %}
+        {% else %}
+          <div class="kb-meta">No other articles yet.</div>
+        {% endif %}
       </div>
 
       <h3>Quick stats</h3>
@@ -418,13 +475,17 @@
 
     <section class="kb-tab-pane active" data-tab-pane="wiki">
       <div class="kb-content" id="wiki-list">
-        {% for article in articles %}
+        {% if hierarchy_articles %}
+        <div class="kb-meta" style="margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">Hierarchy</div>
+        {% for item in hierarchy_articles %}
+        {% with article=item.article %}
         <a
           class="kb-glass kb-card"
           href="{% url 'kb-article-detail' article.slug %}"
           data-item
           data-category="{{ article.category.slug }}"
-          data-search="{{ article.title|lower }} {{ article.content|lower }} {{ article.category.name|lower }}">
+          data-search="{{ article.title|lower }} {{ article.content|striptags|lower }} {{ article.category.name|lower }}"
+          style="margin-left: {{ item.indent }}px;">
           <div style="display: flex; justify-content: space-between; gap: 16px;">
             <div style="flex: 1;">
               <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
@@ -447,9 +508,47 @@
             </div>
           </div>
         </a>
-        {% empty %}
-        <div class="kb-empty">No wiki articles yet.</div>
+        {% endwith %}
         {% endfor %}
+        {% endif %}
+
+        {% if other_articles %}
+        <div class="kb-meta" style="margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px;">Other Articles</div>
+        {% for article in other_articles %}
+        <a
+          class="kb-glass kb-card"
+          href="{% url 'kb-article-detail' article.slug %}"
+          data-item
+          data-category="{{ article.category.slug }}"
+          data-search="{{ article.title|lower }} {{ article.content|striptags|lower }} {{ article.category.name|lower }}">
+          <div style="display: flex; justify-content: space-between; gap: 16px;">
+            <div style="flex: 1;">
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+                <span class="kb-pill" style="background: rgba(99, 102, 241, 0.2); color: #c4b5fd;">
+                  {{ article.category.name }}
+                </span>
+                <span class="kb-meta">Updated {{ article.updated_at|timesince }} ago</span>
+              </div>
+              <h3 style="margin: 0 0 8px; font-size: 18px;">{{ article.title }}</h3>
+              <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                {% for tag in article.tags.all %}
+                <span class="kb-tag">{{ tag.name }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="kb-meta" style="flex-direction: column; align-items: flex-end;">
+              <span class="kb-stat"><i class="fas fa-eye"></i>{{ article.views }}</span>
+              <span class="kb-stat"><i class="fas fa-user"></i>{{ article.author.get_full_name|default:article.author.username }}</span>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+        {% endif %}
+
+        {% if not hierarchy_articles and not other_articles %}
+        <div class="kb-empty">No wiki articles yet.</div>
+        {% endif %}
       </div>
     </section>
 
@@ -558,14 +657,13 @@
     const panes = document.querySelectorAll('[data-tab-pane]');
     const sidebars = document.querySelectorAll('[data-tab-sidebar]');
     const searchInput = document.getElementById('kb-search');
-    const wikiFilter = document.querySelector('[data-filter="wiki-category"]');
     const qaStatus = document.getElementById('qa-status');
     const reportType = document.getElementById('report-type');
     const reportStatus = document.getElementById('report-status');
     const reportPriority = document.getElementById('report-priority');
 
-    let activeTab = 'wiki';
-    let activeWikiCategory = 'all';
+    const params = new URLSearchParams(window.location.search);
+    let activeTab = params.get('tab') || 'wiki';
 
     function setActiveTab(tab) {
       activeTab = tab;
@@ -603,13 +701,6 @@
         const haystack = item.dataset.search || '';
         let visible = !query || haystack.includes(query);
 
-        if (activeTab === 'wiki') {
-          const category = item.dataset.category || '';
-          if (activeWikiCategory !== 'all' && category !== activeWikiCategory) {
-            visible = false;
-          }
-        }
-
         if (activeTab === 'qa') {
           const solved = item.dataset.solved === 'true';
           if (qaStatus.value === 'solved' && !solved) {
@@ -643,17 +734,10 @@
       btn.addEventListener('click', () => setActiveTab(btn.dataset.tabButton));
     });
 
-    if (wikiFilter) {
-      wikiFilter.addEventListener('click', event => {
-        const target = event.target.closest('button');
-        if (!target) {
-          return;
-        }
-        activeWikiCategory = target.dataset.value || 'all';
-        wikiFilter.querySelectorAll('button').forEach(btn => btn.classList.toggle('active', btn === target));
-        applyFilters();
-      });
+    if (!['wiki', 'qa', 'reports'].includes(activeTab)) {
+      activeTab = 'wiki';
     }
+    setActiveTab(activeTab);
 
     [searchInput, qaStatus, reportType, reportStatus, reportPriority].forEach(control => {
       if (!control) {

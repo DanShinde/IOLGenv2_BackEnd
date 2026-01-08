@@ -1,4 +1,5 @@
 from django import forms
+from django.db import models
 
 from .models import Article, Question, Answer, Report, ReportComment, Tag
 
@@ -22,6 +23,12 @@ class MultipleFileField(forms.FileField):
 
 
 class ArticleForm(forms.ModelForm):
+    parent = forms.ModelChoiceField(
+        queryset=Article.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'kb-select'}),
+        empty_label='Bottom section (no hierarchy)'
+    )
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -30,13 +37,31 @@ class ArticleForm(forms.ModelForm):
 
     class Meta:
         model = Article
-        fields = ['title', 'excerpt', 'content', 'category', 'tags']
+        fields = ['title', 'excerpt', 'content', 'category', 'parent', 'tags', 'is_hierarchy_root']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'Article title'}),
             'excerpt': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'Short summary'}),
             'content': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 10, 'placeholder': 'Write the article content'}),
             'category': forms.Select(attrs={'class': 'kb-select'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        hierarchy_queryset = Article.objects.filter(
+            models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False)
+        ).order_by('title')
+        if self.instance and self.instance.pk:
+            hierarchy_queryset = hierarchy_queryset.exclude(pk=self.instance.pk)
+        self.fields['parent'].queryset = hierarchy_queryset
+        if not (user and user.is_staff):
+            self.fields.pop('is_hierarchy_root', None)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('is_hierarchy_root') and cleaned_data.get('parent'):
+            self.add_error('parent', 'Hierarchy roots cannot have a parent.')
+        return cleaned_data
 
 
 class QuestionForm(forms.ModelForm):

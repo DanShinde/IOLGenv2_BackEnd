@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from ckeditor_uploader.fields import RichTextUploadingField
 from django.urls import reverse
 from django.utils.text import slugify
 
@@ -72,9 +73,17 @@ class Category(models.Model):
 class Article(models.Model):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
-    content = models.TextField()
+    content = RichTextUploadingField()
     excerpt = models.CharField(max_length=500, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='articles')
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
+    is_hierarchy_root = models.BooleanField(default=False)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='articles')
     tags = models.ManyToManyField(Tag, blank=True, related_name='articles')
     views = models.PositiveIntegerField(default=0)

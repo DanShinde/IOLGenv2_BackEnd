@@ -1,0 +1,16 @@
+<ul class="kb-tree-list">
+  {% for node in nodes %}
+    <li class="kb-tree-item">
+      {% if node.children %}
+        <details class="kb-tree-details">
+          <summary class="kb-tree-summary">
+            <a class="kb-tree-link" href="{% url 'kb-article-detail' node.article.slug %}">{{ node.article.title }}</a>
+          </summary>
+          {% include 'home/_wiki_tree.html' with nodes=node.children %}
+        </details>
+      {% else %}
+        <a class="kb-tree-link kb-tree-leaf" href="{% url 'kb-article-detail' node.article.slug %}">{{ node.article.title }}</a>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>

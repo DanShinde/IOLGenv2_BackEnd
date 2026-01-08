@@ -48,17 +48,38 @@
   <h1 style="margin: 16px 0 8px; font-family: 'Space Grotesk', sans-serif;">{{ category.name }}</h1>
   <p style="color: rgba(255, 255, 255, 0.6); margin-bottom: 20px;">{{ category.description }}</p>
 
-  {% for article in articles %}
-    <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}">
-      <div class="kb-meta" style="margin-bottom: 8px;">
-        <span>Updated {{ article.updated_at|timesince }} ago</span>
-        <span>{{ article.views }} views</span>
-      </div>
-      <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
-      <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
-    </a>
-  {% empty %}
+  {% if hierarchy_articles %}
+    <div class="kb-meta" style="margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">Hierarchy</div>
+    {% for item in hierarchy_articles %}
+      {% with article=item.article %}
+      <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}" style="margin-left: {{ item.indent }}px;">
+        <div class="kb-meta" style="margin-bottom: 8px;">
+          <span>Updated {{ article.updated_at|timesince }} ago</span>
+          <span>{{ article.views }} views</span>
+        </div>
+        <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
+        <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+      </a>
+      {% endwith %}
+    {% endfor %}
+  {% endif %}
+
+  {% if other_articles %}
+    <div class="kb-meta" style="margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px;">Other Articles</div>
+    {% for article in other_articles %}
+      <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}">
+        <div class="kb-meta" style="margin-bottom: 8px;">
+          <span>Updated {{ article.updated_at|timesince }} ago</span>
+          <span>{{ article.views }} views</span>
+        </div>
+        <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
+        <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+      </a>
+    {% endfor %}
+  {% endif %}
+
+  {% if not hierarchy_articles and not other_articles %}
     <p style="color: rgba(255, 255, 255, 0.6);">No articles in this category yet.</p>
-  {% endfor %}
+  {% endif %}
 </div>
 {% endblock %}

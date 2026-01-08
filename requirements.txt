@@ -21,3 +21,6 @@ firebase-admin
 gunicorn
 reportlab
 openpyxl
+django-ckeditor
+django-storages
+boto3

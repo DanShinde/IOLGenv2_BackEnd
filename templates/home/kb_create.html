@@ -184,6 +184,20 @@
               {{ form.tags.errors }}
             </div>
           </div>
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Hierarchy placement</label>
+              {{ form.parent }}
+              {{ form.parent.errors }}
+            </div>
+            {% if form.is_hierarchy_root %}
+            <div>
+              <label class="kb-label">Hierarchy root (staff)</label>
+              {{ form.is_hierarchy_root }}
+              {{ form.is_hierarchy_root.errors }}
+            </div>
+            {% endif %}
+          </div>
         {% elif content_type == 'qa' %}
           <label class="kb-label">Question</label>
           {{ form.title }}
@@ -255,6 +269,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ form.media }}
 <script>
   (function () {
     const input = document.getElementById('id_attachments');

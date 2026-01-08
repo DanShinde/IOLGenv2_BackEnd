@@ -43,8 +43,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
-    list_display = ['title', 'category', 'author', 'views', 'updated_at']
-    list_filter = ['category', 'updated_at']
+    list_display = ['title', 'category', 'parent', 'is_hierarchy_root', 'author', 'views', 'updated_at']
+    list_filter = ['category', 'is_hierarchy_root', 'updated_at']
     search_fields = ['title', 'content', 'excerpt', 'author__username']
     prepopulated_fields = {'slug': ('title',)}
     readonly_fields = ['views', 'created_at', 'updated_at']

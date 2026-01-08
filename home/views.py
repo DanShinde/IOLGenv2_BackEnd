@@ -58,31 +58,130 @@ def clear_cache(request):
     return JsonResponse({"status": "ok", "message": "Cache cleared"})
 
 
-@login_required
-def forum_home(request):
-    categories = Category.objects.all()
-    articles = Article.objects.select_related('category', 'author').prefetch_related('tags').order_by('-updated_at')
-    questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags').annotate(
-        answer_count=Count('answers')
-    ).order_by('-created_at')
-    reports = Report.objects.select_related('application', 'reporter', 'assignee').prefetch_related('tags').annotate(
-        comment_count=Count('comments')
-    ).order_by('-updated_at')
+def build_article_hierarchy(articles):
+    articles_list = list(articles)
+    if not articles_list:
+        return []
 
-    open_bugs = reports.filter(type=Report.TYPE_BUG, status__in=[Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]).count()
-    open_features = reports.filter(type=Report.TYPE_FEATURE, status__in=[Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]).count()
+    articles_by_parent = {}
+    articles_by_id = {}
+    for article in articles_list:
+        articles_by_id[article.id] = article
+        articles_by_parent.setdefault(article.parent_id, []).append(article)
 
-    total_articles = articles.count()
-    total_questions = questions.count()
-    total_reports = reports.count()
+    roots = [article for article in articles_list if article.is_hierarchy_root]
+    if not roots:
+        roots = [article for article in articles_list if article.parent_id is None]
+
+    for article in articles_list:
+        if article.is_hierarchy_root:
+            continue
+        if article.parent_id and article.parent_id not in articles_by_id:
+            roots.append(article)
+
+    unique_roots = []
+    seen_root_ids = set()
+    for root in roots:
+        if root.id in seen_root_ids:
+            continue
+        seen_root_ids.add(root.id)
+        unique_roots.append(root)
+    roots = sorted(unique_roots, key=lambda item: item.title.lower())
+
+    hierarchy = []
+    visited = set()
+
+    def add_node(node, depth):
+        if node.id in visited:
+            return
+        visited.add(node.id)
+        hierarchy.append({'article': node, 'indent': depth * 18})
+        children = articles_by_parent.get(node.id, [])
+        for child in sorted(children, key=lambda item: item.title.lower()):
+            add_node(child, depth + 1)
+
+    for root in roots:
+        add_node(root, 0)
+
+    added_ids = {item['article'].id for item in hierarchy}
+    leftovers = [article for article in articles_list if article.id not in added_ids]
+    for article in sorted(leftovers, key=lambda item: item.title.lower()):
+        hierarchy.append({'article': article, 'indent': 0})
+
+    return hierarchy
+
+
+def build_article_tree(articles):
+    articles_list = list(articles)
+    if not articles_list:
+        return []
+
+    articles_by_parent = {}
+    articles_by_id = {}
+    for article in articles_list:
+        articles_by_id[article.id] = article
+        articles_by_parent.setdefault(article.parent_id, []).append(article)
+
+    roots = [article for article in articles_list if article.is_hierarchy_root]
+    if not roots:
+        roots = [article for article in articles_list if article.parent_id is None]
+
+    for article in articles_list:
+        if article.is_hierarchy_root:
+            continue
+        if article.parent_id and article.parent_id not in articles_by_id:
+            roots.append(article)
+
+    unique_roots = []
+    seen_root_ids = set()
+    for root in roots:
+        if root.id in seen_root_ids:
+            continue
+        seen_root_ids.add(root.id)
+        unique_roots.append(root)
+    roots = sorted(unique_roots, key=lambda item: item.title.lower())
+
+    visited = set()
+
+    def build_node(node):
+        if node.id in visited:
+            return None
+        visited.add(node.id)
+        children = []
+        for child in sorted(articles_by_parent.get(node.id, []), key=lambda item: item.title.lower()):
+            child_node = build_node(child)
+            if child_node:
+                children.append(child_node)
+        return {'article': node, 'children': children}
+
+    tree = []
+    for root in roots:
+        node = build_node(root)
+        if node:
+            tree.append(node)
+
+    leftovers = [article for article in articles_list if article.id not in visited]
+    for article in sorted(leftovers, key=lambda item: item.title.lower()):
+        tree.append({'article': article, 'children': []})
+
+    return tree
+
+
+def get_kb_stats_context():
+    total_articles = Article.objects.count()
+    total_questions = Question.objects.count()
+    total_reports = Report.objects.count()
     total_interactions = Answer.objects.count() + ReportComment.objects.count()
     total_users = get_user_model().objects.count()
-
-    context = {
-        'categories': categories,
-        'articles': articles,
-        'questions': questions,
-        'reports': reports,
+    open_bugs = Report.objects.filter(
+        type=Report.TYPE_BUG,
+        status__in=[Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]
+    ).count()
+    open_features = Report.objects.filter(
+        type=Report.TYPE_FEATURE,
+        status__in=[Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]
+    ).count()
+    return {
         'total_articles': total_articles,
         'total_questions': total_questions,
         'total_reports': total_reports,
@@ -91,16 +190,61 @@ def forum_home(request):
         'open_bugs': open_bugs,
         'open_features': open_features,
     }
+
+
+def get_kb_sidebar_context():
+    hierarchy_tree = build_article_tree(
+        Article.objects.only('id', 'title', 'slug', 'parent_id', 'is_hierarchy_root')
+        .filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
+        .order_by('title')
+    )
+    other_articles_sidebar = Article.objects.only('id', 'title', 'slug').filter(
+        parent__isnull=True,
+        is_hierarchy_root=False
+    ).order_by('title')
+    return {
+        'hierarchy_tree': hierarchy_tree,
+        'other_articles_sidebar': other_articles_sidebar,
+    }
+
+
+@login_required
+def forum_home(request):
+    articles = Article.objects.select_related('category', 'author', 'parent').prefetch_related('tags').order_by('-updated_at')
+    hierarchy_articles = build_article_hierarchy(
+        articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
+    )
+    other_articles = articles.filter(parent__isnull=True, is_hierarchy_root=False)
+    questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags').annotate(
+        answer_count=Count('answers')
+    ).order_by('-created_at')
+    reports = Report.objects.select_related('application', 'reporter', 'assignee').prefetch_related('tags').annotate(
+        comment_count=Count('comments')
+    ).order_by('-updated_at')
+
+    context = {
+        'hierarchy_articles': hierarchy_articles,
+        'other_articles': other_articles,
+        'questions': questions,
+        'reports': reports,
+    }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
     return render(request, 'home/forum_home.html', context)
 
 
 @login_required
 def article_category(request, slug):
     category = get_object_or_404(Category, slug=slug)
-    articles = Article.objects.filter(category=category).select_related('author').prefetch_related('tags').order_by('-updated_at')
+    articles = Article.objects.filter(category=category).select_related('author', 'parent').prefetch_related('tags').order_by('-updated_at')
+    hierarchy_articles = build_article_hierarchy(
+        articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
+    )
+    other_articles = articles.filter(parent__isnull=True, is_hierarchy_root=False)
     context = {
         'category': category,
-        'articles': articles,
+        'hierarchy_articles': hierarchy_articles,
+        'other_articles': other_articles,
     }
     return render(request, 'home/kb_category.html', context)
 
@@ -112,7 +256,10 @@ def article_detail(request, slug):
     article.refresh_from_db(fields=['views'])
     context = {
         'article': article,
+        'active_tab': 'wiki',
     }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
     return render(request, 'home/kb_article_detail.html', context)
 
 
@@ -140,7 +287,10 @@ def question_detail(request, pk):
         'question': question,
         'answers': question.answers.all(),
         'answer_form': form,
+        'active_tab': 'qa',
     }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
     return render(request, 'home/kb_question_detail.html', context)
 
 
@@ -169,7 +319,10 @@ def report_detail(request, pk):
         'comments': report.comments.all(),
         'attachments': report.attachments.all(),
         'comment_form': form,
+        'active_tab': 'reports',
     }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
     return render(request, 'home/kb_report_detail.html', context)
 
 
@@ -186,7 +339,7 @@ def kb_create(request):
         content_type = ''
 
     if content_type == 'wiki':
-        form = ArticleForm(request.POST or None)
+        form = ArticleForm(request.POST or None, user=request.user)
         if request.method == 'POST' and form.is_valid():
             article = form.save(commit=False)
             article.author = request.user
@@ -240,7 +393,7 @@ def article_update(request, slug):
         messages.error(request, 'You do not have permission to edit this article.')
         return redirect(article.get_absolute_url())
 
-    form = ArticleForm(request.POST or None, instance=article)
+    form = ArticleForm(request.POST or None, instance=article, user=request.user)
     if request.method == 'POST' and form.is_valid():
         form.save()
         messages.success(request, 'Article updated.')
