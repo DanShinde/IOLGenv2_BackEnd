@@ -221,6 +221,7 @@ MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', '')
 MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'media')
 MINIO_REGION = os.getenv('MINIO_REGION', 'us-east-1')
 MINIO_USE_HTTPS = os.getenv('MINIO_USE_HTTPS', 'False').lower() in ('true', '1', 'yes')
+MINIO_PUBLIC_URL = os.getenv('MINIO_PUBLIC_URL', '').rstrip('/')
 if MINIO_ENDPOINT and '://' not in MINIO_ENDPOINT:
     MINIO_ENDPOINT = f"{'https' if MINIO_USE_HTTPS else 'http'}://{MINIO_ENDPOINT}"
 USE_MINIO = bool(MINIO_ENDPOINT and MINIO_ACCESS_KEY and MINIO_SECRET_KEY and MINIO_BUCKET)
@@ -240,7 +241,18 @@ if USE_MINIO:
         'default': {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'},
         'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
     }
-    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+    if MINIO_PUBLIC_URL:
+        MEDIA_URL = f"{MINIO_PUBLIC_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+        AWS_S3_CUSTOM_DOMAIN = f"{MINIO_PUBLIC_URL.replace('http://', '').replace('https://', '')}/{AWS_STORAGE_BUCKET_NAME}"
+    else:
+        MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+
+    if MINIO_PUBLIC_URL:
+        MEDIA_URL = f"{MINIO_PUBLIC_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+        AWS_S3_CUSTOM_DOMAIN = f"{MINIO_PUBLIC_URL.replace('http://', '').replace('https://', '')}/{AWS_STORAGE_BUCKET_NAME}"
+        AWS_S3_URL_PROTOCOL = 'https:' if MINIO_PUBLIC_URL.startswith('https://') else 'http:'
+    else:
+        MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 else:
     # Absolute path to the directory where uploaded media files will be stored.
