@@ -76,6 +76,9 @@
         {% if hide_completed_active %}
         <input type="hidden" name="hide_completed" value="1">
         {% endif %}
+        <input type="hidden" name="chart_view" id="input_chart_view" value="monthly">
+        <input type="hidden" name="chart_stage" id="input_chart_stage" value="">
+        <input type="hidden" name="chart_year" id="input_chart_year" value="">
         <div class="card mb-4">
             <a href="#filterCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button">
                 <h5 class="card-header-title mb-0"><i class="fas fa-sliders-h me-2"></i>Filter Options</h5>
@@ -335,25 +338,49 @@
         </div>
     </div>
 
+    <!-- Common Chart Controls -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card mb-3">
+                <div class="card-body d-flex align-items-center gap-3 py-2">
+                    <h6 class="mb-0 text-muted"><i class="fas fa-filter me-2"></i>Chart Controls:</h6>
+                    
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="small fw-bold">Stage:</label>
+                        <select id="commonStageSelector" class="form-select form-select-sm w-auto" onchange="handleCommonFilterChange()">
+                            <optgroup label="Automation">
+                                {% for stage_key, stage_display in automation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
+                            </optgroup>
+                            <optgroup label="Emulation">
+                                {% for stage_key, stage_display in emulation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="small fw-bold">View:</label>
+                        <select id="commonViewSelector" class="form-select form-select-sm w-auto" onchange="handleCommonFilterChange()">
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                        </select>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="small fw-bold">Year:</label>
+                        <select id="commonYearSelector" class="form-select form-select-sm w-auto" style="display: none;" onchange="handleCommonFilterChange()">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-header-title mb-0"><i class="fas fa-chart-line me-2"></i>Stage Performance Trends (Planned vs Actual)</h5>
-                    <div class="d-flex gap-2">
-                        <select id="trendViewSelector" class="form-select form-select-sm w-auto" onchange="updateTrendChart()">
-                            <option value="monthly">Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                        </select>
-                        <select id="trendYearSelector" class="form-select form-select-sm w-auto" style="display: none;" onchange="updateTrendChart()">
-                            <!-- Options populated by JS -->
-                        </select>
-                        <select id="stageTrendSelector" class="form-select form-select-sm w-auto" onchange="handleStageChange()">
-                            {% for stage_key, stage_display in stage_names %}
-                                <option value="{{ stage_key }}">{{ stage_display }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
                 </div>
                 <div class="card-body">
                     <div style="height: 350px;">
@@ -369,27 +396,25 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-header-title mb-0"><i class="fas fa-percentage me-2"></i>Stage OTIF Trends (On Time In Full)</h5>
-                    <div class="d-flex gap-2">
-                        <select id="otifViewSelector" class="form-select form-select-sm w-auto" onchange="updateOtifChart()">
-                            <option value="monthly">Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                        </select>
-                        <select id="otifYearSelector" class="form-select form-select-sm w-auto" style="display: none;" onchange="updateOtifChart()">
-                            <!-- Options populated by JS -->
-                        </select>
-                        <select id="stageOtifSelector" class="form-select form-select-sm w-auto" onchange="handleOtifStageChange()">
-                            <optgroup label="Automation">
-                                {% for stage_key, stage_display in automation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
-                            </optgroup>
-                            <optgroup label="Emulation">
-                                {% for stage_key, stage_display in emulation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
-                            </optgroup>
-                        </select>
-                    </div>
                 </div>
                 <div class="card-body">
                     <div style="height: 350px;">
                         <canvas id="stageOtifChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-header-title mb-0"><i class="fas fa-stopwatch me-2"></i>Emulation Timing Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <div style="height: 350px;">
+                        <canvas id="emuTimingChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -547,6 +572,64 @@ document.addEventListener('DOMContentLoaded', function() {
     equalizeChartCardHeights();
     // Optional: Re-run when the window is resized
     window.addEventListener('resize', equalizeChartCardHeights);
+
+    // --- Chart Initialization with Persistence ---
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterStage = urlParams.get('chart_filter_stage');
+    const filterMonth = urlParams.get('chart_filter_month');
+    const filterType = urlParams.get('chart_filter_type');
+    const chartViewParam = urlParams.get('chart_view');
+    const chartStageParam = urlParams.get('chart_stage');
+    const chartYearParam = urlParams.get('chart_year');
+
+    function getFYFromDateStr(dateStr) {
+        if (!dateStr) return null;
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return null;
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        let fyStart = (month >= 4) ? year : year - 1;
+        let fyEnd = fyStart + 1;
+        return `FY ${String(fyStart).slice(-2)}-${String(fyEnd).slice(-2)}`;
+    }
+
+    // Initialize Common Controls and Charts
+    if (document.getElementById('commonStageSelector')) {
+        const stageSelector = document.getElementById('commonStageSelector');
+        const viewSelector = document.getElementById('commonViewSelector');
+        const yearSelector = document.getElementById('commonYearSelector');
+        
+        // 1. Set Stage
+        // Priority: Explicit chart_stage > Click filter stage
+        let targetStage = chartStageParam || (filterStage ? filterStage : null);
+        if (targetStage && [...stageSelector.options].some(o => o.value === targetStage)) {
+            stageSelector.value = targetStage;
+        }
+
+        // 2. Set View
+        if (chartViewParam) {
+            viewSelector.value = chartViewParam;
+        }
+
+        // 3. Populate Years based on Stage
+        populateCommonYearSelector();
+
+        // 4. Set Year
+        // Priority: Explicit chart_year > Derived from click filter month
+        let targetYear = chartYearParam;
+        if (!targetYear && filterMonth) {
+            targetYear = getFYFromDateStr(filterMonth);
+        }
+        if (targetYear && [...yearSelector.options].some(o => o.value === targetYear)) {
+            yearSelector.value = targetYear;
+        }
+
+        // 5. Update Charts
+        updateTrendChart();
+        updateOtifChart();
+        updateEmuChart();
+    }
 });
 
 // Stage Trend Chart Logic
@@ -554,30 +637,40 @@ const trendCtx = document.getElementById('stageTrendChart');
 const allTrendData = JSON.parse('{{ stage_trend_data|escapejs }}');
 let trendChart = null;
 
-function handleStageChange() {
-    populateYearSelector();
+function handleCommonFilterChange() {
+    populateCommonYearSelector();
     updateTrendChart();
+    updateOtifChart();
+    updateEmuChart();
 }
 
-function populateYearSelector() {
-    const stageSelector = document.getElementById('stageTrendSelector');
-    const yearSelector = document.getElementById('trendYearSelector');
+function populateCommonYearSelector() {
+    const stageSelector = document.getElementById('commonStageSelector');
+    const yearSelector = document.getElementById('commonYearSelector');
     
     // Store current selection before clearing
     const currentSelection = yearSelector.value;
 
     const selectedStage = stageSelector.value;
-    const data = allTrendData[selectedStage];
+    const trendData = allTrendData[selectedStage];
+    const otifData = allOtifData[selectedStage];
+    const emuData = emuTimingData; // Global variable from below
 
     yearSelector.innerHTML = '';
     
-    if (!data || !data.financial_years || data.financial_years.length === 0) {
+    // Combine years from both datasets to ensure coverage
+    let years = [];
+    if (trendData && trendData.financial_years) years = [...years, ...trendData.financial_years];
+    if (otifData && otifData.financial_years) years = [...years, ...otifData.financial_years];
+    if (emuData && emuData.financial_years) years = [...years, ...emuData.financial_years];
+
+    if (years.length === 0) {
         yearSelector.style.display = 'none';
         return;
     }
 
     // Extract unique FYs and sort descending
-    const uniqueFYs = [...new Set(data.financial_years)].sort().reverse();
+    const uniqueFYs = [...new Set(years)].sort().reverse();
     
     // Only show selector if we have data
     if (uniqueFYs.length > 0) {
@@ -603,12 +696,23 @@ function populateYearSelector() {
 function updateTrendChart() {
     if (!trendCtx) return;
     
-    const stageSelector = document.getElementById('stageTrendSelector');
-    const viewSelector = document.getElementById('trendViewSelector');
-    const yearSelector = document.getElementById('trendYearSelector');
+    const stageSelector = document.getElementById('commonStageSelector');
+    const viewSelector = document.getElementById('commonViewSelector');
+    const yearSelector = document.getElementById('commonYearSelector');
     const selectedStage = stageSelector.value;
     const viewType = viewSelector ? viewSelector.value : 'monthly';
     const selectedFY = yearSelector.value;
+
+    // Update hidden input and URL state for persistence
+    if (document.getElementById('input_chart_view')) document.getElementById('input_chart_view').value = viewType;
+    if (document.getElementById('input_chart_stage')) document.getElementById('input_chart_stage').value = selectedStage;
+    if (document.getElementById('input_chart_year')) document.getElementById('input_chart_year').value = selectedFY;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('chart_view', viewType);
+    url.searchParams.set('chart_stage', selectedStage);
+    url.searchParams.set('chart_year', selectedFY);
+    window.history.replaceState({}, '', url);
     
     const rawData = allTrendData[selectedStage] || { labels: [], years: [], financial_years: [], months: [], planned: [], actual: [] };
     
@@ -616,6 +720,8 @@ function updateTrendChart() {
     let filteredLabels = [];
     let filteredPlanned = [];
     let filteredActual = [];
+    let filteredYears = [];
+    let filteredMonths = [];
 
     if (viewType === 'monthly') {
         if (rawData.financial_years) {
@@ -624,6 +730,8 @@ function updateTrendChart() {
                     filteredLabels.push(rawData.labels[i]);
                     filteredPlanned.push(rawData.planned[i]);
                     filteredActual.push(rawData.actual[i]);
+                    filteredYears.push(rawData.years[i]);
+                    filteredMonths.push(rawData.months[i]);
                 }
             }
         }
@@ -683,6 +791,30 @@ function updateTrendChart() {
                 mode: 'index',
                 intersect: false,
             },
+            onClick: (e, activeElements) => {
+                if (activeElements.length === 0 || viewType !== 'monthly') return;
+                
+                const index = activeElements[0].index;
+                const datasetIndex = activeElements[0].datasetIndex;
+                
+                const year = filteredYears[index];
+                const month = filteredMonths[index];
+                const stage = selectedStage;
+                const type = datasetIndex === 0 ? 'planned' : 'actual';
+                
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+                
+                const url = new URL(window.location.href);
+                url.searchParams.set('chart_filter_stage', stage);
+                url.searchParams.set('chart_filter_month', dateStr);
+                url.searchParams.set('chart_filter_type', type);
+                url.hash = 'resultsCollapse';
+                
+                window.location.href = url.toString();
+            },
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+            },
             plugins: {
                 tooltip: {
                     callbacks: {
@@ -690,6 +822,12 @@ function updateTrendChart() {
                             return context[0].label;
                         }
                     }
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    color: '#444',
+                    font: { weight: 'bold' }
                 }
             },
             scales: {
@@ -703,65 +841,24 @@ function updateTrendChart() {
     });
 }
 
-// Initialize the trend chart
-if (document.getElementById('stageTrendSelector')) {
-    handleStageChange();
-}
-
 // --- Stage OTIF Chart Logic ---
 const otifCtx = document.getElementById('stageOtifChart');
 const allOtifData = JSON.parse('{{ stage_otif_data|escapejs }}');
 let otifChart = null;
 
-function handleOtifStageChange() {
-    populateOtifYearSelector();
-    updateOtifChart();
-}
-
-function populateOtifYearSelector() {
-    const stageSelector = document.getElementById('stageOtifSelector');
-    const yearSelector = document.getElementById('otifYearSelector');
-    const currentSelection = yearSelector.value;
-    const selectedStage = stageSelector.value;
-    const data = allOtifData[selectedStage];
-
-    yearSelector.innerHTML = '';
-    
-    if (!data || !data.financial_years || data.financial_years.length === 0) {
-        yearSelector.style.display = 'none';
-        return;
-    }
-
-    const uniqueFYs = [...new Set(data.financial_years)].sort().reverse();
-    
-    if (uniqueFYs.length > 0) {
-        yearSelector.style.display = 'block';
-        uniqueFYs.forEach(fy => {
-            const option = document.createElement('option');
-            option.value = fy;
-            option.text = fy;
-            yearSelector.appendChild(option);
-        });
-        
-        if (currentSelection && uniqueFYs.includes(currentSelection)) {
-            yearSelector.value = currentSelection;
-        } else {
-            yearSelector.value = uniqueFYs[0];
-        }
-    } else {
-        yearSelector.style.display = 'none';
-    }
-}
-
 function updateOtifChart() {
     if (!otifCtx) return;
     
-    const stageSelector = document.getElementById('stageOtifSelector');
-    const viewSelector = document.getElementById('otifViewSelector');
-    const yearSelector = document.getElementById('otifYearSelector');
+    const stageSelector = document.getElementById('commonStageSelector');
+    const viewSelector = document.getElementById('commonViewSelector');
+    const yearSelector = document.getElementById('commonYearSelector');
     const selectedStage = stageSelector.value;
     const viewType = viewSelector ? viewSelector.value : 'monthly';
     const selectedFY = yearSelector.value;
+
+    // Hidden inputs and URL state are already updated by updateTrendChart, 
+    // but we can leave them here or remove them. 
+    // It's safer to keep them in case this function is called independently in future.
     
     const rawData = allOtifData[selectedStage] || { labels: [], financial_years: [], months: [], total: [], on_time: [] };
     
@@ -769,6 +866,8 @@ function updateOtifChart() {
     let filteredData = [];
     let filteredTotal = [];
     let filteredOnTime = [];
+    let filteredYears = [];
+    let filteredMonths = [];
 
     if (viewType === 'monthly') {
         if (rawData.financial_years) {
@@ -781,6 +880,8 @@ function updateOtifChart() {
                     filteredData.push(percentage);
                     filteredTotal.push(total);
                     filteredOnTime.push(onTime);
+                    filteredYears.push(rawData.years[i]);
+                    filteredMonths.push(rawData.months[i]);
                 }
             }
         }
@@ -853,6 +954,30 @@ function updateOtifChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: (e, activeElements) => {
+                if (activeElements.length === 0 || viewType !== 'monthly') return;
+                
+                const index = activeElements[0].index;
+                // Dataset 0 is the OTIF line, Dataset 1 is the Target line
+                if (activeElements[0].datasetIndex !== 0) return;
+
+                const year = filteredYears[index];
+                const month = filteredMonths[index];
+                const stage = selectedStage;
+                
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+                
+                const url = new URL(window.location.href);
+                url.searchParams.set('chart_filter_stage', stage);
+                url.searchParams.set('chart_filter_month', dateStr);
+                url.searchParams.set('chart_filter_type', 'otif_total');
+                url.hash = 'resultsCollapse';
+                
+                window.location.href = url.toString();
+            },
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -888,9 +1013,115 @@ function updateOtifChart() {
     });
 }
 
-// Initialize the OTIF chart
-if (document.getElementById('stageOtifSelector')) {
-    handleOtifStageChange();
+// --- Emulation Timing Chart Logic ---
+const emuTimingCtx = document.getElementById('emuTimingChart');
+const emuTimingData = JSON.parse('{{ emu_timing_data|escapejs }}');
+let emuChart = null;
+
+function updateEmuChart() {
+    if (!emuTimingCtx) return;
+
+    const viewSelector = document.getElementById('commonViewSelector');
+    const yearSelector = document.getElementById('commonYearSelector');
+    const viewType = viewSelector ? viewSelector.value : 'monthly';
+    const selectedFY = yearSelector.value;
+
+    const rawData = emuTimingData || { labels: [], financial_years: [], months: [], cat1: [], cat2: [], cat3: [] };
+
+    let filteredLabels = [];
+    let filteredCat1 = [];
+    let filteredCat2 = [];
+    let filteredCat3 = [];
+
+    if (viewType === 'monthly') {
+        if (rawData.financial_years) {
+            for (let i = 0; i < rawData.financial_years.length; i++) {
+                if (rawData.financial_years[i] === selectedFY) {
+                    filteredLabels.push(rawData.labels[i]);
+                    filteredCat1.push(rawData.cat1[i]);
+                    filteredCat2.push(rawData.cat2[i]);
+                    filteredCat3.push(rawData.cat3[i]);
+                }
+            }
+        }
+    } else {
+        // Quarterly Aggregation
+        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
+        filteredCat1 = [0, 0, 0, 0];
+        filteredCat2 = [0, 0, 0, 0];
+        filteredCat3 = [0, 0, 0, 0];
+
+        if (rawData.financial_years) {
+            for (let i = 0; i < rawData.financial_years.length; i++) {
+                if (rawData.financial_years[i] === selectedFY) {
+                    const month = rawData.months[i];
+                    let quarterIndex;
+                    if (month >= 4) {
+                        quarterIndex = Math.floor((month - 4) / 3);
+                    } else {
+                        quarterIndex = 3;
+                    }
+                    filteredCat1[quarterIndex] += rawData.cat1[i];
+                    filteredCat2[quarterIndex] += rawData.cat2[i];
+                    filteredCat3[quarterIndex] += rawData.cat3[i];
+                }
+            }
+        }
+    }
+
+    if (emuChart) {
+        emuChart.destroy();
+    }
+
+    emuChart = new Chart(emuTimingCtx, {
+        type: 'bar',
+        data: {
+            labels: filteredLabels,
+            datasets: [
+                {
+                    label: 'Before Dispatch',
+                    data: filteredCat1,
+                    backgroundColor: 'rgba(25, 135, 84, 0.7)', // Success Green
+                },
+                {
+                    label: 'After Dispatch / Before Go Live',
+                    data: filteredCat2,
+                    backgroundColor: 'rgba(255, 193, 7, 0.7)', // Warning Yellow
+                },
+                {
+                    label: 'After Go Live',
+                    data: filteredCat3,
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)', // Danger Red
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true },
+                y: { 
+                    stacked: true,
+                    beginAtZero: true,
+                    title: { display: true, text: 'Number of Projects' }
+                }
+            },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw}`;
+                        }
+                    }
+                },
+                datalabels: {
+                    anchor: 'center', align: 'center', color: '#fff', font: { weight: 'bold' },
+                    formatter: (value) => value > 0 ? value : ''
+                }
+            }
+        }
+    });
 }
 
 // Function to clear inputs for a specific stage row

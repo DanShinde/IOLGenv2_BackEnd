@@ -536,6 +536,44 @@ def project_reports(request):
     # --- Capture QS for Charts (Before Hide Completed) ---
     chart_projects_qs = projects_qs
 
+    # --- Chart Click Filtering ---
+    chart_filter_stage = query_params.get('chart_filter_stage')
+    chart_filter_month = query_params.get('chart_filter_month')
+    chart_filter_type = query_params.get('chart_filter_type')
+
+    if chart_filter_stage and chart_filter_month and chart_filter_type:
+        try:
+            filter_date = parse_date(chart_filter_month)
+            if filter_date:
+                if chart_filter_type == 'planned':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__planned_date__year=filter_date.year,
+                        stages__planned_date__month=filter_date.month
+                    )
+                elif chart_filter_type == 'actual':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__actual_date__year=filter_date.year,
+                        stages__actual_date__month=filter_date.month
+                    )
+                elif chart_filter_type == 'otif_total':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__planned_date__year=filter_date.year,
+                        stages__planned_date__month=filter_date.month
+                    )
+                elif chart_filter_type == 'otif_on_time':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__planned_date__year=filter_date.year,
+                        stages__planned_date__month=filter_date.month,
+                        stages__actual_date__lte=F('stages__planned_date'),
+                        stages__actual_date__isnull=False
+                    )
+        except (ValueError, TypeError):
+            pass
+
     # --- Check for the 'hide_completed' filter ---
     hide_completed = query_params.get('hide_completed') == '1'
     if hide_completed:
@@ -663,12 +701,12 @@ def project_reports(request):
     
     otif_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
-        actual_date__isnull=False
+        planned_date__isnull=False
     ).annotate(
-        month=TruncMonth('actual_date')
+        month=TruncMonth('planned_date')
     ).values('name', 'month').annotate(
         total=Count('id'),
-        on_time=Count('id', filter=Q(planned_date__isnull=False) & Q(actual_date__lte=F('planned_date')))
+        on_time=Count('id', filter=Q(actual_date__isnull=False) & Q(actual_date__lte=F('planned_date')))
     ).order_by('month')
 
     temp_otif = defaultdict(lambda: defaultdict(lambda: {'total': 0, 'on_time': 0}))
@@ -704,6 +742,57 @@ def project_reports(request):
             'on_time': on_time_data
         }
 
+    # --- NEW: Emulation Timing Analysis Trends ---
+    # Categories:
+    # 1. Before Dispatch
+    # 2. After Dispatch but Before Go Live
+    # 3. After Go Live
+    emu_trend_data = defaultdict(lambda: {'cat1': 0, 'cat2': 0, 'cat3': 0})
+    
+    for p in distinct_chart_projects:
+        stages_map = {s.name: s for s in p.stages.all()}
+        
+        emu = stages_map.get('Emulation Testing')
+        dispatch = stages_map.get('Dispatch')
+        comm = stages_map.get('Commissioning')
+        
+        if emu and emu.actual_date:
+            month_key = emu.actual_date.replace(day=1)
+            
+            dispatch_date = dispatch.actual_date if (dispatch and dispatch.actual_date) else None
+            # Using planned_start_date as the 'Start Date' for Go Live (Commissioning) as per user request
+            comm_start_date = comm.planned_start_date if (comm and comm.planned_start_date) else None
+            
+            # 1. Before Dispatch (or Dispatch not yet done)
+            if not dispatch_date or emu.actual_date <= dispatch_date:
+                emu_trend_data[month_key]['cat1'] += 1
+            
+            # 2. After Dispatch but Before Go Live (or Go Live not yet done)
+            elif not comm_start_date or emu.actual_date <= comm_start_date:
+                emu_trend_data[month_key]['cat2'] += 1
+            
+            # 3. After Go Live
+            else:
+                emu_trend_data[month_key]['cat3'] += 1
+
+    sorted_months = sorted(emu_trend_data.keys())
+    emu_chart_data = {
+        'labels': [m.strftime('%b %Y') for m in sorted_months],
+        'years': [m.year for m in sorted_months],
+        'months': [m.month for m in sorted_months],
+        'financial_years': [],
+        'cat1': [emu_trend_data[m]['cat1'] for m in sorted_months],
+        'cat2': [emu_trend_data[m]['cat2'] for m in sorted_months],
+        'cat3': [emu_trend_data[m]['cat3'] for m in sorted_months],
+    }
+    
+    for m in sorted_months:
+        if m.month >= 4:
+            fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+        else:
+            fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+        emu_chart_data['financial_years'].append(fy_str)
+
     context = {
 
         'projects_with_details': projects_with_details,
@@ -728,6 +817,7 @@ def project_reports(request):
         'hide_completed_active': hide_completed,
         'stage_trend_data': json.dumps(stage_trend_data),
         'stage_otif_data': json.dumps(stage_otif_data),
+        'emu_timing_data': json.dumps(emu_chart_data),
     }
     return render(request, 'tracker/project_report.html', context)
 
