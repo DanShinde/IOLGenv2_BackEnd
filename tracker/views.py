@@ -462,15 +462,6 @@ def project_reports(request):
     # --- The FIX is in this line: We add select_related and prefetch_related ---
     projects_qs = Project.objects.select_related('segment_con', 'team_lead').prefetch_related('stages').all()
 
-    # --- Check for the 'hide_completed' filter ---
-    hide_completed = query_params.get('hide_completed') == '1'
-    if hide_completed:
-        completed_project_ids = Project.objects.filter(
-            stages__name='Handover',
-            stages__status='Completed'
-        ).values_list('id', flat=True)
-        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
-
     # --- Get standard filter values ---
     # getlist needs a QueryDict, not a regular dict
     params_for_getlist = QueryDict(mutable=True)
@@ -542,7 +533,21 @@ def project_reports(request):
             # Combine Q object with standard kwargs
             projects_qs = projects_qs.filter(stage_q, **stage_query_filters)
 
+    # --- Capture QS for Charts (Before Hide Completed) ---
+    chart_projects_qs = projects_qs
+
+    # --- Check for the 'hide_completed' filter ---
+    hide_completed = query_params.get('hide_completed') == '1'
+    if hide_completed:
+        completed_project_ids = Project.objects.filter(
+            stages__name='Handover',
+            stages__status='Completed'
+        ).values_list('id', flat=True)
+        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
+
     distinct_projects = projects_qs.distinct()
+    distinct_chart_projects = chart_projects_qs.distinct()
+    chart_project_ids = chart_projects_qs.values_list('id', flat=True).distinct()
 
     # --- Prepare projects with their detailed summaries ---
     projects_with_details = []
@@ -602,7 +607,7 @@ def project_reports(request):
     
     # Aggregate Planned Counts by Month
     planned_qs = Stage.objects.filter(
-        project__in=distinct_projects,
+        project_id__in=chart_project_ids,
         planned_date__isnull=False
     ).annotate(
         month=TruncMonth('planned_date')
@@ -610,7 +615,7 @@ def project_reports(request):
 
     # Aggregate Actual Counts by Month
     actual_qs = Stage.objects.filter(
-        project__in=distinct_projects,
+        project_id__in=chart_project_ids,
         actual_date__isnull=False
     ).annotate(
         month=TruncMonth('actual_date')
@@ -657,13 +662,13 @@ def project_reports(request):
     stage_otif_data = {}
     
     otif_qs = Stage.objects.filter(
-        project__in=distinct_projects,
+        project_id__in=chart_project_ids,
         actual_date__isnull=False
     ).annotate(
         month=TruncMonth('actual_date')
     ).values('name', 'month').annotate(
         total=Count('id'),
-        on_time=Count('id', filter=Q(actual_date__lte=F('planned_date')))
+        on_time=Count('id', filter=Q(planned_date__isnull=False) & Q(actual_date__lte=F('planned_date')))
     ).order_by('month')
 
     temp_otif = defaultdict(lambda: defaultdict(lambda: {'total': 0, 'on_time': 0}))
