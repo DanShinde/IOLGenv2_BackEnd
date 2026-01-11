@@ -1474,11 +1474,23 @@ def add_update_remark(request, update_id):
         text = request.POST.get('remark_text')
         redirect_to = request.POST.get('redirect_to') # ✅ Get the new hidden field
         if text:
-            UpdateRemark.objects.create(
+            remark = UpdateRemark.objects.create(
                 update=update,
                 text=text,
                 added_by=request.user
             )
+            
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'success',
+                    'remark': {
+                        'user': remark.added_by.username if remark.added_by else 'Unknown',
+                        'date': remark.created_at.strftime("%b %d, %H:%M"),
+                        'text': remark.text,
+                        'initials': remark.added_by.username[:2].upper() if remark.added_by else '??'
+                    }
+                })
+
             messages.success(request, "Remark added successfully.")
             
     # ✅ Corrected redirect logic to handle both project and non-project updates
