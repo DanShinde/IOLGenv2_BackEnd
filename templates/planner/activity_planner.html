@@ -65,7 +65,7 @@
     }
 
     /* --- Key Structural and Sticky Column Styles --- */
-    .table-container { max-height: 75vh; overflow: auto; border-top: 1px solid #e5e7eb; scroll-behavior: smooth; }
+    .table-container { max-height: 75vh; overflow: auto; border-top: 1px solid #e5e7eb; scroll-behavior: smooth; overflow-anchor: none; }
     .table-container::-webkit-scrollbar { width: 10px; height: 10px; }
     .table-container::-webkit-scrollbar-track { background: #f1f5f9; }
     .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px;}
@@ -269,7 +269,7 @@
                         <th class="sticky-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
                         <th class="sticky-cell col-end px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">End</th>
                         <th class="sticky-cell col-actions px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
+                        {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" data-date="{{ d|date:'Y-m-d' }}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
                     </tr>
                     <tr class="h-8">
                         {% if not project and grouping_method != 'engineer' %}<th class="sticky-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
@@ -292,13 +292,9 @@
                                 <td colspan="{% if grouping_method == 'project' %}6{% else %}5{% endif %}" class="sticky-cell col-project px-3 py-1 font-bold text-sm text-gray-800 border-r">
                                     <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                 </td>
-                                {% for d in gantt_data.header_dates %}
-                                    <td class="gantt-cell p-0 relative {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" 
-                                        data-date="{{ d|date:'Y-m-d' }}"
-                                        title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% endif %}">
-                                        {% comment %} --- JS will inject group summary bars here --- {% endcomment %}
-                                    </td>
-                                {% endfor %}
+                                <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
+                                    <div class="timeline-row-container h-full w-full relative"></div>
+                                </td>
                             </tr>
                             {% endwith %}
                             {% endif %}
@@ -563,10 +559,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const assigneeCheckboxes = document.querySelectorAll('.assignee-checkbox');
     const clearFiltersBtn = document.getElementById('clearFilters');
     
-    const groupHeaders = document.querySelectorAll('.group-header');
-    const activityRows = document.querySelectorAll('.gantt-activity-row');
-    const noResultsRow = document.getElementById('no-results-row');
-    
+    // Virtual Scroll State
+    let vsRowsData = []; // { element, height, isGroup, groupId, searchData: {} }
+    let vsVisibleRows = [];
+    let vsCollapsedGroups = new Set();
+    let isVirtualScrollActive = false;
+    let isRenderPending = false;
+
     function applyFilters() {
         const globalSearch = searchInput ? searchInput.value.toLowerCase().trim() : '';
         
@@ -590,78 +589,86 @@ document.addEventListener('DOMContentLoaded', () => {
         const assigneeBtnText = document.getElementById('assigneeBtnText');
         if (assigneeBtnText) assigneeBtnText.textContent = selectedAssignees.length > 0 ? `Assignees (${selectedAssignees.length})` : 'Assignees (All)';
 
-        let anyRowVisible = false;
-        
-        activityRows.forEach(row => {
+        // Filter the Virtual Data instead of DOM
+        vsVisibleRows = vsRowsData.filter(row => {
+            // 1. Group Header Logic
+            if (row.isGroup) {
+                // We will filter groups later based on if they have visible children
+                // For now, keep them, we'll do a second pass or check children count
+                return true; 
+            }
+
+            // 2. Check if Group is Collapsed
+            if (row.groupId && vsCollapsedGroups.has(row.groupId)) {
+                return false;
+            }
+
             let isVisible = true;
             
+            // 3. Global Search
             if (globalSearch) {
-                const projectCode = row.dataset.projectCode || '';
-                const customer = row.dataset.customer || '';
-                const segment = row.dataset.segment || '';
-                const teamLead = row.dataset.teamLead || '';
-                const assignee = row.dataset.assignee || '';
-                const activityName = row.dataset.activityName || '';
-                
-                const matchesGlobal = projectCode.includes(globalSearch) || 
-                                      customer.includes(globalSearch) || 
-                                      segment.includes(globalSearch) || 
-                                      teamLead.includes(globalSearch) ||
-                                      assignee.includes(globalSearch) ||
-                                      activityName.includes(globalSearch);
+                const s = row.searchData;
+                const matchesGlobal = s.project.includes(globalSearch) || 
+                                      s.customer.includes(globalSearch) || 
+                                      s.segment.includes(globalSearch) || 
+                                      s.teamLead.includes(globalSearch) ||
+                                      s.assignee.includes(globalSearch) ||
+                                      s.activityName.includes(globalSearch);
                 if (!matchesGlobal) isVisible = false;
             }
 
+            // 4. Specific Filters
             if (isVisible && selectedSegments.length > 0) {
-                const segment = row.dataset.segment || '';
-                if (!selectedSegments.includes(segment)) isVisible = false;
+                if (!selectedSegments.includes(row.searchData.segment)) isVisible = false;
             }
 
             if (isVisible && selectedLeaders.length > 0) {
-                const teamLead = row.dataset.teamLead || '';
-                if (!selectedLeaders.includes(teamLead)) isVisible = false;
+                if (!selectedLeaders.includes(row.searchData.teamLead)) isVisible = false;
             }
 
             if (isVisible && selectedAssignees.length > 0) {
-                const assignee = row.dataset.assignee || '';
-                if (!selectedAssignees.includes(assignee)) isVisible = false;
+                if (!selectedAssignees.includes(row.searchData.assignee)) isVisible = false;
             }
 
             if (isVisible) {
                 for (const column in colFilters) {
-                    const cell = row.querySelector(`[data-filter-column="${column}"]`);
-                    // Use textContent to ensure hidden search spans are included
-                    if (!cell || !cell.textContent.toLowerCase().includes(colFilters[column])) {
+                    // We need to check the text content. We cached this in searchData.fullText or specific fields
+                    // For simplicity, let's assume column filters map to searchData fields or we check the cached text
+                    // Since we didn't cache every column specifically in init, let's use the element's text content which we cached
+                    // Or better, map the column names to searchData keys
+                    let val = '';
+                    if (column === 'project') val = row.searchData.project;
+                    else if (column === 'activity') val = row.searchData.activityName;
+                    else if (column === 'assignee') val = row.searchData.assignee;
+                    // Start/End dates are tricky without cache, let's skip or assume they are in fullText
+                    // For strict correctness with existing code:
+                    if (!row.searchData.fullText.includes(colFilters[column])) {
                         isVisible = false;
                         break;
                     }
                 }
             }
-
-            const isGroupedAndCollapsed = row.classList.contains('hidden');
             
-            if (isVisible) {
-                anyRowVisible = true;
-                if (!isGroupedAndCollapsed) {
-                    row.style.display = '';
-                } else if (isGroupedAndCollapsed && row.dataset.groupId === 'all-activities') {
-                    row.classList.remove('hidden');
-                    row.style.display = '';
-                }
-            } else {
-                row.style.display = 'none';
-            }
+            return isVisible;
         });
 
-        groupHeaders.forEach(header => {
-            const groupId = header.dataset.groupId;
-            const childRows = document.querySelectorAll(`.gantt-activity-row[data-group-id="${groupId}"]`);
-            const hasVisibleChild = Array.from(childRows).some(row => row.style.display !== 'none');
-            header.style.display = hasVisibleChild ? '' : 'none';
-            if(hasVisibleChild) anyRowVisible = true;
+        // Post-process: Hide groups with no visible children
+        // We need to know which groups have visible children
+        const visibleGroupIds = new Set();
+        vsVisibleRows.forEach(row => {
+            if (!row.isGroup && row.groupId) visibleGroupIds.add(row.groupId);
         });
-        
-        if (noResultsRow) noResultsRow.classList.toggle('hidden', anyRowVisible);
+
+        // Filter out groups that have no children in the visible set
+        vsVisibleRows = vsVisibleRows.filter(row => {
+            if (row.isGroup) {
+                return visibleGroupIds.has(row.groupId);
+            }
+            return true;
+        });
+
+        // Trigger Virtual Render
+        renderVirtualWindow(true);
     }
 
     if (searchInput) searchInput.addEventListener('keyup', applyFilters);
@@ -681,34 +688,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    groupHeaders.forEach((header, index) => {
-        const groupId = header.dataset.groupId;
-        if (!groupId) return;
-
-        header.addEventListener('click', () => {
+    // Group Header Click Logic (Delegated)
+    document.querySelector('tbody').addEventListener('click', (e) => {
+        const header = e.target.closest('.group-header');
+        if (header) {
+            const groupId = header.dataset.groupId;
             header.classList.toggle('collapsed');
-            const rowsToToggle = document.querySelectorAll(`.gantt-activity-row[data-group-id="${groupId}"]`);
-            const isCollapsed = header.classList.contains('collapsed');
-
-            rowsToToggle.forEach(row => {
-                if (isCollapsed) {
-                    row.classList.add('hidden');
-                } else {
-                    if (row.style.display !== 'none') { 
-                        row.classList.remove('hidden');
-                    }
-                }
-            });
+            
+            if (vsCollapsedGroups.has(groupId)) {
+                vsCollapsedGroups.delete(groupId);
+            } else {
+                vsCollapsedGroups.add(groupId);
+            }
             applyFilters();
-        });
-
-        if (index > 0) header.classList.add('collapsed');
-        else header.classList.remove('collapsed');
-    });
-    
-    document.querySelectorAll('.group-header.collapsed').forEach(header => {
-        const groupId = header.dataset.groupId;
-        document.querySelectorAll(`.gantt-activity-row[data-group-id="${groupId}"]`).forEach(row => row.classList.add('hidden'));
+        }
     });
     
     // --- Frontend Gantt Rendering Logic ---
@@ -725,15 +718,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function toISODateString(date) {
-        return date.toISOString().split('T')[0];
+        const y = date.getUTCFullYear();
+        const m = date.getUTCMonth() + 1;
+        const d = date.getUTCDate();
+        return `${y}-${m < 10 ? '0' + m : m}-${d < 10 ? '0' + d : d}`;
     }
 
     function getWorkDays(startDate, endDate, holidaysSet) {
         if (!startDate || !endDate) return [];
         let workDays = [];
         let currentDate = new Date(startDate.valueOf());
+        const endValue = endDate.valueOf();
 
-        while (currentDate <= endDate) {
+        while (currentDate.valueOf() <= endValue) {
             const day = currentDate.getUTCDay();
             const isWeekend = (day === 0 || day === 6);
             const dateStr = toISODateString(currentDate);
@@ -741,9 +738,36 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isWeekend && !holidaysSet.has(dateStr)) {
                 workDays.push(dateStr);
             }
-            currentDate = addDays(currentDate, 1);
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
         }
         return workDays;
+    }
+
+    function createGridBackground(headerDates, holidaysSet) {
+        const canvas = document.createElement('canvas');
+        const colWidth = 32; // Must match CSS min-w-[32px]
+        canvas.width = headerDates.length * colWidth;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+
+        headerDates.forEach((dateStr, index) => {
+            const x = index * colWidth;
+            const d = parseDate(dateStr);
+            const day = d.getUTCDay();
+            const isWeekend = (day === 0 || day === 6);
+            const isHoliday = holidaysSet.has(dateStr);
+
+            if (isHoliday) ctx.fillStyle = '#fef9c3';
+            else if (isWeekend) ctx.fillStyle = '#f8fafc';
+            else ctx.fillStyle = 'transparent';
+            
+            if (isHoliday || isWeekend) ctx.fillRect(x, 0, colWidth, 1);
+            
+            // Border
+            ctx.fillStyle = '#f1f5f9'; // border-gray-100
+            ctx.fillRect(x + colWidth - 1, 0, 1, 1);
+        });
+        return canvas.toDataURL();
     }
 
     function renderGantt() {
@@ -753,6 +777,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = JSON.parse(dataEl.textContent);
         const activitiesMap = new Map(data.activities.map(act => [act.pk, act]));
         const holidaysSet = new Set(data.holidays);
+
+        // Hide table body during rendering to prevent layout thrashing
+        const tableBody = document.querySelector('tbody');
+        if (tableBody) tableBody.style.display = 'none';
         
         // NEW: Leave Logic
         const leavesMap = new Map(Object.entries(data.leaves || {}));
@@ -786,58 +814,77 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        const activityCellCache = new Map();
-        const groupCellCache = new Map();
+        // OPTIMIZATION: Build maps
+        const activityRowMap = new Map();
+        const groupActivitiesMap = new Map();
 
         document.querySelectorAll('.gantt-activity-row').forEach(row => {
             const pk = parseInt(row.dataset.activityPk, 10);
-            const cellMap = new Map();
-            row.querySelectorAll('td.gantt-cell').forEach(cell => {
-                cellMap.set(cell.dataset.date, cell);
-            });
-            activityCellCache.set(pk, cellMap);
+            activityRowMap.set(pk, row);
+            const groupId = row.dataset.groupId;
+            if (groupId) {
+                if (!groupActivitiesMap.has(groupId)) groupActivitiesMap.set(groupId, []);
+                groupActivitiesMap.get(groupId).push(pk);
+            }
         });
 
-        document.querySelectorAll('.group-header').forEach(row => {
-            const groupId = row.dataset.groupId;
-            const cellMap = new Map();
-            row.querySelectorAll('td.gantt-cell').forEach(cell => {
-                cellMap.set(cell.dataset.date, cell);
-            });
-            groupCellCache.set(groupId, cellMap);
-        });
+        // Build Date -> Index Map from Header
+        const dateIndexMap = new Map();
+        const headerDates = [];
+        const headerRow = document.querySelector('thead tr:nth-child(2)');
+        if (headerRow) {
+            for (let i = 0; i < headerRow.cells.length; i++) {
+                const cell = headerRow.cells[i];
+                if (cell.classList.contains('gantt-cell') && cell.dataset.date) {
+                    dateIndexMap.set(cell.dataset.date, headerDates.length);
+                    headerDates.push(cell.dataset.date);
+                }
+            }
+        }
+
+        // Generate Background Grid
+        const bgImage = createGridBackground(headerDates, holidaysSet);
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `.timeline-row-container { background-image: url(${bgImage}); background-repeat: repeat-y; }`;
+        document.head.appendChild(styleSheet);
+
+        const COL_WIDTH = 32;
 
         allWorkDays.forEach((workDays, pk) => {
             const act = activitiesMap.get(pk);
-            const cellMap = activityCellCache.get(pk);
+            const row = activityRowMap.get(pk);
             
-            if (!act || !cellMap) return;
+            if (!act || !row) return;
+            
+            const container = row.querySelector('.timeline-row-container');
+            if (!container) return;
 
             workDays.forEach(dateStr => {
-                const cell = cellMap.get(dateStr);
-                if (cell) {
-                    let barClass = 'activity-bar';
-                    let title = `📋 ${act.name}\n👤 ${act.assignee || 'Unassigned'}\n📅 ${dateStr}`;
+                const index = dateIndexMap.get(dateStr);
+                if (index !== undefined) {
+                        let barClass = 'activity-bar';
+                        let title = `📋 ${act.name}\n👤 ${act.assignee || 'Unassigned'}\n📅 ${dateStr}`;
 
-                    // Check for Leaves
-                    const assigneeLeaves = leavesMap.get(act.assignee);
-                    const isLeave = assigneeLeaves && assigneeLeaves.includes(dateStr);
+                        // Check for Leaves
+                        const assigneeLeaves = leavesMap.get(act.assignee);
+                        const isLeave = assigneeLeaves && assigneeLeaves.includes(dateStr);
 
-                    if (isLeave) {
-                        barClass = 'leave-bar'; // Orange color
-                        title = `🏖️ On Leave: ${act.assignee}\n` + title;
-                    }
-                    // Only check overlap if NOT on leave (leave takes precedence visually?)
-                    // Or should overlap show even if on leave? Typically leave means not available.
-                    else if (act.assignee && overlaps.has(dateStr) && overlaps.get(dateStr).has(act.assignee)) {
-                        barClass = 'overlap-bar';
-                        title = `⚠️ OVERLAP: ${act.assignee} on ${dateStr}\n` + title;
-                    }
-                    
-                    const barDiv = document.createElement('div');
-                    barDiv.className = `gantt-bar ${barClass} mx-1`;
-                    barDiv.title = title;
-                    cell.appendChild(barDiv);
+                        if (isLeave) {
+                            barClass = 'leave-bar'; // Orange color
+                            title = `🏖️ On Leave: ${act.assignee}\n` + title;
+                        }
+                        else if (act.assignee && overlaps.has(dateStr) && overlaps.get(dateStr).has(act.assignee)) {
+                            barClass = 'overlap-bar';
+                            title = `⚠️ OVERLAP: ${act.assignee} on ${dateStr}\n` + title;
+                        }
+                        
+                        const barDiv = document.createElement('div');
+                        barDiv.className = `gantt-bar ${barClass} mx-1`;
+                        barDiv.style.position = 'absolute';
+                        barDiv.style.left = `${index * COL_WIDTH}px`;
+                        barDiv.style.width = `${COL_WIDTH - 8}px`; // mx-1 = 4px margin on sides
+                        barDiv.title = title;
+                        container.appendChild(barDiv);
                 }
             });
         });
@@ -846,15 +893,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const groupId = headerRow.dataset.groupId;
             const groupName = headerRow.querySelector('span').textContent || groupId;
             if (!groupId) return;
+            
+            const container = headerRow.querySelector('.timeline-row-container');
+            if (!container) return;
 
-            const cellMap = groupCellCache.get(groupId);
-            if (!cellMap) return;
-
-            const activityRows = document.querySelectorAll(`.gantt-activity-row[data-group-id="${groupId}"]`);
+            const pks = groupActivitiesMap.get(groupId) || [];
             const groupWorkDaysSet = new Set();
 
-            activityRows.forEach(actRow => {
-                const pk = parseInt(actRow.dataset.activityPk, 10);
+            pks.forEach(pk => {
                 const workDays = allWorkDays.get(pk);
                 if (workDays) {
                     workDays.forEach(day => groupWorkDaysSet.add(day));
@@ -868,20 +914,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const maxDate = sortedGroupDays[sortedGroupDays.length - 1];
 
             sortedGroupDays.forEach(dateStr => {
-                const cell = cellMap.get(dateStr);
-                if (cell) {
-                    const barDiv = document.createElement('div');
-                    let barClasses = 'gantt-bar project-timeline-bar my-2';
-                    
-                    if (dateStr === minDate) barClasses += ' summary-bar-start';
-                    if (dateStr === maxDate) barClasses += ' summary-bar-end';
-                    
-                    barDiv.className = barClasses; 
-                    barDiv.title = `Activity in '${groupName}' on ${dateStr}`;
-                    cell.appendChild(barDiv);
+                const index = dateIndexMap.get(dateStr);
+                if (index !== undefined) {
+                        const barDiv = document.createElement('div');
+                        let barClasses = 'gantt-bar project-timeline-bar my-2';
+                        
+                        if (dateStr === minDate) barClasses += ' summary-bar-start';
+                        if (dateStr === maxDate) barClasses += ' summary-bar-end';
+                        
+                        barDiv.className = barClasses; 
+                        barDiv.style.position = 'absolute';
+                        barDiv.style.left = `${index * COL_WIDTH}px`;
+                        barDiv.style.width = `${COL_WIDTH}px`;
+                        barDiv.title = `Activity in '${groupName}' on ${dateStr}`;
+                        container.appendChild(barDiv);
                 }
             });
         });
+
+        // Restore table body display
+        if (tableBody) tableBody.style.display = '';
+
+        // Initialize Virtual Scroll after rendering bars
+        initVirtualScroll();
     }
     
     const loader = document.getElementById('gantt-loader');
@@ -894,6 +949,129 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 300);
         }
     }, 100);
+
+// --- VIRTUAL SCROLL IMPLEMENTATION ---
+function initVirtualScroll() {
+    const tbody = document.querySelector('tbody');
+    const tableContainer = document.querySelector('.table-container');
+    if (!tbody || !tableContainer) return;
+
+    // 1. Capture all rows
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    if (allRows.length === 0) return;
+
+    // 2. Build Data Structure
+    vsRowsData = allRows.map(row => {
+        const isGroup = row.classList.contains('group-header');
+        const groupId = row.dataset.groupId;
+        
+        // Capture height before modifying DOM (avoid layout thrashing)
+        // If row is hidden (grouped), height is 0, so we use fallback.
+        const height = row.offsetHeight || (isGroup ? 32 : 40);
+
+        // FIX: Remove 'hidden' class from server-side rendering so VS can control visibility
+        row.classList.remove('hidden');
+
+        // Cache search data to avoid DOM access during filter
+        const searchData = {
+            project: (row.dataset.projectCode || '').toLowerCase(),
+            customer: (row.dataset.customer || '').toLowerCase(),
+            segment: (row.dataset.segment || '').toLowerCase(),
+            teamLead: (row.dataset.teamLead || '').toLowerCase(),
+            assignee: (row.dataset.assignee || '').toLowerCase(),
+            activityName: (row.dataset.activityName || '').toLowerCase(),
+            fullText: row.textContent.toLowerCase()
+        };
+
+        // Initialize collapsed state for groups (default collapsed except first?)
+        // Existing logic was: index > 0 collapsed.
+        if (isGroup && row.classList.contains('collapsed')) {
+            vsCollapsedGroups.add(groupId);
+        }
+
+        return {
+            element: row,
+            height: height,
+            isGroup: isGroup,
+            groupId: groupId,
+            searchData: searchData
+        };
+    });
+
+    // 3. Detach Rows & Setup Spacers
+    allRows.forEach(row => row.remove());
+
+    const topSpacer = document.createElement('tr');
+    topSpacer.id = 'vs-spacer-top';
+    topSpacer.innerHTML = '<td colspan="100" style="padding:0; border:none;"></td>';
+    
+    const bottomSpacer = document.createElement('tr');
+    bottomSpacer.id = 'vs-spacer-bottom';
+    bottomSpacer.innerHTML = '<td colspan="100" style="padding:0; border:none;"></td>';
+    
+    tbody.appendChild(topSpacer);
+    tbody.appendChild(bottomSpacer);
+
+    // 4. Initial Filter & Render
+    isVirtualScrollActive = true;
+    applyFilters(); // This will populate vsVisibleRows and call renderVirtualWindow
+
+    // 5. Scroll Listener
+    tableContainer.addEventListener('scroll', () => {
+        if (!isRenderPending) {
+            requestAnimationFrame(() => {
+                renderVirtualWindow(false);
+                isRenderPending = false;
+            });
+            isRenderPending = true;
+        }
+    });
+}
+
+function renderVirtualWindow(forceUpdate = false) {
+    if (!isVirtualScrollActive) return;
+
+    const tableContainer = document.querySelector('.table-container');
+    const topSpacer = document.getElementById('vs-spacer-top');
+    const bottomSpacer = document.getElementById('vs-spacer-bottom');
+    
+    const scrollTop = tableContainer.scrollTop;
+    const viewportHeight = tableContainer.clientHeight;
+    const buffer = 15; // Number of rows to render outside viewport
+
+    let accumulatedHeight = 0;
+    let topHeight = 0;
+    let bottomHeight = 0;
+    const nodesToRender = [];
+
+    // Calculate which rows to show
+    for (let i = 0; i < vsVisibleRows.length; i++) {
+        const row = vsVisibleRows[i];
+        const h = row.height;
+        
+        // Check if row is within viewport + buffer
+        if (accumulatedHeight + h < scrollTop - (h * buffer)) {
+            topHeight += h;
+        } else if (accumulatedHeight > scrollTop + viewportHeight + (h * buffer)) {
+            bottomHeight += h;
+        } else {
+            nodesToRender.push(row.element);
+        }
+        accumulatedHeight += h;
+    }
+
+    // Update Spacers
+    topSpacer.firstElementChild.style.height = `${topHeight}px`;
+    bottomSpacer.firstElementChild.style.height = `${bottomHeight}px`;
+
+    // Update DOM: Remove old rows between spacers and insert new ones
+    while (topSpacer.nextSibling && topSpacer.nextSibling !== bottomSpacer) {
+        topSpacer.nextSibling.remove();
+    }
+    if (nodesToRender.length > 0) {
+        topSpacer.after(...nodesToRender);
+    }
+}
 });
 </script>
 

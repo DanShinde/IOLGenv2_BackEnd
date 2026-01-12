@@ -61,12 +61,8 @@
         </div>
     </td>
 
-    {% for d in gantt_data.header_dates %}
-        <td class="gantt-cell p-0 {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}"
-            data-date="{{ d|date:'Y-m-d' }}"
-            title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% endif %}">
-            {% comment %} --- JS will inject bars here --- {% endcomment %}
-        </td>
-    {% endfor %}
+    <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
+        <div class="timeline-row-container h-full w-full relative"></div>
+    </td>
 </tr>
 {% endfor %}
