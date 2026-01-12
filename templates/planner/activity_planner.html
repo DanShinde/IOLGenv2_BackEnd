@@ -89,7 +89,7 @@
     .col-assignee   { width: 60px; min-width: 60px; max-width: 60px; left: 280px; text-align: center; }
     .col-start      { width: 60px;  min-width: 60px;  max-width: 60px;  left: 340px; }
     .col-end        { width: 60px;  min-width: 60px;  max-width: 60px;  left: 400px; }
-    .col-actions    { width: 40px;  min-width: 40px;  max-width: 40px;  left: 460px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
+    .col-actions    { width: 60px;  min-width: 60px;  max-width: 60px;  left: 460px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
 
     .no-project-col .col-activity { width: 200px; min-width: 200px; max-width: 200px; left: 0px; } 
     .no-project-col .col-assignee { left: 200px; }
@@ -234,6 +234,15 @@
                             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h5m4 0v10m0 0l4-4m-4 4l-4-4"></path></svg> Newest First
                         {% endif %}
                     </a>
+                    {% else %}
+                    <div class="flex space-x-1 ml-2 border-l pl-2 border-gray-300">
+                        <button id="expandAllBtn" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 py-1 px-2 rounded-lg text-xs flex items-center transition-colors shadow-sm" title="Expand All">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                        <button id="collapseAllBtn" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 py-1 px-2 rounded-lg text-xs flex items-center transition-colors shadow-sm" title="Collapse All">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        </button>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -635,86 +644,78 @@ document.addEventListener('DOMContentLoaded', () => {
         const assigneeBtnText = document.getElementById('assigneeBtnText');
         if (assigneeBtnText) assigneeBtnText.textContent = selectedAssignees.length > 0 ? `Assignees (${selectedAssignees.length})` : 'Assignees (All)';
 
-        // Filter the Virtual Data instead of DOM
+        // 2-Pass Filtering Logic to handle Group Visibility correctly
+        const matchingGroupIds = new Set();
+
+        // Pass 1: Check content filters for all activity rows
+        vsRowsData.forEach(row => {
+            if (!row.isGroup) {
+                const matches = checkRowFilters(row, globalSearch, colFilters, selectedSegments, selectedLeaders, selectedAssignees);
+                row.matchesFilters = matches;
+                if (matches && row.groupId) {
+                    matchingGroupIds.add(row.groupId);
+                }
+            }
+        });
+
+        // Pass 2: Build visible list
         vsVisibleRows = vsRowsData.filter(row => {
             // 1. Group Header Logic
             if (row.isGroup) {
-                // We will filter groups later based on if they have visible children
-                // For now, keep them, we'll do a second pass or check children count
-                return true; 
+                // Show group if it has any matching children (regardless of collapse state)
+                return matchingGroupIds.has(row.groupId);
             }
 
-            // 2. Check if Group is Collapsed
+            // 2. Child Row Logic
+            // Must match filters AND group must NOT be collapsed
             if (row.groupId && vsCollapsedGroups.has(row.groupId)) {
                 return false;
             }
-
-            let isVisible = true;
             
-            // 3. Global Search
-            if (globalSearch) {
-                const s = row.searchData;
-                const matchesGlobal = s.project.includes(globalSearch) || 
-                                      s.customer.includes(globalSearch) || 
-                                      s.segment.includes(globalSearch) || 
-                                      s.teamLead.includes(globalSearch) ||
-                                      s.assignee.includes(globalSearch) ||
-                                      s.activityName.includes(globalSearch);
-                if (!matchesGlobal) isVisible = false;
-            }
-
-            // 4. Specific Filters
-            if (isVisible && selectedSegments.length > 0) {
-                if (!selectedSegments.includes(row.searchData.segment)) isVisible = false;
-            }
-
-            if (isVisible && selectedLeaders.length > 0) {
-                if (!selectedLeaders.includes(row.searchData.teamLead)) isVisible = false;
-            }
-
-            if (isVisible && selectedAssignees.length > 0) {
-                if (!selectedAssignees.includes(row.searchData.assignee)) isVisible = false;
-            }
-
-            if (isVisible) {
-                for (const column in colFilters) {
-                    // We need to check the text content. We cached this in searchData.fullText or specific fields
-                    // For simplicity, let's assume column filters map to searchData fields or we check the cached text
-                    // Since we didn't cache every column specifically in init, let's use the element's text content which we cached
-                    // Or better, map the column names to searchData keys
-                    let val = '';
-                    if (column === 'project') val = row.searchData.project;
-                    else if (column === 'activity') val = row.searchData.activityName;
-                    else if (column === 'assignee') val = row.searchData.assignee;
-                    // Start/End dates are tricky without cache, let's skip or assume they are in fullText
-                    // For strict correctness with existing code:
-                    if (!row.searchData.fullText.includes(colFilters[column])) {
-                        isVisible = false;
-                        break;
-                    }
-                }
-            }
-            
-            return isVisible;
-        });
-
-        // Post-process: Hide groups with no visible children
-        // We need to know which groups have visible children
-        const visibleGroupIds = new Set();
-        vsVisibleRows.forEach(row => {
-            if (!row.isGroup && row.groupId) visibleGroupIds.add(row.groupId);
-        });
-
-        // Filter out groups that have no children in the visible set
-        vsVisibleRows = vsVisibleRows.filter(row => {
-            if (row.isGroup) {
-                return visibleGroupIds.has(row.groupId);
-            }
-            return true;
+            return row.matchesFilters;
         });
 
         // Trigger Virtual Render
         renderVirtualWindow(true);
+    }
+
+    function checkRowFilters(row, globalSearch, colFilters, selectedSegments, selectedLeaders, selectedAssignees) {
+        let isVisible = true;
+        
+        // 1. Global Search
+        if (globalSearch) {
+            const s = row.searchData;
+            const matchesGlobal = s.project.includes(globalSearch) || 
+                                  s.customer.includes(globalSearch) || 
+                                  s.segment.includes(globalSearch) || 
+                                  s.teamLead.includes(globalSearch) ||
+                                  s.assignee.includes(globalSearch) ||
+                                  s.activityName.includes(globalSearch);
+            if (!matchesGlobal) isVisible = false;
+        }
+
+        // 2. Specific Filters
+        if (isVisible && selectedSegments.length > 0) {
+            if (!selectedSegments.includes(row.searchData.segment)) isVisible = false;
+        }
+
+        if (isVisible && selectedLeaders.length > 0) {
+            if (!selectedLeaders.includes(row.searchData.teamLead)) isVisible = false;
+        }
+
+        if (isVisible && selectedAssignees.length > 0) {
+            if (!selectedAssignees.includes(row.searchData.assignee)) isVisible = false;
+        }
+
+        if (isVisible) {
+            for (const column in colFilters) {
+                if (!row.searchData.fullText.includes(colFilters[column])) {
+                    isVisible = false;
+                    break;
+                }
+            }
+        }
+        return isVisible;
     }
 
     if (searchInput) searchInput.addEventListener('keyup', applyFilters);
@@ -730,6 +731,32 @@ document.addEventListener('DOMContentLoaded', () => {
             segmentCheckboxes.forEach(cb => cb.checked = false);
             leaderCheckboxes.forEach(cb => cb.checked = false);
             assigneeCheckboxes.forEach(cb => cb.checked = false);
+            applyFilters();
+        });
+    }
+
+    // --- Expand/Collapse All Logic ---
+    const expandAllBtn = document.getElementById('expandAllBtn');
+    const collapseAllBtn = document.getElementById('collapseAllBtn');
+
+    if (expandAllBtn) {
+        expandAllBtn.addEventListener('click', () => {
+            vsCollapsedGroups.clear();
+            vsRowsData.forEach(row => {
+                if (row.isGroup) row.element.classList.remove('collapsed');
+            });
+            applyFilters();
+        });
+    }
+
+    if (collapseAllBtn) {
+        collapseAllBtn.addEventListener('click', () => {
+            vsRowsData.forEach(row => {
+                if (row.isGroup) {
+                    vsCollapsedGroups.add(row.groupId);
+                    row.element.classList.add('collapsed');
+                }
+            });
             applyFilters();
         });
     }
@@ -789,7 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return workDays;
     }
 
-    function createGridBackground(headerDates, holidaysSet) {
+    function createGridBackground(headerDates, holidaysSet, todayStr) {
         const canvas = document.createElement('canvas');
         const colWidth = 32; // Must match CSS min-w-[32px]
         canvas.width = headerDates.length * colWidth;
@@ -802,16 +829,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const day = d.getUTCDay();
             const isWeekend = (day === 0 || day === 6);
             const isHoliday = holidaysSet.has(dateStr);
+            const isToday = dateStr === todayStr;
 
-            if (isHoliday) ctx.fillStyle = '#fef9c3';
+            if (isToday) ctx.fillStyle = '#fee2e2';
+            else if (isHoliday) ctx.fillStyle = '#fef9c3';
             else if (isWeekend) ctx.fillStyle = '#f8fafc';
             else ctx.fillStyle = 'transparent';
             
-            if (isHoliday || isWeekend) ctx.fillRect(x, 0, colWidth, 1);
+            if (isHoliday || isWeekend || isToday) ctx.fillRect(x, 0, colWidth, 1);
             
             // Border
             ctx.fillStyle = '#f1f5f9'; // border-gray-100
             ctx.fillRect(x + colWidth - 1, 0, 1, 1);
+
+            if (isToday) {
+                ctx.fillStyle = '#ef4444'; // Red border
+                ctx.fillRect(x, 0, 2, 1); // Left
+                ctx.fillRect(x + colWidth - 2, 0, 2, 1); // Right
+            }
         });
         return canvas.toDataURL();
     }
@@ -888,8 +923,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Get Today String
+        const todayCell = document.querySelector('th.today-cell');
+        const todayStr = todayCell ? todayCell.dataset.date : null;
+
         // Generate Background Grid
-        const bgImage = createGridBackground(headerDates, holidaysSet);
+        const bgImage = createGridBackground(headerDates, holidaysSet, todayStr);
         const styleSheet = document.createElement("style");
         styleSheet.innerText = `.timeline-row-container { background-image: url(${bgImage}); background-repeat: repeat-y; }`;
         document.head.appendChild(styleSheet);
