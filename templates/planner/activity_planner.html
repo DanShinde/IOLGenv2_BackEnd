@@ -14,8 +14,8 @@
     .project-row:hover .sticky-cell { background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%); }
     
     /* COMPACT: Reduced height for activity bars */
-    .gantt-bar { border-radius: 4px; transition: all 0.2s ease; position: relative; height: 1.25rem; top: 2px; }
-    .gantt-bar:hover { transform: scaleY(1.2); z-index: 10; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+    .gantt-bar { border-radius: 4px; transition: all 0.2s ease; position: relative; height: 1.25rem; top: 50%; transform: translateY(-50%); }
+    .gantt-bar:hover { transform: translateY(-50%) scaleY(1.2); z-index: 10; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
     
     /* Bar Colors */
     .activity-bar { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
@@ -70,8 +70,13 @@
     .table-container::-webkit-scrollbar-track { background: #f1f5f9; }
     .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px;}
     .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    .sticky-cell { position: -webkit-sticky; position: sticky; background-color: white; z-index: 20; }
-    thead .sticky-cell { z-index: 30; }
+    .sticky-cell { position: -webkit-sticky; position: sticky; background-color: white; z-index: 30; }
+    thead .sticky-cell { z-index: 40; }
+
+    /* Fix for horizontal scroll visibility behind sticky columns */
+    table { border-collapse: separate !important; border-spacing: 0; }
+    tbody tr td { border-bottom: 1px solid #f1f5f9; }
+    thead tr th { border-bottom: 1px solid #e5e7eb; }
 
     /* Active Row Highlighting */
     tr.row-is-active .sticky-cell {
@@ -84,7 +89,7 @@
     .col-assignee   { width: 60px; min-width: 60px; left: 280px; text-align: center; }
     .col-start      { width: 60px;  min-width: 60px;  left: 340px; }
     .col-end        { width: 60px;  min-width: 60px;  left: 400px; }
-    .col-actions    { width: 40px;  min-width: 40px;  left: 460px; }
+    .col-actions    { width: 40px;  min-width: 40px;  left: 460px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
 
     .no-project-col .col-activity { width: 200px; min-width: 200px; left: 0px; } 
     .no-project-col .col-assignee { left: 200px; }
@@ -254,7 +259,7 @@
                 </div>
             </div>
 
-            <table class="w-full table-auto border-collapse {% if project or grouping_method == 'engineer' %}no-project-col{% endif %}" style="min-width: 4000px;">
+            <table class="w-full table-auto {% if project or grouping_method == 'engineer' %}no-project-col{% endif %}" style="min-width: 4000px;">
                 <thead class="bg-gray-50 sticky top-0 z-40">
                     <tr class="h-6">
                         <th colspan="{% if not project and grouping_method != 'engineer' %}6{% else %}5{% endif %}" class="sticky-cell col-project px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
@@ -281,15 +286,15 @@
                         <th colspan="{{ gantt_data.header_dates|length }}" class="bg-gray-100"></th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
+                <tbody>
                     {% if project %}
                         {% include 'planner/_activity_rows.html' with activities=activities %}
                     {% else %}
                         {% for group_name, activities_in_group in display_data.items %}
                             {% if grouping_method != 'none' %}
                             {% with group_data=group_gantt_data|get_item:group_name %}
-                            <tr class="group-header h-8 border-l-4 border-indigo-500 bg-gray-50" data-group-id="{{ group_name|slugify }}">
-                                <td colspan="{% if grouping_method == 'project' %}6{% else %}5{% endif %}" class="sticky-cell col-project px-3 py-1 font-bold text-sm text-gray-800 border-r">
+                            <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}">
+                                <td colspan="{% if grouping_method == 'project' %}6{% else %}5{% endif %}" class="sticky-cell col-project px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
                                     <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                 </td>
                                 <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
@@ -917,7 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const index = dateIndexMap.get(dateStr);
                 if (index !== undefined) {
                         const barDiv = document.createElement('div');
-                        let barClasses = 'gantt-bar project-timeline-bar my-2';
+                        let barClasses = 'gantt-bar project-timeline-bar';
                         
                         if (dateStr === minDate) barClasses += ' summary-bar-start';
                         if (dateStr === maxDate) barClasses += ' summary-bar-end';
