@@ -7,9 +7,10 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
 from employees.models import Employee
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson, ProjectComment
 
 from django.db.models import Q, F, Sum, Count
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
@@ -149,9 +150,24 @@ def project_detail(request, project_id):
 
 
     if request.method == 'POST':
-        stages_to_save = []
         active_tab = request.POST.get('active_tab', 'automation')
-        
+
+        # --- Handle Note/Remark Addition First ---
+        if 'add_project_comment' in request.POST:
+            note_text = request.POST.get('note_text')
+            
+            if note_text:
+                ProjectComment.objects.create(project=project, text=note_text, added_by=request.user)
+                messages.success(request, "Note added successfully.")
+            else:
+                messages.error(request, "Please enter a note to save.")
+            
+            base_url = reverse('tracker_project_detail', args=[project.id])
+            # Redirect with a hash to scroll to the notes section
+            redirect_url = f'{base_url}?active_tab={active_tab}#project-notes'
+            return HttpResponseRedirect(redirect_url)
+
+        stages_to_save = []
         if 'save_all_automation' in request.POST:
             stages_to_save = project.stages.filter(stage_type='Automation')
         elif 'save_all_emulation' in request.POST:
@@ -184,6 +200,7 @@ def project_detail(request, project_id):
 
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
+            new_completion_percentage = request.POST.get(f'completion_percentage_{stage.id}')
             
 
 
@@ -192,6 +209,7 @@ def project_detail(request, project_id):
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
+            new_completion = int(new_completion_percentage) if new_completion_percentage else 0
 
 
 
@@ -205,11 +223,14 @@ def project_detail(request, project_id):
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Status", old_value=stage.status, new_value=new_status)
             if stage.actual_date != new_actual:
                 StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="Actual Finish Date", old_value=str(stage.actual_date), new_value=str(new_actual))
+            if stage.completion_percentage != new_completion:
+                StageHistory.objects.create(stage=stage, changed_by=request.user, field_name="% Completion", old_value=str(stage.completion_percentage), new_value=str(new_completion))
             
             stage.planned_start_date = new_planned_start
             stage.planned_date = new_planned
             stage.status = new_status
             stage.actual_date = new_actual
+            stage.completion_percentage = new_completion
             stage.save()
 
         if 'save_all_automation' in request.POST:
@@ -226,8 +247,15 @@ def project_detail(request, project_id):
         redirect_url = f'{base_url}?active_tab={active_tab}'
         return HttpResponseRedirect(redirect_url)
 
+    # Filter stages based on status if provided
+    status_filter = request.GET.get('status_filter')
+
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
+    
+    if status_filter:
+        automation_stages_qs = automation_stages_qs.filter(status=status_filter)
+        emulation_stages_qs = emulation_stages_qs.filter(status=status_filter)
     
     automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
     emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
@@ -261,14 +289,8 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    automation_remarks = StageRemark.objects.filter(
-        stage__project=project, stage__stage_type='Automation'
-    ).select_related('stage', 'added_by').order_by('-created_at')
-
-    emulation_remarks = StageRemark.objects.filter(
-        stage__project=project, stage__stage_type='Emulation'
-    ).select_related('stage', 'added_by').order_by('-created_at')
-
+    project_comments = project.comments.select_related('added_by').order_by('created_at')
+    
     context = {
         'project': project,
         'automation_stages': automation_stages,
@@ -287,10 +309,11 @@ def project_detail(request, project_id):
         'next_emulation_milestone': get_next_milestone(emulation_stages),
         'last_update_time': last_update_time,
         'recent_activity': recent_activity,
-        'automation_remarks': automation_remarks,
-        'emulation_remarks': emulation_remarks,
+        'project_comments': project_comments,
 
         'contact_persons': contact_persons,
+        'status_choices': Stage.STATUS_CHOICES,
+        'selected_status_filter': status_filter,
 
     }
     
@@ -439,15 +462,6 @@ def project_reports(request):
     # --- The FIX is in this line: We add select_related and prefetch_related ---
     projects_qs = Project.objects.select_related('segment_con', 'team_lead').prefetch_related('stages').all()
 
-    # --- Check for the 'hide_completed' filter ---
-    hide_completed = query_params.get('hide_completed') == '1'
-    if hide_completed:
-        completed_project_ids = Project.objects.filter(
-            stages__name='Handover',
-            stages__status='Completed'
-        ).values_list('id', flat=True)
-        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
-
     # --- Get standard filter values ---
     # getlist needs a QueryDict, not a regular dict
     params_for_getlist = QueryDict(mutable=True)
@@ -483,16 +497,95 @@ def project_reports(request):
         status = query_params.get(f'stage_{stage_key}_status')
         start = query_params.get(f'stage_{stage_key}_start')
         end = query_params.get(f'stage_{stage_key}_end')
+        planned_start = query_params.get(f'stage_{stage_key}_planned_start')
+        planned_end = query_params.get(f'stage_{stage_key}_planned_end')
+        schedule_statuses = params_for_getlist.getlist(f'stage_{stage_key}_schedule_status')
 
+        if status or (start and end) or (planned_start and planned_end) or schedule_statuses:
+            stage_filters_from_request[stage_key] = {
+                'status': status, 
+                'start': start, 
+                'end': end,
+                'planned_start': planned_start,
+                'planned_end': planned_end,
+                'schedule_status': schedule_statuses
+            }
+            
+            # Base filter for the specific stage name
+            stage_q = Q(stages__name=stage_key)
 
-        if status or (start and end):
-            stage_filters_from_request[stage_key] = {'status': status, 'start': start, 'end': end}
-            stage_query_filters = {'stages__name': stage_key}
+            # Apply Schedule Logic (Planned vs Actual)
+            if schedule_statuses:
+                schedule_q = Q()
+                if 'delayed' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__gt=F('stages__planned_date'))
+                if 'on_time' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__lte=F('stages__planned_date'))
+                if 'overdue' in schedule_statuses:
+                    schedule_q |= Q(stages__status__in=['Not started', 'In Progress'], stages__planned_date__lt=timezone.now().date())
+                stage_q &= schedule_q
+
+            stage_query_filters = {}
             if status: stage_query_filters['stages__status'] = status
             if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
-            projects_qs = projects_qs.filter(**stage_query_filters)
+            if planned_start and planned_end: stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
+            
+            # Combine Q object with standard kwargs
+            projects_qs = projects_qs.filter(stage_q, **stage_query_filters)
+
+    # --- Capture QS for Charts (Before Hide Completed) ---
+    chart_projects_qs = projects_qs
+
+    # --- Chart Click Filtering ---
+    chart_filter_stage = query_params.get('chart_filter_stage')
+    chart_filter_month = query_params.get('chart_filter_month')
+    chart_filter_type = query_params.get('chart_filter_type')
+
+    if chart_filter_stage and chart_filter_month and chart_filter_type:
+        try:
+            filter_date = parse_date(chart_filter_month)
+            if filter_date:
+                if chart_filter_type == 'planned':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__planned_date__year=filter_date.year,
+                        stages__planned_date__month=filter_date.month
+                    )
+                elif chart_filter_type == 'actual':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__actual_date__year=filter_date.year,
+                        stages__actual_date__month=filter_date.month
+                    )
+                elif chart_filter_type == 'otif_total':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__planned_date__year=filter_date.year,
+                        stages__planned_date__month=filter_date.month
+                    )
+                elif chart_filter_type == 'otif_on_time':
+                    projects_qs = projects_qs.filter(
+                        stages__name=chart_filter_stage,
+                        stages__planned_date__year=filter_date.year,
+                        stages__planned_date__month=filter_date.month,
+                        stages__actual_date__lte=F('stages__planned_date'),
+                        stages__actual_date__isnull=False
+                    )
+        except (ValueError, TypeError):
+            pass
+
+    # --- Check for the 'hide_completed' filter ---
+    hide_completed = query_params.get('hide_completed') == '1'
+    if hide_completed:
+        completed_project_ids = Project.objects.filter(
+            stages__name='Handover',
+            stages__status='Completed'
+        ).values_list('id', flat=True)
+        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
 
     distinct_projects = projects_qs.distinct()
+    distinct_chart_projects = chart_projects_qs.distinct()
+    chart_project_ids = chart_projects_qs.values_list('id', flat=True).distinct()
 
     # --- Prepare projects with their detailed summaries ---
     projects_with_details = []
@@ -529,6 +622,177 @@ def project_reports(request):
     segment_labels = [item['segment_con__name'] for item in segment_counts if item['segment_con__name']]
     segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
 
+    # --- NEW: Team Lead Distribution ---
+    team_lead_counts = Counter(p.team_lead.name if p.team_lead else 'Unassigned' for p in distinct_projects)
+    team_lead_labels = list(team_lead_counts.keys())
+    team_lead_data = list(team_lead_counts.values())
+
+    # --- NEW: Stage Bottleneck Analysis (Top Delayed Stages) ---
+    # Count stages where Actual > Planned OR (Status is active AND Today > Planned)
+    today = timezone.now().date()
+    delayed_stages_qs = Stage.objects.filter(
+        project__in=distinct_projects
+    ).filter(
+        Q(actual_date__gt=F('planned_date')) | 
+        Q(status__in=['Not started', 'In Progress'], planned_date__lt=today)
+    ).values('name').annotate(count=Count('id')).order_by('-count')
+    
+    stage_delay_labels = [item['name'] for item in delayed_stages_qs[:10]] # Top 10 bottlenecks
+    stage_delay_data = [item['count'] for item in delayed_stages_qs[:10]]
+
+    # --- NEW: Monthly Planned vs Actual Trends per Stage ---
+    stage_trend_data = {}
+    
+    # Aggregate Planned Counts by Month
+    planned_qs = Stage.objects.filter(
+        project_id__in=chart_project_ids,
+        planned_date__isnull=False
+    ).annotate(
+        month=TruncMonth('planned_date')
+    ).values('name', 'month').annotate(count=Count('id')).order_by('month')
+
+    # Aggregate Actual Counts by Month
+    actual_qs = Stage.objects.filter(
+        project_id__in=chart_project_ids,
+        actual_date__isnull=False
+    ).annotate(
+        month=TruncMonth('actual_date')
+    ).values('name', 'month').annotate(count=Count('id')).order_by('month')
+
+    # Process into dictionary structure for Chart.js
+    temp_trends = defaultdict(lambda: defaultdict(lambda: {'p': 0, 'a': 0}))
+
+    for item in planned_qs:
+        if item['month']:
+            temp_trends[item['name']][item['month']]['p'] = item['count']
+            
+    for item in actual_qs:
+        if item['month']:
+            temp_trends[item['name']][item['month']]['a'] = item['count']
+            
+    for stage_name, month_data in temp_trends.items():
+        sorted_months = sorted(month_data.keys())
+        labels = [m.strftime('%b %Y') for m in sorted_months]
+        years = [m.year for m in sorted_months]
+        months = [m.month for m in sorted_months]
+        
+        financial_years = []
+        for m in sorted_months:
+            if m.month >= 4:
+                fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+            else:
+                fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+            financial_years.append(fy_str)
+
+        p_data = [month_data[m]['p'] for m in sorted_months]
+        a_data = [month_data[m]['a'] for m in sorted_months]
+        
+        stage_trend_data[stage_name] = {
+            'labels': labels,
+            'years': years,
+            'financial_years': financial_years,
+            'months': months,
+            'planned': p_data,
+            'actual': a_data
+        }
+
+    # --- NEW: OTIF Trends per Stage ---
+    stage_otif_data = {}
+    
+    otif_qs = Stage.objects.filter(
+        project_id__in=chart_project_ids,
+        planned_date__isnull=False
+    ).annotate(
+        month=TruncMonth('planned_date')
+    ).values('name', 'month').annotate(
+        total=Count('id'),
+        on_time=Count('id', filter=Q(actual_date__isnull=False) & Q(actual_date__lte=F('planned_date')))
+    ).order_by('month')
+
+    temp_otif = defaultdict(lambda: defaultdict(lambda: {'total': 0, 'on_time': 0}))
+
+    for item in otif_qs:
+        if item['month']:
+            temp_otif[item['name']][item['month']]['total'] = item['total']
+            temp_otif[item['name']][item['month']]['on_time'] = item['on_time']
+
+    for stage_name, month_data in temp_otif.items():
+        sorted_months = sorted(month_data.keys())
+        labels = [m.strftime('%b %Y') for m in sorted_months]
+        years = [m.year for m in sorted_months]
+        months = [m.month for m in sorted_months]
+        
+        financial_years = []
+        for m in sorted_months:
+            if m.month >= 4:
+                fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+            else:
+                fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+            financial_years.append(fy_str)
+
+        total_data = [month_data[m]['total'] for m in sorted_months]
+        on_time_data = [month_data[m]['on_time'] for m in sorted_months]
+        
+        stage_otif_data[stage_name] = {
+            'labels': labels,
+            'years': years,
+            'financial_years': financial_years,
+            'months': months,
+            'total': total_data,
+            'on_time': on_time_data
+        }
+
+    # --- NEW: Emulation Timing Analysis Trends ---
+    # Categories:
+    # 1. Before Dispatch
+    # 2. After Dispatch but Before Go Live
+    # 3. After Go Live
+    emu_trend_data = defaultdict(lambda: {'cat1': 0, 'cat2': 0, 'cat3': 0})
+    
+    for p in distinct_chart_projects:
+        stages_map = {s.name: s for s in p.stages.all()}
+        
+        emu = stages_map.get('Emulation Testing')
+        dispatch = stages_map.get('Dispatch')
+        comm = stages_map.get('Commissioning')
+        
+        if emu and emu.actual_date:
+            month_key = emu.actual_date.replace(day=1)
+            
+            dispatch_date = dispatch.actual_date if (dispatch and dispatch.actual_date) else None
+            # Using planned_start_date as the 'Start Date' for Go Live (Commissioning) as per user request
+            comm_start_date = comm.planned_start_date if (comm and comm.planned_start_date) else None
+            
+            # 1. Before Dispatch (or Dispatch not yet done)
+            if not dispatch_date or emu.actual_date <= dispatch_date:
+                emu_trend_data[month_key]['cat1'] += 1
+            
+            # 2. After Dispatch but Before Go Live (or Go Live not yet done)
+            elif not comm_start_date or emu.actual_date <= comm_start_date:
+                emu_trend_data[month_key]['cat2'] += 1
+            
+            # 3. After Go Live
+            else:
+                emu_trend_data[month_key]['cat3'] += 1
+
+    sorted_months = sorted(emu_trend_data.keys())
+    emu_chart_data = {
+        'labels': [m.strftime('%b %Y') for m in sorted_months],
+        'years': [m.year for m in sorted_months],
+        'months': [m.month for m in sorted_months],
+        'financial_years': [],
+        'cat1': [emu_trend_data[m]['cat1'] for m in sorted_months],
+        'cat2': [emu_trend_data[m]['cat2'] for m in sorted_months],
+        'cat3': [emu_trend_data[m]['cat3'] for m in sorted_months],
+    }
+    
+    for m in sorted_months:
+        if m.month >= 4:
+            fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+        else:
+            fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+        emu_chart_data['financial_years'].append(fy_str)
+
     context = {
 
         'projects_with_details': projects_with_details,
@@ -543,10 +807,17 @@ def project_reports(request):
         'min_value': min_value, 'max_value': max_value,
         'status_labels': status_labels, 'status_data': status_data,
         'segment_labels': segment_labels, 'segment_data': segment_data,
+        'team_lead_labels': team_lead_labels, 'team_lead_data': team_lead_data,
+        'stage_delay_labels': stage_delay_labels, 'stage_delay_data': stage_delay_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
+        'automation_stage_names': Stage.AUTOMATION_STAGES,
+        'emulation_stage_names': Stage.EMULATION_STAGES,
         'stage_filters': stage_filters_from_request,
         'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
+        'stage_trend_data': json.dumps(stage_trend_data),
+        'stage_otif_data': json.dumps(stage_otif_data),
+        'emu_timing_data': json.dumps(emu_chart_data),
     }
     return render(request, 'tracker/project_report.html', context)
 
@@ -719,13 +990,32 @@ def export_report_pdf(request):
         status = request.GET.get(f'stage_{stage_key}_status')
         start = request.GET.get(f'stage_{stage_key}_start')
         end = request.GET.get(f'stage_{stage_key}_end')
-        if status or (start and end):
-            stage_query_filters = {'stages__name': stage_key}
+        planned_start = request.GET.get(f'stage_{stage_key}_planned_start')
+        planned_end = request.GET.get(f'stage_{stage_key}_planned_end')
+        schedule_statuses = request.GET.getlist(f'stage_{stage_key}_schedule_status')
+
+        if status or (start and end) or (planned_start and planned_end) or schedule_statuses:
+            stage_q = Q(stages__name=stage_key)
+
+            if schedule_statuses:
+                schedule_q = Q()
+                if 'delayed' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__gt=F('stages__planned_date'))
+                if 'on_time' in schedule_statuses:
+                    schedule_q |= Q(stages__actual_date__lte=F('stages__planned_date'))
+                if 'overdue' in schedule_statuses:
+                    schedule_q |= Q(stages__status__in=['Not started', 'In Progress'], stages__planned_date__lt=timezone.now().date())
+                stage_q &= schedule_q
+
+            stage_query_filters = {}
             if status:
                 stage_query_filters['stages__status'] = status
             if start and end:
                 stage_query_filters['stages__actual_date__range'] = [start, end]
-            projects = projects.filter(**stage_query_filters)
+            if planned_start and planned_end:
+                stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
+            
+            projects = projects.filter(stage_q, **stage_query_filters)
     
     distinct_projects = projects.distinct()
 
@@ -1240,6 +1530,7 @@ def update_stage_ajax(request, stage_id):
                 'planned_date': 'Planned Finish Date',
                 'status': 'Status',
                 'actual_date': 'Actual Finish Date',
+                'completion_percentage': '% Completion',
             }
             history_field_name = field_map.get(field_name, field_name.replace('_', ' ').title())
 
@@ -1278,11 +1569,23 @@ def add_update_remark(request, update_id):
         text = request.POST.get('remark_text')
         redirect_to = request.POST.get('redirect_to') # ✅ Get the new hidden field
         if text:
-            UpdateRemark.objects.create(
+            remark = UpdateRemark.objects.create(
                 update=update,
                 text=text,
                 added_by=request.user
             )
+            
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'success',
+                    'remark': {
+                        'user': remark.added_by.username if remark.added_by else 'Unknown',
+                        'date': remark.created_at.strftime("%b %d, %H:%M"),
+                        'text': remark.text,
+                        'initials': remark.added_by.username[:2].upper() if remark.added_by else '??'
+                    }
+                })
+
             messages.success(request, "Remark added successfully.")
             
     # ✅ Corrected redirect logic to handle both project and non-project updates

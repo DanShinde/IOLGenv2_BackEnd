@@ -118,6 +118,248 @@
         padding: 10px;
         margin-top: 10px;
     }
+
+    /* Professional Table Styling */
+    .table-card {
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+        background: #fff;
+    }
+    .stage-table {
+        margin-bottom: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .stage-table thead th {
+        background-color: #f8f9fa;
+        color: #4b5563;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+    }
+    .stage-table tbody td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        color: #1f2937;
+        font-size: 0.875rem;
+    }
+    .stage-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .stage-table tbody tr:hover {
+        background-color: #f9fafb;
+    }
+    
+    /* Form controls inside table */
+    .stage-table .form-control-sm, 
+    .stage-table .form-select-sm {
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        padding: 6px 10px;
+        font-size: 0.8125rem;
+        transition: all 0.2s ease;
+    }
+    .stage-table .form-control-sm:focus, 
+    .stage-table .form-select-sm:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Progress bar styling */
+    .stage-table .progress {
+        height: 6px !important;
+        background-color: #e5e7eb;
+        border-radius: 9999px;
+        margin-top: 8px;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .stage-table .progress-bar {
+        border-radius: 9999px;
+    }
+    
+    /* MS Loop-style Table */
+    .loop-table th {
+        font-weight: 600;
+        color: #6b7280;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 12px 10px;
+        text-align: left;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .loop-table td {
+        border-bottom: 1px solid #f3f4f6;
+        padding: 8px 5px;
+        vertical-align: middle;
+    }
+    .loop-table .form-control, 
+    .loop-table .form-select {
+        border: 1px solid transparent;
+        background-color: transparent;
+        font-size: 0.9rem;
+        padding: 6px 8px;
+    }
+    .loop-table .form-control:hover, 
+    .loop-table .form-select:hover {
+        background-color: #f9fafb;
+    }
+    .loop-table .form-control:focus, 
+    .loop-table .form-select:focus {
+        background-color: #fff;
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    /* Select2 adjustments for table */
+    .loop-table .select2-container--bootstrap-5 .select2-selection {
+        border-color: transparent;
+        background-color: transparent;
+        min-height: 32px;
+    }
+    .loop-table .select2-container--bootstrap-5 .select2-selection:hover {
+        background-color: #f9fafb;
+    }
+    /* Enhanced Select2 Tags for Loop Table */
+    .loop-table .select2-container--bootstrap-5 .select2-selection__choice {
+        background-color: #eef2ff !important; /* Light Indigo */
+        color: #4338ca !important; /* Indigo 700 */
+        border: 1px solid #c7d2fe !important;
+        border-radius: 50rem !important; /* Pill shape */
+        padding: 3px 10px 3px 24px !important; /* Adjusted padding for a tighter fit */
+        font-size: 0.75rem !important;
+        font-weight: 600;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        position: relative;
+    }
+    .loop-table .select2-container--bootstrap-5 .select2-selection__choice__remove {
+        border: none !important;
+        background: transparent !important;
+        color: #4338ca !important;
+        position: absolute !important;
+        left: 4px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-indent: 0 !important;
+    }
+    /* Remarks scroll container in table */
+    .remark-scroll-container::-webkit-scrollbar {
+        width: 3px;
+    }
+    .remark-scroll-container::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 3px;
+    }
+    /* Restore the 'x' using a pseudo-element since we removed the background image */
+    .loop-table .select2-container--bootstrap-5 .select2-selection__choice__remove::before {
+        content: "\00d7"; /* Multiplication sign */
+        font-size: 1rem;
+        line-height: 1;
+    }
+    .loop-table .select2-container--bootstrap-5 .select2-selection__choice__remove:hover {
+        opacity: 1;
+        background-color: rgba(67, 56, 202, 0.1) !important;
+        border-radius: 50%;
+        color: #312e81 !important;
+    }
+
+    /* Project Notes Styling */
+    .project-notes-feed {
+        height: 500px; /* Fixed height window */
+        overflow-y: auto;
+        padding: 15px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .project-notes-feed::-webkit-scrollbar {
+        width: 6px;
+    }
+    .project-notes-feed::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+    }
+    .project-notes-feed::-webkit-scrollbar-thumb {
+        background: #d1d5db; 
+        border-radius: 3px;
+    }
+    .note-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        transition: all 0.2s ease;
+        position: relative;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .note-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transform: translateY(-1px);
+    }
+    .note-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 12px;
+        bottom: 12px;
+        width: 4px;
+        background-color: #3b82f6;
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }
+    .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .note-author {
+        font-weight: 600;
+        color: #111827;
+        font-size: 0.9rem;
+    }
+    .note-time {
+        font-size: 0.75rem;
+        color: #6b7280;
+        background-color: #f3f4f6;
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+    .note-content {
+        color: #374151;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        padding-left: 10px; 
+    }
+    .note-avatar-small {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        margin-right: 10px;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 </style>
 {% endblock %}
 
@@ -246,7 +488,7 @@
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
 
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
 
                         {% for stage in automation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
@@ -266,6 +508,15 @@
 
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;" {% if stage.status != 'In Progress' %}disabled{% endif %}>
+                                    <span class="text-muted small">%</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ stage.completion_percentage|default:0 }}%;" aria-valuenow="{{ stage.completion_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </td>
                             <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
 
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
@@ -301,7 +552,7 @@
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
 
-                    <div class="table-responsive"><table class="table table-bordered table-hover align-middle mb-0"><thead class="table-light"><tr><th style="width:20%">Stage</th><th style="width:15%">Planned Finish Date</th><th style="width:20%">Status</th><th style="width:15%">Start Date</th><th style="width:15%">Finish Date</th><th style="width:15%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
 
                         {% for stage in emulation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
@@ -321,6 +572,15 @@
 
                             <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
                             <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;" {% if stage.status != 'In Progress' %}disabled{% endif %}>
+                                    <span class="text-muted small">%</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ stage.completion_percentage|default:0 }}%;" aria-valuenow="{{ stage.completion_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </td>
                             <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
 
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
@@ -348,6 +608,40 @@
     </div>
 </div>
 
+<div class="card mb-4" id="project-notes">
+    <div class="card-header bg-white">
+        <h5 class="card-header-title mb-0"><i class="far fa-sticky-note me-2 text-primary"></i>Project Notes</h5>
+    </div>
+    <div class="card-body bg-light">
+        <div class="project-notes-feed">
+            {% for comment in project_comments %}
+                <div class="note-card">
+                    <div class="note-header">
+                        <div class="d-flex align-items-center">
+                            <div class="note-avatar-small">{{ comment.added_by.username|slice:":2"|upper }}</div>
+                            <span class="note-author">{{ comment.added_by.username|default:'Unknown' }}</span>
+                        </div>
+                        <span class="note-time"><i class="far fa-clock me-1"></i>{{ comment.created_at|naturaltime }}</span>
+                    </div>
+                    <div class="note-content">{{ comment.text|linebreaksbr }}</div>
+                </div>
+            {% empty %}
+                <div class="text-center text-muted p-4">
+                    <i class="far fa-clipboard fa-2x mb-3 text-secondary opacity-50"></i>
+                    <p>No notes added yet.</p>
+                </div>
+            {% endfor %}
+        </div>
+        <form method="POST" action="{% url 'tracker_project_detail' project.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="active_tab" value="{{ request.GET.active_tab|default:'automation' }}">
+            <div class="d-flex gap-2">
+                <textarea name="note_text" class="form-control shadow-sm border-0" rows="2" placeholder="Type a note here..." required style="resize: none;"></textarea>
+                <button type="submit" name="add_project_comment" value="1" class="btn btn-primary px-4 align-self-end"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="row mt-4">
     <div class="col-lg-6 d-flex">
@@ -437,56 +731,103 @@
 
         <div class="card" id="push-pull-contents">
 
-            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-bullhorn me-2"></i>Push-Pull Contents</h5></div>
-            <div class="card-body">
-                <form action="{% url 'add_project_update' project.id %}" method="post" class="mb-4 p-3 bg-light rounded">
-                    {% csrf_token %}
-                    
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-4">
-                            <label for="push_pull_type" class="form-label">Type</label>
-                            <select name="push_pull_type" id="push_pull_type" class="form-select">
-                                <option value="Push">Push Content</option>
-                                <option value="Pull">Pull Content</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="who_contact" class="form-label">Who</label>
-                            <select name="who_contact" id="who_contact" class="form-control select2-multiple" multiple="multiple">
-                                {% for person in contact_persons %}
-                                    <option value="{{ person.id }}">{{ person.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="eta_date" class="form-label">ETA</label>
-                            <input type="date" name="eta_date" id="eta_date" class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="update_text" class="form-label">Description</label>
-                        <textarea name="update_text" id="update_text" rows="5" class="form-control" placeholder="Share a new update on the project's progress, risks, or actions needed..." required></textarea>
-                    </div>
-
-                    <div class="text-end">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save</button>
-                    </div>
-                </form>
-                <hr>
-                <h5 class="mt-4">Push Pull Content Summary</h5>
-                <div class="update-feed mt-3 accordion" id="updateAccordion">
+            <div class="card-header bg-white"><h5 class="card-header-title mb-0"><i class="fas fa-table me-2 text-primary"></i>Push-Pull Contents</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table loop-table mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th style="width: 15%;">Type</th>
+                                <th style="width: 35%;">Description</th>
+                                <th style="width: 20%;">Who</th>
+                                <th style="width: 12%;">ETA</th>
+                                <th style="width: 12%;">Status</th>
+                                <th style="width: 6%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
                     {% for update in updates %}
-                        {% include 'tracker/partials/project_update_item.html' with update=update user=user contact_persons=contact_persons redirect_to='project_detail' %}
-                    {% empty %}
-                        <p class="text-muted text-center py-3">No push pull contents have been added yet.</p>
+                            <tr>
+                                <td>
+                                    <select class="form-select form-select-sm autosave-update-input" data-id="{{ update.id }}" data-field="push_pull_type">
+                                        {% for val, label in update.PUSH_PULL_CHOICES %}
+                                        <option value="{{ val }}" {% if update.push_pull_type == val %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="text" value="{{ update.text }}">
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm select2-update-who" multiple data-id="{{ update.id }}" data-field="who_contact">
+                                        {% for person in contact_persons %}
+                                        <option value="{{ person.id }}" {% if person in update.who_contact.all %}selected{% endif %}>{{ person.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="date" class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="eta" value="{{ update.eta|date:'Y-m-d' }}">
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm autosave-update-input" data-id="{{ update.id }}" data-field="status">
+                                        {% for val, label in update.STATUS_CHOICES %}
+                                        <option value="{{ val }}" {% if update.status == val %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-bs-toggle="modal" data-bs-target="#localUpdateRemarksModal{{ update.id }}" title="View Details"><i class="fas fa-eye"></i></button>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item text-danger" href="{% url 'delete_project_update' update.id %}"><i class="far fa-trash-alt me-2"></i>Delete</a></li>
+                                        </ul>
+                                    </div>
+                                    <a href="{% url 'delete_project_update' update.id %}" class="btn btn-sm btn-link text-danger p-0" title="Delete" onclick="return confirm('Are you sure you want to delete this item?');"><i class="far fa-trash-alt"></i></a>
+                                    <span id="update-indicator-{{ update.id }}" class="ms-1"></span>
+                                </td>
+                            </tr>
                     {% endfor %}
+                            
+                            <!-- New Row (Hidden by default) -->
+                            <tr id="new-update-row" style="display: none; background-color: #f8f9fa;">
+                                <form id="new-update-form" action="{% url 'add_project_update' project.id %}" method="post">
+                                    {% csrf_token %}
+                                    <td>
+                                        <select name="push_pull_type" class="form-select form-select-sm" form="new-update-form">
+                                            <option value="Pull" selected>Pull Content</option>
+                                            <option value="Push">Push Content</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="update_text" class="form-control form-control-sm" placeholder="Description" required form="new-update-form">
+                                    </td>
+                                    <td>
+                                        <select name="who_contact" class="form-select form-select-sm select2-new-who" multiple form="new-update-form">
+                                            {% for person in contact_persons %}
+                                                <option value="{{ person.id }}">{{ person.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="date" name="eta_date" class="form-control form-control-sm" form="new-update-form">
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">Open</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="submit" class="btn btn-sm btn-primary" form="new-update-form"><i class="fas fa-plus"></i></button>
+                                    </td>
+                                </form>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                {% if updates_count > 5 %}
-                <div class="text-center mt-3">
-                    <a href="{% url 'all_project_updates' project.id %}">View all {{ updates_count }} updates...</a>
+                <div class="p-2 border-top">
+                    <button class="btn btn-sm btn-light text-primary fw-bold" onclick="document.getElementById('new-update-row').style.display = 'table-row'; this.style.display='none';">
+                        <i class="fas fa-plus me-1"></i> Add Row
+                    </button>
                 </div>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -498,6 +839,89 @@
 {% include 'tracker/partials/project_update_modals.html' with updates=updates contact_persons=contact_persons %}
 {% include 'tracker/partials/all_remarks_modals.html' %}
 
+<!-- Local Update Remarks Modals to ensure functionality -->
+{% for update in updates %}
+<div class="modal fade" id="localUpdateRemarksModal{{ update.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <h6 class="text-muted small text-uppercase">Description</h6>
+                        <p class="fw-bold">{{ update.text }}</p>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <h6 class="text-muted small text-uppercase">Type</h6>
+                        <span class="badge {% if update.push_pull_type == 'Push' %}bg-info{% else %}bg-warning text-dark{% endif %}">{{ update.get_push_pull_type_display }}</span>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <h6 class="text-muted small text-uppercase">Status</h6>
+                        <span class="badge {% if update.status == 'Closed' %}bg-success{% else %}bg-secondary{% endif %}">{{ update.status }}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted small text-uppercase">Who</h6>
+                        <div>
+                            {% for person in update.who_contact.all %}
+                                <span class="badge bg-light text-dark border me-1">{{ person.name }}</span>
+                            {% empty %}
+                                <span class="text-muted small">-</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted small text-uppercase">ETA</h6>
+                        <p>{{ update.eta|date:"M d, Y"|default:"-" }}</p>
+                    </div>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <h6><i class="far fa-comments me-2"></i>Remarks</h6>
+                    <div class="project-notes-feed" style="height: 300px;" id="remarks-container-{{ update.id }}">
+                        {% for remark in update.remarks.all %}
+                            <div class="note-card">
+                                <div class="note-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="note-avatar-small">{{ remark.added_by.username|slice:":2"|upper }}</div>
+                                        <span class="note-author">{{ remark.added_by.username }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="note-time me-2"><i class="far fa-clock me-1"></i>{{ remark.created_at|naturaltime }}</span>
+                                        {% if request.user == remark.added_by or request.user.is_staff %}
+                                        <form action="{% url 'delete_update_remark' remark.id %}" method="POST" class="d-inline" onsubmit="return confirm('Delete this remark?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="redirect_to" value="project_detail">
+                                            <button type="submit" class="btn btn-link text-danger p-0 lh-1" style="font-size: 0.9rem;"><i class="fas fa-times"></i></button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="note-content">{{ remark.text|linebreaksbr }}</div>
+                            </div>
+                        {% empty %}
+                            <div class="text-center text-muted p-4">
+                                <i class="far fa-comment-dots fa-2x mb-2 opacity-50"></i>
+                                <p class="small mb-0">No remarks yet.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <form action="{% url 'add_update_remark' update.id %}" method="POST" class="ajax-remark-form" data-update-id="{{ update.id }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="redirect_to" value="project_detail">
+                    <div class="d-flex gap-2">
+                        <textarea class="form-control shadow-sm border-0" id="remarkText{{ update.id }}" name="remark_text" rows="2" required placeholder="Type a remark..." style="resize: none;"></textarea>
+                        <button type="submit" class="btn btn-primary px-3 align-self-end"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 {% endblock %}
 
@@ -507,8 +931,8 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Initialize Select2 for the "add new update" form
-        $('#who_contact').select2({
+        // Initialize Select2 for the "new row"
+        $('.select2-new-who').select2({
             tags: true,
             tokenSeparators: [','],
             theme: 'bootstrap-5',
@@ -519,7 +943,7 @@
                 if (term === '' || $.isNumeric(term)) {
                     return null;
                 }
-                const existingOptions = $('#who_contact').find('option');
+                const existingOptions = $(this).find('option');
                 const isExisting = existingOptions.filter(function() {
                     return $.trim($(this).text()).toLowerCase() === term.toLowerCase();
                 }).length > 0;
@@ -544,7 +968,7 @@
         });
         
         // Handle new tags (persons) being added via AJAX
-        $('#who_contact').on('select2:select', function (e) {
+        $('.select2-new-who').on('select2:select', function (e) {
             const data = e.params.data;
             if (data.new) {
                 const $select = $(this);
@@ -576,6 +1000,58 @@
                 });
             }
         });
+
+        // Initialize Select2 for existing rows (Inline Editing)
+        $('.select2-update-who').each(function() {
+            $(this).select2({
+                tags: true,
+                tokenSeparators: [','],
+                theme: 'bootstrap-5',
+                placeholder: "Select person(s)",
+                width: '100%',
+                createTag: function(params) {
+                    const term = $.trim(params.term);
+                    if (term === '' || $.isNumeric(term)) { return null; }
+                    return { id: term, text: term, new: true };
+                },
+                templateResult: function (data) {
+                    if (data.new) { return $('<span><b>(New)</b> ' + data.text + '</span>'); }
+                    return data.text;
+                }
+            }).on('change', function(e) {
+                // Trigger autosave manually on change
+                const select = e.target;
+                const updateId = select.dataset.id;
+                const field = select.dataset.field;
+                const value = $(select).val(); // Array of IDs
+                handleUpdateAutosave(updateId, field, value);
+            }).on('select2:select', function(e) {
+                // Handle new tag creation via AJAX inside the table
+                const data = e.params.data;
+                if (data.new) {
+                    const $select = $(this);
+                    $.ajax({
+                        url: "{% url 'add_contact_person_ajax' %}",
+                        method: 'POST',
+                        data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                        success: function(response) {
+                            if(response.status === 'success') {
+                                const newOption = new Option(response.name, response.id, false, false);
+                                $select.find(`option[value="${data.id}"]`).remove();
+                                $select.append(newOption).trigger('change');
+                                // The change event above will handle the autosave
+                            } else {
+                                alert('Error creating new contact.');
+                            }
+                        },
+                        error: function() {
+                            alert('Error creating new contact.');
+                        }
+                    });
+                }
+            });
+        });
+
 
         // Initialize Select2 for the edit modals when they are shown
         $('.select2-multiple-edit').each(function() {
@@ -663,7 +1139,20 @@ document.addEventListener('DOMContentLoaded', function () {
         const input = event.target;
         const stageId = input.dataset.stageId;
         const fieldName = input.dataset.fieldName;
-        const newValue = input.value;
+        let newValue = input.value;
+
+        // Sanitize completion_percentage to prevent 400 errors on empty/invalid input
+        if (fieldName === 'completion_percentage') {
+            if (newValue === '' || newValue === null) {
+                newValue = '0';
+            } else if (parseInt(newValue) > 100) {
+                newValue = '100';
+                input.value = '100'; // Clamp visual input
+            } else if (parseInt(newValue) < 0) {
+                newValue = '0';
+                input.value = '0'; // Clamp visual input
+            }
+        }
         
         const indicator = document.getElementById(`autosave-indicator-${stageId}`);
         indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
@@ -708,6 +1197,66 @@ document.addEventListener('DOMContentLoaded', function () {
     const autosaveInputs = document.querySelectorAll('.autosave-input');
     autosaveInputs.forEach(input => {
         input.addEventListener('change', handleStageUpdate);
+
+        // Prevent form submission on Enter key
+        input.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                input.blur(); // This triggers the change event handler defined above
+            }
+        });
+    });
+
+    // Handle status changes to update percentage behavior
+    function handleStatusChangeForPercentage(event) {
+        const statusSelect = event.target;
+        const stageId = statusSelect.dataset.stageId;
+        const status = statusSelect.value;
+        const percentInput = document.querySelector(`input[name="completion_percentage_${stageId}"]`);
+        const progressBar = percentInput.closest('td').querySelector('.progress-bar');
+        
+        if (!percentInput) return;
+
+        // 1. If the stage inprogress then only user should be allowed to add %.
+        if (status === 'In Progress') {
+            percentInput.disabled = false;
+        } else {
+            percentInput.disabled = true;
+        }
+
+        let newPercent = null;
+        // 2. If user selected it as completed, then by default progress bar becomes 100%.
+        if (status === 'Completed') {
+            newPercent = 100;
+        } else if (status === 'Not started') {
+            newPercent = 0;
+        }
+
+        if (newPercent !== null && percentInput.value != newPercent) {
+            percentInput.value = newPercent;
+            if (progressBar) {
+                progressBar.style.width = newPercent + '%';
+                progressBar.setAttribute('aria-valuenow', newPercent);
+            }
+            // Trigger autosave for the percentage input
+            percentInput.dispatchEvent(new Event('change'));
+        }
+    }
+
+    document.querySelectorAll('.status-select').forEach(select => {
+        select.addEventListener('change', handleStatusChangeForPercentage);
+    });
+
+    // Update progress bar visually on input for completion percentage
+    document.addEventListener('input', function(event) {
+        if (event.target.classList.contains('autosave-input') && event.target.dataset.fieldName === 'completion_percentage') {
+            const val = event.target.value;
+            const progressBar = event.target.closest('td').querySelector('.progress-bar');
+            if (progressBar) {
+                progressBar.style.width = val + '%';
+                progressBar.setAttribute('aria-valuenow', val);
+            }
+        }
     });
 
     // New script to scroll to the push-pull contents section on load
@@ -717,6 +1266,115 @@ document.addEventListener('DOMContentLoaded', function () {
             targetElement.scrollIntoView({ behavior: 'smooth' });
         }
     }
+
+    // Scroll notes feed to bottom on load
+    const notesFeed = document.querySelector('.project-notes-feed');
+    if (notesFeed) {
+        notesFeed.scrollTop = notesFeed.scrollHeight;
+    }
+
+    // --- Push-Pull Content Autosave Logic ---
+    window.handleUpdateAutosave = async function(updateId, field, value) {
+        const indicator = document.getElementById(`update-indicator-${updateId}`);
+        if(indicator) indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
+
+        const url = "{% url 'update_project_update_ajax' %}";
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    id: updateId,
+                    field: field,
+                    value: value
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                if(indicator) indicator.innerHTML = '<i class="fas fa-check text-success small"></i>';
+                setTimeout(() => { if(indicator) indicator.innerHTML = ''; }, 2000);
+            } else {
+                if(indicator) indicator.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i>';
+                console.error('Autosave error:', data.message);
+            }
+        } catch (error) {
+            if(indicator) indicator.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i>';
+            console.error('Autosave network error:', error);
+        }
+    };
+
+    document.querySelectorAll('.autosave-update-input').forEach(input => {
+        input.addEventListener('change', function(e) {
+            handleUpdateAutosave(this.dataset.id, this.dataset.field, this.value);
+        });
+    });
+
+    // Handle AJAX remark submission
+    document.querySelectorAll('.ajax-remark-form').forEach(form => {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const updateId = this.dataset.updateId;
+            const container = document.getElementById(`remarks-container-${updateId}`);
+            const textarea = this.querySelector('textarea[name="remark_text"]');
+            const submitBtn = this.querySelector('button[type="submit"]');
+            
+            // Disable button
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+            const formData = new FormData(this);
+
+            try {
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrftoken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const newRemarkHtml = `
+                        <div class="note-card">
+                            <div class="note-header">
+                                <div class="d-flex align-items-center">
+                                    <div class="note-avatar-small">${data.remark.initials}</div>
+                                    <span class="note-author">${data.remark.user}</span>
+                                </div>
+                                <span class="note-time"><i class="far fa-clock me-1"></i>${data.remark.date}</span>
+                            </div>
+                            <div class="note-content">${data.remark.text.replace(/\n/g, '<br>')}</div>
+                        </div>
+                    `;
+                    
+                    const noRemarksDiv = container.querySelector('.text-center.text-muted');
+                    if (noRemarksDiv) {
+                        noRemarksDiv.remove();
+                    }
+
+                    container.insertAdjacentHTML('beforeend', newRemarkHtml);
+                    container.scrollTop = container.scrollHeight;
+                    textarea.value = '';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        });
+    });
 });
 </script>
 {% endblock %}

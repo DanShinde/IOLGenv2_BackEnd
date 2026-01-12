@@ -1,0 +1,25 @@
+<div class="row gx-2 gy-2 align-items-start mb-3 border-bottom pb-3">
+    <div class="col-md-2 pt-1">
+        <label class="form-label fw-bold mb-0 text-primary">{{ stage_display }}</label>
+    </div>
+    <div class="col-md-2">
+        <select name="stage_{{ stage_key }}_status" class="form-select form-select-sm" aria-label="{{ stage_display }} Status">
+            <option value="">-- Status --</option>
+            {% for status_key, status_display in status_choices %}
+            <option value="{{ status_key }}" {% if stage_values and stage_values.status == status_key %}selected{% endif %}>{{ status_display }}</option>
+            {% endfor %}
+        </select>
+        <select name="stage_{{ stage_key }}_schedule_status" class="form-select form-select-sm mt-1" multiple size="3" aria-label="Schedule Status">
+            <option value="delayed" {% if stage_values.schedule_status and 'delayed' in stage_values.schedule_status %}selected{% endif %}>Delayed</option>
+            <option value="on_time" {% if stage_values.schedule_status and 'on_time' in stage_values.schedule_status %}selected{% endif %}>On Time</option>
+            <option value="overdue" {% if stage_values.schedule_status and 'overdue' in stage_values.schedule_status %}selected{% endif %}>Overdue</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <div class="input-group input-group-sm mb-1"><span class="input-group-text" style="width: 60px;">Plan</span><input type="date" name="stage_{{ stage_key }}_planned_start" class="form-control" value="{{ stage_values.planned_start|default:'' }}"><span class="input-group-text">-</span><input type="date" name="stage_{{ stage_key }}_planned_end" class="form-control" value="{{ stage_values.planned_end|default:'' }}"></div>
+        <div class="input-group input-group-sm"><span class="input-group-text" style="width: 60px;">Actual</span><input type="date" name="stage_{{ stage_key }}_start" class="form-control" value="{{ stage_values.start|default:'' }}"><span class="input-group-text">-</span><input type="date" name="stage_{{ stage_key }}_end" class="form-control" value="{{ stage_values.end|default:'' }}"></div>
+    </div>
+    <div class="col-md-1 text-end">
+        <button type="button" class="btn btn-outline-secondary btn-sm border-0" onclick="clearStageRow(this)" title="Clear filters for {{ stage_display }}"><i class="fas fa-times"></i></button>
+    </div>
+</div>
