@@ -70,8 +70,8 @@
     .table-container::-webkit-scrollbar-track { background: #f1f5f9; }
     .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px;}
     .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    .sticky-cell { position: -webkit-sticky; position: sticky; background-color: white; z-index: 30; }
-    thead .sticky-cell { z-index: 40; }
+    .sticky-cell { position: -webkit-sticky; position: sticky; background-color: white; z-index: 40; }
+    thead .sticky-cell { z-index: 50; }
 
     /* Fix for horizontal scroll visibility behind sticky columns */
     table { border-collapse: separate !important; border-spacing: 0; }
@@ -84,20 +84,26 @@
         border-bottom: 1px solid #818cf8;
     }
 
-    .col-project    { width: 100px; min-width: 100px; left: 0px; }
-    .col-activity   { width: 180px; min-width: 180px; left: 100px; }
-    .col-assignee   { width: 60px; min-width: 60px; left: 280px; text-align: center; }
-    .col-start      { width: 60px;  min-width: 60px;  left: 340px; }
-    .col-end        { width: 60px;  min-width: 60px;  left: 400px; }
-    .col-actions    { width: 40px;  min-width: 40px;  left: 460px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
+    .col-project    { width: 100px; min-width: 100px; max-width: 100px; left: 0px; }
+    .col-activity   { width: 180px; min-width: 180px; max-width: 180px; left: 100px; }
+    .col-assignee   { width: 60px; min-width: 60px; max-width: 60px; left: 280px; text-align: center; }
+    .col-start      { width: 60px;  min-width: 60px;  max-width: 60px;  left: 340px; }
+    .col-end        { width: 60px;  min-width: 60px;  max-width: 60px;  left: 400px; }
+    .col-actions    { width: 40px;  min-width: 40px;  max-width: 40px;  left: 460px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
 
-    .no-project-col .col-activity { width: 200px; min-width: 200px; left: 0px; } 
+    .no-project-col .col-activity { width: 200px; min-width: 200px; max-width: 200px; left: 0px; } 
     .no-project-col .col-assignee { left: 200px; }
     .no-project-col .col-start    { left: 260px; }
     .no-project-col .col-end      { left: 320px; }
     .no-project-col .col-actions  { left: 380px; }
 
-    .group-header .sticky-cell { background-color: #f8fafc; }
+    .group-header .sticky-cell { 
+        background-color: #f8fafc; 
+        left: 0px !important; 
+        width: auto !important; 
+        min-width: auto !important;
+        box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); /* Match col-actions shadow */
+    }
 
     .icon { width: 1.25rem; height: 1.25rem; }
     .large-icon { width: 2rem; height: 2rem; }
@@ -241,10 +247,16 @@
                     <svg class="icon mr-2 text-gray-600 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                     <h2 class="text-sm font-bold text-gray-800">Activity Timeline</h2>
                 </div>
-                <button id="openModalBtn" class="btn-success text-white py-1 px-4 rounded-md font-semibold text-xs flex items-center">
-                    <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    Add Activity
-                </button>
+                <div class="flex items-center space-x-3">
+                    <button id="goToTodayBtn" class="bg-white text-gray-700 border border-gray-300 py-1 px-3 rounded-md font-semibold text-xs flex items-center hover:bg-gray-50 transition-colors shadow-sm" title="Scroll to Today">
+                        <svg class="w-3 h-3 mr-1.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Today
+                    </button>
+                    <button id="openModalBtn" class="btn-success text-white py-1 px-4 rounded-md font-semibold text-xs flex items-center">
+                        <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Add Activity
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -262,7 +274,7 @@
             <table class="w-full table-auto {% if project or grouping_method == 'engineer' %}no-project-col{% endif %}" style="min-width: 4000px;">
                 <thead class="bg-gray-50 sticky top-0 z-40">
                     <tr class="h-6">
-                        <th colspan="{% if not project and grouping_method != 'engineer' %}6{% else %}5{% endif %}" class="sticky-cell col-project px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+                        <th colspan="{% if not project and grouping_method != 'engineer' %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 60;">
                             <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
                         </th>
                         {% for month, day_count in gantt_data.months.items %}<th colspan="{{ day_count }}" class="px-2 py-1 text-center text-xs font-semibold border-l bg-gradient-to-r from-indigo-500 to-purple-600 text-white">{{ month }}</th>{% endfor %}
@@ -294,7 +306,7 @@
                             {% if grouping_method != 'none' %}
                             {% with group_data=group_gantt_data|get_item:group_name %}
                             <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}">
-                                <td colspan="{% if grouping_method == 'project' %}6{% else %}5{% endif %}" class="sticky-cell col-project px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
+                                <td colspan="{% if grouping_method == 'project' %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
                                     <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                 </td>
                                 <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
@@ -432,6 +444,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
         window.addEventListener('keydown', (e) => {
             if (e.key === "Escape" && !modal.classList.contains('hidden')) closeModal();
+        });
+    }
+
+    // --- Scroll to Today Logic ---
+    const goToTodayBtn = document.getElementById('goToTodayBtn');
+    if (goToTodayBtn) {
+        goToTodayBtn.addEventListener('click', () => {
+            const todayCell = document.querySelector('th.today-cell');
+            const container = document.querySelector('.table-container');
+            
+            if (todayCell && container) {
+                // Calculate width of sticky columns to offset the scroll
+                // The last sticky column is .col-actions
+                const stickyActionCol = document.querySelector('.col-actions');
+                let stickyOffset = 0;
+                if (stickyActionCol) {
+                    // Use the left position + width from CSS/Computed style or offsetLeft + offsetWidth
+                    stickyOffset = stickyActionCol.offsetLeft + stickyActionCol.offsetWidth;
+                }
+
+                // Scroll to the cell, minus the sticky header width, plus a little padding (20px)
+                container.scrollTo({
+                    left: todayCell.offsetLeft - stickyOffset + 20,
+                    behavior: 'smooth'
+                });
+            } else {
+                // Optional: Feedback if today is not in range
+                console.log("Today's date is not within the current view range.");
+            }
         });
     }
 
