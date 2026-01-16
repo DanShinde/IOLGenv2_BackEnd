@@ -176,20 +176,6 @@ def project_detail(request, project_id):
             stage_id = request.POST.get('stage_id')
             stages_to_save = project.stages.filter(id=stage_id)
 
-        validation_passed = True
-        for stage in stages_to_save:
-            new_status = request.POST.get(f'status_{stage.id}') or "Not started"
-            actual_date_val = request.POST.get(f'actual_date_{stage.id}')
-            
-            if new_status == 'Completed' and not actual_date_val:
-                messages.error(request, f"Please add an actual finish date for stage '{stage.name}' to save it as 'Completed'.")
-                validation_passed = False
-        
-        if not validation_passed:
-            base_url = reverse('tracker_project_detail', args=[project.id])
-            redirect_url = f'{base_url}?active_tab={active_tab}'
-            return HttpResponseRedirect(redirect_url)
-
         success_message = "Changes saved successfully!"
         for stage in stages_to_save:
 
@@ -210,6 +196,10 @@ def project_detail(request, project_id):
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
             
+            # Auto-fill actual date if Completed and missing (Consistency with AJAX)
+            if new_status == 'Completed' and not new_actual:
+                new_actual = timezone.now().date()
+
             if new_status == 'Completed':
                 new_completion = 100
             elif new_status == 'Not started':
@@ -469,13 +459,32 @@ def dashboard(request):
     active_live_projects = status_counts['In Progress']
     delayed_live_projects = status_counts['Hold']
     
-    status_labels = list(status_counts.keys())
-    status_data = list(status_counts.values())
+    # --- FIX: Enforce consistent order for Status Chart Colors ---
+    ordered_statuses = ['Completed', 'In Progress', 'Hold', 'Not started']
+    color_map = {
+        'Completed': 'rgba(40, 167, 69, 0.7)',   # Green
+        'In Progress': 'rgba(255, 193, 7, 0.7)', # Yellow
+        'Hold': 'rgba(220, 53, 69, 0.7)',        # Red
+        'Not started': 'rgba(108, 117, 125, 0.7)', # Grey
+        'Not Applicable': 'rgba(200, 200, 200, 0.5)'
+    }
+    
+    final_status_labels = []
+    final_status_data = []
+    final_status_colors = []
+    
+    for s in ordered_statuses + [k for k in status_counts.keys() if k not in ordered_statuses]:
+        if status_counts[s] > 0:
+            final_status_labels.append(s)
+            final_status_data.append(status_counts[s])
+            final_status_colors.append(color_map.get(s, 'rgba(100, 100, 100, 0.7)'))
+
     context = {
         'total_projects': total_live_projects, 'active_projects': active_live_projects, 'delayed_projects': delayed_live_projects, 'total_value': total_live_value,
         'department_otif': department_otif, 'recent_projects': Project.objects.all().order_by('-so_punch_date')[:5],
         'labels': labels, 'on_track_data': on_track_data, 'at_risk_data': at_risk_data, 'delayed_data': delayed_data,
-        'status_labels': status_labels, 'status_data': status_data, 'selected_period_display': display_period,
+        'status_labels': final_status_labels, 'status_data': final_status_data, 'status_colors': final_status_colors,
+        'selected_period_display': display_period,
         'custom_start_date': custom_start, 'custom_end_date': custom_end, 'chronic_projects': chronic_projects, 'selected_chronic_period': chronic_period,
         'period_filter_options': period_map, 'selected_period_key': period,
     }
@@ -1428,7 +1437,12 @@ def export_push_pull_excel(request):
     for update in updates:
         # Join multiple contacts with a comma
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_text = " | ".join([f"{(r.added_by.get_full_name() or r.added_by.username)} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
+        
+        remarks_list = []
+        for r in update.remarks.all():
+            user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
+            remarks_list.append(f"{user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}")
+        remarks_text = " | ".join(remarks_list)
 
         # --- FIX START ---
         # A date object does not have a tzinfo attribute, so it doesn't need to be replaced.
@@ -1512,7 +1526,10 @@ def export_push_pull_pdf(request):
     
     for update in updates:
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_list = [f"• {(r.added_by.get_full_name() or r.added_by.username)} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()]
+        remarks_list = []
+        for r in update.remarks.all():
+            user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
+            remarks_list.append(f"• {user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}")
         
         what_cell = Paragraph(update.text, long_text_style)
         who_cell = Paragraph(who_contacts_str if who_contacts_str else '-', long_text_style)
@@ -1590,6 +1607,7 @@ def update_stage_ajax(request, stage_id):
             history_field_name = field_map.get(field_name, field_name.replace('_', ' ').title())
 
             # Update the field on the stage object
+            fields_to_update = [field_name]
             if 'date' in field_name:
                 setattr(stage, field_name, parse_date(new_value) if new_value else None)
             else:
@@ -1601,15 +1619,18 @@ def update_stage_ajax(request, stage_id):
                 if new_value == 'Completed' and not stage.actual_date:
                     stage.actual_date = timezone.now().date()
                     updated_actual_date = stage.actual_date.strftime('%Y-%m-%d')
+                    fields_to_update.append('actual_date')
                 elif new_value != 'Completed':
                     stage.actual_date = None
                     updated_actual_date = '' # Signal frontend to clear it
+                    fields_to_update.append('actual_date')
             
             # Prevent clearing actual date if status is Completed
             if field_name == 'actual_date' and not new_value and stage.status == 'Completed':
                  return JsonResponse({'status': 'error', 'message': 'Cannot remove Actual Date while status is Completed.'}, status=400)
             
-            stage.save()
+            # Use update_fields to prevent race conditions (e.g. Status vs % Completion updates)
+            stage.save(update_fields=fields_to_update)
 
             # Create a history record of the change
             StageHistory.objects.create(

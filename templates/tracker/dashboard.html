@@ -202,6 +202,25 @@
 {% block scripts %}
 {{ block.super }}
 <script>
+// --- Table Filtering Function ---
+function filterDashboardTables(input) {
+    const filterValue = input.value.toLowerCase();
+    const table = input.closest('table');
+    const columnIndex = input.closest('th').cellIndex;
+    const rows = table.querySelectorAll('tbody tr');
+
+    rows.forEach(row => {
+        // Skip "No projects found" rows
+        if (row.cells.length <= 1) return;
+        
+        const cell = row.cells[columnIndex];
+        if (cell) {
+            const text = cell.textContent || cell.innerText;
+            row.style.display = text.toLowerCase().indexOf(filterValue) > -1 ? '' : 'none';
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     Chart.register(ChartDataLabels);
 
@@ -215,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const heightPerProject = 40; // The desired height for each project's bar
 
     // 2. Calculate the total height the chart CONTENT needs to be
-    const projectsCount = {{ labels|safe }}.length;
+    const projectsCount = {{ labels|length }};
     const totalContentHeight = projectsCount * heightPerProject;
 
     // 3. Determine the final height for the chart's container
@@ -229,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(progressCtx, {
         type: 'bar',
         data: { 
-            labels: {{ labels|safe }}, 
+            labels: [{% for label in labels %}"{{ label|escapejs }}",{% endfor %}], 
             datasets: [ 
                 { label: 'On Track (>= 80%)', data: {{ on_track_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)', borderWidth: 1 }, 
                 { label: 'At Risk (40-79%)', data: {{ at_risk_data|safe }}, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderWidth: 1 }, 
@@ -260,16 +279,11 @@ document.addEventListener('DOMContentLoaded', function() {
         new Chart(statusCtx, {
             type: 'pie',
             data: { 
-                labels: {{ status_labels|safe }}, 
+                labels: [{% for label in status_labels %}"{{ label|escapejs }}",{% endfor %}], 
                 datasets: [{ 
                     label: 'Project Status', 
                     data: {{ status_data|safe }}, 
-                    backgroundColor: [
-                        'rgba(40, 167, 69, 0.7)',   // On Track
-                        'rgba(255, 193, 7, 0.7)',   // At Risk
-                        'rgba(220, 53, 69, 0.7)',   // Delayed
-                        'rgba(108, 117, 125, 0.7)'  // On Hold / Other
-                    ] 
+                    backgroundColor: [{% for color in status_colors %}"{{ color|escapejs }}",{% endfor %}]
                 }] 
             },
             options: { 
