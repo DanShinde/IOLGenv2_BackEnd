@@ -402,7 +402,7 @@ def dashboard(request):
         display_period = label
 
     completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
-    live_projects = Project.objects.filter(so_punch_date__lte=end_date).exclude(id__in=completed_early_ids).prefetch_related('stages').distinct()
+    live_projects = Project.objects.filter(so_punch_date__lte=end_date).exclude(id__in=completed_early_ids).select_related('segment_con', 'team_lead').prefetch_related('stages').distinct()
 
     # --- CHRONIC PROJECTS LOGIC CORRECTION ---
     chronic_period = request.GET.get('chronic_period', '1y')
@@ -441,6 +441,8 @@ def dashboard(request):
     status_counts = Counter()
     labels = []
     on_track_data, at_risk_data, delayed_data = [], [], []
+    segment_counts = Counter()
+    team_lead_counts = Counter()
     
     for project in live_projects:
         # Use utils functions with the prefetched stages list to avoid N+1 queries
@@ -450,6 +452,12 @@ def dashboard(request):
         
         status_counts[status] += 1
         labels.append(project.code)
+
+        # Aggregate Segment & Team Lead Data
+        seg_name = project.segment_con.name if project.segment_con else 'Unassigned'
+        segment_counts[seg_name] += 1
+        tl_name = project.team_lead.name if project.team_lead else 'Unassigned'
+        team_lead_counts[tl_name] += 1
         
         if completion >= 80: on_track_data.append(completion); at_risk_data.append(0); delayed_data.append(0)
         elif completion >= 40: on_track_data.append(0); at_risk_data.append(completion); delayed_data.append(0)
@@ -481,9 +489,12 @@ def dashboard(request):
 
     context = {
         'total_projects': total_live_projects, 'active_projects': active_live_projects, 'delayed_projects': delayed_live_projects, 'total_value': total_live_value,
-        'department_otif': department_otif, 'recent_projects': Project.objects.all().order_by('-so_punch_date')[:5],
+        'department_otif': department_otif, 
+        'recent_projects': Project.objects.select_related('segment_con').prefetch_related('stages').order_by('-so_punch_date')[:5],
         'labels': labels, 'on_track_data': on_track_data, 'at_risk_data': at_risk_data, 'delayed_data': delayed_data,
         'status_labels': final_status_labels, 'status_data': final_status_data, 'status_colors': final_status_colors,
+        'segment_labels': list(segment_counts.keys()), 'segment_data': list(segment_counts.values()),
+        'team_lead_labels': list(team_lead_counts.keys()), 'team_lead_data': list(team_lead_counts.values()),
         'selected_period_display': display_period,
         'custom_start_date': custom_start, 'custom_end_date': custom_end, 'chronic_projects': chronic_projects, 'selected_chronic_period': chronic_period,
         'period_filter_options': period_map, 'selected_period_key': period,

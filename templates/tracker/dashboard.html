@@ -90,6 +90,21 @@
 </div>
 
 <div class="row mt-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-layer-group"></i>Projects by Segment</h5></div>
+            <div class="card-body"><canvas id="segmentChart" height="200"></canvas></div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-users"></i>Projects by Team Lead</h5></div>
+            <div class="card-body"><canvas id="teamLeadChart" height="200"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
@@ -294,6 +309,42 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // --- Segment Chart ---
+    const segmentCtx = document.getElementById('segmentChart').getContext('2d');
+    new Chart(segmentCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [{% for label in segment_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                data: {{ segment_data|safe }},
+                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'right' } }
+        }
+    });
+
+    // --- Team Lead Chart ---
+    const teamLeadCtx = document.getElementById('teamLeadChart').getContext('2d');
+    new Chart(teamLeadCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for label in team_lead_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                label: 'Projects',
+                data: {{ team_lead_data|safe }},
+                backgroundColor: '#36b9cc',
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
 });
 </script>
 {% endblock %}
