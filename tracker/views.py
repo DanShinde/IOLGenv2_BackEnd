@@ -606,6 +606,15 @@ def project_reports(request):
             # Combine Q object with standard kwargs
             projects_qs = projects_qs.filter(stage_q, **stage_query_filters)
 
+    # --- Check for the 'hide_completed' filter ---
+    hide_completed = query_params.get('hide_completed') == '1'
+    if hide_completed:
+        completed_project_ids = Project.objects.filter(
+            stages__name='Handover',
+            stages__status='Completed'
+        ).values_list('id', flat=True)
+        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
+
     # --- Capture QS for Charts (Before Hide Completed) ---
     chart_projects_qs = projects_qs
 
@@ -646,15 +655,6 @@ def project_reports(request):
                     )
         except (ValueError, TypeError):
             pass
-
-    # --- Check for the 'hide_completed' filter ---
-    hide_completed = query_params.get('hide_completed') == '1'
-    if hide_completed:
-        completed_project_ids = Project.objects.filter(
-            stages__name='Handover',
-            stages__status='Completed'
-        ).values_list('id', flat=True)
-        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
 
     distinct_projects = projects_qs.distinct()
     distinct_chart_projects = chart_projects_qs.distinct()
@@ -1078,6 +1078,14 @@ def export_report_pdf(request):
             
             projects = projects.filter(stage_q, **stage_query_filters)
     
+    # --- NEW: Hide Completed Logic for PDF ---
+    if request.GET.get('hide_completed') == '1':
+        completed_project_ids = Project.objects.filter(
+            stages__name='Handover',
+            stages__status='Completed'
+        ).values_list('id', flat=True)
+        projects = projects.exclude(id__in=completed_project_ids)
+
     distinct_projects = projects.distinct()
 
     # --- Start Building the PDF ---

@@ -399,32 +399,33 @@
 <script>
 // ✅ NEW: Function to make cards in a row the same height
 function equalizeChartCardHeights() {
-    const chartRow = document.querySelector('.row.mt-4');
-    if (!chartRow) return;
+    const chartRows = document.querySelectorAll('.row.mt-4');
+    
+    chartRows.forEach(row => {
+        const cards = row.querySelectorAll('.card');
+        if (cards.length < 2) return;
 
-    const cards = chartRow.querySelectorAll('.card');
-    if (cards.length < 2) return;
+        // Use a small timeout to ensure charts have rendered before we measure them
+        setTimeout(() => {
+            let maxHeight = 0;
+            // First, reset any previously set heights to get the natural height
+            cards.forEach(card => {
+                card.style.height = 'auto';
+            });
 
-    // Use a small timeout to ensure charts have rendered before we measure them
-    setTimeout(() => {
-        let maxHeight = 0;
-        // First, reset any previously set heights to get the natural height
-        cards.forEach(card => {
-            card.style.height = 'auto';
-        });
+            // Find the height of the tallest card
+            cards.forEach(card => {
+                if (card.offsetHeight > maxHeight) {
+                    maxHeight = card.offsetHeight;
+                }
+            });
 
-        // Find the height of the tallest card
-        cards.forEach(card => {
-            if (card.offsetHeight > maxHeight) {
-                maxHeight = card.offsetHeight;
-            }
-        });
-
-        // Set all cards to the height of the tallest one
-        cards.forEach(card => {
-            card.style.height = `${maxHeight}px`;
-        });
-    }, 200); // 200ms delay
+            // Set all cards to the height of the tallest one
+            cards.forEach(card => {
+                card.style.height = `${maxHeight}px`;
+            });
+        }, 200); // 200ms delay
+    });
 }
 
 
