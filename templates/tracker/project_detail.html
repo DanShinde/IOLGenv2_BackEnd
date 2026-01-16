@@ -745,11 +745,12 @@
                     <table class="table loop-table mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th style="width: 12%;">Type</th>
-                                <th style="width: 35%;">Description</th>
-                                <th style="width: 20%;">Who</th>
-                                <th style="width: 12%;">ETA</th>
-                                <th style="width: 11%;">Status</th>
+                                <th style="width: 10%;">Type</th>
+                                <th style="width: 30%;">WHAT</th>
+                                <th style="width: 15%;">Who</th>
+                                <th style="width: 15%;">Raised By</th>
+                                <th style="width: 10%;">WHEN</th>
+                                <th style="width: 10%;">Status</th>
                                 <th style="width: 10%;"></th>
                             </tr>
                         </thead>
@@ -770,6 +771,14 @@
                                     <select class="form-select form-select-sm select2-update-who" multiple data-id="{{ update.id }}" data-field="who_contact">
                                         {% for person in contact_persons %}
                                         <option value="{{ person.id }}" {% if person in update.who_contact.all %}selected{% endif %}>{{ person.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm select2-update-raised-by" data-id="{{ update.id }}" data-field="raised_by">
+                                        <option value="">Select</option>
+                                        {% for person in contact_persons %}
+                                        <option value="{{ person.id }}" {% if update.raised_by.id == person.id %}selected{% endif %}>{{ person.name }}</option>
                                         {% endfor %}
                                     </select>
                                 </td>
@@ -804,6 +813,14 @@
                                     </td>
                                     <td>
                                         <select name="who_contact" class="form-select form-select-sm select2-new-who" multiple form="new-update-form">
+                                            {% for person in contact_persons %}
+                                                <option value="{{ person.id }}">{{ person.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="raised_by" class="form-select form-select-sm select2-new-raised-by" form="new-update-form">
+                                            <option value="">Select</option>
                                             {% for person in contact_persons %}
                                                 <option value="{{ person.id }}">{{ person.name }}</option>
                                             {% endfor %}
@@ -970,6 +987,56 @@
             }
         });
         
+        // Initialize Select2 for "Raised By" in new row
+        $('.select2-new-raised-by').select2({
+            tags: true,
+            theme: 'bootstrap-5',
+            placeholder: "Select person",
+            width: '100%',
+            createTag: function(params) {
+                const term = $.trim(params.term);
+                if (term === '' || $.isNumeric(term)) return null;
+                const existingOptions = $(this).find('option');
+                const isExisting = existingOptions.filter(function() {
+                    return $.trim($(this).text()).toLowerCase() === term.toLowerCase();
+                }).length > 0;
+                if (isExisting) return null;
+                return { id: term, text: term, new: true };
+            },
+            templateResult: function (data) {
+                if (data.new) return $('<span><b>(New)</b> ' + data.text + '</span>');
+                return data.text;
+            }
+        });
+
+        // Handle new tags for "Raised By" via AJAX
+        $('.select2-new-raised-by').on('select2:select', function (e) {
+            const data = e.params.data;
+            if (data.new) {
+                const $select = $(this);
+                $.ajax({
+                    url: "{% url 'add_contact_person_ajax' %}",
+                    method: 'POST',
+                    data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                    success: function(response) {
+                        if(response.status === 'success') {
+                            const newOption = new Option(response.name, response.id, false, false);
+                            $select.find(`option[value="${data.id}"]`).remove();
+                            $select.append(newOption).trigger('change');
+                            $select.val(response.id).trigger('change');
+                        } else {
+                            alert('Error creating new contact.');
+                            $select.val('').trigger('change');
+                        }
+                    },
+                    error: function() {
+                        alert('Error creating new contact.');
+                        $select.val('').trigger('change');
+                    }
+                });
+            }
+        });
+
         // Handle new tags (persons) being added via AJAX
         $('.select2-new-who').on('select2:select', function (e) {
             const data = e.params.data;
@@ -1027,6 +1094,56 @@
                 const updateId = select.dataset.id;
                 const field = select.dataset.field;
                 const value = $(select).val(); // Array of IDs
+                handleUpdateAutosave(updateId, field, value);
+            }).on('select2:select', function(e) {
+                // Handle new tag creation via AJAX inside the table
+                const data = e.params.data;
+                if (data.new) {
+                    const $select = $(this);
+                    $.ajax({
+                        url: "{% url 'add_contact_person_ajax' %}",
+                        method: 'POST',
+                        data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                        success: function(response) {
+                            if(response.status === 'success') {
+                                const newOption = new Option(response.name, response.id, false, false);
+                                $select.find(`option[value="${data.id}"]`).remove();
+                                $select.append(newOption).trigger('change');
+                                // The change event above will handle the autosave
+                            } else {
+                                alert('Error creating new contact.');
+                            }
+                        },
+                        error: function() {
+                            alert('Error creating new contact.');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Initialize Select2 for "Raised By" in existing rows (Inline Editing)
+        $('.select2-update-raised-by').each(function() {
+            $(this).select2({
+                tags: true,
+                theme: 'bootstrap-5',
+                placeholder: "Select person",
+                width: '100%',
+                createTag: function(params) {
+                    const term = $.trim(params.term);
+                    if (term === '' || $.isNumeric(term)) return null;
+                    return { id: term, text: term, new: true };
+                },
+                templateResult: function (data) {
+                    if (data.new) return $('<span><b>(New)</b> ' + data.text + '</span>');
+                    return data.text;
+                }
+            }).on('change', function(e) {
+                // Trigger autosave manually on change
+                const select = e.target;
+                const updateId = select.dataset.id;
+                const field = select.dataset.field;
+                const value = $(select).val();
                 handleUpdateAutosave(updateId, field, value);
             }).on('select2:select', function(e) {
                 // Handle new tag creation via AJAX inside the table
