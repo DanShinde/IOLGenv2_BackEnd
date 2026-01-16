@@ -209,7 +209,12 @@ def project_detail(request, project_id):
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
-            if new_completion_percentage is not None:
+            
+            if new_status == 'Completed':
+                new_completion = 100
+            elif new_status == 'Not started':
+                new_completion = 0
+            elif new_completion_percentage is not None:
                 new_completion = int(new_completion_percentage) if new_completion_percentage else 0
             else:
                 new_completion = stage.completion_percentage
