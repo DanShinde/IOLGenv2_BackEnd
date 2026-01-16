@@ -87,19 +87,19 @@
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution (Live in Period)</h5></div>
-            <div class="card-body"><canvas id="statusChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="statusChart"></canvas></div></div>
         </div>
     </div>
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-layer-group"></i>Projects by Segment</h5></div>
-            <div class="card-body"><canvas id="segmentChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="segmentChart"></canvas></div></div>
         </div>
     </div>
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-users"></i>Projects by Team Lead</h5></div>
-            <div class="card-body"><canvas id="teamLeadChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="teamLeadChart"></canvas></div></div>
         </div>
     </div>
 </div>
@@ -108,19 +108,19 @@
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-indian-rupee-sign"></i> Value by Segment</h5></div>
-            <div class="card-body"><canvas id="segmentValueChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="segmentValueChart"></canvas></div></div>
         </div>
     </div>
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-user-tie"></i> Value by Team Lead</h5></div>
-            <div class="card-body"><canvas id="teamLeadValueChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="teamLeadValueChart"></canvas></div></div>
         </div>
     </div>
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i> Value by Status</h5></div>
-            <div class="card-body"><canvas id="statusValueChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="statusValueChart"></canvas></div></div>
         </div>
     </div>
 </div>
@@ -129,7 +129,7 @@
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-hourglass-half"></i> Project Age Distribution</h5></div>
-            <div class="card-body"><canvas id="ageChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="ageChart"></canvas></div></div>
         </div>
     </div>
 </div>
@@ -332,9 +332,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }] 
             },
             options: { 
-                responsive: true, 
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: { 
-                    legend: { position: 'top' } 
+                    legend: { position: 'top' },
+                    datalabels: { color: '#ffffff', font: { weight: 'bold' } }
                 } 
             }
         });
@@ -354,6 +356,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: { 
                 legend: { position: 'right' },
                 tooltip: {
@@ -366,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 },
-                datalabels: { formatter: function(value) { return value.toFixed(2); } }
+                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
             }
         }
     });
@@ -385,7 +388,12 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         options: {
             responsive: true,
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: {
+                legend: { display: false },
+                datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' } }
+            }
         }
     });
 
@@ -403,7 +411,8 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         options: {
             responsive: true,
-            plugins: { legend: { position: 'right' } }
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'right' }, datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } } }
         }
     });
 
@@ -421,6 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             scales: { y: { beginAtZero: true } },
             plugins: {
                 tooltip: {
@@ -437,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 },
-                datalabels: { formatter: function(value) { return value.toFixed(2); } }
+                datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
             }
         }
     });
@@ -455,6 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: { 
                 legend: { position: 'right' },
                 tooltip: {
@@ -471,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 },
-                datalabels: { formatter: function(value) { return value.toFixed(2); } }
+                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
             }
         }
     });
@@ -488,7 +499,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 backgroundColor: '#fd7e14', // Orange
             }]
         },
-        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: { legend: { display: false }, datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' } } }
+        }
     });
 });
 </script>
