@@ -308,6 +308,50 @@
     textarea:focus, select:focus, input:focus { box-shadow: none !important; border-color: #ced4da !important; }
     /* Make select2 inline look cleaner */
     .select2-container--bootstrap-5 .select2-selection { border: none; background-color: transparent; padding-left: 0; }
+
+    /* Enhanced Select2 Tags for Push Pull Table (Matching Project Detail Page) */
+    #pushPullTable .select2-container--bootstrap-5 .select2-selection__choice {
+        background-color: #eef2ff !important; /* Light Indigo */
+        color: #4338ca !important; /* Indigo 700 */
+        border: 1px solid #c7d2fe !important;
+        border-radius: 50rem !important; /* Pill shape */
+        padding: 3px 10px 3px 24px !important; /* Adjusted padding for a tighter fit */
+        font-size: 0.75rem !important;
+        font-weight: 600;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        position: relative;
+    }
+    #pushPullTable .select2-container--bootstrap-5 .select2-selection__choice__remove {
+        border: none !important;
+        background: transparent !important;
+        color: #4338ca !important;
+        position: absolute !important;
+        left: 4px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-indent: 0 !important;
+    }
+    /* Restore the 'x' using a pseudo-element since we removed the background image */
+    #pushPullTable .select2-container--bootstrap-5 .select2-selection__choice__remove::before {
+        content: "\00d7"; /* Multiplication sign */
+        font-size: 1rem;
+        line-height: 1;
+    }
+    #pushPullTable .select2-container--bootstrap-5 .select2-selection__choice__remove:hover {
+        opacity: 1;
+        background-color: rgba(67, 56, 202, 0.1) !important;
+        border-radius: 50%;
+        color: #312e81 !important;
+    }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
