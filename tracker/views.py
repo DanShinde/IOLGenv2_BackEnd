@@ -71,7 +71,12 @@ def signup_view(request):
 @login_required
 def index(request):
     projects = Project.objects.select_related('segment_con').all()
-    return render(request, 'tracker/index.html', {'projects': projects})
+    context = {
+        'projects': projects,
+        'all_segments': trackerSegment.objects.all(),
+        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD')
+    }
+    return render(request, 'tracker/index.html', context)
 
 @login_required
 def new_project(request):
