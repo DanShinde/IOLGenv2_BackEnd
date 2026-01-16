@@ -402,7 +402,9 @@ def dashboard(request):
         display_period = label
 
     completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
-    live_projects = Project.objects.filter(so_punch_date__lte=end_date).exclude(id__in=completed_early_ids).select_related('segment_con', 'team_lead').prefetch_related('stages').distinct()
+    live_projects = Project.objects.filter(
+        Q(so_punch_date__lte=end_date) | Q(so_punch_date__isnull=True)
+    ).exclude(id__in=completed_early_ids).select_related('segment_con', 'team_lead').prefetch_related('stages').distinct()
 
     # --- CHRONIC PROJECTS LOGIC CORRECTION ---
     chronic_period = request.GET.get('chronic_period', '1y')
@@ -448,7 +450,7 @@ def dashboard(request):
         # Use utils functions with the prefetched stages list to avoid N+1 queries
         stages = list(project.stages.all())
         status = get_overall_status(stages)
-        completion = get_completion_percentage(stages)
+        completion = get_completion_percentage(stages) or 0
         
         status_counts[status] += 1
         labels.append(project.code)
@@ -464,7 +466,7 @@ def dashboard(request):
         else: on_track_data.append(0); at_risk_data.append(0); delayed_data.append(completion)
     
     # Derive counts from the consistent status calculation
-    active_live_projects = status_counts['In Progress']
+    active_live_projects = status_counts['In Progress'] + status_counts['Not started']
     delayed_live_projects = status_counts['Hold']
     
     # --- FIX: Enforce consistent order for Status Chart Colors ---
