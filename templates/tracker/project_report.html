@@ -639,26 +639,33 @@ function updateTrendChart() {
         filteredMonths = rawData.months || [];
     } else {
         // Quarterly Aggregation
-        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
-        filteredPlanned = [0, 0, 0, 0];
-        filteredActual = [0, 0, 0, 0];
+        let quarterlyData = {};
+        let keysOrder = [];
         
         if (rawData.financial_years) {
             for (let i = 0; i < rawData.financial_years.length; i++) {
+                const fy = rawData.financial_years[i];
                 const month = rawData.months[i]; // 1-12
                 
-                // Indian Financial Year Logic: Q1=Apr-Jun
-                let quarterIndex;
-                if (month >= 4) {
-                    quarterIndex = Math.floor((month - 4) / 3); // 4-6->0, 7-9->1, 10-12->2
-                } else {
-                    quarterIndex = 3; // 1-3 -> 3 (Q4)
+                let qIndex, monthRange;
+                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+                
+                const key = `${fy}_Q${qIndex}`;
+                if (!quarterlyData[key]) {
+                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, planned: 0, actual: 0 };
+                    keysOrder.push(key);
                 }
                 
-                filteredPlanned[quarterIndex] += rawData.planned[i];
-                filteredActual[quarterIndex] += rawData.actual[i];
+                quarterlyData[key].planned += rawData.planned[i];
+                quarterlyData[key].actual += rawData.actual[i];
             }
         }
+        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
+        filteredPlanned = keysOrder.map(k => quarterlyData[k].planned);
+        filteredActual = keysOrder.map(k => quarterlyData[k].actual);
     }
 
     if (trendChart) {
@@ -784,28 +791,37 @@ function updateOtifChart() {
         }
     } else {
         // Quarterly Aggregation (IFY)
-        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
-        let qTotal = [0, 0, 0, 0];
-        let qOnTime = [0, 0, 0, 0];
+        let quarterlyData = {};
+        let keysOrder = [];
         
         if (rawData.financial_years) {
             for (let i = 0; i < rawData.financial_years.length; i++) {
+                const fy = rawData.financial_years[i];
                 const month = rawData.months[i];
-                let quarterIndex;
-                if (month >= 4) {
-                    quarterIndex = Math.floor((month - 4) / 3);
-                } else {
-                    quarterIndex = 3;
+                
+                let qIndex, monthRange;
+                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+                
+                const key = `${fy}_Q${qIndex}`;
+                if (!quarterlyData[key]) {
+                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, total: 0, on_time: 0 };
+                    keysOrder.push(key);
                 }
-                qTotal[quarterIndex] += rawData.total[i];
-                qOnTime[quarterIndex] += rawData.on_time[i];
+                quarterlyData[key].total += rawData.total[i];
+                quarterlyData[key].on_time += rawData.on_time[i];
             }
         }
         
-        // Calculate percentages for quarters
-        filteredData = qTotal.map((total, index) => total > 0 ? (qOnTime[index] / total) * 100 : 0);
-        filteredTotal = qTotal;
-        filteredOnTime = qOnTime;
+        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
+        filteredTotal = keysOrder.map(k => quarterlyData[k].total);
+        filteredOnTime = keysOrder.map(k => quarterlyData[k].on_time);
+        filteredData = keysOrder.map(k => {
+            const t = quarterlyData[k].total;
+            return t > 0 ? (quarterlyData[k].on_time / t) * 100 : 0;
+        });
     }
 
     if (otifChart) {
@@ -933,25 +949,34 @@ function updateEmuChart() {
         filteredCat3 = rawData.cat3 || [];
     } else {
         // Quarterly Aggregation
-        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
-        filteredCat1 = [0, 0, 0, 0];
-        filteredCat2 = [0, 0, 0, 0];
-        filteredCat3 = [0, 0, 0, 0];
+        let quarterlyData = {};
+        let keysOrder = [];
 
         if (rawData.financial_years) {
             for (let i = 0; i < rawData.financial_years.length; i++) {
+                const fy = rawData.financial_years[i];
                 const month = rawData.months[i];
-                let quarterIndex;
-                if (month >= 4) {
-                    quarterIndex = Math.floor((month - 4) / 3);
-                } else {
-                    quarterIndex = 3;
+                
+                let qIndex, monthRange;
+                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+                
+                const key = `${fy}_Q${qIndex}`;
+                if (!quarterlyData[key]) {
+                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, cat1: 0, cat2: 0, cat3: 0 };
+                    keysOrder.push(key);
                 }
-                filteredCat1[quarterIndex] += rawData.cat1[i];
-                filteredCat2[quarterIndex] += rawData.cat2[i];
-                filteredCat3[quarterIndex] += rawData.cat3[i];
+                quarterlyData[key].cat1 += rawData.cat1[i];
+                quarterlyData[key].cat2 += rawData.cat2[i];
+                quarterlyData[key].cat3 += rawData.cat3[i];
             }
         }
+        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
+        filteredCat1 = keysOrder.map(k => quarterlyData[k].cat1);
+        filteredCat2 = keysOrder.map(k => quarterlyData[k].cat2);
+        filteredCat3 = keysOrder.map(k => quarterlyData[k].cat3);
     }
 
     if (emuChart) {

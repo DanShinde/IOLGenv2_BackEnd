@@ -564,8 +564,8 @@ def project_reports(request):
     selected_segment_ids = params_for_getlist.getlist('segments')
     selected_team_lead_ids = params_for_getlist.getlist('team_leads')
 
-    start_date = query_params.get('start_date')
-    end_date = query_params.get('end_date')
+    start_date = parse_date(query_params.get('start_date')) if query_params.get('start_date') else None
+    end_date = parse_date(query_params.get('end_date')) if query_params.get('end_date') else None
     min_value = query_params.get('min_value')
     max_value = query_params.get('max_value')
     selected_fy = query_params.get('financial_year')
@@ -575,6 +575,10 @@ def project_reports(request):
         year = int(selected_fy)
         fy_start = date(year, 4, 1)
         fy_end = date(year + 1, 3, 31)
+        
+        # Update start/end date for chart filtering
+        start_date = fy_start
+        end_date = fy_end
         
         # Match Dashboard Logic: Live Projects in Period (Carry-over + New)
         # 1. Exclude projects completed before the start of the FY
@@ -755,7 +759,11 @@ def project_reports(request):
     planned_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
         planned_date__isnull=False
-    ).annotate(
+    )
+    if start_date and end_date:
+        planned_qs = planned_qs.filter(planned_date__range=[start_date, end_date])
+        
+    planned_qs = planned_qs.annotate(
         month=TruncMonth('planned_date')
     ).values('name', 'month').annotate(count=Count('id')).order_by('month')
 
@@ -763,7 +771,11 @@ def project_reports(request):
     actual_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
         actual_date__isnull=False
-    ).annotate(
+    )
+    if start_date and end_date:
+        actual_qs = actual_qs.filter(actual_date__range=[start_date, end_date])
+        
+    actual_qs = actual_qs.annotate(
         month=TruncMonth('actual_date')
     ).values('name', 'month').annotate(count=Count('id')).order_by('month')
 
@@ -810,7 +822,11 @@ def project_reports(request):
     otif_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
         planned_date__isnull=False
-    ).annotate(
+    )
+    if start_date and end_date:
+        otif_qs = otif_qs.filter(planned_date__range=[start_date, end_date])
+        
+    otif_qs = otif_qs.annotate(
         month=TruncMonth('planned_date')
     ).values('name', 'month').annotate(
         total=Count('id'),
@@ -866,6 +882,10 @@ def project_reports(request):
         
         if emu and emu.actual_date:
             month_key = emu.actual_date.replace(day=1)
+            
+            # Filter by date range if selected
+            if start_date and end_date and not (start_date <= emu.actual_date <= end_date):
+                continue
             
             dispatch_date = dispatch.actual_date if (dispatch and dispatch.actual_date) else None
             # Using planned_start_date as the 'Start Date' for Go Live (Commissioning) as per user request
