@@ -664,47 +664,57 @@
 </div>
 
 <div class="card mb-4" id="project-notes">
-    <div class="card-header bg-white">
-        <h5 class="card-header-title mb-0"><i class="far fa-sticky-note me-2 text-primary"></i>Project Notes</h5>
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" id="notesPushPullTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="notes-tab" data-bs-toggle="tab" data-bs-target="#notes-content" type="button" role="tab" aria-controls="notes-content" aria-selected="true">
+                    <i class="far fa-sticky-note me-2"></i>Project Notes
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="push-pull-tab" data-bs-toggle="tab" data-bs-target="#push-pull-content" type="button" role="tab" aria-controls="push-pull-content" aria-selected="false">
+                    <i class="fas fa-table me-2"></i>Push-Pull Contents
+                </button>
+            </li>
+        </ul>
     </div>
-    <div class="card-body bg-light">
-        <div class="project-notes-feed">
-            {% for comment in project_comments %}
-                <div class="note-card">
-                    <div class="note-header">
-                        <div class="d-flex align-items-center">
-                            <div class="note-avatar-small">{{ comment.added_by.username|slice:":2"|upper }}</div>
-                            <span class="note-author">{{ comment.added_by.username|default:'Unknown' }}</span>
-                        </div>
-                        <span class="note-time"><i class="far fa-clock me-1"></i>{{ comment.created_at|naturaltime }}</span>
+    <div class="card-body p-0">
+        <div class="tab-content" id="notesPushPullTabsContent">
+            <!-- Project Notes Tab -->
+            <div class="tab-pane fade show active" id="notes-content" role="tabpanel" aria-labelledby="notes-tab">
+                <div class="p-3 bg-light">
+                    <div class="project-notes-feed">
+                        {% for comment in project_comments %}
+                            <div class="note-card">
+                                <div class="note-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="note-avatar-small">{{ comment.added_by.username|slice:":2"|upper }}</div>
+                                        <span class="note-author">{{ comment.added_by.username|default:'Unknown' }}</span>
+                                    </div>
+                                    <span class="note-time"><i class="far fa-clock me-1"></i>{{ comment.created_at|naturaltime }}</span>
+                                </div>
+                                <div class="note-content">{{ comment.text|linebreaksbr }}</div>
+                            </div>
+                        {% empty %}
+                            <div class="text-center text-muted p-4">
+                                <i class="far fa-clipboard fa-2x mb-3 text-secondary opacity-50"></i>
+                                <p>No notes added yet.</p>
+                            </div>
+                        {% endfor %}
                     </div>
-                    <div class="note-content">{{ comment.text|linebreaksbr }}</div>
+                    <form method="POST" action="{% url 'tracker_project_detail' project.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="active_tab" value="{{ request.GET.active_tab|default:'automation' }}">
+                        <div class="d-flex gap-2">
+                            <textarea name="note_text" class="form-control shadow-sm border-0" rows="2" placeholder="Type a note here..." required style="resize: none;"></textarea>
+                            <button type="submit" name="add_project_comment" value="1" class="btn btn-primary px-4 align-self-end"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </form>
                 </div>
-            {% empty %}
-                <div class="text-center text-muted p-4">
-                    <i class="far fa-clipboard fa-2x mb-3 text-secondary opacity-50"></i>
-                    <p>No notes added yet.</p>
-                </div>
-            {% endfor %}
-        </div>
-        <form method="POST" action="{% url 'tracker_project_detail' project.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="active_tab" value="{{ request.GET.active_tab|default:'automation' }}">
-            <div class="d-flex gap-2">
-                <textarea name="note_text" class="form-control shadow-sm border-0" rows="2" placeholder="Type a note here..." required style="resize: none;"></textarea>
-                <button type="submit" name="add_project_comment" value="1" class="btn btn-primary px-4 align-self-end"><i class="fas fa-paper-plane"></i></button>
             </div>
-        </form>
-    </div>
-</div>
 
-<div class="row mt-4">
-    <div class="col-12">
-
-        <div class="card" id="push-pull-contents">
-
-            <div class="card-header bg-white"><h5 class="card-header-title mb-0"><i class="fas fa-table me-2 text-primary"></i>Push-Pull Contents</h5></div>
-            <div class="card-body p-0">
+            <!-- Push-Pull Contents Tab -->
+            <div class="tab-pane fade" id="push-pull-content" role="tabpanel" aria-labelledby="push-pull-tab">
                 <div class="table-responsive">
                     <table class="table loop-table mb-0">
                         <thead class="bg-light">
@@ -718,7 +728,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                    {% for update in updates %}
+                        {% for update in updates %}
                             <tr>
                                 <td>
                                     <select class="form-select form-select-sm autosave-update-input" data-id="{{ update.id }}" data-field="push_pull_type">
@@ -759,7 +769,7 @@
                                     <span id="update-indicator-{{ update.id }}" class="ms-1"></span>
                                 </td>
                             </tr>
-                    {% endfor %}
+                        {% endfor %}
                             
                             <!-- New Row (Hidden by default) -->
                             <tr id="new-update-row" style="display: none; background-color: #f8f9fa;">
