@@ -446,6 +446,11 @@ def dashboard(request):
     segment_counts = Counter()
     team_lead_counts = Counter()
     
+    segment_values = defaultdict(float)
+    team_lead_values = defaultdict(float)
+    status_values = defaultdict(float)
+    age_counts = defaultdict(int)
+    
     for project in live_projects:
         # Use utils functions with the prefetched stages list to avoid N+1 queries
         stages = list(project.stages.all())
@@ -460,6 +465,23 @@ def dashboard(request):
         segment_counts[seg_name] += 1
         tl_name = project.team_lead.name if project.team_lead else 'Unassigned'
         team_lead_counts[tl_name] += 1
+        
+        # --- NEW: Value Aggregations ---
+        val = float(project.value) if project.value else 0.0
+        segment_values[seg_name] += val
+        team_lead_values[tl_name] += val
+        status_values[status] += val
+
+        # --- NEW: Project Age Split ---
+        if project.so_punch_date:
+            age_days = (today - project.so_punch_date).days
+            if age_days < 180: age_bucket = 'Below 6 Months'
+            elif age_days < 365: age_bucket = '6 Months - 1 Year'
+            elif age_days < 547: age_bucket = '1 - 1.5 Years'
+            elif age_days < 730: age_bucket = '1.5 - 2 Years'
+            else: age_bucket = 'More than 2 Years'
+            age_counts[age_bucket] += 1
+
         
         if completion >= 80: on_track_data.append(completion); at_risk_data.append(0); delayed_data.append(0)
         elif completion >= 40: on_track_data.append(0); at_risk_data.append(completion); delayed_data.append(0)
@@ -488,6 +510,26 @@ def dashboard(request):
             final_status_labels.append(s)
             final_status_data.append(status_counts[s])
             final_status_colors.append(color_map.get(s, 'rgba(100, 100, 100, 0.7)'))
+            
+    # --- NEW: Prepare Status Value Data (Consistent Coloring) ---
+    final_status_value_labels = []
+    final_status_value_data = []
+    final_status_value_colors = []
+    for s in ordered_statuses + [k for k in status_values.keys() if k not in ordered_statuses]:
+        if status_values[s] > 0:
+            final_status_value_labels.append(s)
+            final_status_value_data.append(status_values[s])
+            final_status_value_colors.append(color_map.get(s, 'rgba(100, 100, 100, 0.7)'))
+
+    # --- NEW: Prepare Age Data (Ordered) ---
+    age_buckets_order = ['Below 6 Months', '6 Months - 1 Year', '1 - 1.5 Years', '1.5 - 2 Years', 'More than 2 Years']
+    age_labels = []
+    age_data = []
+    for bucket in age_buckets_order:
+        if age_counts[bucket] > 0:
+            age_labels.append(bucket)
+            age_data.append(age_counts[bucket])
+
 
     context = {
         'total_projects': total_live_projects, 'active_projects': active_live_projects, 'delayed_projects': delayed_live_projects, 'total_value': total_live_value,
@@ -497,6 +539,10 @@ def dashboard(request):
         'status_labels': final_status_labels, 'status_data': final_status_data, 'status_colors': final_status_colors,
         'segment_labels': list(segment_counts.keys()), 'segment_data': list(segment_counts.values()),
         'team_lead_labels': list(team_lead_counts.keys()), 'team_lead_data': list(team_lead_counts.values()),
+        'segment_value_labels': list(segment_values.keys()), 'segment_value_data': list(segment_values.values()),
+        'team_lead_value_labels': list(team_lead_values.keys()), 'team_lead_value_data': list(team_lead_values.values()),
+        'status_value_labels': final_status_value_labels, 'status_value_data': final_status_value_data, 'status_value_colors': final_status_value_colors,
+        'age_labels': age_labels, 'age_data': age_data,
         'selected_period_display': display_period,
         'custom_start_date': custom_start, 'custom_end_date': custom_end, 'chronic_projects': chronic_projects, 'selected_chronic_period': chronic_period,
         'period_filter_options': period_map, 'selected_period_key': period,
