@@ -412,6 +412,61 @@
     </div>
 </div>
 
+<!-- Project Summary & Activity Toggle -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-header-title mb-0"><i class="fas fa-info-circle me-2"></i>Project Summary</h5>
+        <a href="{% url 'tracker_project_activity' project.id %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-history me-1"></i> View Recent Activity
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <h6 class="text-muted">Current Status</h6>
+            <div class="d-flex align-items-center mt-1">
+                <span class="badge fs-6 {% if overall_status == 'Completed' %}bg-success{% elif overall_status == 'In Progress' %}bg-warning text-dark{% elif overall_status == 'Hold' %}bg-danger{% else %}bg-secondary{% endif %} me-3">{{ overall_status }}</span>
+                {% if last_update_time %}<small class="text-muted"><i class="far fa-clock me-1"></i>Last updated: {{ last_update_time|date:"M d, Y" }}</small>{% endif %}
+            </div>
+        </div>
+        <hr>
+        <div class="row mb-3">
+            <div class="col-md-6 border-end">
+                <h6 class="text-muted">Next Automation Milestone</h6>
+                {% if next_automation_milestone %}
+                    <strong>{{ next_automation_milestone.name }}</strong>
+                    <div class="text-muted small mt-1">Planned: {{ next_automation_milestone.planned_date|date:"M d, Y" }}</div>
+                {% else %}
+                    <p class="text-muted mb-0 small">All automation stages complete.</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted">Next Emulation Milestone</h6>
+                {% if next_emulation_milestone %}
+                    <strong>{{ next_emulation_milestone.name }}</strong>
+                    <div class="text-muted small mt-1">Planned: {{ next_emulation_milestone.planned_date|date:"M d, Y" }}</div>
+                {% else %}
+                    <p class="text-muted mb-0 small">All emulation stages complete.</p>
+                {% endif %}
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-md-6 border-end">
+                 <h6 class="text-muted">Automation Schedule</h6>
+                 {% with schedule_status=automation_schedule_status %}
+                    {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
+                 {% endwith %}
+            </div>
+             <div class="col-md-6">
+                <h6 class="text-muted">Emulation Schedule</h6>
+                {% with schedule_status=emulation_schedule_status %}
+                   {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
+                {% endwith %}
+           </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-lg-6 mb-4">
         <div class="card h-100">
@@ -640,89 +695,6 @@
                 <button type="submit" name="add_project_comment" value="1" class="btn btn-primary px-4 align-self-end"><i class="fas fa-paper-plane"></i></button>
             </div>
         </form>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-lg-6 d-flex">
-        <div class="card w-100">
-            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-info-circle me-2"></i>Project Summary</h5></div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <h6 class="text-muted">Current Status</h6>
-                    <div class="d-flex align-items-center mt-1">
-                        <span class="badge fs-6 {% if overall_status == 'Completed' %}bg-success{% elif overall_status == 'In Progress' %}bg-warning text-dark{% elif overall_status == 'Hold' %}bg-danger{% else %}bg-secondary{% endif %} me-3">{{ overall_status }}</span>
-                        {% if last_update_time %}<small class="text-muted"><i class="far fa-clock me-1"></i>Last updated: {{ last_update_time|date:"M d, Y" }}</small>{% endif %}
-                    </div>
-                </div>
-                <hr>
-                <div class="row mb-3">
-                    <div class="col-6 border-end">
-                        <h6 class="text-muted">Next Automation Milestone</h6>
-                        {% if next_automation_milestone %}
-                            <strong>{{ next_automation_milestone.name }}</strong>
-                            <div class="text-muted small mt-1">Planned: {{ next_automation_milestone.planned_date|date:"M d, Y" }}</div>
-                        {% else %}
-                            <p class="text-muted mb-0 small">All automation stages complete.</p>
-                        {% endif %}
-                    </div>
-                    <div class="col-6">
-                        <h6 class="text-muted">Next Emulation Milestone</h6>
-                        {% if next_emulation_milestone %}
-                            <strong>{{ next_emulation_milestone.name }}</strong>
-                            <div class="text-muted small mt-1">Planned: {{ next_emulation_milestone.planned_date|date:"M d, Y" }}</div>
-                        {% else %}
-                            <p class="text-muted mb-0 small">All emulation stages complete.</p>
-                        {% endif %}
-                    </div>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="col-6 border-end">
-
-                         <h6 class="text-muted">Automation Schedule</h6>
-                         {% with schedule_status=automation_schedule_status %}
-                            {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                         {% endwith %}
-                    </div>
-                     <div class="col-6">
-                        <h6 class="text-muted">Emulation Schedule</h6>
-                        {% with schedule_status=emulation_schedule_status %}
-                           {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                        {% endwith %}
-                   </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6 d-flex">
-        <div class="card w-100">
-            <div class="card-header">
-                <h5 class="card-header-title"><i class="fas fa-history me-2"></i>Recent Activity</h5>
-                <a href="{% url 'tracker_project_activity' project.id %}" class="btn btn-sm btn-outline-primary">View All</a>
-            </div>
-            <div class="card-body">
-                {% if recent_activity %}
-                    {% for log in recent_activity %}
-                    <div class="d-flex mb-3">
-                        <div class="me-3">
-                            <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
-                                <i class="fas fa-{% if log.field_name == 'status' %}exchange-alt{% else %}calendar-alt{% endif %} text-primary"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1">
-                            <p class="mb-0 lh-sm">
-                                <strong>{{ log.stage.name }}</strong> {{ log.field_name }} updated from '{{ log.old_value|default:"-" }}' to '{{ log.new_value|default:"-" }}'.
-                            </p>
-                            <small class="text-muted">{{ log.changed_at|naturaltime }} by {{ log.changed_by|default:"System" }}</small>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                <div class="text-center py-4"><i class="fas fa-info-circle fa-2x text-muted mb-3"></i><p class="text-muted">No recent activity</p></div>
-                {% endif %}
-            </div>
-        </div>
     </div>
 </div>
 
