@@ -25,13 +25,11 @@
                     <i class="fas fa-calendar-alt me-2"></i> {{ selected_period_display }}
                 </button>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=all">All Time</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_month">Current Month</a></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_year">Current Year</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=7d">Last 7 Days</a></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=30d">Last 30 Days</a></li>
+                    {% for key, value in period_filter_options.items %}
+                    <li>
+                        <a class="dropdown-item {% if selected_period_key == key %}active{% endif %}" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period={{ key }}">{{ value.0 }}</a>
+                    </li>
+                    {% endfor %}
                 </ul>
             </div>
             

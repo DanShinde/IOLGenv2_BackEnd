@@ -369,7 +369,34 @@ def delete_remark(request, remark_id):
 @login_required
 def dashboard(request):
     today = timezone.now().date()
-    period = request.GET.get('period', '30d')
+    
+    # --- Dynamic Financial Year Logic ---
+    # 1. Identify the current Financial Year start year
+    if today.month >= 4:
+        current_fy_year = today.year
+    else:
+        current_fy_year = today.year - 1
+
+    # 2. Get all distinct years from project dates to build the list
+    project_dates = Project.objects.filter(so_punch_date__isnull=False).values_list('so_punch_date', flat=True)
+    fy_years = {current_fy_year} # Start with current FY
+    for p_date in project_dates:
+        if p_date.month >= 4:
+            fy_years.add(p_date.year)
+        else:
+            fy_years.add(p_date.year - 1)
+            
+    # 3. Build the period map
+    period_map = {}
+    for year in sorted(list(fy_years), reverse=True):
+        start = date(year, 4, 1)
+        end = date(year + 1, 3, 31)
+        label = f"FY {str(year)[-2:]}-{str(year + 1)[-2:]}"
+        key = f"fy_{year}"
+        period_map[key] = (label, start, end)
+
+    default_period = f"fy_{current_fy_year}"
+    period = request.GET.get('period', default_period)
     custom_start = request.GET.get('start_date_custom')
     custom_end = request.GET.get('end_date_custom')
     start_date, end_date = None, None
@@ -378,17 +405,14 @@ def dashboard(request):
         start_date = parse_date(custom_start)
         end_date = parse_date(custom_end)
     else:
-        period_map = {
-            '7d': ("Last 7 Days", today - timedelta(days=7), today), '30d': ("Last 30 Days", today - timedelta(days=30), today),
-            'this_month': ("Current Month", today.replace(day=1), today), 'this_year': ("Current Year", today.replace(day=1, month=1), today),
-            'all': ("All Time", None, None),
-        }
-        display_period, start_date, end_date = period_map.get(period,("Last 30 Days", today - timedelta(days=30), today))
-    if period == 'all' and not (custom_start and custom_end):
-        live_projects = Project.objects.all().distinct()
-    else:
-        completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
-        live_projects = Project.objects.filter(so_punch_date__lte=end_date).exclude(id__in=completed_early_ids).distinct()
+        if period not in period_map:
+            period = default_period
+        
+        label, start_date, end_date = period_map[period]
+        display_period = label
+
+    completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
+    live_projects = Project.objects.filter(so_punch_date__lte=end_date).exclude(id__in=completed_early_ids).prefetch_related('stages').distinct()
 
     # --- CHRONIC PROJECTS LOGIC CORRECTION ---
     chronic_period = request.GET.get('chronic_period', '1y')
@@ -416,20 +440,35 @@ def dashboard(request):
     if period != 'all' or (custom_start and custom_end):
         completed_stages = completed_stages.filter(actual_date__range=[start_date, end_date])
     total_completed_stages = completed_stages.count()
-    on_time_stages = completed_stages.filter(actual_date__lte=F('planned_date')).count()
+    on_time_stages = completed_stages.filter(planned_date__isnull=False, actual_date__lte=F('planned_date')).count()
     department_otif = round((on_time_stages / total_completed_stages) * 100, 1) if total_completed_stages > 0 else 0
     total_live_projects = live_projects.count()
-    active_live_projects = live_projects.filter(stages__status="In Progress").distinct().count()
-    delayed_live_projects = live_projects.filter(stages__status="Hold").distinct().count()
-    total_live_value = sum(p.value for p in live_projects)
-    status_counts = Counter(p.get_overall_status() for p in live_projects)
-    labels = [p.code for p in live_projects]
+    
+    # Optimized Value Calculation
+    total_live_value = live_projects.aggregate(total=Sum('value'))['total'] or 0
+    
+    # Optimized Loop for Status, Completion, and Counts
+    status_counts = Counter()
+    labels = []
     on_track_data, at_risk_data, delayed_data = [], [], []
+    
     for project in live_projects:
-        completion = project.get_completion_percentage()
+        # Use utils functions with the prefetched stages list to avoid N+1 queries
+        stages = list(project.stages.all())
+        status = get_overall_status(stages)
+        completion = get_completion_percentage(stages)
+        
+        status_counts[status] += 1
+        labels.append(project.code)
+        
         if completion >= 80: on_track_data.append(completion); at_risk_data.append(0); delayed_data.append(0)
         elif completion >= 40: on_track_data.append(0); at_risk_data.append(completion); delayed_data.append(0)
         else: on_track_data.append(0); at_risk_data.append(0); delayed_data.append(completion)
+    
+    # Derive counts from the consistent status calculation
+    active_live_projects = status_counts['In Progress']
+    delayed_live_projects = status_counts['Hold']
+    
     status_labels = list(status_counts.keys())
     status_data = list(status_counts.values())
     context = {
@@ -438,6 +477,7 @@ def dashboard(request):
         'labels': labels, 'on_track_data': on_track_data, 'at_risk_data': at_risk_data, 'delayed_data': delayed_data,
         'status_labels': status_labels, 'status_data': status_data, 'selected_period_display': display_period,
         'custom_start_date': custom_start, 'custom_end_date': custom_end, 'chronic_projects': chronic_projects, 'selected_chronic_period': chronic_period,
+        'period_filter_options': period_map, 'selected_period_key': period,
     }
     return render(request, 'tracker/dashboard.html', context)
 
