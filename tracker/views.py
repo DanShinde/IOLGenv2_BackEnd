@@ -209,7 +209,10 @@ def project_detail(request, project_id):
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
-            new_completion = int(new_completion_percentage) if new_completion_percentage else 0
+            if new_completion_percentage is not None:
+                new_completion = int(new_completion_percentage) if new_completion_percentage else 0
+            else:
+                new_completion = stage.completion_percentage
 
 
 
@@ -289,7 +292,10 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    project_comments = project.comments.select_related('added_by').order_by('created_at')
+    project_comments = list(project.comments.select_related('added_by').order_by('created_at'))
+    for comment in project_comments:
+        if comment.added_by:
+            comment.added_by.username = comment.added_by.get_full_name() or comment.added_by.username
     
     context = {
         'project': project,
@@ -1312,7 +1318,11 @@ def all_push_pull_content(request, filter=None):
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
 
-    updates = updates_qs.all()
+    updates = list(updates_qs.all())
+    for update in updates:
+        for remark in update.remarks.all():
+            if remark.added_by:
+                remark.added_by.username = remark.added_by.get_full_name() or remark.added_by.username
     contact_persons = ContactPerson.objects.all()
     projects = Project.objects.all()
 
@@ -1373,7 +1383,7 @@ def export_push_pull_excel(request):
     for update in updates:
         # Join multiple contacts with a comma
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_text = " | ".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
+        remarks_text = " | ".join([f"{(r.added_by.get_full_name() or r.added_by.username)} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
 
         # --- FIX START ---
         # A date object does not have a tzinfo attribute, so it doesn't need to be replaced.
@@ -1457,7 +1467,7 @@ def export_push_pull_pdf(request):
     
     for update in updates:
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_list = [f"• {r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()]
+        remarks_list = [f"• {(r.added_by.get_full_name() or r.added_by.username)} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()]
         
         what_cell = Paragraph(update.text, long_text_style)
         who_cell = Paragraph(who_contacts_str if who_contacts_str else '-', long_text_style)
@@ -1576,13 +1586,21 @@ def add_update_remark(request, update_id):
             )
             
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                user_display = (remark.added_by.get_full_name() or remark.added_by.username) if remark.added_by else 'Unknown'
+                initials = "??"
+                if remark.added_by:
+                    if remark.added_by.first_name and remark.added_by.last_name:
+                        initials = (remark.added_by.first_name[0] + remark.added_by.last_name[0]).upper()
+                    else:
+                        initials = remark.added_by.username[:2].upper()
+
                 return JsonResponse({
                     'status': 'success',
                     'remark': {
-                        'user': remark.added_by.username if remark.added_by else 'Unknown',
+                        'user': user_display,
                         'date': remark.created_at.strftime("%b %d, %H:%M"),
                         'text': remark.text,
-                        'initials': remark.added_by.username[:2].upper() if remark.added_by else '??'
+                        'initials': initials
                     }
                 })
 
@@ -1665,7 +1683,7 @@ def public_push_pull_content(request, access_token):
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all')
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks', 'remarks__added_by').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1682,7 +1700,11 @@ def public_push_pull_content(request, access_token):
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
 
-    updates = updates_qs.all()
+    updates = list(updates_qs.all())
+    for update in updates:
+        for remark in update.remarks.all():
+            if remark.added_by:
+                remark.added_by.username = remark.added_by.get_full_name() or remark.added_by.username
     contact_persons = ContactPerson.objects.all()
 
     # The redirect logic needs to be updated to redirect back to the public URL
