@@ -764,7 +764,7 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="text" value="{{ update.text }}">
+                                    <textarea class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="text" rows="1" style="resize: none; min-height: 30px; overflow: hidden;" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'">{{ update.text }}</textarea>
                                 </td>
                                 <td>
                                     <select class="form-select form-select-sm select2-update-who" multiple data-id="{{ update.id }}" data-field="who_contact">
@@ -800,7 +800,7 @@
                                         </select>
                                     </td>
                                     <td>
-                                        <input type="text" name="update_text" class="form-control form-control-sm" placeholder="Description" required form="new-update-form">
+                                        <textarea name="update_text" class="form-control form-control-sm" placeholder="Description" required form="new-update-form" rows="1" style="resize: none; min-height: 30px; overflow: hidden;" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
                                     </td>
                                     <td>
                                         <select name="who_contact" class="form-select form-select-sm select2-new-who" multiple form="new-update-form">
@@ -1386,6 +1386,25 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // Auto-resize textareas on load
+    function resizeAllTextareas() {
+        document.querySelectorAll('textarea.autosave-update-input').forEach(textarea => {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        });
+    }
+
+    // Resize on load
+    resizeAllTextareas();
+
+    // Resize when the Push-Pull tab is shown (fix for hidden elements having 0 height)
+    const pushPullTab = document.getElementById('push-pull-tab');
+    if (pushPullTab) {
+        pushPullTab.addEventListener('shown.bs.tab', function (e) {
+            resizeAllTextareas();
+        });
+    }
 });
 </script>
 {% endblock %}
