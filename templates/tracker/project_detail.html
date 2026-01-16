@@ -431,6 +431,32 @@
         <hr>
         <div class="row mb-3">
             <div class="col-md-6 border-end">
+                <h6 class="text-muted">Overall Project OTIF %</h6>
+                <div class="mt-1">
+                    {% if overall_otif_percentage is not None %}
+                        <span class="fs-5 fw-bold {% if overall_otif_percentage >= 100 %}text-success{% elif overall_otif_percentage >= 80 %}text-warning{% else %}text-danger{% endif %}">{{ overall_otif_percentage }}%</span>
+                        <small class="text-muted ms-2">(Based on completed stages)</small>
+                    {% else %}
+                        <span class="text-muted small">No completed stages yet</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted">Project OTIF (Handover)</h6>
+                <div class="mt-1">
+                    {% if project_otif is not None %}
+                        {% if project_otif == 101 %}<span class="badge bg-success">Before Time</span>
+                        {% elif project_otif == 100 %}<span class="badge bg-primary">On Time</span>
+                        {% else %}<span class="badge bg-danger">Delayed</span>{% endif %}
+                    {% else %}
+                        <span class="text-muted small">Pending Handover Completion</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="row mb-3">
+            <div class="col-md-6 border-end">
                 <h6 class="text-muted">Next Automation Milestone</h6>
                 {% if next_automation_milestone %}
                     <strong>{{ next_automation_milestone.name }}</strong>
