@@ -150,7 +150,10 @@
 
     <div class="card">
         <a href="#resultsCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button" aria-expanded="false" aria-controls="resultsCollapse">
-            <h5 class="card-header-title mb-0"><i class="fas fa-table me-2"></i>Filtered Results</h5>
+            <div class="d-flex align-items-center">
+                <h5 class="card-header-title mb-0"><i class="fas fa-table me-2"></i>Filtered Results</h5>
+                <span class="badge bg-secondary ms-2" id="project-count-badge">{{ projects_with_details|length }} Found</span>
+            </div>
             <i class="fas fa-chevron-down"></i>
         </a>
         <div class="collapse" id="resultsCollapse">
@@ -1158,6 +1161,11 @@ function clearStageRow(btn) {
         }
         if (noResultsRow) {
             noResultsRow.style.display = (visibleProjectCount === 0) ? 'table-row' : 'none';
+        }
+
+        const countBadge = document.getElementById('project-count-badge');
+        if (countBadge) {
+            countBadge.textContent = visibleProjectCount + ' Found';
         }
     }
 </script>
