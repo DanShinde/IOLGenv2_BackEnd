@@ -1550,8 +1550,19 @@ def update_stage_ajax(request, stage_id):
             else:
                 setattr(stage, field_name, new_value)
 
-            if field_name == 'status' and new_value != 'Completed':
-                stage.actual_date = None
+            updated_actual_date = None
+
+            if field_name == 'status':
+                if new_value == 'Completed' and not stage.actual_date:
+                    stage.actual_date = timezone.now().date()
+                    updated_actual_date = stage.actual_date.strftime('%Y-%m-%d')
+                elif new_value != 'Completed':
+                    stage.actual_date = None
+                    updated_actual_date = '' # Signal frontend to clear it
+            
+            # Prevent clearing actual date if status is Completed
+            if field_name == 'actual_date' and not new_value and stage.status == 'Completed':
+                 return JsonResponse({'status': 'error', 'message': 'Cannot remove Actual Date while status is Completed.'}, status=400)
             
             stage.save()
 
@@ -1563,7 +1574,12 @@ def update_stage_ajax(request, stage_id):
                 old_value=str(old_value),
                 new_value=str(new_value)
             )
-            return JsonResponse({'status': 'success', 'message': 'Stage updated successfully.'})
+            
+            response_data = {'status': 'success', 'message': 'Stage updated successfully.'}
+            if updated_actual_date is not None:
+                response_data['updated_actual_date'] = updated_actual_date
+            
+            return JsonResponse(response_data)
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

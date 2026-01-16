@@ -793,8 +793,6 @@
                             
                             <!-- New Row (Hidden by default) -->
                             <tr id="new-update-row" style="display: none; background-color: #f8f9fa;">
-                                <form id="new-update-form" action="{% url 'add_project_update' project.id %}" method="post">
-                                    {% csrf_token %}
                                     <td>
                                         <select name="push_pull_type" class="form-select form-select-sm" form="new-update-form">
                                             <option value="Pull" selected>Pull Content</option>
@@ -820,11 +818,14 @@
                                     <td class="text-end">
                                         <button type="submit" class="btn btn-sm btn-primary" form="new-update-form"><i class="fas fa-plus"></i></button>
                                     </td>
-                                </form>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+                <!-- Hidden form for the new row, placed outside the table for valid HTML -->
+                <form id="new-update-form" action="{% url 'add_project_update' project.id %}" method="post" style="display:none;">
+                    {% csrf_token %}
+                </form>
                 <div class="p-2 border-top">
                     <button class="btn btn-sm btn-light text-primary fw-bold" onclick="document.getElementById('new-update-row').style.display = 'table-row'; this.style.display='none';">
                         <i class="fas fa-plus me-1"></i> Add Row
@@ -1179,6 +1180,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (response.ok && data.status === 'success') {
                 indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+                
+                // Update actual date input if the backend auto-filled or cleared it
+                if (data.updated_actual_date !== undefined) {
+                    const actualDateInput = document.querySelector(`input[name="actual_date_${stageId}"]`);
+                    if (actualDateInput) {
+                        actualDateInput.value = data.updated_actual_date;
+                    }
+                }
             } else {
                 indicator.innerHTML = `<i class="fas fa-times-circle text-danger" title="${data.message || 'Unknown error'}"></i>`;
                 alert(`Error saving stage: ${data.message}`);
