@@ -678,14 +678,6 @@ def project_reports(request):
         })
 
     # --- Calculate Standard KPIs ---
-    total_projects_found = distinct_projects.count()
-    total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
-    completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
-    average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
-    completed_stages = Stage.objects.filter(project__in=distinct_projects, status='Completed')
-    total_completed = completed_stages.count()
-    on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
-    on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
     
     # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
@@ -869,9 +861,6 @@ def project_reports(request):
     context = {
 
         'projects_with_details': projects_with_details,
-        'total_projects_found': total_projects_found,
-        'total_portfolio_value': total_portfolio_value,
-        'average_completion': average_completion,
         'all_segments': trackerSegment.objects.all(),
         'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD'),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
@@ -886,7 +875,6 @@ def project_reports(request):
         'automation_stage_names': Stage.AUTOMATION_STAGES,
         'emulation_stage_names': Stage.EMULATION_STAGES,
         'stage_filters': stage_filters_from_request,
-        'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
         'stage_trend_data': json.dumps(stage_trend_data),
         'stage_otif_data': json.dumps(stage_otif_data),

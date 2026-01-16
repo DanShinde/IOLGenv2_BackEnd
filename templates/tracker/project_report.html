@@ -41,37 +41,6 @@
 
 <div id="report-content">
 
-    <div class="row mb-4">
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon"><i class="fas fa-project-diagram"></i></div>
-                <div class="metric-value">{{ total_projects_found }}</div>
-                <div class="metric-label">Projects Found</div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon"><i class="fas fa-indian-rupee-sign"></i></div>
-                <div class="metric-value">₹{{ total_portfolio_value|intcomma }}</div>
-                <div class="metric-label">Total Value of Found Projects in Cr.</div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon"><i class="fas fa-tasks"></i></div>
-                <div class="metric-value">{{ average_completion|floatformat:1 }}%</div>
-                <div class="metric-label">Average Completion</div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon" style="color: #28a745; background: rgba(40, 167, 69, 0.1);"><i class="fas fa-check-double"></i></div>
-                <div class="metric-value">{{ on_time_completion_rate|floatformat:1 }}%</div>
-                <div class="metric-label">On-Time Completion</div>
-            </div>
-        </div>
-    </div>
-
     <form method="get">
         {% if hide_completed_active %}
         <input type="hidden" name="hide_completed" value="1">
