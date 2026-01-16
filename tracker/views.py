@@ -535,6 +535,28 @@ def project_reports(request):
     # --- The FIX is in this line: We add select_related and prefetch_related ---
     projects_qs = Project.objects.select_related('segment_con', 'team_lead').prefetch_related('stages').all()
 
+    # --- Dynamic Financial Year Logic (Same as Dashboard) ---
+    today = timezone.now().date()
+    if today.month >= 4:
+        current_fy_year = today.year
+    else:
+        current_fy_year = today.year - 1
+
+    # Get all distinct years from project dates
+    project_dates = Project.objects.filter(so_punch_date__isnull=False).values_list('so_punch_date', flat=True)
+    fy_years = {current_fy_year}
+    for p_date in project_dates:
+        if p_date.month >= 4:
+            fy_years.add(p_date.year)
+        else:
+            fy_years.add(p_date.year - 1)
+            
+    fy_options = []
+    for year in sorted(list(fy_years), reverse=True):
+        label = f"FY {str(year)[-2:]}-{str(year + 1)[-2:]}"
+        value = str(year)
+        fy_options.append((value, label))
+
     # --- Get standard filter values ---
     # getlist needs a QueryDict, not a regular dict
     params_for_getlist = QueryDict(mutable=True)
@@ -546,6 +568,26 @@ def project_reports(request):
     end_date = query_params.get('end_date')
     min_value = query_params.get('min_value')
     max_value = query_params.get('max_value')
+    selected_fy = query_params.get('financial_year')
+
+    # Apply Financial Year Filter (Overrides custom dates if present)
+    if selected_fy:
+        year = int(selected_fy)
+        fy_start = date(year, 4, 1)
+        fy_end = date(year + 1, 3, 31)
+        
+        # Match Dashboard Logic: Live Projects in Period (Carry-over + New)
+        # 1. Exclude projects completed before the start of the FY
+        completed_early_ids = Project.objects.filter(
+            stages__name='Handover', 
+            stages__status='Completed', 
+            stages__actual_date__lt=fy_start
+        ).values_list('id', flat=True)
+
+        # 2. Include projects punched on/before end of period (or null)
+        projects_qs = projects_qs.filter(
+            Q(so_punch_date__lte=fy_end) | Q(so_punch_date__isnull=True)
+        ).exclude(id__in=completed_early_ids)
 
     if selected_segment_ids:
         projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
@@ -553,7 +595,8 @@ def project_reports(request):
     if selected_team_lead_ids:
         projects_qs = projects_qs.filter(team_lead__id__in=selected_team_lead_ids)
 
-    if start_date and end_date:
+    # Only apply custom date range if FY is NOT selected
+    if start_date and end_date and not selected_fy:
         projects_qs = projects_qs.filter(so_punch_date__range=[start_date, end_date])
     if min_value:
         try:
@@ -879,6 +922,8 @@ def project_reports(request):
         'stage_trend_data': json.dumps(stage_trend_data),
         'stage_otif_data': json.dumps(stage_otif_data),
         'emu_timing_data': json.dumps(emu_chart_data),
+        'fy_options': fy_options,
+        'selected_fy': selected_fy,
     }
     return render(request, 'tracker/project_report.html', context)
 
