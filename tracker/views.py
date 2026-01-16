@@ -1274,7 +1274,6 @@ def add_project_update(request, project_id):
         text = request.POST.get('update_text')
         push_pull_type = request.POST.get('push_pull_type')
         who_contact_ids = request.POST.getlist('who_contact')
-        raised_by_id = request.POST.get('raised_by')
         eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
 
         if text and push_pull_type:
@@ -1284,7 +1283,6 @@ def add_project_update(request, project_id):
                 text=text,
                 push_pull_type=push_pull_type,
                 eta=eta,
-                raised_by_id=raised_by_id if raised_by_id else None,
                 content_type='Project',
             )
 
@@ -1480,7 +1478,7 @@ def all_push_pull_content(request, filter=None):
     push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
 
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1535,7 +1533,7 @@ def add_contact_person_ajax(request):
 
 @login_required
 def export_push_pull_excel(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author').prefetch_related('who_contact', 'remarks')
     filter = request.GET.get('filter')
 
     if filter == 'project':
@@ -1556,7 +1554,7 @@ def export_push_pull_excel(request):
     
     # Headers
     headers = [
-        'Project Code', 'Type', 'What', 'Who', 'Raised By', 'ETA', 'Status', 'Created At', 'Closed At', 'Remarks'
+        'Project Code', 'Type', 'What', 'Who', 'ETA', 'Status', 'Created At', 'Closed At', 'Remarks'
     ]
     sheet.append(headers)
     
@@ -1586,7 +1584,6 @@ def export_push_pull_excel(request):
             update.get_push_pull_type_display(),
             update.text,
             who_contacts_str,
-            update.raised_by.name if update.raised_by else '-',
             eta_naive,
             update.status,
             created_at_naive,
@@ -1602,7 +1599,7 @@ def export_push_pull_excel(request):
 @login_required
 def export_push_pull_pdf(request):
 
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author').prefetch_related('who_contact', 'remarks')
     filter = request.GET.get('filter')
 
     if filter == 'project':
@@ -1646,7 +1643,6 @@ def export_push_pull_pdf(request):
             Paragraph('Type', header_style),
             Paragraph('What', header_style),
             Paragraph('Who', header_style),
-            Paragraph('Raised By', header_style),
             Paragraph('ETA', header_style),
             Paragraph('Status', header_style),
             Paragraph('Remarks', header_style)
@@ -1669,14 +1665,13 @@ def export_push_pull_pdf(request):
             update.get_push_pull_type_display(),
             what_cell,
             who_cell,
-            Paragraph(update.raised_by.name if update.raised_by else '-', long_text_style),
             update.eta.strftime('%Y-%m-%d') if update.eta else '-',
             update.status,
             remarks_cell
         ]
         table_data.append(row)
         
-    col_widths = [1.8*cm, 2.5*cm, 4*cm, 2*cm, 2*cm, 2.5*cm, 2.5*cm, 5.2*cm]
+    col_widths = [1.8*cm, 2.5*cm, 5*cm, 2*cm, 2.5*cm, 2.5*cm, 6.2*cm]
     
     table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -1895,7 +1890,7 @@ def public_push_pull_content(request, access_token):
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all')
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks', 'remarks__added_by').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1977,8 +1972,6 @@ def update_project_update_ajax(request):
             if field == 'who_contact':
                 # Expecting a list of IDs for Many-to-Many
                 update.who_contact.set(value)
-            elif field == 'raised_by':
-                update.raised_by_id = value if value else None
             elif field == 'eta':
                 update.eta = parse_date(value) if value else None
             elif field == 'push_pull_type':

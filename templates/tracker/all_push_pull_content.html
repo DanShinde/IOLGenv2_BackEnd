@@ -55,7 +55,16 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label for="eta_date" class="form-label small mb-0">ETA</label>
+                    <label for="raised_by" class="form-label small mb-0">Raised By</label>
+                    <select name="raised_by" id="raised_by" class="form-control form-control-sm select2-single">
+                        <option value="">Select</option>
+                        {% for person in contact_persons %}
+                        <option value="{{ person.id }}">{{ person.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="eta_date" class="form-label small mb-0">WHEN</label>
                     <input type="date" name="eta_date" id="eta_date" class="form-control form-control-sm">
                 </div>
                 <div class="col-12 text-end">
@@ -121,11 +130,12 @@
             <table class="table table-bordered table-hover align-middle" id="pushPullTable">
                 <thead class="table-light text-muted small text-uppercase">
                     <tr>
-                        <th style="width: 10%;">Source</th>
-                        <th style="width: 10%;">Type</th>
-                        <th style="width: 25%;">Description</th>
-                        <th style="width: 15%;">Who</th>
-                        <th style="width: 10%;">ETA</th>
+                        <th style="width: 8%;">Source</th>
+                        <th style="width: 8%;">Type</th>
+                        <th style="width: 20%;">WHAT</th>
+                        <th style="width: 12%;">Who</th>
+                        <th style="width: 12%;">Raised By</th>
+                        <th style="width: 10%;">WHEN</th>
                         <th style="width: 10%;">Status</th>
                         <th style="width: 15%;">Remarks</th>
                         {% if not is_public_view %}
@@ -190,6 +200,22 @@
                                 {% empty %}
                                     <span class="text-muted">-</span>
                                 {% endfor %}
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if not is_public_view %}
+                                <select class="raised-by-select-inline" data-id="{{ update.id }}" style="width: 100%;">
+                                    <option value="">Select</option>
+                                    {% for person in contact_persons %}
+                                        <option value="{{ person.id }}" 
+                                            {% if update.raised_by.id == person.id %}selected{% endif %}>
+                                            {{ person.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                <span class="text-muted small">{{ update.raised_by.name|default:"-" }}</span>
                             {% endif %}
                         </td>
 
@@ -332,6 +358,25 @@ document.addEventListener('DOMContentLoaded', function() {
         handleNewContactAjax(e, $(this));
     });
 
+    // Initialize Top Bar "Raised By" Select2
+    $('#raised_by').select2({
+        tags: true,
+        theme: 'bootstrap-5',
+        placeholder: "Select person",
+        width: '100%',
+        createTag: function(params) {
+            const term = $.trim(params.term);
+            if (term === '' || $.isNumeric(term)) { return null; }
+            return { id: term, text: term, new: true };
+        },
+        templateResult: function (data) {
+            return data.new ? $('<span><b>(New)</b> ' + data.text + '</span>') : data.text;
+        }
+    });
+    $('#raised_by').on('select2:select', function (e) {
+        handleNewContactAjax(e, $(this));
+    });
+
     // --- INLINE TABLE EDITING FOR "WHO" ---
     $('.who-select-inline').each(function() {
         $(this).select2({
@@ -354,6 +399,36 @@ document.addEventListener('DOMContentLoaded', function() {
             const updateId = $(this).data('id');
             const values = $(this).val(); // Array of IDs
             updateField(updateId, 'who_contact', values);
+        });
+
+        // 2. Handle creation of new contacts via inline Select2
+        $(this).on('select2:select', function (e) {
+            handleNewContactAjax(e, $(this));
+        });
+    });
+
+    // --- INLINE TABLE EDITING FOR "RAISED BY" ---
+    $('.raised-by-select-inline').each(function() {
+        $(this).select2({
+            tags: true,
+            theme: 'bootstrap-5',
+            placeholder: "-",
+            width: '100%',
+            createTag: function(params) {
+                const term = $.trim(params.term);
+                if (term === '' || $.isNumeric(term)) { return null; }
+                return { id: term, text: term, new: true };
+            },
+            templateResult: function (data) {
+                return data.new ? $('<span><b>(New)</b> ' + data.text + '</span>') : data.text;
+            }
+        });
+
+        // 1. Handle selection change -> Save to DB
+        $(this).on('change', function(e) {
+            const updateId = $(this).data('id');
+            const value = $(this).val(); // Single ID
+            updateField(updateId, 'raised_by', value);
         });
 
         // 2. Handle creation of new contacts via inline Select2
