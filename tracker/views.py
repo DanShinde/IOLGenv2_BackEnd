@@ -906,7 +906,7 @@ def get_filtered_stages(filter_type):
             planned_date__range=(start, end)
         ).order_by('planned_date')
     elif filter_type == 'all':
-        return Stage.objects.exclude(status="Completed").order_by('planned_date')
+        return Stage.objects.exclude(status__in=["Completed", "Not Applicable"]).order_by('planned_date')
     else:
         return Stage.objects.filter(
             status__in=["Not started", "In Progress"],
