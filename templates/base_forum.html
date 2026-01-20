@@ -1,0 +1,154 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Knowledge Base{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --kb-nav-bg: linear-gradient(135deg, #0f0f12 0%, #1a1a24 50%, #0f0f12 100%);
+      --kb-nav-border: rgba(255, 255, 255, 0.08);
+      --kb-nav-text: rgba(255, 255, 255, 0.8);
+      --kb-nav-text-strong: #ffffff;
+    }
+
+    body {
+      background: #0f0f12;
+      color: #e8e8ed;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .kb-navbar {
+      background: var(--kb-nav-bg);
+      border-bottom: 1px solid var(--kb-nav-border);
+      padding: 0.8rem 1.5rem;
+    }
+
+    .kb-brand {
+      color: var(--kb-nav-text-strong) !important;
+      font-weight: 700;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .kb-brand i {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: #fff;
+      padding: 8px;
+      border-radius: 10px;
+    }
+
+    .kb-nav-link {
+      color: var(--kb-nav-text) !important;
+      font-weight: 500;
+      padding: 0.45rem 0.9rem !important;
+      border-radius: 10px;
+      margin: 0 4px;
+      transition: all 0.2s ease;
+    }
+
+    .kb-nav-link:hover,
+    .kb-nav-link.active {
+      color: var(--kb-nav-text-strong) !important;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .kb-nav-link i {
+      margin-right: 6px;
+    }
+
+    .kb-action-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--kb-nav-text-strong);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .kb-select,
+    select {
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: #e8e8ed !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+
+    .kb-select option,
+    select option {
+      background: #0f0f12;
+      color: #e8e8ed;
+    }
+
+    main {
+      flex: 1;
+    }
+
+    @media (max-width: 991px) {
+      .navbar-nav {
+        margin-top: 12px;
+      }
+    }
+  </style>
+  {% block styles %}{% endblock %}
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark kb-navbar">
+    <a class="kb-brand navbar-brand" href="{% url 'forum-home' %}">
+      <i class="fas fa-book"></i>
+      Knowledge Base
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#kbNavbar" aria-controls="kbNavbar" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="kbNavbar">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'home' %}">Home</a></li>
+        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'tracker_index' %}">Tracker</a></li>
+        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'inventory-dashboard' %}">Inventory</a></li>
+        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'downloads' %}">Downloads</a></li>
+        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'planner_project_list' %}">Planner</a></li>
+        <li class="nav-item"><a class="kb-nav-link nav-link active" href="{% url 'forum-home' %}">Knowledge Base</a></li>
+      </ul>
+
+      <ul class="navbar-nav ms-auto mb-0 d-flex flex-row align-items-center gap-2">
+        {% if user.is_staff %}
+        <li class="nav-item">
+          <a class="kb-action-btn nav-link" href="{% url 'admin:index' %}">Admin</a>
+        </li>
+        {% endif %}
+        <li class="nav-item">
+          <form method="post" action="{% url 'logoutw' %}">
+            {% csrf_token %}
+            <button type="submit" class="kb-action-btn">Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    {% if messages %}
+      <div class="container" style="padding-top: 16px;">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }}" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4); color: #e8e8ed;">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

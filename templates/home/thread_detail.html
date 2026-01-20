@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{{ thread.title }} - Forum{% endblock %}
+{% block title %}{{ thread.title }} - Knowledge Base{% endblock %}
 
 {% block styles %}
 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -34,24 +34,24 @@
         pointer-events: none;
     }
 
-    .forum-container {
+    .Knowledge Base-container {
         position: relative;
         z-index: 1;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
     }
 
-    .forum-container * {
+    .Knowledge Base-container * {
         font-family: inherit;
     }
 
     /* Override Bootstrap container styles at all breakpoints */
-    .forum-container .container,
-    .forum-container .container-fluid,
-    .forum-container .container-sm,
-    .forum-container .container-md,
-    .forum-container .container-lg,
-    .forum-container .container-xl,
-    .forum-container .container-xxl {
+    .Knowledge Base-container .container,
+    .Knowledge Base-container .container-fluid,
+    .Knowledge Base-container .container-sm,
+    .Knowledge Base-container .container-md,
+    .Knowledge Base-container .container-lg,
+    .Knowledge Base-container .container-xl,
+    .Knowledge Base-container .container-xxl {
         max-width: 95% !important;
         width: 95% !important;
         margin-left: auto !important;
@@ -61,45 +61,45 @@
     }
 
     @media (min-width: 1200px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 90% !important;
         }
     }
 
     @media (min-width: 1400px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 1600px !important;
         }
     }
 
     @media (min-width: 1536px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 1700px !important;
         }
     }
 
     @media (min-width: 1920px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
+        .Knowledge Base-container .container,
+        .Knowledge Base-container .container-sm,
+        .Knowledge Base-container .container-md,
+        .Knowledge Base-container .container-lg,
+        .Knowledge Base-container .container-xl,
+        .Knowledge Base-container .container-xxl {
             max-width: 1800px !important;
         }
     }
@@ -159,6 +159,8 @@
         height: 500px;
         background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
         animation: float 6s ease-in-out infinite;
+        pointer-events: none;
+        z-index: 1;
     }
 
     @keyframes float {
@@ -395,6 +397,10 @@
         align-items: center;
         gap: 0.5rem;
         font-size: 0.9rem;
+        position: relative;
+        z-index: 100;
+        pointer-events: auto;
+        text-decoration: none;
     }
 
     .action-btn:hover {
@@ -685,121 +691,121 @@
 
     /* CRITICAL: Final Bootstrap override - must be at end */
     /* Ultra-specific selectors to override Bootstrap at ALL screen sizes */
-    body .forum-container .container,
-    body .forum-container .container-fluid,
-    body .forum-container .container-sm,
-    body .forum-container .container-md,
-    body .forum-container .container-lg,
-    body .forum-container .container-xl,
-    body .forum-container .container-xxl,
-    .forum-container > .container,
-    .forum-container > .container-fluid,
-    .forum-container > .container-sm,
-    .forum-container > .container-md,
-    .forum-container > .container-lg,
-    .forum-container > .container-xl,
-    .forum-container > .container-xxl {
+    body .Knowledge Base-container .container,
+    body .Knowledge Base-container .container-fluid,
+    body .Knowledge Base-container .container-sm,
+    body .Knowledge Base-container .container-md,
+    body .Knowledge Base-container .container-lg,
+    body .Knowledge Base-container .container-xl,
+    body .Knowledge Base-container .container-xxl,
+    .Knowledge Base-container > .container,
+    .Knowledge Base-container > .container-fluid,
+    .Knowledge Base-container > .container-sm,
+    .Knowledge Base-container > .container-md,
+    .Knowledge Base-container > .container-lg,
+    .Knowledge Base-container > .container-xl,
+    .Knowledge Base-container > .container-xxl {
         max-width: 95% !important;
         width: 95% !important;
     }
 
     @media (min-width: 576px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-sm {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm {
             max-width: 95% !important;
         }
     }
 
     @media (min-width: 768px) {
-        body .forum-container .container,
-        body .forum-container .container-md,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-md,
-        .forum-container > .container-sm {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-sm,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-sm {
             max-width: 95% !important;
         }
     }
 
     @media (min-width: 992px) {
-        body .forum-container .container,
-        body .forum-container .container-lg,
-        body .forum-container .container-md,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-lg,
-        .forum-container > .container-md,
-        .forum-container > .container-sm {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-sm,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-sm {
             max-width: 90% !important;
         }
     }
 
     @media (min-width: 1200px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 90% !important;
         }
     }
 
     @media (min-width: 1400px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 1600px !important;
         }
     }
 
     @media (min-width: 1536px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 1700px !important;
         }
     }
 
     @media (min-width: 1920px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
+        body .Knowledge Base-container .container,
+        body .Knowledge Base-container .container-sm,
+        body .Knowledge Base-container .container-md,
+        body .Knowledge Base-container .container-lg,
+        body .Knowledge Base-container .container-xl,
+        body .Knowledge Base-container .container-xxl,
+        .Knowledge Base-container > .container,
+        .Knowledge Base-container > .container-sm,
+        .Knowledge Base-container > .container-md,
+        .Knowledge Base-container > .container-lg,
+        .Knowledge Base-container > .container-xl,
+        .Knowledge Base-container > .container-xxl {
             max-width: 1800px !important;
         }
     }
@@ -807,15 +813,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="forum-container">
+<div class="Knowledge Base-container">
 <div class="container mx-auto px-4 py-8">
     <!-- Breadcrumb -->
     <nav class="breadcrumb animate-fadeInUp">
-        <a href="{% url 'forum-home' %}">
-            <i class="fas fa-home"></i> Forum
+        <a href="{% url 'Knowledge Base-home' %}">
+            <i class="fas fa-home"></i> Knowledge Base
         </a>
         <span class="breadcrumb-separator">/</span>
-        <a href="{% url 'forum-category' thread.category.slug %}">
+        <a href="{% url 'Knowledge Base-category' thread.category.slug %}">
             {{ thread.category.name }}
         </a>
         <span class="breadcrumb-separator">/</span>
@@ -854,7 +860,7 @@
                 </div>
             </div>
             {% if user == thread.author or user.is_staff %}
-            <a href="{% url 'forum-thread-edit' thread.slug %}" class="action-btn primary">
+            <a href="{% url 'Knowledge Base-thread-edit' thread.slug %}" class="action-btn primary">
                 <i class="fas fa-edit"></i> Edit Thread
             </a>
             {% endif %}
@@ -1014,7 +1020,7 @@
                         <!-- Quick Reply Form -->
                         {% if not thread.is_locked %}
                         <div class="quick-reply" id="quick-reply-{{ post.id }}">
-                            <form method="post" action="{% url 'forum-post-create' thread.slug %}">
+                            <form method="post" action="{% url 'Knowledge Base-post-create' thread.slug %}">
                                 {% csrf_token %}
                                 <input type="hidden" name="parent_id" value="{{ post.id }}">
                                 <textarea name="content" class="form-textarea" placeholder="Write your reply to {{ post.author.username }}..." required></textarea>
@@ -1047,7 +1053,7 @@
                 <h3>
                     <i class="fas fa-comment-dots mr-2"></i> Post Your Reply
                 </h3>
-                <form method="post" action="{% url 'forum-post-create' thread.slug %}">
+                <form method="post" action="{% url 'Knowledge Base-post-create' thread.slug %}">
                     {% csrf_token %}
                     <textarea name="content" class="form-textarea" placeholder="Share your thoughts, solutions, or questions..." required></textarea>
                     <div class="mt-4">
@@ -1172,7 +1178,7 @@
 
     async function toggleUpvote(postId) {
         try {
-            const response = await fetch(`/forum/post/${postId}/upvote/`, {
+            const response = await fetch(`/Knowledge Base/post/${postId}/upvote/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -1204,7 +1210,7 @@
         if (!confirm('Mark this post as the solution to your thread?')) return;
 
         try {
-            const response = await fetch(`/forum/post/${postId}/mark-solution/`, {
+            const response = await fetch(`/Knowledge Base/post/${postId}/mark-solution/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),

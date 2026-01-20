@@ -1,30 +1,34 @@
-from django.http import JsonResponse
-from django.shortcuts import render, redirect, get_object_or_404
-from accounts.models import Info
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q, Count, Prefetch
-from django.views.decorators.http import require_http_methods
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db import transaction
-from datetime import datetime
-from django.contrib.admin.views.decorators import staff_member_required
+from django.db import models
+from django.db.models import Count
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 from django.core.exceptions import PermissionDenied
 
-from .models import (
-    ForumCategory, ForumThread, ForumPost,
-    ForumAttachment, ForumTag
-)
+from accounts.models import Info
+
 from .forms import (
-    ThreadCreateForm, ThreadUpdateForm, PostCreateForm,
-    ThreadFilterForm
+    ArticleForm,
+    QuestionForm,
+    AnswerForm,
+    ReportForm,
+    ReportCommentForm,
+)
+from .models import (
+    Article,
+    Category,
+    Question,
+    Answer,
+    Report,
+    ReportComment,
+    ReportAttachment,
 )
 
-
-# ============================================================================
-# EXISTING VIEWS
-# ============================================================================
 
 @login_required
 def home(request):
@@ -54,400 +58,398 @@ def clear_cache(request):
     return JsonResponse({"status": "ok", "message": "Cache cleared"})
 
 
-# ============================================================================
-# FORUM UTILITY FUNCTIONS
-# ============================================================================
+def build_article_hierarchy(articles):
+    articles_list = list(articles)
+    if not articles_list:
+        return []
 
-def get_cache_key(prefix, **filters):
-    """Generate cache key with versioning"""
-    filter_parts = []
-    for key, value in sorted(filters.items()):
-        if value is not None and value != '':
-            filter_parts.append(f"{key}:{value}")
+    articles_by_parent = {}
+    articles_by_id = {}
+    for article in articles_list:
+        articles_by_id[article.id] = article
+        articles_by_parent.setdefault(article.parent_id, []).append(article)
 
-    filter_string = "_".join(filter_parts) if filter_parts else "all"
-    version = cache.get(f"{prefix}_version", 0)
-    return f"{prefix}:v{version}:{filter_string}"
+    roots = [article for article in articles_list if article.is_hierarchy_root]
+    if not roots:
+        roots = [article for article in articles_list if article.parent_id is None]
+
+    for article in articles_list:
+        if article.is_hierarchy_root:
+            continue
+        if article.parent_id and article.parent_id not in articles_by_id:
+            roots.append(article)
+
+    unique_roots = []
+    seen_root_ids = set()
+    for root in roots:
+        if root.id in seen_root_ids:
+            continue
+        seen_root_ids.add(root.id)
+        unique_roots.append(root)
+    roots = sorted(unique_roots, key=lambda item: item.title.lower())
+
+    hierarchy = []
+    visited = set()
+
+    def add_node(node, depth):
+        if node.id in visited:
+            return
+        visited.add(node.id)
+        hierarchy.append({'article': node, 'indent': depth * 18})
+        children = articles_by_parent.get(node.id, [])
+        for child in sorted(children, key=lambda item: item.title.lower()):
+            add_node(child, depth + 1)
+
+    for root in roots:
+        add_node(root, 0)
+
+    added_ids = {item['article'].id for item in hierarchy}
+    leftovers = [article for article in articles_list if article.id not in added_ids]
+    for article in sorted(leftovers, key=lambda item: item.title.lower()):
+        hierarchy.append({'article': article, 'indent': 0})
+
+    return hierarchy
 
 
-def invalidate_cache(prefix):
-    """Invalidate cache by incrementing version"""
-    cache_version_key = f"{prefix}_version"
-    current_version = cache.get(cache_version_key, 0)
-    cache.set(cache_version_key, current_version + 1, None)
+def build_article_tree(articles):
+    articles_list = list(articles)
+    if not articles_list:
+        return []
+
+    articles_by_parent = {}
+    articles_by_id = {}
+    for article in articles_list:
+        articles_by_id[article.id] = article
+        articles_by_parent.setdefault(article.parent_id, []).append(article)
+
+    roots = [article for article in articles_list if article.is_hierarchy_root]
+    if not roots:
+        roots = [article for article in articles_list if article.parent_id is None]
+
+    for article in articles_list:
+        if article.is_hierarchy_root:
+            continue
+        if article.parent_id and article.parent_id not in articles_by_id:
+            roots.append(article)
+
+    unique_roots = []
+    seen_root_ids = set()
+    for root in roots:
+        if root.id in seen_root_ids:
+            continue
+        seen_root_ids.add(root.id)
+        unique_roots.append(root)
+    roots = sorted(unique_roots, key=lambda item: item.title.lower())
+
+    visited = set()
+
+    def build_node(node):
+        if node.id in visited:
+            return None
+        visited.add(node.id)
+        children = []
+        for child in sorted(articles_by_parent.get(node.id, []), key=lambda item: item.title.lower()):
+            child_node = build_node(child)
+            if child_node:
+                children.append(child_node)
+        return {'article': node, 'children': children}
+
+    tree = []
+    for root in roots:
+        node = build_node(root)
+        if node:
+            tree.append(node)
+
+    leftovers = [article for article in articles_list if article.id not in visited]
+    for article in sorted(leftovers, key=lambda item: item.title.lower()):
+        tree.append({'article': article, 'children': []})
+
+    return tree
 
 
-class ForumPaginator:
-    """Custom paginator for forum views"""
-    page_size = 20
-    max_page_size = 100
+def get_kb_stats_context():
+    total_articles = Article.objects.count()
+    total_questions = Question.objects.count()
+    total_reports = Report.objects.count()
+    total_interactions = Answer.objects.count() + ReportComment.objects.count()
+    total_users = get_user_model().objects.count()
+    open_bugs = Report.objects.filter(
+        type=Report.TYPE_BUG,
+        status__in=[Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]
+    ).count()
+    open_features = Report.objects.filter(
+        type=Report.TYPE_FEATURE,
+        status__in=[Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]
+    ).count()
+    return {
+        'total_articles': total_articles,
+        'total_questions': total_questions,
+        'total_reports': total_reports,
+        'total_interactions': total_interactions,
+        'total_users': total_users,
+        'open_bugs': open_bugs,
+        'open_features': open_features,
+    }
 
-    @staticmethod
-    def paginate_queryset(queryset, request, page_size=None):
-        page_size = page_size or request.GET.get('page_size', ForumPaginator.page_size)
-        try:
-            page_size = min(int(page_size), ForumPaginator.page_size)
-        except (TypeError, ValueError):
-            page_size = ForumPaginator.page_size
 
-        page = request.GET.get('page', 1)
-        paginator = Paginator(queryset, page_size)
+def get_kb_sidebar_context():
+    hierarchy_tree = build_article_tree(
+        Article.objects.only('id', 'title', 'slug', 'parent_id', 'is_hierarchy_root')
+        .filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
+        .order_by('title')
+    )
+    other_articles_sidebar = Article.objects.only('id', 'title', 'slug').filter(
+        parent__isnull=True,
+        is_hierarchy_root=False
+    ).order_by('title')
+    return {
+        'hierarchy_tree': hierarchy_tree,
+        'other_articles_sidebar': other_articles_sidebar,
+    }
 
-        try:
-            paginated_data = paginator.page(page)
-        except PageNotAnInteger:
-            paginated_data = paginator.page(1)
-        except EmptyPage:
-            paginated_data = paginator.page(paginator.num_pages)
-
-        return paginated_data, paginator
-
-
-# ============================================================================
-# FORUM MAIN VIEWS
-# ============================================================================
 
 @login_required
 def forum_home(request):
-    """Forum homepage showing all categories and recent threads"""
-    categories = ForumCategory.objects.filter(is_active=True).prefetch_related(
-        Prefetch('threads',
-                queryset=ForumThread.objects.select_related('author').order_by('-last_activity_at'),
-                to_attr='recent_threads_list')
+    articles = Article.objects.select_related('category', 'author', 'parent').prefetch_related('tags').order_by('-updated_at')
+    hierarchy_articles = build_article_hierarchy(
+        articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
     )
-
-    recent_threads = ForumThread.objects.select_related(
-        'category', 'author', 'best_answer'
-    ).annotate(
-        reply_count=Count('posts')
-    ).order_by('-last_activity_at')[:10]
-
-    total_threads = ForumThread.objects.count()
-    total_posts = ForumPost.objects.count()
-    total_users = ForumThread.objects.values('author').distinct().count()
+    other_articles = articles.filter(parent__isnull=True, is_hierarchy_root=False)
+    questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags').annotate(
+        answer_count=Count('answers')
+    ).order_by('-created_at')
+    reports = Report.objects.select_related('application', 'reporter', 'assignee').prefetch_related('tags').annotate(
+        comment_count=Count('comments')
+    ).order_by('-updated_at')
 
     context = {
-        'categories': categories,
-        'recent_threads': recent_threads,
-        'total_threads': total_threads,
-        'total_posts': total_posts,
-        'total_users': total_users,
+        'hierarchy_articles': hierarchy_articles,
+        'other_articles': other_articles,
+        'questions': questions,
+        'reports': reports,
     }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
     return render(request, 'home/forum_home.html', context)
 
 
 @login_required
-def forum_category(request, slug):
-    """View threads in a specific category"""
-    category = get_object_or_404(ForumCategory, slug=slug, is_active=True)
-
-    filter_form = ThreadFilterForm(request.GET)
-    filter_params = {
-        'status': request.GET.get('status', ''),
-        'priority': request.GET.get('priority', ''),
-        'search': request.GET.get('search', ''),
-        'sort_by': request.GET.get('sort', '-last_activity_at'),
-    }
-
-    threads = ForumThread.objects.filter(category=category).select_related(
-        'author', 'best_answer'
-    ).prefetch_related('tags').annotate(
-        reply_count=Count('posts')
+def article_category(request, slug):
+    category = get_object_or_404(Category, slug=slug)
+    articles = Article.objects.filter(category=category).select_related('author', 'parent').prefetch_related('tags').order_by('-updated_at')
+    hierarchy_articles = build_article_hierarchy(
+        articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
     )
-
-    if filter_params['status']:
-        threads = threads.filter(status=filter_params['status'])
-
-    if filter_params['priority']:
-        threads = threads.filter(priority=filter_params['priority'])
-
-    if filter_params['search']:
-        threads = threads.filter(
-            Q(title__icontains=filter_params['search']) |
-            Q(content__icontains=filter_params['search'])
-        )
-
-    # Handle sorting
-    sort = filter_params['sort_by']
-    if sort == '-last_activity_at' or sort == 'recent':
-        threads = threads.order_by('-is_pinned', '-last_activity_at')
-    elif sort == '-created_at':
-        threads = threads.order_by('-is_pinned', '-created_at')
-    elif sort == 'created_at':
-        threads = threads.order_by('-is_pinned', 'created_at')
-    elif sort == '-views':
-        threads = threads.order_by('-is_pinned', '-views')
-    elif sort == '-is_pinned,-last_activity_at':
-        threads = threads.order_by('-is_pinned', '-last_activity_at')
-    else:
-        threads = threads.order_by('-is_pinned', '-last_activity_at')
-
-    paginated_threads, paginator = ForumPaginator.paginate_queryset(threads, request)
-
+    other_articles = articles.filter(parent__isnull=True, is_hierarchy_root=False)
     context = {
         'category': category,
-        'threads': paginated_threads,
-        'threads_count': threads.count(),
-        'paginator': paginator,
-        'filter_form': filter_form,
-        'status_filter': filter_params['status'],
-        'sort': sort,
-        'is_paginated': paginator.num_pages > 1,
+        'hierarchy_articles': hierarchy_articles,
+        'other_articles': other_articles,
     }
-    return render(request, 'home/forum_category.html', context)
+    return render(request, 'home/kb_category.html', context)
 
 
 @login_required
-def thread_detail(request, slug):
-    """View thread details and posts"""
-    thread = get_object_or_404(
-        ForumThread.objects.select_related('category', 'author', 'best_answer'),
-        slug=slug
-    )
+def article_detail(request, slug):
+    article = get_object_or_404(Article.objects.select_related('category', 'author').prefetch_related('tags'), slug=slug)
+    Article.objects.filter(pk=article.pk).update(views=models.F('views') + 1)
+    article.refresh_from_db(fields=['views'])
+    context = {
+        'article': article,
+        'active_tab': 'wiki',
+    }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
+    return render(request, 'home/kb_article_detail.html', context)
 
-    thread.views += 1
-    thread.save(update_fields=['views'])
 
-    posts = thread.posts.select_related('author').prefetch_related(
-        'upvotes', 'attachments', 'replies__author'
+@login_required
+def question_detail(request, pk):
+    question = get_object_or_404(
+        Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags', 'answers__author'),
+        pk=pk
     )
 
     if request.method == 'POST':
-        post_form = PostCreateForm(request.POST, request.FILES)
-        if post_form.is_valid():
-            post = post_form.save(commit=False)
-            post.thread = thread
-            post.author = request.user
-            post.save()
+        form = AnswerForm(request.POST)
+        if form.is_valid():
+            answer = form.save(commit=False)
+            answer.question = question
+            answer.author = request.user
+            answer.save()
+            messages.success(request, 'Answer posted.')
+            return redirect('kb-question-detail', pk=question.pk)
+        messages.error(request, 'Please correct the errors below.')
+    else:
+        form = AnswerForm()
 
-            attachments = post_form.cleaned_data.get('attachments', [])
+    context = {
+        'question': question,
+        'answers': question.answers.all(),
+        'answer_form': form,
+        'active_tab': 'qa',
+    }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
+    return render(request, 'home/kb_question_detail.html', context)
+
+
+@login_required
+def report_detail(request, pk):
+    report = get_object_or_404(
+        Report.objects.select_related('application', 'reporter', 'assignee').prefetch_related('tags', 'comments__author', 'attachments'),
+        pk=pk
+    )
+
+    if request.method == 'POST':
+        form = ReportCommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.report = report
+            comment.author = request.user
+            comment.save()
+            messages.success(request, 'Comment added.')
+            return redirect('kb-report-detail', pk=report.pk)
+        messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ReportCommentForm()
+
+    context = {
+        'report': report,
+        'comments': report.comments.all(),
+        'attachments': report.attachments.all(),
+        'comment_form': form,
+        'active_tab': 'reports',
+    }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
+    return render(request, 'home/kb_report_detail.html', context)
+
+
+@login_required
+def kb_create(request):
+    content_type = request.GET.get('type', '')
+    form = None
+    template = 'home/kb_create.html'
+
+    if request.method == 'POST':
+        content_type = request.POST.get('content_type', content_type)
+
+    if content_type not in {'wiki', 'qa', 'report'}:
+        content_type = ''
+
+    if content_type == 'wiki':
+        form = ArticleForm(request.POST or None, user=request.user)
+        if request.method == 'POST' and form.is_valid():
+            article = form.save(commit=False)
+            article.author = request.user
+            article.save()
+            form.save_m2m()
+            messages.success(request, 'Article created.')
+            return redirect(article.get_absolute_url())
+        if request.method == 'POST' and form.errors:
+            messages.error(request, 'Please correct the errors below.')
+    elif content_type == 'qa':
+        form = QuestionForm(request.POST or None)
+        if request.method == 'POST' and form.is_valid():
+            question = form.save(commit=False)
+            question.author = request.user
+            question.save()
+            form.save_m2m()
+            messages.success(request, 'Question posted.')
+            return redirect(question.get_absolute_url())
+        if request.method == 'POST' and form.errors:
+            messages.error(request, 'Please correct the errors below.')
+    elif content_type == 'report':
+        form = ReportForm(request.POST or None, request.FILES or None)
+        if request.method == 'POST' and form.is_valid():
+            report = form.save(commit=False)
+            report.reporter = request.user
+            report.save()
+            form.save_m2m()
+            attachments = form.cleaned_data.get('attachments', [])
             for uploaded_file in attachments:
-                ForumAttachment.objects.create(
-                    thread=thread,
-                    post=post,
+                ReportAttachment.objects.create(
+                    report=report,
                     file=uploaded_file,
                     uploaded_by=request.user
                 )
-
-            thread.last_activity_at = datetime.now()
-            thread.save(update_fields=['last_activity_at'])
-
-            messages.success(request, 'Your reply has been posted!')
-            return redirect('forum-thread-detail', slug=thread.slug)
-        else:
+            messages.success(request, 'Report submitted.')
+            return redirect(report.get_absolute_url())
+        if request.method == 'POST' and form.errors:
             messages.error(request, 'Please correct the errors below.')
-    else:
-        post_form = PostCreateForm()
-
-    paginated_posts, paginator = ForumPaginator.paginate_queryset(posts, request, page_size=10)
-    can_edit = request.user.is_staff or thread.author == request.user
 
     context = {
-        'thread': thread,
-        'posts': paginated_posts,
-        'paginator': paginator,
-        'post_form': post_form,
-        'can_edit': can_edit,
-        'is_paginated': paginator.num_pages > 1,
-    }
-    return render(request, 'home/thread_detail.html', context)
-
-
-@login_required
-def thread_create(request):
-    """Create a new thread"""
-    if request.method == 'POST':
-        form = ThreadCreateForm(request.POST, request.FILES)
-        if form.is_valid():
-            with transaction.atomic():
-                thread = form.save(commit=False)
-                thread.author = request.user
-                thread.save()
-
-                tags = form.cleaned_data.get('tags', [])
-                thread.tags.set(tags)
-
-                attachments = form.cleaned_data.get('attachments', [])
-                for uploaded_file in attachments:
-                    ForumAttachment.objects.create(
-                        thread=thread,
-                        file=uploaded_file,
-                        uploaded_by=request.user
-                    )
-
-                invalidate_cache('forum_threads')
-                messages.success(request, 'Thread created successfully!')
-                return redirect('forum-thread-detail', slug=thread.slug)
-        else:
-            messages.error(request, 'Please correct the errors below.')
-    else:
-        form = ThreadCreateForm()
-
-    # Get all categories for visual selection
-    categories = ForumCategory.objects.filter(is_active=True).order_by('order', 'name')
-
-    context = {
+        'content_type': content_type,
         'form': form,
-        'title': 'Create New Thread',
-        'categories': categories,
     }
-    return render(request, 'home/thread_form.html', context)
+    return render(request, template, context)
 
 
 @login_required
-def thread_update(request, slug):
-    """Update thread details"""
-    thread = get_object_or_404(ForumThread, slug=slug)
+def article_update(request, slug):
+    article = get_object_or_404(Article, slug=slug)
+    if not (request.user.is_staff or article.author == request.user):
+        messages.error(request, 'You do not have permission to edit this article.')
+        return redirect(article.get_absolute_url())
 
-    if not (request.user.is_staff or thread.author == request.user):
-        messages.error(request, 'You do not have permission to edit this thread.')
-        return redirect('forum-thread-detail', slug=thread.slug)
-
-    if request.method == 'POST':
-        form = ThreadUpdateForm(request.POST, instance=thread)
-        if form.is_valid():
-            form.save()
-            invalidate_cache('forum_threads')
-            messages.success(request, 'Thread updated successfully!')
-            return redirect('forum-thread-detail', slug=thread.slug)
-    else:
-        form = ThreadUpdateForm(instance=thread)
-
-    # Get all categories for visual selection
-    categories = ForumCategory.objects.filter(is_active=True).order_by('order', 'name')
+    form = ArticleForm(request.POST or None, instance=article, user=request.user)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Article updated.')
+        return redirect(article.get_absolute_url())
 
     context = {
+        'content_type': 'wiki',
         'form': form,
-        'thread': thread,
-        'title': 'Edit Thread',
-        'categories': categories,
+        'object': article,
     }
-    return render(request, 'home/thread_form.html', context)
+    return render(request, 'home/kb_create.html', context)
 
 
 @login_required
-@require_http_methods(["POST"])
-def post_create(request, slug):
-    """Create a new post/reply in a thread"""
-    thread = get_object_or_404(ForumThread, slug=slug)
+def question_update(request, pk):
+    question = get_object_or_404(Question, pk=pk)
+    if not (request.user.is_staff or question.author == request.user):
+        messages.error(request, 'You do not have permission to edit this question.')
+        return redirect(question.get_absolute_url())
 
-    if thread.is_locked and not request.user.is_staff:
-        messages.error(request, 'This thread is locked.')
-        return redirect('forum-thread-detail', slug=thread.slug)
+    form = QuestionForm(request.POST or None, instance=question)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Question updated.')
+        return redirect(question.get_absolute_url())
 
-    content = request.POST.get('content', '').strip()
-    parent_id = request.POST.get('parent_id')
-
-    if not content:
-        messages.error(request, 'Reply content cannot be empty.')
-        return redirect('forum-thread-detail', slug=thread.slug)
-
-    with transaction.atomic():
-        post = ForumPost.objects.create(
-            thread=thread,
-            author=request.user,
-            content=content
-        )
-
-        if parent_id:
-            try:
-                parent_post = ForumPost.objects.get(id=parent_id, thread=thread)
-                post.parent = parent_post
-                post.save(update_fields=['parent'])
-            except ForumPost.DoesNotExist:
-                pass
-
-        thread.last_activity_at = datetime.now()
-        thread.save(update_fields=['last_activity_at'])
-
-    messages.success(request, 'Your reply has been posted!')
-    return redirect('forum-thread-detail', slug=thread.slug)
-
-
-# ============================================================================
-# AJAX ENDPOINTS
-# ============================================================================
-
-@login_required
-@require_http_methods(["POST"])
-def post_upvote(request, post_id):
-    """Toggle upvote on a post"""
-    post = get_object_or_404(ForumPost, id=post_id)
-
-    if request.user in post.upvotes.all():
-        post.upvotes.remove(request.user)
-        upvoted = False
-    else:
-        post.upvotes.add(request.user)
-        upvoted = True
-
-    return JsonResponse({
-        'success': True,
-        'upvoted': upvoted,
-        'upvote_count': post.upvotes.count()
-    })
+    context = {
+        'content_type': 'qa',
+        'form': form,
+        'object': question,
+    }
+    return render(request, 'home/kb_create.html', context)
 
 
 @login_required
-@require_http_methods(["POST"])
-def mark_solution(request, post_id):
-    """Mark a post as the solution"""
-    post = get_object_or_404(ForumPost, id=post_id)
-    thread = post.thread
+def report_update(request, pk):
+    report = get_object_or_404(Report, pk=pk)
+    if not (request.user.is_staff or report.reporter == request.user):
+        messages.error(request, 'You do not have permission to edit this report.')
+        return redirect(report.get_absolute_url())
 
-    if not (request.user.is_staff or thread.author == request.user):
-        return JsonResponse({
-            'success': False,
-            'message': 'You do not have permission to mark solutions.'
-        }, status=403)
+    form = ReportForm(request.POST or None, instance=report)
+    if request.method == 'POST' and form.is_valid():
+        updated_report = form.save(commit=False)
+        if updated_report.status in [Report.STATUS_RESOLVED, Report.STATUS_CLOSED] and not updated_report.resolved_at:
+            updated_report.resolved_at = timezone.now()
+        if updated_report.status in [Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]:
+            updated_report.resolved_at = None
+        updated_report.save()
+        form.save_m2m()
+        messages.success(request, 'Report updated.')
+        return redirect(report.get_absolute_url())
 
-    post.mark_as_solution()
-    invalidate_cache('forum_threads')
-
-    return JsonResponse({
-        'success': True,
-        'message': 'Post marked as solution!'
-    })
-
-
-@login_required
-@require_http_methods(["POST"])
-def thread_lock_toggle(request, slug):
-    """Lock/unlock a thread"""
-    thread = get_object_or_404(ForumThread, slug=slug)
-
-    if not request.user.is_staff:
-        return JsonResponse({
-            'success': False,
-            'message': 'Only staff can lock threads.'
-        }, status=403)
-
-    thread.is_locked = not thread.is_locked
-    thread.save(update_fields=['is_locked'])
-
-    return JsonResponse({
-        'success': True,
-        'is_locked': thread.is_locked
-    })
-
-
-@login_required
-@require_http_methods(["POST"])
-def thread_pin_toggle(request, slug):
-    """Pin/unpin a thread"""
-    thread = get_object_or_404(ForumThread, slug=slug)
-
-    if not request.user.is_staff:
-        return JsonResponse({
-            'success': False,
-            'message': 'Only staff can pin threads.'
-        }, status=403)
-
-    thread.is_pinned = not thread.is_pinned
-    thread.save(update_fields=['is_pinned'])
-    invalidate_cache('forum_threads')
-
-    return JsonResponse({
-        'success': True,
-        'is_pinned': thread.is_pinned
-    })
+    context = {
+        'content_type': 'report',
+        'form': form,
+        'object': report,
+    }
+    return render(request, 'home/kb_create.html', context)

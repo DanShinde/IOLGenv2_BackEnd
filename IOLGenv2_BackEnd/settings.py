@@ -46,6 +46,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'storages',
+    'ckeditor',
+    'ckeditor_uploader',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -212,16 +215,56 @@ STATICFILES_DIRS = [
 # URL that handles the media served from MEDIA_ROOT.
 MEDIA_URL = '/media/'
 
-# Absolute path to the directory where uploaded media files will be stored.
-# Production: Use separate drive for uploaded content (easier to manage/backup)
-# Development: Use project folder
-# Check multiple indicators for production environment
-if (os.environ.get('DJANGO_ENV') == 'production' or
-    os.environ.get('COMPUTERNAME') == 'ACGServer' or
-    not DEBUG):
-    MEDIA_ROOT = r'C:\media'
-else:
+MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', '').rstrip('/')
+MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', '')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', '')
+MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'media')
+MINIO_REGION = os.getenv('MINIO_REGION', 'us-east-1')
+MINIO_USE_HTTPS = os.getenv('MINIO_USE_HTTPS', 'False').lower() in ('true', '1', 'yes')
+MINIO_PUBLIC_URL = os.getenv('MINIO_PUBLIC_URL', '').rstrip('/')
+if MINIO_ENDPOINT and '://' not in MINIO_ENDPOINT:
+    MINIO_ENDPOINT = f"{'https' if MINIO_USE_HTTPS else 'http'}://{MINIO_ENDPOINT}"
+USE_MINIO = bool(MINIO_ENDPOINT and MINIO_ACCESS_KEY and MINIO_SECRET_KEY and MINIO_BUCKET)
+
+if USE_MINIO:
+    AWS_ACCESS_KEY_ID = MINIO_ACCESS_KEY
+    AWS_SECRET_ACCESS_KEY = MINIO_SECRET_KEY
+    AWS_STORAGE_BUCKET_NAME = MINIO_BUCKET
+    AWS_S3_ENDPOINT_URL = MINIO_ENDPOINT
+    AWS_S3_REGION_NAME = MINIO_REGION
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_S3_ADDRESSING_STYLE = 'path'
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_USE_SSL = MINIO_USE_HTTPS
+    STORAGES = {
+        'default': {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
+    if MINIO_PUBLIC_URL:
+        MEDIA_URL = f"{MINIO_PUBLIC_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+        AWS_S3_CUSTOM_DOMAIN = f"{MINIO_PUBLIC_URL.replace('http://', '').replace('https://', '')}/{AWS_STORAGE_BUCKET_NAME}"
+    else:
+        MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+
+    if MINIO_PUBLIC_URL:
+        MEDIA_URL = f"{MINIO_PUBLIC_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+        AWS_S3_CUSTOM_DOMAIN = f"{MINIO_PUBLIC_URL.replace('http://', '').replace('https://', '')}/{AWS_STORAGE_BUCKET_NAME}"
+        AWS_S3_URL_PROTOCOL = 'https:' if MINIO_PUBLIC_URL.startswith('https://') else 'http:'
+    else:
+        MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+else:
+    # Absolute path to the directory where uploaded media files will be stored.
+    # Production: Use separate drive for uploaded content (easier to manage/backup)
+    # Development: Use project folder
+    # Check multiple indicators for production environment
+    if (os.environ.get('DJANGO_ENV') == 'production' or
+        os.environ.get('COMPUTERNAME') == 'ACGServer' or
+        not DEBUG):
+        MEDIA_ROOT = r'C:\media'
+    else:
+        MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 LOGIN_URL = '/accounts/loginw/'
 LOGIN_REDIRECT_URL = '/'  # or wherever you want to land after login
@@ -290,6 +333,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://115.245.5.130:8005",
 ]
+
+CKEDITOR_UPLOAD_PATH = 'wiki/'
+CKEDITOR_CONFIGS = {
+    'default': {
+        'toolbar': 'full',
+        'height': 320,
+        'width': 'auto',
+    },
+}
 
 
 # Logging configuration

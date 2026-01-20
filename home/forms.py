@@ -1,15 +1,14 @@
 from django import forms
-from .models import ForumThread, ForumPost, ForumCategory, ForumTag
+from django.db import models
+
+from .models import Article, Question, Answer, Report, ReportComment, Tag
 
 
 class MultipleFileInput(forms.ClearableFileInput):
-    """Widget for multiple file uploads"""
     allow_multiple_selected = True
 
 
 class MultipleFileField(forms.FileField):
-    """Custom FileField that handles multiple file uploads"""
-
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("widget", MultipleFileInput())
         super().__init__(*args, **kwargs)
@@ -23,188 +22,117 @@ class MultipleFileField(forms.FileField):
         return result
 
 
-class ThreadCreateForm(forms.ModelForm):
-    """Form for creating new forum threads"""
-    attachments = MultipleFileField(
+class ArticleForm(forms.ModelForm):
+    parent = forms.ModelChoiceField(
+        queryset=Article.objects.none(),
         required=False,
-        help_text="Upload screenshots or files (max 5MB each)",
-        label="Attachments"
+        widget=forms.Select(attrs={'class': 'kb-select'}),
+        empty_label='Bottom section (no hierarchy)'
     )
-
     tags = forms.ModelMultipleChoiceField(
-        queryset=ForumTag.objects.all(),
+        queryset=Tag.objects.all(),
         required=False,
-        widget=forms.CheckboxSelectMultiple,
-        help_text="Select relevant tags"
+        widget=forms.SelectMultiple(attrs={'class': 'kb-select'})
     )
 
     class Meta:
-        model = ForumThread
-        fields = [
-            'category',
-            'title',
-            'content',
-            'application_version',
-            'steps_to_reproduce',
-            'log_text',
-            'priority',
-        ]
+        model = Article
+        fields = ['title', 'excerpt', 'content', 'category', 'parent', 'tags', 'is_hierarchy_root']
         widgets = {
-            'category': forms.Select(attrs={
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
-            }),
-            'title': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
-                'placeholder': 'Brief, descriptive title...'
-            }),
-            'content': forms.Textarea(attrs={
-                'rows': 6,
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
-                'placeholder': 'Describe your issue, question, or idea in detail...'
-            }),
-            'application_version': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
-                'placeholder': 'e.g., v2.0.1'
-            }),
-            'steps_to_reproduce': forms.Textarea(attrs={
-                'rows': 4,
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
-                'placeholder': '1. Go to...\n2. Click on...\n3. See error...'
-            }),
-            'log_text': forms.Textarea(attrs={
-                'rows': 4,
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm bg-gray-50',
-                'placeholder': 'Paste error logs or stack traces here...'
-            }),
-            'priority': forms.Select(attrs={
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
-            }),
+            'title': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'Article title'}),
+            'excerpt': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'Short summary'}),
+            'content': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 10, 'placeholder': 'Write the article content'}),
+            'category': forms.Select(attrs={'class': 'kb-select'}),
         }
 
-    def clean_attachments(self):
-        """Validate uploaded files"""
-        files = self.cleaned_data.get('attachments', [])
-        files = [f for f in files if f is not None]
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        hierarchy_queryset = Article.objects.filter(
+            models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False)
+        ).order_by('title')
+        if self.instance and self.instance.pk:
+            hierarchy_queryset = hierarchy_queryset.exclude(pk=self.instance.pk)
+        self.fields['parent'].queryset = hierarchy_queryset
+        if not (user and user.is_staff):
+            self.fields.pop('is_hierarchy_root', None)
 
-        if not files:
-            return []
-
-        for file in files:
-            # Validate file size (max 5MB)
-            max_size = 5 * 1024 * 1024
-            if file.size > max_size:
-                raise forms.ValidationError(
-                    f"File '{file.name}' exceeds maximum size of 5MB."
-                )
-
-        return files
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('is_hierarchy_root') and cleaned_data.get('parent'):
+            self.add_error('parent', 'Hierarchy roots cannot have a parent.')
+        return cleaned_data
 
 
-class ThreadUpdateForm(forms.ModelForm):
-    """Form for updating thread status and details"""
+class QuestionForm(forms.ModelForm):
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'kb-select'})
+    )
 
     class Meta:
-        model = ForumThread
-        fields = ['status', 'priority', 'content']
+        model = Question
+        fields = ['title', 'body', 'tags']
         widgets = {
-            'status': forms.Select(attrs={
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
-            }),
-            'priority': forms.Select(attrs={
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
-            }),
-            'content': forms.Textarea(attrs={
-                'rows': 6,
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
-            }),
+            'title': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'What do you want to know?'}),
+            'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 8, 'placeholder': 'Add context, code, or links'}),
         }
 
 
-class PostCreateForm(forms.ModelForm):
-    """Form for creating replies/posts"""
+class AnswerForm(forms.ModelForm):
+    class Meta:
+        model = Answer
+        fields = ['body']
+        widgets = {
+            'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 6, 'placeholder': 'Write your answer'}),
+        }
+
+
+class ReportForm(forms.ModelForm):
+    tags = forms.ModelMultipleChoiceField(
+        queryset=Tag.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'kb-select'})
+    )
     attachments = MultipleFileField(
         required=False,
-        help_text="Upload screenshots or files",
-        label="Attachments"
+        label="Screenshots",
+        help_text="Upload screenshots (PNG, JPG, GIF)"
     )
 
     class Meta:
-        model = ForumPost
-        fields = ['content']
+        model = Report
+        fields = ['type', 'title', 'description', 'application', 'assignee', 'priority', 'status', 'tags']
         widgets = {
-            'content': forms.Textarea(attrs={
-                'rows': 4,
-                'class': 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all',
-                'placeholder': 'Write your reply...'
-            }),
+            'type': forms.Select(attrs={'class': 'kb-select'}),
+            'title': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'Short, descriptive title'}),
+            'description': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 8, 'placeholder': 'Describe the issue or request'}),
+            'application': forms.Select(attrs={'class': 'kb-select'}),
+            'assignee': forms.Select(attrs={'class': 'kb-select'}),
+            'priority': forms.Select(attrs={'class': 'kb-select'}),
+            'status': forms.Select(attrs={'class': 'kb-select'}),
         }
-        labels = {
-            'content': 'Your Reply'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'type' in self.fields:
+            self.fields['type'].initial = Report.TYPE_BUG
+        if 'status' in self.fields:
+            self.fields['status'].initial = Report.STATUS_OPEN
+        if 'priority' in self.fields:
+            self.fields['priority'].initial = Report.PRIORITY_MEDIUM
+        assignee_field = self.fields.get('assignee')
+        if assignee_field:
+            assignee_field.label_from_instance = (
+                lambda user: user.get_full_name() or user.username
+            )
+
+
+class ReportCommentForm(forms.ModelForm):
+    class Meta:
+        model = ReportComment
+        fields = ['body']
+        widgets = {
+            'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 4, 'placeholder': 'Add a comment'}),
         }
-
-    def clean_attachments(self):
-        """Validate uploaded files"""
-        files = self.cleaned_data.get('attachments', [])
-        files = [f for f in files if f is not None]
-
-        if not files:
-            return []
-
-        for file in files:
-            max_size = 5 * 1024 * 1024
-            if file.size > max_size:
-                raise forms.ValidationError(
-                    f"File '{file.name}' exceeds maximum size of 5MB."
-                )
-
-        return files
-
-
-class ThreadFilterForm(forms.Form):
-    """Form for filtering threads"""
-    category = forms.ModelChoiceField(
-        queryset=ForumCategory.objects.filter(is_active=True),
-        required=False,
-        empty_label='All Categories',
-        widget=forms.Select(attrs={
-            'class': 'px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all'
-        })
-    )
-
-    status = forms.ChoiceField(
-        choices=[('', 'All Status')] + ForumThread.STATUS_CHOICES,
-        required=False,
-        widget=forms.Select(attrs={
-            'class': 'px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all'
-        })
-    )
-
-    priority = forms.ChoiceField(
-        choices=[('', 'All Priorities')] + ForumThread.PRIORITY_CHOICES,
-        required=False,
-        widget=forms.Select(attrs={
-            'class': 'px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all'
-        })
-    )
-
-    search = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all',
-            'placeholder': 'Search threads...'
-        })
-    )
-
-    sort_by = forms.ChoiceField(
-        choices=[
-            ('recent', 'Recent Activity'),
-            ('created', 'Newest First'),
-            ('views', 'Most Viewed'),
-            ('posts', 'Most Replies'),
-        ],
-        required=False,
-        initial='recent',
-        widget=forms.Select(attrs={
-            'class': 'px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 transition-all'
-        })
-    )

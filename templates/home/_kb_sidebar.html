@@ -1,0 +1,67 @@
+<aside class="kb-glass kb-sidebar">
+  {% if active_tab == 'wiki' %}
+    <h3>Hierarchy</h3>
+    <div class="kb-filter">
+      {% if hierarchy_tree %}
+        {% include 'home/_wiki_tree.html' with nodes=hierarchy_tree %}
+      {% else %}
+        <div class="kb-meta">No hierarchy yet.</div>
+      {% endif %}
+    </div>
+
+    <h3 style="margin-top: 20px;">Other articles</h3>
+    <div class="kb-filter">
+      {% if other_articles_sidebar %}
+        {% for article in other_articles_sidebar %}
+          <a class="kb-tree-link kb-tree-leaf" href="{% url 'kb-article-detail' article.slug %}">{{ article.title }}</a>
+        {% endfor %}
+      {% else %}
+        <div class="kb-meta">No other articles yet.</div>
+      {% endif %}
+    </div>
+  {% elif active_tab == 'qa' %}
+    <h3>Status</h3>
+    <select class="kb-select">
+      <option value="all">All questions</option>
+      <option value="solved">Solved</option>
+      <option value="unsolved">Unsolved</option>
+    </select>
+
+    <h3 style="margin-top: 20px;">Helpful tips</h3>
+    <div class="kb-meta">
+      <span class="kb-stat"><i class="fas fa-check-circle"></i>Mark solutions</span>
+      <span class="kb-stat"><i class="fas fa-search"></i>Search first</span>
+    </div>
+  {% elif active_tab == 'reports' %}
+    <h3>Type</h3>
+    <select class="kb-select">
+      <option value="all">All types</option>
+      <option value="bug">Bug</option>
+      <option value="feature">Feature</option>
+    </select>
+
+    <h3 style="margin-top: 20px;">Status</h3>
+    <select class="kb-select">
+      <option value="all">All status</option>
+      <option value="open">Open</option>
+      <option value="in_progress">In progress</option>
+      <option value="resolved">Resolved</option>
+      <option value="closed">Closed</option>
+    </select>
+
+    <h3 style="margin-top: 20px;">Priority</h3>
+    <select class="kb-select">
+      <option value="all">All priority</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+
+    <h3 style="margin-top: 20px;">Open items</h3>
+    <div class="kb-meta">
+      <span class="kb-stat" style="color: #fca5a5;">{{ open_bugs }} bugs</span>
+      <span class="kb-stat" style="color: #c4b5fd;">{{ open_features }} features</span>
+    </div>
+  {% endif %}
+</aside>

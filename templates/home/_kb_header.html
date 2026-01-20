@@ -1,0 +1,35 @@
+<div class="kb-glass kb-header">
+  <div class="kb-title">
+    <div class="kb-logo"><i class="fas fa-book"></i></div>
+    <div>
+      <h1>Knowledge Base</h1>
+      <p>Wiki, Q and A, Bug Reports and Feature Requests</p>
+    </div>
+  </div>
+  <div class="kb-search">
+    <i class="fas fa-search"></i>
+    <input type="text" placeholder="Search articles, questions, or reports" />
+  </div>
+  <a class="kb-action" href="{% url 'kb-create' %}">
+    <i class="fas fa-plus"></i>
+    Contribute
+  </a>
+</div>
+
+<div class="kb-tabs">
+  <a class="kb-tab {% if active_tab == 'wiki' %}active{% endif %}" href="{% url 'forum-home' %}?tab=wiki">
+    <i class="fas fa-book-open"></i>
+    Wiki Articles
+    <span>{{ total_articles }}</span>
+  </a>
+  <a class="kb-tab {% if active_tab == 'qa' %}active{% endif %}" href="{% url 'forum-home' %}?tab=qa">
+    <i class="fas fa-comments"></i>
+    Q and A
+    <span>{{ total_questions }}</span>
+  </a>
+  <a class="kb-tab {% if active_tab == 'reports' %}active{% endif %}" href="{% url 'forum-home' %}?tab=reports">
+    <i class="fas fa-bug"></i>
+    Bug Reports and Features
+    <span>{{ open_bugs|add:open_features }}</span>
+  </a>
+</div>

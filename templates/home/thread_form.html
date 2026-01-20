@@ -2,7 +2,7 @@
 {% load static %}
 {% load widget_tweaks %}
 
-{% block title %}{% if form.instance.pk %}Edit Thread{% else %}Create New Thread{% endif %} - Forum{% endblock %}
+{% block title %}{% if form.instance.pk %}Edit Thread{% else %}Create New Thread{% endif %} - Knowledge Base{% endblock %}
 
 {% block styles %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
@@ -972,7 +972,7 @@
 <div class="form-wrapper">
     <div class="form-header">
         <div class="container">
-            <a href="{% if form.instance.pk %}{% url 'forum-thread-detail' form.instance.slug %}{% else %}{% url 'forum-home' %}{% endif %}" class="back-btn">
+            <a href="{% if form.instance.pk %}{% url 'Knowledge Base-thread-detail' form.instance.slug %}{% else %}{% url 'Knowledge Base-home' %}{% endif %}" class="back-btn">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
             <h1 class="mt-3">
@@ -1067,11 +1067,11 @@
                                 <span class="tooltip-trigger" data-tooltip="Use rich formatting to make your post clear and readable">?</span>
                             </label>
 
-                            <!-- Rich Text Editor -->
-                            <div id="quill-editor" style="background: white;"></div>
+                            <!-- Rich Text Editor (hidden until Quill loads) -->
+                            <div id="quill-editor" style="background: white; min-height: 250px; display: none;"></div>
 
-                            <!-- Hidden textarea for form submission -->
-                            <textarea name="content" id="id_content" style="display: none;">{{ form.content.value|default:'' }}</textarea>
+                            <!-- Textarea for form submission (visible by default, hidden when Quill loads) -->
+                            <textarea name="content" id="id_content" class="form-textarea" placeholder="Write your thread content here...">{{ form.content.value|default:'' }}</textarea>
 
                             {% if form.content.errors %}
                                 <span class="form-error">{{ form.content.errors.0 }}</span>
@@ -1094,71 +1094,44 @@
                         </div>
                     </div>
 
-                    <!-- Bug Report Details (Optional) -->
+                    <!-- Additional Details (Optional) -->
                     <div class="form-section">
-                        <div class="section-toggle" onclick="toggleSection('bug-details')">
+                        <div class="section-toggle" onclick="toggleSection('additional-details')">
                             <div>
-                                <i class="fas fa-bug"></i>
-                                <strong style="font-size: 1.1rem; color: #1f2937;">Bug Report Details</strong>
+                                <i class="fas fa-info-circle"></i>
+                                <strong style="font-size: 1.1rem; color: #1f2937;">Additional Details</strong>
                                 <span class="badge">Optional</span>
                             </div>
                             <i class="fas fa-chevron-down toggle-icon"></i>
                         </div>
 
-                        <div class="collapsible-section" id="bug-details" style="max-height: 0; margin-top: 0;">
+                        <div class="collapsible-section" id="additional-details" style="max-height: 0; margin-top: 0;">
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="{{ form.bug_severity.id_for_label }}" class="form-label">Severity</label>
-                                    {{ form.bug_severity|add_class:"form-select" }}
-                                    {% if form.bug_severity.errors %}
-                                        <span class="form-error">{{ form.bug_severity.errors.0 }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="{{ form.bug_version.id_for_label }}" class="form-label">Version</label>
-                                    {{ form.bug_version|add_class:"form-control"|attr:"placeholder:e.g., 2.1.0" }}
-                                    {% if form.bug_version.errors %}
-                                        <span class="form-error">{{ form.bug_version.errors.0 }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
+                        <div class="form-group">
+                            <label for="{{ form.application_version.id_for_label }}" class="form-label">Application Version</label>
+                            {{ form.application_version|add_class:"form-control"|attr:"placeholder:e.g., v2.1.0" }}
+                            {% if form.application_version.errors %}
+                                <span class="form-error">{{ form.application_version.errors.0 }}</span>
+                            {% endif %}
+                            <small class="form-help">Specify the version of the application if relevant</small>
                         </div>
 
                         <div class="form-group">
-                            <label for="{{ form.bug_module.id_for_label }}" class="form-label">Module/Component</label>
-                            {{ form.bug_module|add_class:"form-control"|attr:"placeholder:e.g., Inventory, Planner, Tracker" }}
-                            {% if form.bug_module.errors %}
-                                <span class="form-error">{{ form.bug_module.errors.0 }}</span>
+                            <label for="{{ form.steps_to_reproduce.id_for_label }}" class="form-label">Steps to Reproduce</label>
+                            {{ form.steps_to_reproduce|add_class:"form-textarea"|attr:"placeholder:1. Go to...\n2. Click on...\n3. See error..." }}
+                            {% if form.steps_to_reproduce.errors %}
+                                <span class="form-error">{{ form.steps_to_reproduce.errors.0 }}</span>
                             {% endif %}
+                            <small class="form-help">If reporting a bug, describe the steps to reproduce the issue</small>
                         </div>
 
                         <div class="form-group">
-                            <label for="{{ form.bug_steps_to_reproduce.id_for_label }}" class="form-label">Steps to Reproduce</label>
-                            {{ form.bug_steps_to_reproduce|add_class:"form-textarea"|attr:"placeholder:1. Go to...\n2. Click on...\n3. See error..." }}
-                            {% if form.bug_steps_to_reproduce.errors %}
-                                <span class="form-error">{{ form.bug_steps_to_reproduce.errors.0 }}</span>
+                            <label for="{{ form.log_text.id_for_label }}" class="form-label">Error Logs / Stack Trace</label>
+                            {{ form.log_text|add_class:"form-textarea"|attr:"placeholder:Paste error logs or stack traces here..." }}
+                            {% if form.log_text.errors %}
+                                <span class="form-error">{{ form.log_text.errors.0 }}</span>
                             {% endif %}
-                        </div>
-
-                        <div class="form-group">
-                            <label for="{{ form.bug_expected_behavior.id_for_label }}" class="form-label">Expected Behavior</label>
-                            {{ form.bug_expected_behavior|add_class:"form-textarea"|attr:"placeholder:What should happen..." }}
-                            {% if form.bug_expected_behavior.errors %}
-                                <span class="form-error">{{ form.bug_expected_behavior.errors.0 }}</span>
-                            {% endif %}
-                        </div>
-
-                        <div class="form-group">
-                            <label for="{{ form.bug_actual_behavior.id_for_label }}" class="form-label">Actual Behavior</label>
-                            {{ form.bug_actual_behavior|add_class:"form-textarea"|attr:"placeholder:What actually happens..." }}
-                            {% if form.bug_actual_behavior.errors %}
-                                <span class="form-error">{{ form.bug_actual_behavior.errors.0 }}</span>
-                            {% endif %}
+                            <small class="form-help">Include any relevant error messages or logs</small>
                         </div>
 
                         </div><!-- End collapsible section -->
@@ -1171,44 +1144,14 @@
                             Thread Settings
                         </h3>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="{{ form.priority.id_for_label }}" class="form-label">Priority</label>
-                                    {{ form.priority|add_class:"form-select" }}
-                                    {% if form.priority.errors %}
-                                        <span class="form-error">{{ form.priority.errors.0 }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="{{ form.status.id_for_label }}" class="form-label">Status</label>
-                                    {{ form.status|add_class:"form-select" }}
-                                    {% if form.status.errors %}
-                                        <span class="form-error">{{ form.status.errors.0 }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
+                        <div class="form-group">
+                            <label for="{{ form.priority.id_for_label }}" class="form-label">Priority</label>
+                            {{ form.priority|add_class:"form-select" }}
+                            {% if form.priority.errors %}
+                                <span class="form-error">{{ form.priority.errors.0 }}</span>
+                            {% endif %}
+                            <small class="form-help">Set the priority level for this thread</small>
                         </div>
-
-                        {% if user.is_staff %}
-                        <div class="checkbox-group">
-                            <div class="checkbox-item">
-                                {{ form.is_pinned }}
-                                <label for="{{ form.is_pinned.id_for_label }}">
-                                    <i class="fas fa-thumbtack"></i> Pin this thread
-                                </label>
-                            </div>
-                            <div class="checkbox-item">
-                                {{ form.is_locked }}
-                                <label for="{{ form.is_locked.id_for_label }}">
-                                    <i class="fas fa-lock"></i> Lock this thread
-                                </label>
-                            </div>
-                        </div>
-                        {% endif %}
                     </div>
 
                     <!-- Attachments -->
@@ -1238,7 +1181,7 @@
                             <i class="fas fa-save"></i>
                             {% if form.instance.pk %}Update Thread{% else %}Create Thread{% endif %}
                         </button>
-                        <a href="{% if form.instance.pk %}{% url 'forum-thread-detail' form.instance.slug %}{% else %}{% url 'forum-home' %}{% endif %}" class="btn-secondary">
+                        <a href="{% if form.instance.pk %}{% url 'Knowledge Base-thread-detail' form.instance.slug %}{% else %}{% url 'Knowledge Base-home' %}{% endif %}" class="btn-secondary">
                             <i class="fas fa-times"></i> Cancel
                         </a>
                     </div>
@@ -1299,6 +1242,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
@@ -1306,19 +1250,61 @@
     let quill; // Global quill instance
     let titleInput; // Global title input reference
 
-    // Initialize everything when DOM is ready
-    $(document).ready(function() {
+    // Initialize everything when DOM is ready (using vanilla JS)
+    document.addEventListener('DOMContentLoaded', function() {
         // Get title input element
         titleInput = document.querySelector('[name="title"]');
 
-        // Initialize Select2 for tags
-        $('#{{ form.tags.id_for_label }}').select2({
-            placeholder: 'Select tags...',
-            allowClear: true
-        });
+        // Get textarea element
+        const contentTextarea = document.getElementById('id_content');
 
-        // Initialize Quill rich text editor
-        initializeQuill();
+        // Add event listener to textarea (used whether Quill loads or not)
+        if (contentTextarea) {
+            contentTextarea.addEventListener('input', function() {
+                updateContentCounter();
+                updatePreview();
+            });
+        }
+
+        // Initialize Select2 for tags (wait for jQuery and Select2)
+        function initSelect2() {
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                try {
+                    jQuery('#{{ form.tags.id_for_label }}').select2({
+                        placeholder: 'Select tags...',
+                        allowClear: true,
+                        width: '100%',
+                        theme: 'default'
+                    });
+                    console.log('Select2 initialized successfully');
+                } catch (error) {
+                    console.error('Select2 initialization error:', error);
+                }
+            } else {
+                console.log('jQuery or Select2 not loaded yet, retrying...');
+                setTimeout(initSelect2, 100);
+            }
+        }
+        initSelect2();
+
+        // Try to initialize Quill rich text editor
+        try {
+            initializeQuill();
+            // If successful, hide textarea and show Quill
+            const quillContainer = document.getElementById('quill-editor');
+            if (quillContainer && quill) {
+                quillContainer.style.display = 'block';
+                if (contentTextarea) {
+                    contentTextarea.style.display = 'none';
+                }
+                console.log('Quill loaded successfully, textarea hidden');
+            }
+        } catch (error) {
+            console.error('Quill initialization error:', error);
+            // Textarea stays visible as fallback
+            console.log('Using fallback textarea (Quill failed to load)');
+            showToast('Using simple text editor (rich editor failed to load)', 'info');
+        }
 
         // Set up title input listener
         if (titleInput) {
@@ -1332,6 +1318,9 @@
         updateTitleCounter();
         updateContentCounter();
 
+        // Initialize file upload handling
+        initializeFileUpload();
+
         // Initialize live preview after everything is set up
         setTimeout(function() {
             updatePreview();
@@ -1340,6 +1329,22 @@
 
     // Initialize Quill Editor
     function initializeQuill() {
+        console.log('Initializing Quill editor...');
+
+        // Check if Quill is loaded
+        if (typeof Quill === 'undefined') {
+            console.error('Quill library not loaded!');
+            throw new Error('Quill library not found');
+        }
+
+        const editorElement = document.getElementById('quill-editor');
+        if (!editorElement) {
+            console.error('Quill editor element not found!');
+            throw new Error('Editor element not found');
+        }
+
+        console.log('Editor element found:', editorElement);
+
         const toolbarOptions = [
             ['bold', 'italic', 'underline', 'strike'],
             ['blockquote', 'code-block'],
@@ -1357,6 +1362,8 @@
             theme: 'snow',
             placeholder: 'Write your thread content here...\n\nTip: Use formatting tools above to make your post clear and readable.'
         });
+
+        console.log('Quill initialized successfully:', quill);
 
         // Load existing content if editing
         const existingContent = document.getElementById('id_content').value;
@@ -1410,14 +1417,26 @@
         }
     }
 
-    // Character counter for content (works with Quill)
+    // Character counter for content (works with Quill or fallback textarea)
     const contentCounter = document.getElementById('content-counter');
 
     function updateContentCounter() {
-        if (!quill || !contentCounter) return;
+        if (!contentCounter) return;
 
-        const text = quill.getText();
-        const length = text.trim().length;
+        let length = 0;
+
+        if (quill) {
+            // Use Quill if available
+            const text = quill.getText();
+            length = text.trim().length;
+        } else {
+            // Fallback to textarea
+            const textarea = document.getElementById('id_content');
+            if (textarea && textarea.style.display !== 'none') {
+                length = textarea.value.trim().length;
+            }
+        }
+
         contentCounter.textContent = `${length.toLocaleString()} characters`;
 
         if (length > 5000) {
@@ -1467,83 +1486,110 @@
                 previewBody.innerHTML = '<p class="preview-empty">Your content will appear here as you type...</p>';
             }
         } else {
-            previewBody.innerHTML = '<p class="preview-empty">Loading editor...</p>';
+            // Fallback to textarea
+            const textarea = document.getElementById('id_content');
+            if (textarea && textarea.style.display !== 'none') {
+                const text = textarea.value.trim();
+                if (text) {
+                    // Convert line breaks to <br> for preview
+                    const htmlContent = text.replace(/\n/g, '<br>');
+                    previewBody.innerHTML = htmlContent;
+                    previewBody.style.color = '#374151';
+                } else {
+                    previewBody.innerHTML = '<p class="preview-empty">Your content will appear here as you type...</p>';
+                }
+            } else {
+                previewBody.innerHTML = '<p class="preview-empty">Loading editor...</p>';
+            }
         }
     }
 
     // File upload handling
-    const fileUploadArea = document.getElementById('file-upload-area');
-    const fileInput = document.getElementById('file-input');
-    const fileList = document.getElementById('file-list');
     let selectedFiles = [];
 
-    fileUploadArea.addEventListener('click', () => fileInput.click());
+    function initializeFileUpload() {
+        const fileUploadArea = document.getElementById('file-upload-area');
+        const fileInput = document.getElementById('file-input');
+        const fileList = document.getElementById('file-list');
 
-    fileUploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        fileUploadArea.classList.add('dragover');
-    });
-
-    fileUploadArea.addEventListener('dragleave', () => {
-        fileUploadArea.classList.remove('dragover');
-    });
-
-    fileUploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        fileUploadArea.classList.remove('dragover');
-        handleFiles(e.dataTransfer.files);
-    });
-
-    fileInput.addEventListener('change', (e) => {
-        handleFiles(e.target.files);
-    });
-
-    function handleFiles(files) {
-        for (let file of files) {
-            if (file.size > 10 * 1024 * 1024) {
-                showToast(`File ${file.name} is too large (max 10MB)`, 'error');
-                continue;
-            }
-            selectedFiles.push(file);
+        if (!fileUploadArea || !fileInput || !fileList) {
+            console.error('File upload elements not found');
+            return;
         }
-        updateFileList();
-    }
 
-    function updateFileList() {
-        fileList.innerHTML = '';
-        selectedFiles.forEach((file, index) => {
-            const fileItem = document.createElement('div');
-            fileItem.className = 'file-item';
-            fileItem.innerHTML = `
-                <div class="file-item-info">
-                    <i class="fas fa-file"></i>
-                    <span>${file.name}</span>
-                    <small class="text-muted">(${formatFileSize(file.size)})</small>
-                </div>
-                <button type="button" class="file-item-remove" onclick="removeFile(${index})">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-            fileList.appendChild(fileItem);
+        console.log('Initializing file upload...');
+
+        fileUploadArea.addEventListener('click', () => fileInput.click());
+
+        fileUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUploadArea.classList.add('dragover');
         });
 
-        // Update the file input
-        const dataTransfer = new DataTransfer();
-        selectedFiles.forEach(file => dataTransfer.items.add(file));
-        fileInput.files = dataTransfer.files;
-    }
+        fileUploadArea.addEventListener('dragleave', () => {
+            fileUploadArea.classList.remove('dragover');
+        });
 
-    function removeFile(index) {
-        selectedFiles.splice(index, 1);
-        updateFileList();
-    }
+        fileUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
 
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            for (let file of files) {
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast(`File ${file.name} is too large (max 10MB)`, 'error');
+                    continue;
+                }
+                selectedFiles.push(file);
+            }
+            updateFileList();
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div class="file-item-info">
+                        <i class="fas fa-file"></i>
+                        <span>${file.name}</span>
+                        <small class="text-muted">(${formatFileSize(file.size)})</small>
+                    </div>
+                    <button type="button" class="file-item-remove" onclick="removeFile(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                fileList.appendChild(fileItem);
+            });
+
+            // Update the file input
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            fileInput.files = dataTransfer.files;
+        }
+
+        // Make removeFile globally accessible
+        window.removeFile = function(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+        };
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        console.log('File upload initialized successfully');
     }
 
     function showToast(message, type) {
@@ -1594,28 +1640,25 @@
         }
     }
 
-    // Auto-expand bug details if any bug field has a value (for edit mode)
+    // Auto-expand additional details if any field has a value (for edit mode)
     window.addEventListener('DOMContentLoaded', () => {
-        const bugFields = [
-            '[name="bug_severity"]',
-            '[name="bug_version"]',
-            '[name="bug_module"]',
-            '[name="bug_steps_to_reproduce"]',
-            '[name="bug_expected_behavior"]',
-            '[name="bug_actual_behavior"]'
+        const additionalFields = [
+            '[name="application_version"]',
+            '[name="steps_to_reproduce"]',
+            '[name="log_text"]'
         ];
 
-        const hasBugData = bugFields.some(selector => {
+        const hasAdditionalData = additionalFields.some(selector => {
             const field = document.querySelector(selector);
             return field && field.value && field.value.trim() !== '';
         });
 
-        if (hasBugData) {
-            const bugSection = document.getElementById('bug-details');
-            const toggle = document.querySelector('[onclick*="bug-details"]');
-            if (bugSection && toggle) {
-                bugSection.style.maxHeight = '2000px';
-                bugSection.style.marginTop = '1rem';
+        if (hasAdditionalData) {
+            const additionalSection = document.getElementById('additional-details');
+            const toggle = document.querySelector('[onclick*="additional-details"]');
+            if (additionalSection && toggle) {
+                additionalSection.style.maxHeight = '2000px';
+                additionalSection.style.marginTop = '1rem';
                 toggle.classList.add('active');
             }
         }
@@ -1645,7 +1688,16 @@
         }
 
         // Check content
-        const contentText = quill ? quill.getText().trim() : '';
+        let contentText = '';
+        if (quill) {
+            contentText = quill.getText().trim();
+        } else {
+            const textarea = document.getElementById('id_content');
+            if (textarea && textarea.style.display !== 'none') {
+                contentText = textarea.value.trim();
+            }
+        }
+
         if (contentText && contentText.length >= 20) {
             contentDot.classList.add('completed');
         } else {
@@ -1687,10 +1739,10 @@
 
     // Show keyboard shortcuts hint on first visit
     setTimeout(() => {
-        const hasSeenHint = localStorage.getItem('forum_shortcuts_hint');
+        const hasSeenHint = localStorage.getItem('Knowledge Base_shortcuts_hint');
         if (!hasSeenHint) {
             showToast('💡 Tip: Use Ctrl+Enter to submit quickly!', 'info');
-            localStorage.setItem('forum_shortcuts_hint', 'true');
+            localStorage.setItem('Knowledge Base_shortcuts_hint', 'true');
         }
     }, 3000);
 </script>

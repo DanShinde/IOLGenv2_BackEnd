@@ -1,849 +1,751 @@
-{% extends 'base.html' %}
+{% extends 'base_forum.html' %}
 {% load static %}
 
-{% block title %}Community Forum{% endblock %}
+{% block title %}Knowledge Base{% endblock %}
 
 {% block styles %}
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 <style>
-    /* Override base template styles */
-    body {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        min-height: 100vh;
-        position: relative;
-        color: #1f2937 !important;
-        display: block !important;
-        margin: 0 !important;
-        padding: 0 !important;
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+
+  :root {
+    --kb-bg: #0f0f12;
+    --kb-bg-soft: #1a1a24;
+    --kb-card: rgba(255, 255, 255, 0.04);
+    --kb-card-hover: rgba(255, 255, 255, 0.08);
+    --kb-border: rgba(255, 255, 255, 0.1);
+    --kb-text: #e8e8ed;
+    --kb-muted: rgba(255, 255, 255, 0.55);
+    --kb-accent: #6366f1;
+    --kb-accent-2: #8b5cf6;
+    --kb-bug: #ef4444;
+    --kb-feature: #8b5cf6;
+    --kb-success: #22c55e;
+  }
+
+  body {
+    background: linear-gradient(135deg, #0f0f12 0%, #1a1a24 50%, #0f0f12 100%) !important;
+    color: var(--kb-text) !important;
+  }
+
+  main {
+    background: transparent !important;
+  }
+
+  .kb-page {
+    min-height: 100vh;
+    padding: 24px 32px 48px;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .kb-glass {
+    background: var(--kb-card);
+    border: 1px solid var(--kb-border);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .kb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 20px 28px;
+    border-radius: 18px;
+  }
+
+  .kb-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .kb-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--kb-accent) 0%, var(--kb-accent-2) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+  }
+
+  .kb-title h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+  }
+
+  .kb-title p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--kb-muted);
+  }
+
+  .kb-search {
+    position: relative;
+    flex: 1;
+    max-width: 420px;
+  }
+
+  .kb-search input {
+    width: 100%;
+    padding: 12px 16px 12px 44px;
+    border-radius: 12px;
+    border: 1px solid var(--kb-border);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--kb-text);
+    font-size: 14px;
+  }
+
+  .kb-search input:focus {
+    outline: none;
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  .kb-search i {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--kb-muted);
+  }
+
+  .kb-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--kb-accent) 0%, var(--kb-accent-2) 100%);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .kb-tabs {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  .kb-tab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--kb-border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--kb-muted);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .kb-tab.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #c4b5fd;
+  }
+
+  .kb-tab span {
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 12px;
+  }
+
+  .kb-main {
+    margin-top: 26px;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .kb-sidebar {
+    padding: 20px;
+    border-radius: 16px;
+  }
+
+  .kb-sidebar h3 {
+    margin: 0 0 16px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--kb-muted);
+  }
+
+  .kb-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .kb-tree-list {
+    list-style: none;
+    margin: 0;
+    padding-left: 14px;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .kb-tree-item {
+    margin: 6px 0;
+  }
+
+  .kb-tree-details {
+    margin: 0;
+  }
+
+  .kb-tree-summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--kb-muted);
+    font-size: 13px;
+  }
+
+  .kb-tree-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .kb-tree-summary::before {
+    content: '+';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    color: var(--kb-muted);
+    flex-shrink: 0;
+  }
+
+  details[open] > .kb-tree-summary::before {
+    content: '-';
+  }
+
+  .kb-tree-link {
+    color: var(--kb-muted);
+    text-decoration: none;
+  }
+
+  .kb-tree-link:hover {
+    color: #c4b5fd;
+  }
+
+  .kb-tree-leaf {
+    display: inline-block;
+    padding-left: 24px;
+    font-size: 13px;
+  }
+
+  .kb-select {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--kb-border);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--kb-text);
+    font-size: 13px;
+  }
+
+  .kb-content {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .kb-card {
+    padding: 18px 20px;
+    border-radius: 16px;
+    transition: transform 0.2s ease, background 0.2s ease;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .kb-card:hover {
+    background: var(--kb-card-hover);
+    transform: translateY(-2px);
+  }
+
+  .kb-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .kb-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: #a5b4fc;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .status-open { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+  .status-in_progress { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+  .status-resolved { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+  .status-closed { background: rgba(107, 114, 128, 0.2); color: #d1d5db; }
+
+  .priority-critical { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+  .priority-high { background: rgba(249, 115, 22, 0.18); color: #fdba74; }
+  .priority-medium { background: rgba(234, 179, 8, 0.18); color: #fde68a; }
+  .priority-low { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+
+  .type-bug { background: rgba(239, 68, 68, 0.15); color: var(--kb-bug); }
+  .type-feature { background: rgba(139, 92, 246, 0.15); color: var(--kb-feature); }
+
+  .kb-empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--kb-muted);
+  }
+
+  .kb-meta {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--kb-muted);
+    flex-wrap: wrap;
+  }
+
+  .kb-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kb-tab-pane,
+  .kb-tab-sidebar {
+    display: none;
+  }
+
+  .kb-tab-pane.active,
+  .kb-tab-sidebar.active {
+    display: block;
+  }
+
+  @media (max-width: 960px) {
+    .kb-header {
+      flex-direction: column;
+      align-items: stretch;
     }
 
-    body::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background:
-            radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(249, 168, 212, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 40% 20%, rgba(167, 139, 250, 0.2) 0%, transparent 50%);
-        z-index: 0;
-        pointer-events: none;
+    .kb-search {
+      max-width: 100%;
     }
 
-    /* Forum-specific container resets */
-    .forum-container {
-        position: relative;
-        z-index: 1;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    .kb-main {
+      grid-template-columns: 1fr;
     }
-
-    .forum-container * {
-        font-family: inherit;
-    }
-
-    /* Override any base container styles - make container wider */
-    .forum-container .container,
-    .forum-container .container-fluid,
-    .forum-container .container-sm,
-    .forum-container .container-md,
-    .forum-container .container-lg,
-    .forum-container .container-xl,
-    .forum-container .container-xxl {
-        max-width: 95% !important;
-        width: 95% !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
-
-    @media (min-width: 1200px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
-            max-width: 90% !important;
-        }
-    }
-
-    @media (min-width: 1400px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
-            max-width: 1600px !important;
-        }
-    }
-
-    @media (min-width: 1536px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
-            max-width: 1700px !important;
-        }
-    }
-
-    @media (min-width: 1920px) {
-        .forum-container .container,
-        .forum-container .container-sm,
-        .forum-container .container-md,
-        .forum-container .container-lg,
-        .forum-container .container-xl,
-        .forum-container .container-xxl {
-            max-width: 1800px !important;
-        }
-    }
-
-    /* Ensure main content area doesn't inherit base styles */
-    main {
-        flex: none !important;
-        background: transparent !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-
-    /* Reset any bootstrap/base framework styles */
-    .forum-container .row {
-        display: block;
-    }
-
-    .forum-container .col,
-    .forum-container [class*="col-"] {
-        width: 100%;
-        padding: 0;
-    }
-
-    .glass-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
-    }
-
-    .category-card {
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%);
-        backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 2rem;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        border: 2px solid rgba(255, 255, 255, 0.5);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .category-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 6px;
-        background: linear-gradient(90deg, var(--category-color), var(--category-color-light));
-        transform: scaleX(0);
-        transform-origin: left;
-        transition: transform 0.4s ease;
-    }
-
-    .category-card:hover::before {
-        transform: scaleX(1);
-    }
-
-    .category-card:hover {
-        transform: translateY(-12px) scale(1.02);
-        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.35);
-        border-color: var(--category-color);
-    }
-
-    .category-icon {
-        width: 80px;
-        height: 80px;
-        border-radius: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.5rem;
-        color: white;
-        background: linear-gradient(135deg, var(--category-color) 0%, var(--category-color-dark) 100%);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-        transition: all 0.3s ease;
-        position: relative;
-    }
-
-    .category-icon::after {
-        content: '';
-        position: absolute;
-        inset: -4px;
-        border-radius: 22px;
-        background: linear-gradient(135deg, var(--category-color), var(--category-color-dark));
-        z-index: -1;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-
-    .category-card:hover .category-icon {
-        transform: rotate(10deg) scale(1.1);
-    }
-
-    .category-card:hover .category-icon::after {
-        opacity: 0.5;
-        animation: pulse-ring 1.5s ease-out infinite;
-    }
-
-    @keyframes pulse-ring {
-        0% {
-            transform: scale(0.95);
-            opacity: 0.5;
-        }
-        50% {
-            transform: scale(1.1);
-            opacity: 0.3;
-        }
-        100% {
-            transform: scale(1.3);
-            opacity: 0;
-        }
-    }
-
-    .thread-card {
-        background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(10px);
-        padding: 1.5rem;
-        border-radius: 16px;
-        border-left: 4px solid transparent;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .thread-card::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 4px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        transform: scaleY(0);
-        transition: transform 0.3s ease;
-    }
-
-    .thread-card:hover::before {
-        transform: scaleY(1);
-    }
-
-    .thread-card:hover {
-        background: rgba(255, 255, 255, 1);
-        transform: translateX(8px);
-        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.2);
-    }
-
-    .hero-section {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-        border-radius: 30px;
-        padding: 3rem;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
-    }
-
-    .hero-section::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -20%;
-        width: 500px;
-        height: 500px;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-        animation: float 6s ease-in-out infinite;
-    }
-
-    @keyframes float {
-        0%, 100% { transform: translateY(0px) rotate(0deg); }
-        50% { transform: translateY(-20px) rotate(10deg); }
-    }
-
-    .stat-card {
-        background: rgba(255, 255, 255, 0.25);
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        padding: 1.5rem;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        transition: all 0.3s ease;
-    }
-
-    .stat-card:hover {
-        background: rgba(255, 255, 255, 0.35);
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    }
-
-    .stat-icon {
-        background: rgba(255, 255, 255, 0.3);
-        backdrop-filter: blur(10px);
-        width: 60px;
-        height: 60px;
-        border-radius: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s ease;
-    }
-
-    .stat-card:hover .stat-icon {
-        transform: scale(1.1) rotate(5deg);
-        background: rgba(255, 255, 255, 0.4);
-    }
-
-    .badge-glow {
-        box-shadow: 0 0 20px currentColor;
-        animation: glow-pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes glow-pulse {
-        0%, 100% { box-shadow: 0 0 10px currentColor; }
-        50% { box-shadow: 0 0 25px currentColor; }
-    }
-
-    .gradient-text {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        font-weight: 800;
-    }
-
-    .btn-gradient {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1rem 2rem;
-        border-radius: 15px;
-        font-weight: 700;
-        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .btn-gradient::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-        transition: left 0.5s ease;
-    }
-
-    .btn-gradient:hover::before {
-        left: 100%;
-    }
-
-    .btn-gradient:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
-    }
-
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .animate-fadeInUp {
-        animation: fadeInUp 0.6s ease-out backwards;
-    }
-
-    .stagger-1 { animation-delay: 0.1s; }
-    .stagger-2 { animation-delay: 0.2s; }
-    .stagger-3 { animation-delay: 0.3s; }
-    .stagger-4 { animation-delay: 0.4s; }
-    .stagger-5 { animation-delay: 0.5s; }
-    .stagger-6 { animation-delay: 0.6s; }
-    .stagger-7 { animation-delay: 0.7s; }
-
-    .guidelines-card {
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 245, 255, 0.98) 100%);
-        backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 2.5rem;
-        border: 2px solid rgba(167, 139, 250, 0.4);
-        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.3);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .guidelines-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 5px;
-        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-    }
-
-    .section-title {
-        font-size: 2rem;
-        font-weight: 800;
-        margin-bottom: 2rem;
-        position: relative;
-        display: inline-block;
-    }
-
-    .section-title::after {
-        content: '';
-        position: absolute;
-        bottom: -8px;
-        left: 0;
-        width: 60%;
-        height: 4px;
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        border-radius: 2px;
-    }
-
-    .avatar-gradient {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-    }
-
-    .category-stats {
-        background: rgba(102, 126, 234, 0.08);
-        padding: 0.75rem;
-        border-radius: 12px;
-        margin-top: 1rem;
-    }
-
-    /* Floating Action Button */
-    .fab {
-        position: fixed;
-        bottom: 2rem;
-        right: 2rem;
-        width: 64px;
-        height: 64px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 1.5rem;
-        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
-        cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1000;
-        text-decoration: none;
-        border: 3px solid rgba(255, 255, 255, 0.3);
-    }
-
-    .fab:hover {
-        transform: scale(1.1) rotate(90deg);
-        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.6);
-        color: white;
-    }
-
-    .fab:active {
-        transform: scale(1.05) rotate(90deg);
-    }
-
-    @media (max-width: 768px) {
-        .fab {
-            bottom: 1.5rem;
-            right: 1.5rem;
-            width: 56px;
-            height: 56px;
-            font-size: 1.25rem;
-        }
-    }
-
-    /* CRITICAL: Final Bootstrap override - must be at end */
-    /* Ultra-specific selectors to override Bootstrap at ALL screen sizes */
-    body .forum-container .container,
-    body .forum-container .container-fluid,
-    body .forum-container .container-sm,
-    body .forum-container .container-md,
-    body .forum-container .container-lg,
-    body .forum-container .container-xl,
-    body .forum-container .container-xxl,
-    .forum-container > .container,
-    .forum-container > .container-fluid,
-    .forum-container > .container-sm,
-    .forum-container > .container-md,
-    .forum-container > .container-lg,
-    .forum-container > .container-xl,
-    .forum-container > .container-xxl {
-        max-width: 95% !important;
-        width: 95% !important;
-        max-width: 1350rem;
-    }
-
-    @media (min-width: 576px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-sm {
-            max-width: 95% !important;
-        }
-    }
-
-    @media (min-width: 768px) {
-        body .forum-container .container,
-        body .forum-container .container-md,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-md,
-        .forum-container > .container-sm {
-            max-width: 95% !important;
-        }
-    }
-
-    @media (min-width: 992px) {
-        body .forum-container .container,
-        body .forum-container .container-lg,
-        body .forum-container .container-md,
-        body .forum-container .container-sm,
-        .forum-container > .container,
-        .forum-container > .container-lg,
-        .forum-container > .container-md,
-        .forum-container > .container-sm {
-            max-width: 90% !important;
-        }
-    }
-
-    @media (min-width: 1200px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
-            max-width: 90% !important;
-        }
-    }
-
-    @media (min-width: 1400px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
-            max-width: 1600px !important;
-        }
-    }
-
-    @media (min-width: 1536px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
-            max-width: 1700px !important;
-        }
-    }
-
-    @media (min-width: 1920px) {
-        body .forum-container .container,
-        body .forum-container .container-sm,
-        body .forum-container .container-md,
-        body .forum-container .container-lg,
-        body .forum-container .container-xl,
-        body .forum-container .container-xxl,
-        .forum-container > .container,
-        .forum-container > .container-sm,
-        .forum-container > .container-md,
-        .forum-container > .container-lg,
-        .forum-container > .container-xl,
-        .forum-container > .container-xxl {
-            max-width: 1800rem !important;
-        }
-    }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="forum-container">
-<div class="container mx-auto px-4 py-8 space-y-8">
-    <!-- Hero Section -->
-    <div class="hero-section animate-fadeInUp text-white relative z-10">
-        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div class="flex-1">
-                <h1 class="text-5xl lg:text-6xl font-black mb-4 flex items-center gap-4">
-                    <i class="fas fa-comments"></i>
-                    <span>Community Forum</span>
-                </h1>
-                <p class="text-xl lg:text-2xl text-purple-100 font-medium mb-6">
-                    Share ideas, report bugs, and collaborate with the team
-                </p>
-            </div>
-            <a href="{% url 'forum-thread-create' %}"
-               class="btn-gradient inline-flex items-center gap-3 text-lg">
-                <i class="fas fa-plus-circle"></i>
-                Create New Thread
-            </a>
-        </div>
-
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-            <div class="stat-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-purple-100 text-sm font-semibold uppercase tracking-wide mb-1">Total Threads</p>
-                        <p class="text-5xl font-black">{{ total_threads }}</p>
-                    </div>
-                    <div class="stat-icon">
-                        <i class="fas fa-layer-group text-3xl text-white"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-purple-100 text-sm font-semibold uppercase tracking-wide mb-1">Total Posts</p>
-                        <p class="text-5xl font-black">{{ total_posts }}</p>
-                    </div>
-                    <div class="stat-icon">
-                        <i class="fas fa-comment-dots text-3xl text-white"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-purple-100 text-sm font-semibold uppercase tracking-wide mb-1">Active Users</p>
-                        <p class="text-5xl font-black">{{ total_users }}</p>
-                    </div>
-                    <div class="stat-icon">
-                        <i class="fas fa-users text-3xl text-white"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="kb-page">
+  <div class="kb-glass kb-header">
+    <div class="kb-title">
+      <div class="kb-logo"><i class="fas fa-book"></i></div>
+      <div>
+        <h1>Knowledge Base</h1>
+        <p>Wiki, Q and A, Bug Reports and Feature Requests</p>
+      </div>
     </div>
-
-    <!-- Categories Section -->
-    <div class="animate-fadeInUp" style="animation-delay: 0.2s;">
-        <h2 class="section-title gradient1-text mb-8">
-            <i class="fas fa-th-large mr-3"></i>Browse Categories
-        </h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {% for category in categories %}
-            <a href="{% url 'forum-category' category.slug %}"
-               class="category-card stagger-{{ forloop.counter }} animate-fadeInUp group"
-               style="--category-color: {{ category.color }}; --category-color-dark: {{ category.color }}dd; --category-color-light: {{ category.color }}99;">
-
-                <div class="category-icon mb-4">
-                    <i class="{{ category.icon }}"></i>
-                </div>
-
-                <h3 class="text-2xl font-black text-gray-900 mb-3">{{ category.name }}</h3>
-                <p class="text-gray-600 text-base mb-4 leading-relaxed">{{ category.description }}</p>
-
-                <div class="category-stats">
-                    <div class="flex items-center justify-between text-sm font-semibold">
-                        <div class="flex items-center text-gray-700">
-                            <i class="fas fa-layer-group mr-2 text-lg" style="color: {{ category.color }};"></i>
-                            <span>{{ category.thread_count }} Threads</span>
-                        </div>
-                        <div class="flex items-center text-gray-700">
-                            <i class="fas fa-comment mr-2 text-lg" style="color: {{ category.color }};"></i>
-                            <span>{{ category.post_count }} Posts</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-6 flex items-center font-bold text-base group-hover:translate-x-2 transition-transform duration-300"
-                     style="color: {{ category.color }};">
-                    Explore Category
-                    <i class="fas fa-arrow-right ml-3 group-hover:ml-4 transition-all duration-300"></i>
-                </div>
-            </a>
-            {% empty %}
-            <div class="col-span-full text-center py-20 glass-card rounded-3xl">
-                <i class="fas fa-inbox text-8xl text-gray-300 mb-6"></i>
-                <p class="text-gray-500 text-2xl font-semibold">No categories available yet</p>
-            </div>
-            {% endfor %}
-        </div>
+    <div class="kb-search">
+      <i class="fas fa-search"></i>
+      <input id="kb-search" type="text" placeholder="Search articles, questions, or reports" />
     </div>
+    <a class="kb-action" href="{% url 'kb-create' %}">
+      <i class="fas fa-plus"></i>
+      Contribute
+    </a>
+  </div>
 
-    <!-- Recent Threads Section -->
-    <div class="glass-card rounded-3xl p-8 animate-fadeInUp" style="animation-delay: 0.4s;">
-        <div class="flex justify-between items-center mb-8">
-            <h2 class="section-title gradient-text">
-                <i class="fas fa-fire mr-3"></i>Recent Activity
-            </h2>
-            <span class="text-sm font-semibold text-gray-500 bg-gray-100 px-4 py-2 rounded-full">
-                Last 10 threads
-            </span>
-        </div>
+  <div class="kb-tabs">
+    <button class="kb-tab active" data-tab-button="wiki">
+      <i class="fas fa-book-open"></i>
+      Wiki Articles
+      <span>{{ total_articles }}</span>
+    </button>
+    <button class="kb-tab" data-tab-button="qa">
+      <i class="fas fa-comments"></i>
+      Q and A
+      <span>{{ total_questions }}</span>
+    </button>
+    <button class="kb-tab" data-tab-button="reports">
+      <i class="fas fa-bug"></i>
+      Bug Reports and Features
+      <span>{{ open_bugs|add:open_features }}</span>
+    </button>
+  </div>
 
-        <div class="space-y-4">
-            {% for thread in recent_threads %}
-            <a href="{% url 'forum-thread-detail' thread.slug %}" class="thread-card block group">
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-3 flex-wrap">
-                            <span class="px-3 py-1.5 text-sm rounded-xl font-bold shadow-sm transition-all duration-300 group-hover:shadow-md"
-                                  style="background-color: {{ thread.category.color }}20; color: {{ thread.category.color }};">
-                                <i class="{{ thread.category.icon }} mr-2"></i>{{ thread.category.name }}
-                            </span>
+  <div class="kb-main">
+    <aside class="kb-glass kb-sidebar kb-tab-sidebar active" data-tab-sidebar="wiki">
+      <h3>Hierarchy</h3>
+      <div class="kb-filter">
+        {% if hierarchy_tree %}
+          {% include 'home/_wiki_tree.html' with nodes=hierarchy_tree %}
+        {% else %}
+          <div class="kb-meta">No hierarchy yet.</div>
+        {% endif %}
+      </div>
 
-                            {% if thread.status == 'open' %}
-                            <span class="px-3 py-1.5 text-xs rounded-xl bg-gradient-to-r from-blue-400 to-blue-600 text-white font-bold">
-                                OPEN
-                            </span>
-                            {% elif thread.status == 'in_progress' %}
-                            <span class="px-3 py-1.5 text-xs rounded-xl bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold">
-                                IN PROGRESS
-                            </span>
-                            {% elif thread.status == 'resolved' %}
-                            <span class="px-3 py-1.5 text-xs rounded-xl bg-gradient-to-r from-green-400 to-green-600 text-white font-bold">
-                                RESOLVED
-                            </span>
-                            {% endif %}
+      <h3 style="margin-top: 20px;">Other articles</h3>
+      <div class="kb-filter">
+        {% if other_articles_sidebar %}
+          {% for article in other_articles_sidebar %}
+            <a class="kb-tree-link kb-tree-leaf" href="{% url 'kb-article-detail' article.slug %}">{{ article.title }}</a>
+          {% endfor %}
+        {% else %}
+          <div class="kb-meta">No other articles yet.</div>
+        {% endif %}
+      </div>
 
-                            {% if thread.priority == 'high' or thread.priority == 'critical' %}
-                            <span class="px-3 py-1.5 text-xs rounded-xl bg-gradient-to-r from-red-500 to-red-700 text-white font-bold badge-glow">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ thread.get_priority_display|upper }}
-                            </span>
-                            {% endif %}
+      <h3>Quick stats</h3>
+      <div class="kb-meta">
+        <span class="kb-stat"><i class="fas fa-book"></i>{{ total_articles }} articles</span>
+        <span class="kb-stat"><i class="fas fa-comment"></i>{{ total_interactions }} replies</span>
+        <span class="kb-stat"><i class="fas fa-user"></i>{{ total_users }} users</span>
+      </div>
+    </aside>
 
-                            {% if thread.is_pinned %}
-                            <i class="fas fa-thumbtack text-2xl text-purple-600 transform rotate-45"></i>
-                            {% endif %}
+    <aside class="kb-glass kb-sidebar kb-tab-sidebar" data-tab-sidebar="qa">
+      <h3>Status</h3>
+      <select class="kb-select" id="qa-status">
+        <option value="all">All questions</option>
+        <option value="solved">Solved</option>
+        <option value="unsolved">Unsolved</option>
+      </select>
 
-                            {% if thread.best_answer %}
-                            <span class="px-3 py-1.5 text-xs rounded-xl bg-gradient-to-r from-green-400 to-emerald-500 text-white font-bold">
-                                <i class="fas fa-check-circle mr-1"></i>SOLVED
-                            </span>
-                            {% endif %}
-                        </div>
+      <h3 style="margin-top: 20px;">Helpful tips</h3>
+      <div class="kb-meta">
+        <span class="kb-stat"><i class="fas fa-check-circle"></i>Mark solutions</span>
+        <span class="kb-stat"><i class="fas fa-search"></i>Search first</span>
+      </div>
+    </aside>
 
-                        <h3 class="text-xl font-black text-gray-900 mb-2 group-hover:text-purple-600 transition-colors duration-300">
-                            {{ thread.title }}
-                        </h3>
+    <aside class="kb-glass kb-sidebar kb-tab-sidebar" data-tab-sidebar="reports">
+      <h3>Type</h3>
+      <select class="kb-select" id="report-type">
+        <option value="all">All types</option>
+        <option value="bug">Bug</option>
+        <option value="feature">Feature</option>
+      </select>
 
-                        <div class="flex items-center text-sm font-medium text-gray-600">
-                            <div class="flex items-center mr-6">
-                                <div class="w-8 h-8 rounded-full avatar-gradient flex items-center justify-center text-white text-sm font-black mr-2 shadow-lg">
-                                    {{ thread.author.get_full_name.0|default:thread.author.username.0|upper }}
-                                </div>
-                                <span class="font-semibold">{{ thread.author.get_full_name|default:thread.author.username }}</span>
-                            </div>
-                            <span class="text-gray-400 mx-2">•</span>
-                            <span class="text-gray-600">{{ thread.created_at|timesince }} ago</span>
-                        </div>
-                    </div>
+      <h3 style="margin-top: 20px;">Status</h3>
+      <select class="kb-select" id="report-status">
+        <option value="all">All status</option>
+        <option value="open">Open</option>
+        <option value="in_progress">In progress</option>
+        <option value="resolved">Resolved</option>
+        <option value="closed">Closed</option>
+      </select>
 
-                    <div class="flex flex-col items-end gap-3 text-sm font-bold">
-                        <div class="flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-xl">
-                            <i class="fas fa-comment text-lg"></i>
-                            <span class="text-lg">{{ thread.reply_count }}</span>
-                        </div>
-                        <div class="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl">
-                            <i class="fas fa-eye text-lg"></i>
-                            <span class="text-lg">{{ thread.views }}</span>
-                        </div>
-                    </div>
+      <h3 style="margin-top: 20px;">Priority</h3>
+      <select class="kb-select" id="report-priority">
+        <option value="all">All priority</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+
+      <h3 style="margin-top: 20px;">Open items</h3>
+      <div class="kb-meta">
+        <span class="kb-stat" style="color: #fca5a5;">{{ open_bugs }} bugs</span>
+        <span class="kb-stat" style="color: #c4b5fd;">{{ open_features }} features</span>
+      </div>
+    </aside>
+
+    <section class="kb-tab-pane active" data-tab-pane="wiki">
+      <div class="kb-content" id="wiki-list">
+        {% if hierarchy_articles %}
+        <div class="kb-meta" style="margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">Hierarchy</div>
+        {% for item in hierarchy_articles %}
+        {% with article=item.article %}
+        <a
+          class="kb-glass kb-card"
+          href="{% url 'kb-article-detail' article.slug %}"
+          data-item
+          data-category="{{ article.category.slug }}"
+          data-search="{{ article.title|lower }} {{ article.content|striptags|lower }} {{ article.category.name|lower }}"
+          style="margin-left: {{ item.indent }}px;">
+          <div style="display: flex; justify-content: space-between; gap: 16px;">
+            <div style="flex: 1;">
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+                <span class="kb-pill" style="background: rgba(99, 102, 241, 0.2); color: #c4b5fd;">
+                  {{ article.category.name }}
+                </span>
+                <span class="kb-meta">Updated {{ article.updated_at|timesince }} ago</span>
+              </div>
+              <h3 style="margin: 0 0 8px; font-size: 18px;">{{ article.title }}</h3>
+              <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                {% for tag in article.tags.all %}
+                <span class="kb-tag">{{ tag.name }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="kb-meta" style="flex-direction: column; align-items: flex-end;">
+              <span class="kb-stat"><i class="fas fa-eye"></i>{{ article.views }}</span>
+              <span class="kb-stat"><i class="fas fa-user"></i>{{ article.author.get_full_name|default:article.author.username }}</span>
+            </div>
+          </div>
+        </a>
+        {% endwith %}
+        {% endfor %}
+        {% endif %}
+
+        {% if other_articles %}
+        <div class="kb-meta" style="margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px;">Other Articles</div>
+        {% for article in other_articles %}
+        <a
+          class="kb-glass kb-card"
+          href="{% url 'kb-article-detail' article.slug %}"
+          data-item
+          data-category="{{ article.category.slug }}"
+          data-search="{{ article.title|lower }} {{ article.content|striptags|lower }} {{ article.category.name|lower }}">
+          <div style="display: flex; justify-content: space-between; gap: 16px;">
+            <div style="flex: 1;">
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+                <span class="kb-pill" style="background: rgba(99, 102, 241, 0.2); color: #c4b5fd;">
+                  {{ article.category.name }}
+                </span>
+                <span class="kb-meta">Updated {{ article.updated_at|timesince }} ago</span>
+              </div>
+              <h3 style="margin: 0 0 8px; font-size: 18px;">{{ article.title }}</h3>
+              <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                {% for tag in article.tags.all %}
+                <span class="kb-tag">{{ tag.name }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="kb-meta" style="flex-direction: column; align-items: flex-end;">
+              <span class="kb-stat"><i class="fas fa-eye"></i>{{ article.views }}</span>
+              <span class="kb-stat"><i class="fas fa-user"></i>{{ article.author.get_full_name|default:article.author.username }}</span>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+        {% endif %}
+
+        {% if not hierarchy_articles and not other_articles %}
+        <div class="kb-empty">No wiki articles yet.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="kb-tab-pane" data-tab-pane="qa">
+      <div class="kb-content" id="qa-list">
+        {% for question in questions %}
+        <a
+          class="kb-glass kb-card"
+          href="{% url 'kb-question-detail' question.pk %}"
+          data-item
+          data-solved="{% if question.is_solved %}true{% else %}false{% endif %}"
+          data-search="{{ question.title|lower }} {{ question.body|lower }} {{ question.author.username|lower }}">
+          <div style="display: flex; gap: 16px; align-items: flex-start;">
+            <div style="display: flex; flex-direction: column; gap: 8px; align-items: center; min-width: 60px;">
+              <span class="kb-meta">{{ question.answer_count }}</span>
+              <span class="kb-meta">answers</span>
+            </div>
+            <div style="flex: 1;">
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 17px;">{{ question.title }}</h3>
+                {% if question.is_solved %}
+                <span class="kb-pill" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">Solved</span>
+                {% endif %}
+              </div>
+              <p style="margin: 0 0 10px; color: var(--kb-muted);">{{ question.body|truncatewords:24 }}</p>
+              <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  {% for tag in question.tags.all %}
+                  <span class="kb-tag">{{ tag.name }}</span>
+                  {% endfor %}
                 </div>
-            </a>
-            {% empty %}
-            <div class="text-center py-16">
-                <i class="fas fa-inbox text-7xl text-gray-300 mb-6"></i>
-                <p class="text-gray-500 text-xl font-semibold mb-6">No threads yet. Be the first to start a discussion!</p>
-                <a href="{% url 'forum-thread-create' %}"
-                   class="btn-gradient inline-flex items-center gap-3">
-                    <i class="fas fa-plus-circle"></i>
-                    Create First Thread
-                </a>
+                <div class="kb-meta">
+                  <span>{{ question.answer_count }} answers</span>
+                  <span>{{ question.author.get_full_name|default:question.author.username }} - {{ question.created_at|timesince }} ago</span>
+                </div>
+              </div>
             </div>
-            {% endfor %}
-        </div>
-    </div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="kb-empty">No questions available yet.</div>
+        {% endfor %}
+      </div>
+    </section>
 
-    <!-- Guidelines Section -->
-    <div class="guidelines-card animate-fadeInUp" style="animation-delay: 0.6s;">
-        <div class="flex flex-col md:flex-row items-start gap-6">
-            <div class="bg-gradient-to-br from-purple-500 via-purple-600 to-pink-500 rounded-3xl p-6 shadow-2xl flex-shrink-0 hover:scale-110 transition-transform duration-300">
-                <i class="fas fa-lightbulb text-white text-5xl"></i>
+    <section class="kb-tab-pane" data-tab-pane="reports">
+      <div class="kb-content" id="report-list">
+        {% for report in reports %}
+        <a
+          class="kb-glass kb-card"
+          href="{% url 'kb-report-detail' report.pk %}"
+          data-item
+          data-type="{{ report.type }}"
+          data-status="{{ report.status }}"
+          data-priority="{{ report.priority }}"
+          data-search="{{ report.title|lower }} {{ report.description|lower }} {{ report.application.name|lower }}">
+          <div style="display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px;">
+            <div style="flex: 1;">
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+                <span class="kb-pill {% if report.type == 'bug' %}type-bug{% else %}type-feature{% endif %}">
+                  {% if report.type == 'bug' %}
+                  <i class="fas fa-bug"></i>
+                  Bug
+                  {% else %}
+                  <i class="fas fa-lightbulb"></i>
+                  Feature
+                  {% endif %}
+                </span>
+                <span class="kb-meta">#{{ report.id }}</span>
+                <h3 style="margin: 0; font-size: 17px;">{{ report.title }}</h3>
+              </div>
+              <p style="margin: 0 0 10px; color: var(--kb-muted);">{{ report.description|truncatewords:26 }}</p>
             </div>
-            <div class="flex-1">
-                <h3 class="text-4xl font-black mb-6" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                    Forum Guidelines
-                </h3>
-                <ul class="space-y-4">
-                    <li class="flex items-start gap-4 bg-white bg-opacity-60 p-4 rounded-xl hover:bg-opacity-80 transition-all duration-300 hover:transform hover:translate-x-2">
-                        <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
-                            <i class="fas fa-check text-white text-lg font-bold"></i>
-                        </div>
-                        <span class="font-bold text-gray-800 text-lg leading-relaxed">Be respectful and constructive in all discussions</span>
-                    </li>
-                    <li class="flex items-start gap-4 bg-white bg-opacity-60 p-4 rounded-xl hover:bg-opacity-80 transition-all duration-300 hover:transform hover:translate-x-2">
-                        <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                            <i class="fas fa-search text-white text-lg font-bold"></i>
-                        </div>
-                        <span class="font-bold text-gray-800 text-lg leading-relaxed">Search before posting to avoid duplicate threads</span>
-                    </li>
-                    <li class="flex items-start gap-4 bg-white bg-opacity-60 p-4 rounded-xl hover:bg-opacity-80 transition-all duration-300 hover:transform hover:translate-x-2">
-                        <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                            <i class="fas fa-heading text-white text-lg font-bold"></i>
-                        </div>
-                        <span class="font-bold text-gray-800 text-lg leading-relaxed">Use clear, descriptive titles for better visibility</span>
-                    </li>
-                    <li class="flex items-start gap-4 bg-white bg-opacity-60 p-4 rounded-xl hover:bg-opacity-80 transition-all duration-300 hover:transform hover:translate-x-2">
-                        <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full flex items-center justify-center shadow-lg">
-                            <i class="fas fa-award text-white text-lg font-bold"></i>
-                        </div>
-                        <span class="font-bold text-gray-800 text-lg leading-relaxed">Mark solutions to help the community</span>
-                    </li>
-                </ul>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <span class="kb-pill priority-{{ report.priority }}">{{ report.get_priority_display }}</span>
+              <span class="kb-pill status-{{ report.status }}">{{ report.get_status_display }}</span>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Floating Action Button -->
-<a href="{% url 'forum-thread-create' %}" class="fab" title="Create New Thread">
-    <i class="fas fa-plus"></i>
-</a>
+          </div>
+          <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <span class="kb-pill" style="background: rgba(139, 92, 246, 0.18); color: #c4b5fd;">{{ report.application.name }}</span>
+              {% for tag in report.tags.all %}
+              <span class="kb-tag">{{ tag.name }}</span>
+              {% endfor %}
+            </div>
+            <div class="kb-meta">
+              <span>{{ report.comment_count }} comments</span>
+              <span>{{ report.reporter.get_full_name|default:report.reporter.username }}</span>
+              <span>{{ report.updated_at|timesince }} ago</span>
+            </div>
+          </div>
+        </a>
+        {% empty %}
+        <div class="kb-empty">No reports yet.</div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<script>
+  (function () {
+    const tabs = document.querySelectorAll('[data-tab-button]');
+    const panes = document.querySelectorAll('[data-tab-pane]');
+    const sidebars = document.querySelectorAll('[data-tab-sidebar]');
+    const searchInput = document.getElementById('kb-search');
+    const qaStatus = document.getElementById('qa-status');
+    const reportType = document.getElementById('report-type');
+    const reportStatus = document.getElementById('report-status');
+    const reportPriority = document.getElementById('report-priority');
+
+    const params = new URLSearchParams(window.location.search);
+    let activeTab = params.get('tab') || 'wiki';
+
+    function setActiveTab(tab) {
+      activeTab = tab;
+      tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.tabButton === tab));
+      panes.forEach(pane => pane.classList.toggle('active', pane.dataset.tabPane === tab));
+      sidebars.forEach(sidebar => sidebar.classList.toggle('active', sidebar.dataset.tabSidebar === tab));
+      applyFilters();
+    }
+
+    function updateEmptyState(container) {
+      const items = container.querySelectorAll('[data-item]');
+      const visible = Array.from(items).some(item => !item.classList.contains('is-hidden'));
+      let empty = container.querySelector('.kb-empty.dynamic');
+      if (!visible) {
+        if (!empty) {
+          empty = document.createElement('div');
+          empty.className = 'kb-empty dynamic';
+          empty.textContent = 'No matching results.';
+          container.appendChild(empty);
+        }
+      } else if (empty) {
+        empty.remove();
+      }
+    }
+
+    function applyFilters() {
+      const query = (searchInput.value || '').toLowerCase().trim();
+      const activePane = document.querySelector(`[data-tab-pane="${activeTab}"]`);
+      if (!activePane) {
+        return;
+      }
+
+      const items = activePane.querySelectorAll('[data-item]');
+      items.forEach(item => {
+        const haystack = item.dataset.search || '';
+        let visible = !query || haystack.includes(query);
+
+        if (activeTab === 'qa') {
+          const solved = item.dataset.solved === 'true';
+          if (qaStatus.value === 'solved' && !solved) {
+            visible = false;
+          }
+          if (qaStatus.value === 'unsolved' && solved) {
+            visible = false;
+          }
+        }
+
+        if (activeTab === 'reports') {
+          if (reportType.value !== 'all' && item.dataset.type !== reportType.value) {
+            visible = false;
+          }
+          if (reportStatus.value !== 'all' && item.dataset.status !== reportStatus.value) {
+            visible = false;
+          }
+          if (reportPriority.value !== 'all' && item.dataset.priority !== reportPriority.value) {
+            visible = false;
+          }
+        }
+
+        item.classList.toggle('is-hidden', !visible);
+        item.style.display = visible ? '' : 'none';
+      });
+
+      updateEmptyState(activePane.querySelector('.kb-content'));
+    }
+
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => setActiveTab(btn.dataset.tabButton));
+    });
+
+    if (!['wiki', 'qa', 'reports'].includes(activeTab)) {
+      activeTab = 'wiki';
+    }
+    setActiveTab(activeTab);
+
+    [searchInput, qaStatus, reportType, reportStatus, reportPriority].forEach(control => {
+      if (!control) {
+        return;
+      }
+      control.addEventListener('input', applyFilters);
+      control.addEventListener('change', applyFilters);
+    });
+  })();
+</script>
 {% endblock %}
