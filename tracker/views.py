@@ -71,7 +71,12 @@ def signup_view(request):
 @login_required
 def index(request):
     projects = Project.objects.select_related('segment_con').all()
-    return render(request, 'tracker/index.html', {'projects': projects})
+    context = {
+        'projects': projects,
+        'all_segments': trackerSegment.objects.all(),
+        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD')
+    }
+    return render(request, 'tracker/index.html', context)
 
 @login_required
 def new_project(request):
@@ -176,20 +181,6 @@ def project_detail(request, project_id):
             stage_id = request.POST.get('stage_id')
             stages_to_save = project.stages.filter(id=stage_id)
 
-        validation_passed = True
-        for stage in stages_to_save:
-            new_status = request.POST.get(f'status_{stage.id}') or "Not started"
-            actual_date_val = request.POST.get(f'actual_date_{stage.id}')
-            
-            if new_status == 'Completed' and not actual_date_val:
-                messages.error(request, f"Please add an actual finish date for stage '{stage.name}' to save it as 'Completed'.")
-                validation_passed = False
-        
-        if not validation_passed:
-            base_url = reverse('tracker_project_detail', args=[project.id])
-            redirect_url = f'{base_url}?active_tab={active_tab}'
-            return HttpResponseRedirect(redirect_url)
-
         success_message = "Changes saved successfully!"
         for stage in stages_to_save:
 
@@ -209,7 +200,19 @@ def project_detail(request, project_id):
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
-            new_completion = int(new_completion_percentage) if new_completion_percentage else 0
+            
+            # Auto-fill actual date if Completed and missing (Consistency with AJAX)
+            if new_status == 'Completed' and not new_actual:
+                new_actual = timezone.now().date()
+
+            if new_status == 'Completed':
+                new_completion = 100
+            elif new_status == 'Not started':
+                new_completion = 0
+            elif new_completion_percentage is not None:
+                new_completion = int(new_completion_percentage) if new_completion_percentage else 0
+            else:
+                new_completion = stage.completion_percentage
 
 
 
@@ -289,7 +292,10 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    project_comments = project.comments.select_related('added_by').order_by('created_at')
+    project_comments = list(project.comments.select_related('added_by').order_by('created_at'))
+    for comment in project_comments:
+        if comment.added_by:
+            comment.added_by.username = comment.added_by.get_full_name() or comment.added_by.username
     
     context = {
         'project': project,
@@ -358,7 +364,34 @@ def delete_remark(request, remark_id):
 @login_required
 def dashboard(request):
     today = timezone.now().date()
-    period = request.GET.get('period', '30d')
+    
+    # --- Dynamic Financial Year Logic ---
+    # 1. Identify the current Financial Year start year
+    if today.month >= 4:
+        current_fy_year = today.year
+    else:
+        current_fy_year = today.year - 1
+
+    # 2. Get all distinct years from project dates to build the list
+    project_dates = Project.objects.filter(so_punch_date__isnull=False).values_list('so_punch_date', flat=True)
+    fy_years = {current_fy_year} # Start with current FY
+    for p_date in project_dates:
+        if p_date.month >= 4:
+            fy_years.add(p_date.year)
+        else:
+            fy_years.add(p_date.year - 1)
+            
+    # 3. Build the period map
+    period_map = {}
+    for year in sorted(list(fy_years), reverse=True):
+        start = date(year, 4, 1)
+        end = date(year + 1, 3, 31)
+        label = f"FY {str(year)[-2:]}-{str(year + 1)[-2:]}"
+        key = f"fy_{year}"
+        period_map[key] = (label, start, end)
+
+    default_period = f"fy_{current_fy_year}"
+    period = request.GET.get('period', default_period)
     custom_start = request.GET.get('start_date_custom')
     custom_end = request.GET.get('end_date_custom')
     start_date, end_date = None, None
@@ -367,17 +400,16 @@ def dashboard(request):
         start_date = parse_date(custom_start)
         end_date = parse_date(custom_end)
     else:
-        period_map = {
-            '7d': ("Last 7 Days", today - timedelta(days=7), today), '30d': ("Last 30 Days", today - timedelta(days=30), today),
-            'this_month': ("Current Month", today.replace(day=1), today), 'this_year': ("Current Year", today.replace(day=1, month=1), today),
-            'all': ("All Time", None, None),
-        }
-        display_period, start_date, end_date = period_map.get(period,("Last 30 Days", today - timedelta(days=30), today))
-    if period == 'all' and not (custom_start and custom_end):
-        live_projects = Project.objects.all().distinct()
-    else:
-        completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
-        live_projects = Project.objects.filter(so_punch_date__lte=end_date).exclude(id__in=completed_early_ids).distinct()
+        if period not in period_map:
+            period = default_period
+        
+        label, start_date, end_date = period_map[period]
+        display_period = label
+
+    completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
+    live_projects = Project.objects.filter(
+        Q(so_punch_date__lte=end_date) | Q(so_punch_date__isnull=True)
+    ).exclude(id__in=completed_early_ids).select_related('segment_con', 'team_lead').prefetch_related('stages').distinct()
 
     # --- CHRONIC PROJECTS LOGIC CORRECTION ---
     chronic_period = request.GET.get('chronic_period', '1y')
@@ -405,28 +437,120 @@ def dashboard(request):
     if period != 'all' or (custom_start and custom_end):
         completed_stages = completed_stages.filter(actual_date__range=[start_date, end_date])
     total_completed_stages = completed_stages.count()
-    on_time_stages = completed_stages.filter(actual_date__lte=F('planned_date')).count()
+    on_time_stages = completed_stages.filter(planned_date__isnull=False, actual_date__lte=F('planned_date')).count()
     department_otif = round((on_time_stages / total_completed_stages) * 100, 1) if total_completed_stages > 0 else 0
     total_live_projects = live_projects.count()
-    active_live_projects = live_projects.filter(stages__status="In Progress").distinct().count()
-    delayed_live_projects = live_projects.filter(stages__status="Hold").distinct().count()
-    total_live_value = sum(p.value for p in live_projects)
-    status_counts = Counter(p.get_overall_status() for p in live_projects)
-    labels = [p.code for p in live_projects]
+    
+    # Optimized Value Calculation
+    total_live_value = live_projects.aggregate(total=Sum('value'))['total'] or 0
+    
+    # Optimized Loop for Status, Completion, and Counts
+    status_counts = Counter()
+    labels = []
     on_track_data, at_risk_data, delayed_data = [], [], []
+    segment_counts = Counter()
+    team_lead_counts = Counter()
+    
+    segment_values = defaultdict(float)
+    team_lead_values = defaultdict(float)
+    status_values = defaultdict(float)
+    age_counts = defaultdict(int)
+    
     for project in live_projects:
-        completion = project.get_completion_percentage()
+        # Use utils functions with the prefetched stages list to avoid N+1 queries
+        stages = list(project.stages.all())
+        status = get_overall_status(stages)
+        completion = get_completion_percentage(stages) or 0
+        
+        status_counts[status] += 1
+        labels.append(project.code)
+
+        # Aggregate Segment & Team Lead Data
+        seg_name = project.segment_con.name if project.segment_con else 'Unassigned'
+        segment_counts[seg_name] += 1
+        tl_name = project.team_lead.name if project.team_lead else 'Unassigned'
+        team_lead_counts[tl_name] += 1
+        
+        # --- NEW: Value Aggregations ---
+        val = float(project.value) if project.value else 0.0
+        segment_values[seg_name] += val
+        team_lead_values[tl_name] += val
+        status_values[status] += val
+
+        # --- NEW: Project Age Split ---
+        if project.so_punch_date:
+            age_days = (today - project.so_punch_date).days
+            if age_days < 180: age_bucket = 'Below 6 Months'
+            elif age_days < 365: age_bucket = '6 Months - 1 Year'
+            elif age_days < 547: age_bucket = '1 - 1.5 Years'
+            elif age_days < 730: age_bucket = '1.5 - 2 Years'
+            else: age_bucket = 'More than 2 Years'
+            age_counts[age_bucket] += 1
+
+        
         if completion >= 80: on_track_data.append(completion); at_risk_data.append(0); delayed_data.append(0)
         elif completion >= 40: on_track_data.append(0); at_risk_data.append(completion); delayed_data.append(0)
         else: on_track_data.append(0); at_risk_data.append(0); delayed_data.append(completion)
-    status_labels = list(status_counts.keys())
-    status_data = list(status_counts.values())
+    
+    # Derive counts from the consistent status calculation
+    active_live_projects = status_counts['In Progress'] + status_counts['Not started']
+    delayed_live_projects = status_counts['Hold']
+    
+    # --- FIX: Enforce consistent order for Status Chart Colors ---
+    ordered_statuses = ['Completed', 'In Progress', 'Hold', 'Not started']
+    color_map = {
+        'Completed': 'rgba(40, 167, 69, 0.7)',   # Green
+        'In Progress': 'rgba(255, 193, 7, 0.7)', # Yellow
+        'Hold': 'rgba(220, 53, 69, 0.7)',        # Red
+        'Not started': 'rgba(108, 117, 125, 0.7)', # Grey
+        'Not Applicable': 'rgba(200, 200, 200, 0.5)'
+    }
+    
+    final_status_labels = []
+    final_status_data = []
+    final_status_colors = []
+    
+    for s in ordered_statuses + [k for k in status_counts.keys() if k not in ordered_statuses]:
+        if status_counts[s] > 0:
+            final_status_labels.append(s)
+            final_status_data.append(status_counts[s])
+            final_status_colors.append(color_map.get(s, 'rgba(100, 100, 100, 0.7)'))
+            
+    # --- NEW: Prepare Status Value Data (Consistent Coloring) ---
+    final_status_value_labels = []
+    final_status_value_data = []
+    final_status_value_colors = []
+    for s in ordered_statuses + [k for k in status_values.keys() if k not in ordered_statuses]:
+        if status_values[s] > 0:
+            final_status_value_labels.append(s)
+            final_status_value_data.append(status_values[s])
+            final_status_value_colors.append(color_map.get(s, 'rgba(100, 100, 100, 0.7)'))
+
+    # --- NEW: Prepare Age Data (Ordered) ---
+    age_buckets_order = ['Below 6 Months', '6 Months - 1 Year', '1 - 1.5 Years', '1.5 - 2 Years', 'More than 2 Years']
+    age_labels = []
+    age_data = []
+    for bucket in age_buckets_order:
+        if age_counts[bucket] > 0:
+            age_labels.append(bucket)
+            age_data.append(age_counts[bucket])
+
+
     context = {
         'total_projects': total_live_projects, 'active_projects': active_live_projects, 'delayed_projects': delayed_live_projects, 'total_value': total_live_value,
-        'department_otif': department_otif, 'recent_projects': Project.objects.all().order_by('-so_punch_date')[:5],
+        'department_otif': department_otif, 
+        'recent_projects': Project.objects.select_related('segment_con').prefetch_related('stages').order_by('-so_punch_date')[:5],
         'labels': labels, 'on_track_data': on_track_data, 'at_risk_data': at_risk_data, 'delayed_data': delayed_data,
-        'status_labels': status_labels, 'status_data': status_data, 'selected_period_display': display_period,
+        'status_labels': final_status_labels, 'status_data': final_status_data, 'status_colors': final_status_colors,
+        'segment_labels': list(segment_counts.keys()), 'segment_data': list(segment_counts.values()),
+        'team_lead_labels': list(team_lead_counts.keys()), 'team_lead_data': list(team_lead_counts.values()),
+        'segment_value_labels': list(segment_values.keys()), 'segment_value_data': list(segment_values.values()),
+        'team_lead_value_labels': list(team_lead_values.keys()), 'team_lead_value_data': list(team_lead_values.values()),
+        'status_value_labels': final_status_value_labels, 'status_value_data': final_status_value_data, 'status_value_colors': final_status_value_colors,
+        'age_labels': age_labels, 'age_data': age_data,
+        'selected_period_display': display_period,
         'custom_start_date': custom_start, 'custom_end_date': custom_end, 'chronic_projects': chronic_projects, 'selected_chronic_period': chronic_period,
+        'period_filter_options': period_map, 'selected_period_key': period,
     }
     return render(request, 'tracker/dashboard.html', context)
 
@@ -462,6 +586,28 @@ def project_reports(request):
     # --- The FIX is in this line: We add select_related and prefetch_related ---
     projects_qs = Project.objects.select_related('segment_con', 'team_lead').prefetch_related('stages').all()
 
+    # --- Dynamic Financial Year Logic (Same as Dashboard) ---
+    today = timezone.now().date()
+    if today.month >= 4:
+        current_fy_year = today.year
+    else:
+        current_fy_year = today.year - 1
+
+    # Get all distinct years from project dates
+    project_dates = Project.objects.filter(so_punch_date__isnull=False).values_list('so_punch_date', flat=True)
+    fy_years = {current_fy_year}
+    for p_date in project_dates:
+        if p_date.month >= 4:
+            fy_years.add(p_date.year)
+        else:
+            fy_years.add(p_date.year - 1)
+            
+    fy_options = []
+    for year in sorted(list(fy_years), reverse=True):
+        label = f"FY {str(year)[-2:]}-{str(year + 1)[-2:]}"
+        value = str(year)
+        fy_options.append((value, label))
+
     # --- Get standard filter values ---
     # getlist needs a QueryDict, not a regular dict
     params_for_getlist = QueryDict(mutable=True)
@@ -469,10 +615,34 @@ def project_reports(request):
     selected_segment_ids = params_for_getlist.getlist('segments')
     selected_team_lead_ids = params_for_getlist.getlist('team_leads')
 
-    start_date = query_params.get('start_date')
-    end_date = query_params.get('end_date')
+    start_date = parse_date(query_params.get('start_date')) if query_params.get('start_date') else None
+    end_date = parse_date(query_params.get('end_date')) if query_params.get('end_date') else None
     min_value = query_params.get('min_value')
     max_value = query_params.get('max_value')
+    selected_fy = query_params.get('financial_year')
+
+    # Apply Financial Year Filter (Overrides custom dates if present)
+    if selected_fy:
+        year = int(selected_fy)
+        fy_start = date(year, 4, 1)
+        fy_end = date(year + 1, 3, 31)
+        
+        # Update start/end date for chart filtering
+        start_date = fy_start
+        end_date = fy_end
+        
+        # Match Dashboard Logic: Live Projects in Period (Carry-over + New)
+        # 1. Exclude projects completed before the start of the FY
+        completed_early_ids = Project.objects.filter(
+            stages__name='Handover', 
+            stages__status='Completed', 
+            stages__actual_date__lt=fy_start
+        ).values_list('id', flat=True)
+
+        # 2. Include projects punched on/before end of period (or null)
+        projects_qs = projects_qs.filter(
+            Q(so_punch_date__lte=fy_end) | Q(so_punch_date__isnull=True)
+        ).exclude(id__in=completed_early_ids)
 
     if selected_segment_ids:
         projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
@@ -480,7 +650,8 @@ def project_reports(request):
     if selected_team_lead_ids:
         projects_qs = projects_qs.filter(team_lead__id__in=selected_team_lead_ids)
 
-    if start_date and end_date:
+    # Only apply custom date range if FY is NOT selected
+    if start_date and end_date and not selected_fy:
         projects_qs = projects_qs.filter(so_punch_date__range=[start_date, end_date])
     if min_value:
         try:
@@ -533,6 +704,15 @@ def project_reports(request):
             # Combine Q object with standard kwargs
             projects_qs = projects_qs.filter(stage_q, **stage_query_filters)
 
+    # --- Check for the 'hide_completed' filter ---
+    hide_completed = query_params.get('hide_completed') == '1'
+    if hide_completed:
+        completed_project_ids = Project.objects.filter(
+            stages__name='Handover',
+            stages__status='Completed'
+        ).values_list('id', flat=True)
+        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
+
     # --- Capture QS for Charts (Before Hide Completed) ---
     chart_projects_qs = projects_qs
 
@@ -574,15 +754,6 @@ def project_reports(request):
         except (ValueError, TypeError):
             pass
 
-    # --- Check for the 'hide_completed' filter ---
-    hide_completed = query_params.get('hide_completed') == '1'
-    if hide_completed:
-        completed_project_ids = Project.objects.filter(
-            stages__name='Handover',
-            stages__status='Completed'
-        ).values_list('id', flat=True)
-        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
-
     distinct_projects = projects_qs.distinct()
     distinct_chart_projects = chart_projects_qs.distinct()
     chart_project_ids = chart_projects_qs.values_list('id', flat=True).distinct()
@@ -605,14 +776,6 @@ def project_reports(request):
         })
 
     # --- Calculate Standard KPIs ---
-    total_projects_found = distinct_projects.count()
-    total_portfolio_value = distinct_projects.aggregate(total_value=Sum('value'))['total_value'] or 0
-    completion_percentages = [p.get_completion_percentage() for p in distinct_projects]
-    average_completion = sum(completion_percentages) / total_projects_found if total_projects_found > 0 else 0
-    completed_stages = Stage.objects.filter(project__in=distinct_projects, status='Completed')
-    total_completed = completed_stages.count()
-    on_time_completed = completed_stages.filter(actual_date__lte=F('planned_date')).count()
-    on_time_completion_rate = (on_time_completed / total_completed) * 100 if total_completed > 0 else 0
     
     # --- Prepare standard chart data ---
     status_counts = Counter(p.get_overall_status() for p in distinct_projects)
@@ -647,7 +810,11 @@ def project_reports(request):
     planned_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
         planned_date__isnull=False
-    ).annotate(
+    )
+    if start_date and end_date:
+        planned_qs = planned_qs.filter(planned_date__range=[start_date, end_date])
+        
+    planned_qs = planned_qs.annotate(
         month=TruncMonth('planned_date')
     ).values('name', 'month').annotate(count=Count('id')).order_by('month')
 
@@ -655,7 +822,11 @@ def project_reports(request):
     actual_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
         actual_date__isnull=False
-    ).annotate(
+    )
+    if start_date and end_date:
+        actual_qs = actual_qs.filter(actual_date__range=[start_date, end_date])
+        
+    actual_qs = actual_qs.annotate(
         month=TruncMonth('actual_date')
     ).values('name', 'month').annotate(count=Count('id')).order_by('month')
 
@@ -702,7 +873,11 @@ def project_reports(request):
     otif_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
         planned_date__isnull=False
-    ).annotate(
+    )
+    if start_date and end_date:
+        otif_qs = otif_qs.filter(planned_date__range=[start_date, end_date])
+        
+    otif_qs = otif_qs.annotate(
         month=TruncMonth('planned_date')
     ).values('name', 'month').annotate(
         total=Count('id'),
@@ -759,6 +934,10 @@ def project_reports(request):
         if emu and emu.actual_date:
             month_key = emu.actual_date.replace(day=1)
             
+            # Filter by date range if selected
+            if start_date and end_date and not (start_date <= emu.actual_date <= end_date):
+                continue
+            
             dispatch_date = dispatch.actual_date if (dispatch and dispatch.actual_date) else None
             # Using planned_start_date as the 'Start Date' for Go Live (Commissioning) as per user request
             comm_start_date = comm.planned_start_date if (comm and comm.planned_start_date) else None
@@ -796,9 +975,6 @@ def project_reports(request):
     context = {
 
         'projects_with_details': projects_with_details,
-        'total_projects_found': total_projects_found,
-        'total_portfolio_value': total_portfolio_value,
-        'average_completion': average_completion,
         'all_segments': trackerSegment.objects.all(),
         'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD'),
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
@@ -813,11 +989,12 @@ def project_reports(request):
         'automation_stage_names': Stage.AUTOMATION_STAGES,
         'emulation_stage_names': Stage.EMULATION_STAGES,
         'stage_filters': stage_filters_from_request,
-        'on_time_completion_rate': on_time_completion_rate,
         'hide_completed_active': hide_completed,
         'stage_trend_data': json.dumps(stage_trend_data),
         'stage_otif_data': json.dumps(stage_otif_data),
         'emu_timing_data': json.dumps(emu_chart_data),
+        'fy_options': fy_options,
+        'selected_fy': selected_fy,
     }
     return render(request, 'tracker/project_report.html', context)
 
@@ -900,7 +1077,7 @@ def get_filtered_stages(filter_type):
             planned_date__range=(start, end)
         ).order_by('planned_date')
     elif filter_type == 'all':
-        return Stage.objects.exclude(status="Completed").order_by('planned_date')
+        return Stage.objects.exclude(status__in=["Completed", "Not Applicable"]).order_by('planned_date')
     else:
         return Stage.objects.filter(
             status__in=["Not started", "In Progress"],
@@ -1017,6 +1194,14 @@ def export_report_pdf(request):
             
             projects = projects.filter(stage_q, **stage_query_filters)
     
+    # --- NEW: Hide Completed Logic for PDF ---
+    if request.GET.get('hide_completed') == '1':
+        completed_project_ids = Project.objects.filter(
+            stages__name='Handover',
+            stages__status='Completed'
+        ).values_list('id', flat=True)
+        projects = projects.exclude(id__in=completed_project_ids)
+
     distinct_projects = projects.distinct()
 
     # --- Start Building the PDF ---
@@ -1089,6 +1274,7 @@ def add_project_update(request, project_id):
         text = request.POST.get('update_text')
         push_pull_type = request.POST.get('push_pull_type')
         who_contact_ids = request.POST.getlist('who_contact')
+        raised_by_id = request.POST.get('raised_by')
         eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
 
         if text and push_pull_type:
@@ -1098,6 +1284,7 @@ def add_project_update(request, project_id):
                 text=text,
                 push_pull_type=push_pull_type,
                 eta=eta,
+                raised_by_id=raised_by_id if raised_by_id else None,
                 content_type='Project',
             )
 
@@ -1121,6 +1308,7 @@ def add_general_update(request):
         text = request.POST.get('update_text')
         push_pull_type = request.POST.get('push_pull_type')
         who_contact_ids = request.POST.getlist('who_contact')
+        raised_by_id = request.POST.get('raised_by')
 
         eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
 
@@ -1130,6 +1318,7 @@ def add_general_update(request):
                 text=text,
                 push_pull_type=push_pull_type,
                 eta=eta,
+                raised_by_id=raised_by_id if raised_by_id else None,
                 content_type='General',
             )
             for contact_id in who_contact_ids:
@@ -1293,7 +1482,7 @@ def all_push_pull_content(request, filter=None):
     push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
 
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1312,7 +1501,11 @@ def all_push_pull_content(request, filter=None):
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
 
-    updates = updates_qs.all()
+    updates = list(updates_qs.all())
+    for update in updates:
+        for remark in update.remarks.all():
+            if remark.added_by:
+                remark.added_by.username = remark.added_by.get_full_name() or remark.added_by.username
     contact_persons = ContactPerson.objects.all()
     projects = Project.objects.all()
 
@@ -1344,7 +1537,7 @@ def add_contact_person_ajax(request):
 
 @login_required
 def export_push_pull_excel(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
     filter = request.GET.get('filter')
 
     if filter == 'project':
@@ -1365,7 +1558,7 @@ def export_push_pull_excel(request):
     
     # Headers
     headers = [
-        'Project Code', 'Type', 'What', 'Who', 'ETA', 'Status', 'Created At', 'Closed At', 'Remarks'
+        'Project Code', 'Type', 'What', 'Who', 'Raised By', 'ETA', 'Status', 'Created At', 'Closed At', 'Remarks'
     ]
     sheet.append(headers)
     
@@ -1373,7 +1566,12 @@ def export_push_pull_excel(request):
     for update in updates:
         # Join multiple contacts with a comma
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_text = " | ".join([f"{r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()])
+        
+        remarks_list = []
+        for r in update.remarks.all():
+            user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
+            remarks_list.append(f"{user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}")
+        remarks_text = " | ".join(remarks_list)
 
         # --- FIX START ---
         # A date object does not have a tzinfo attribute, so it doesn't need to be replaced.
@@ -1390,6 +1588,7 @@ def export_push_pull_excel(request):
             update.get_push_pull_type_display(),
             update.text,
             who_contacts_str,
+            update.raised_by.name if update.raised_by else '-',
             eta_naive,
             update.status,
             created_at_naive,
@@ -1405,7 +1604,7 @@ def export_push_pull_excel(request):
 @login_required
 def export_push_pull_pdf(request):
 
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
     filter = request.GET.get('filter')
 
     if filter == 'project':
@@ -1449,6 +1648,7 @@ def export_push_pull_pdf(request):
             Paragraph('Type', header_style),
             Paragraph('What', header_style),
             Paragraph('Who', header_style),
+            Paragraph('Raised By', header_style),
             Paragraph('ETA', header_style),
             Paragraph('Status', header_style),
             Paragraph('Remarks', header_style)
@@ -1457,7 +1657,10 @@ def export_push_pull_pdf(request):
     
     for update in updates:
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_list = [f"• {r.added_by.username} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}" for r in update.remarks.all()]
+        remarks_list = []
+        for r in update.remarks.all():
+            user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
+            remarks_list.append(f"• {user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}")
         
         what_cell = Paragraph(update.text, long_text_style)
         who_cell = Paragraph(who_contacts_str if who_contacts_str else '-', long_text_style)
@@ -1468,13 +1671,14 @@ def export_push_pull_pdf(request):
             update.get_push_pull_type_display(),
             what_cell,
             who_cell,
+            Paragraph(update.raised_by.name if update.raised_by else '-', long_text_style),
             update.eta.strftime('%Y-%m-%d') if update.eta else '-',
             update.status,
             remarks_cell
         ]
         table_data.append(row)
         
-    col_widths = [1.8*cm, 2.5*cm, 5*cm, 2*cm, 2.5*cm, 2.5*cm, 6.2*cm]
+    col_widths = [1.8*cm, 2.5*cm, 4*cm, 2*cm, 2*cm, 2.5*cm, 2.5*cm, 5.2*cm]
     
     table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -1535,15 +1739,30 @@ def update_stage_ajax(request, stage_id):
             history_field_name = field_map.get(field_name, field_name.replace('_', ' ').title())
 
             # Update the field on the stage object
+            fields_to_update = [field_name]
             if 'date' in field_name:
                 setattr(stage, field_name, parse_date(new_value) if new_value else None)
             else:
                 setattr(stage, field_name, new_value)
 
-            if field_name == 'status' and new_value != 'Completed':
-                stage.actual_date = None
+            updated_actual_date = None
+
+            if field_name == 'status':
+                if new_value == 'Completed' and not stage.actual_date:
+                    stage.actual_date = timezone.now().date()
+                    updated_actual_date = stage.actual_date.strftime('%Y-%m-%d')
+                    fields_to_update.append('actual_date')
+                elif new_value != 'Completed':
+                    stage.actual_date = None
+                    updated_actual_date = '' # Signal frontend to clear it
+                    fields_to_update.append('actual_date')
             
-            stage.save()
+            # Prevent clearing actual date if status is Completed
+            if field_name == 'actual_date' and not new_value and stage.status == 'Completed':
+                 return JsonResponse({'status': 'error', 'message': 'Cannot remove Actual Date while status is Completed.'}, status=400)
+            
+            # Use update_fields to prevent race conditions (e.g. Status vs % Completion updates)
+            stage.save(update_fields=fields_to_update)
 
             # Create a history record of the change
             StageHistory.objects.create(
@@ -1553,7 +1772,12 @@ def update_stage_ajax(request, stage_id):
                 old_value=str(old_value),
                 new_value=str(new_value)
             )
-            return JsonResponse({'status': 'success', 'message': 'Stage updated successfully.'})
+            
+            response_data = {'status': 'success', 'message': 'Stage updated successfully.'}
+            if updated_actual_date is not None:
+                response_data['updated_actual_date'] = updated_actual_date
+            
+            return JsonResponse(response_data)
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
@@ -1576,13 +1800,21 @@ def add_update_remark(request, update_id):
             )
             
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                user_display = (remark.added_by.get_full_name() or remark.added_by.username) if remark.added_by else 'Unknown'
+                initials = "??"
+                if remark.added_by:
+                    if remark.added_by.first_name and remark.added_by.last_name:
+                        initials = (remark.added_by.first_name[0] + remark.added_by.last_name[0]).upper()
+                    else:
+                        initials = remark.added_by.username[:2].upper()
+
                 return JsonResponse({
                     'status': 'success',
                     'remark': {
-                        'user': remark.added_by.username if remark.added_by else 'Unknown',
+                        'user': user_display,
                         'date': remark.created_at.strftime("%b %d, %H:%M"),
                         'text': remark.text,
-                        'initials': remark.added_by.username[:2].upper() if remark.added_by else '??'
+                        'initials': initials
                     }
                 })
 
@@ -1665,7 +1897,7 @@ def public_push_pull_content(request, access_token):
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all')
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks', 'remarks__added_by').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1682,7 +1914,11 @@ def public_push_pull_content(request, access_token):
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
 
-    updates = updates_qs.all()
+    updates = list(updates_qs.all())
+    for update in updates:
+        for remark in update.remarks.all():
+            if remark.added_by:
+                remark.added_by.username = remark.added_by.get_full_name() or remark.added_by.username
     contact_persons = ContactPerson.objects.all()
 
     # The redirect logic needs to be updated to redirect back to the public URL
@@ -1743,6 +1979,8 @@ def update_project_update_ajax(request):
             if field == 'who_contact':
                 # Expecting a list of IDs for Many-to-Many
                 update.who_contact.set(value)
+            elif field == 'raised_by':
+                update.raised_by_id = value if value else None
             elif field == 'eta':
                 update.eta = parse_date(value) if value else None
             elif field == 'push_pull_type':

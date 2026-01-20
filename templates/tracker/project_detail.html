@@ -412,6 +412,87 @@
     </div>
 </div>
 
+<!-- Project Summary & Activity Toggle -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-header-title mb-0"><i class="fas fa-info-circle me-2"></i>Project Summary</h5>
+        <a href="{% url 'tracker_project_activity' project.id %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-history me-1"></i> View Recent Activity
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <h6 class="text-muted">Current Status</h6>
+            <div class="d-flex align-items-center mt-1">
+                <span class="badge fs-6 {% if overall_status == 'Completed' %}bg-success{% elif overall_status == 'In Progress' %}bg-warning text-dark{% elif overall_status == 'Hold' %}bg-danger{% else %}bg-secondary{% endif %} me-3">{{ overall_status }}</span>
+                {% if last_update_time %}<small class="text-muted"><i class="far fa-clock me-1"></i>Last updated: {{ last_update_time|date:"M d, Y" }}</small>{% endif %}
+            </div>
+        </div>
+        <hr>
+        <div class="row mb-3">
+            <div class="col-md-6 border-end">
+                <h6 class="text-muted">Overall Project OTIF %</h6>
+                <div class="mt-1">
+                    {% if overall_otif_percentage is not None %}
+                        <span class="fs-5 fw-bold {% if overall_otif_percentage >= 100 %}text-success{% elif overall_otif_percentage >= 80 %}text-warning{% else %}text-danger{% endif %}">{{ overall_otif_percentage }}%</span>
+                        <small class="text-muted ms-2">(Based on completed stages)</small>
+                    {% else %}
+                        <span class="text-muted small">No completed stages yet</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted">Project OTIF (Handover)</h6>
+                <div class="mt-1">
+                    {% if project_otif is not None %}
+                        {% if project_otif == 101 %}<span class="badge bg-success">Before Time</span>
+                        {% elif project_otif == 100 %}<span class="badge bg-primary">On Time</span>
+                        {% else %}<span class="badge bg-danger">Delayed</span>{% endif %}
+                    {% else %}
+                        <span class="text-muted small">Pending Handover Completion</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="row mb-3">
+            <div class="col-md-6 border-end">
+                <h6 class="text-muted">Next Automation Milestone</h6>
+                {% if next_automation_milestone %}
+                    <strong>{{ next_automation_milestone.name }}</strong>
+                    <div class="text-muted small mt-1">Planned: {{ next_automation_milestone.planned_date|date:"M d, Y" }}</div>
+                {% else %}
+                    <p class="text-muted mb-0 small">All automation stages complete.</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted">Next Emulation Milestone</h6>
+                {% if next_emulation_milestone %}
+                    <strong>{{ next_emulation_milestone.name }}</strong>
+                    <div class="text-muted small mt-1">Planned: {{ next_emulation_milestone.planned_date|date:"M d, Y" }}</div>
+                {% else %}
+                    <p class="text-muted mb-0 small">All emulation stages complete.</p>
+                {% endif %}
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-md-6 border-end">
+                 <h6 class="text-muted">Automation Schedule</h6>
+                 {% with schedule_status=automation_schedule_status %}
+                    {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
+                 {% endwith %}
+            </div>
+             <div class="col-md-6">
+                <h6 class="text-muted">Emulation Schedule</h6>
+                {% with schedule_status=emulation_schedule_status %}
+                   {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
+                {% endwith %}
+           </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-lg-6 mb-4">
         <div class="card h-100">
@@ -609,144 +690,72 @@
 </div>
 
 <div class="card mb-4" id="project-notes">
-    <div class="card-header bg-white">
-        <h5 class="card-header-title mb-0"><i class="far fa-sticky-note me-2 text-primary"></i>Project Notes</h5>
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" id="notesPushPullTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="notes-tab" data-bs-toggle="tab" data-bs-target="#notes-content" type="button" role="tab" aria-controls="notes-content" aria-selected="true">
+                    <i class="far fa-sticky-note me-2"></i>Project Notes
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="push-pull-tab" data-bs-toggle="tab" data-bs-target="#push-pull-content" type="button" role="tab" aria-controls="push-pull-content" aria-selected="false">
+                    <i class="fas fa-table me-2"></i>Push-Pull Contents
+                </button>
+            </li>
+        </ul>
     </div>
-    <div class="card-body bg-light">
-        <div class="project-notes-feed">
-            {% for comment in project_comments %}
-                <div class="note-card">
-                    <div class="note-header">
-                        <div class="d-flex align-items-center">
-                            <div class="note-avatar-small">{{ comment.added_by.username|slice:":2"|upper }}</div>
-                            <span class="note-author">{{ comment.added_by.username|default:'Unknown' }}</span>
-                        </div>
-                        <span class="note-time"><i class="far fa-clock me-1"></i>{{ comment.created_at|naturaltime }}</span>
-                    </div>
-                    <div class="note-content">{{ comment.text|linebreaksbr }}</div>
-                </div>
-            {% empty %}
-                <div class="text-center text-muted p-4">
-                    <i class="far fa-clipboard fa-2x mb-3 text-secondary opacity-50"></i>
-                    <p>No notes added yet.</p>
-                </div>
-            {% endfor %}
-        </div>
-        <form method="POST" action="{% url 'tracker_project_detail' project.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="active_tab" value="{{ request.GET.active_tab|default:'automation' }}">
-            <div class="d-flex gap-2">
-                <textarea name="note_text" class="form-control shadow-sm border-0" rows="2" placeholder="Type a note here..." required style="resize: none;"></textarea>
-                <button type="submit" name="add_project_comment" value="1" class="btn btn-primary px-4 align-self-end"><i class="fas fa-paper-plane"></i></button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-lg-6 d-flex">
-        <div class="card w-100">
-            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-info-circle me-2"></i>Project Summary</h5></div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <h6 class="text-muted">Current Status</h6>
-                    <div class="d-flex align-items-center mt-1">
-                        <span class="badge fs-6 {% if overall_status == 'Completed' %}bg-success{% elif overall_status == 'In Progress' %}bg-warning text-dark{% elif overall_status == 'Hold' %}bg-danger{% else %}bg-secondary{% endif %} me-3">{{ overall_status }}</span>
-                        {% if last_update_time %}<small class="text-muted"><i class="far fa-clock me-1"></i>Last updated: {{ last_update_time|date:"M d, Y" }}</small>{% endif %}
-                    </div>
-                </div>
-                <hr>
-                <div class="row mb-3">
-                    <div class="col-6 border-end">
-                        <h6 class="text-muted">Next Automation Milestone</h6>
-                        {% if next_automation_milestone %}
-                            <strong>{{ next_automation_milestone.name }}</strong>
-                            <div class="text-muted small mt-1">Planned: {{ next_automation_milestone.planned_date|date:"M d, Y" }}</div>
-                        {% else %}
-                            <p class="text-muted mb-0 small">All automation stages complete.</p>
-                        {% endif %}
-                    </div>
-                    <div class="col-6">
-                        <h6 class="text-muted">Next Emulation Milestone</h6>
-                        {% if next_emulation_milestone %}
-                            <strong>{{ next_emulation_milestone.name }}</strong>
-                            <div class="text-muted small mt-1">Planned: {{ next_emulation_milestone.planned_date|date:"M d, Y" }}</div>
-                        {% else %}
-                            <p class="text-muted mb-0 small">All emulation stages complete.</p>
-                        {% endif %}
-                    </div>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="col-6 border-end">
-
-                         <h6 class="text-muted">Automation Schedule</h6>
-                         {% with schedule_status=automation_schedule_status %}
-                            {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                         {% endwith %}
-                    </div>
-                     <div class="col-6">
-                        <h6 class="text-muted">Emulation Schedule</h6>
-                        {% with schedule_status=emulation_schedule_status %}
-                           {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                        {% endwith %}
-                   </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6 d-flex">
-        <div class="card w-100">
-            <div class="card-header">
-                <h5 class="card-header-title"><i class="fas fa-history me-2"></i>Recent Activity</h5>
-                <a href="{% url 'tracker_project_activity' project.id %}" class="btn btn-sm btn-outline-primary">View All</a>
-            </div>
-            <div class="card-body">
-                {% if recent_activity %}
-                    {% for log in recent_activity %}
-                    <div class="d-flex mb-3">
-                        <div class="me-3">
-                            <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
-                                <i class="fas fa-{% if log.field_name == 'status' %}exchange-alt{% else %}calendar-alt{% endif %} text-primary"></i>
+    <div class="card-body p-0">
+        <div class="tab-content" id="notesPushPullTabsContent">
+            <!-- Project Notes Tab -->
+            <div class="tab-pane fade show active" id="notes-content" role="tabpanel" aria-labelledby="notes-tab">
+                <div class="p-3 bg-light">
+                    <div class="project-notes-feed">
+                        {% for comment in project_comments %}
+                            <div class="note-card">
+                                <div class="note-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="note-avatar-small">{{ comment.added_by.username|slice:":2"|upper }}</div>
+                                        <span class="note-author">{{ comment.added_by.username|default:'Unknown' }}</span>
+                                    </div>
+                                    <span class="note-time"><i class="far fa-clock me-1"></i>{{ comment.created_at|naturaltime }}</span>
+                                </div>
+                                <div class="note-content">{{ comment.text|linebreaksbr }}</div>
                             </div>
-                        </div>
-                        <div class="flex-grow-1">
-                            <p class="mb-0 lh-sm">
-                                <strong>{{ log.stage.name }}</strong> {{ log.field_name }} updated from '{{ log.old_value|default:"-" }}' to '{{ log.new_value|default:"-" }}'.
-                            </p>
-                            <small class="text-muted">{{ log.changed_at|naturaltime }} by {{ log.changed_by|default:"System" }}</small>
-                        </div>
+                        {% empty %}
+                            <div class="text-center text-muted p-4">
+                                <i class="far fa-clipboard fa-2x mb-3 text-secondary opacity-50"></i>
+                                <p>No notes added yet.</p>
+                            </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
-                {% else %}
-                <div class="text-center py-4"><i class="fas fa-info-circle fa-2x text-muted mb-3"></i><p class="text-muted">No recent activity</p></div>
-                {% endif %}
+                    <form method="POST" action="{% url 'tracker_project_detail' project.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="active_tab" value="{{ request.GET.active_tab|default:'automation' }}">
+                        <div class="d-flex gap-2">
+                            <textarea name="note_text" class="form-control shadow-sm border-0" rows="2" placeholder="Type a note here..." required style="resize: none;"></textarea>
+                            <button type="submit" name="add_project_comment" value="1" class="btn btn-primary px-4 align-self-end"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<div class="row mt-4">
-    <div class="col-12">
-
-        <div class="card" id="push-pull-contents">
-
-            <div class="card-header bg-white"><h5 class="card-header-title mb-0"><i class="fas fa-table me-2 text-primary"></i>Push-Pull Contents</h5></div>
-            <div class="card-body p-0">
+            <!-- Push-Pull Contents Tab -->
+            <div class="tab-pane fade" id="push-pull-content" role="tabpanel" aria-labelledby="push-pull-tab">
                 <div class="table-responsive">
                     <table class="table loop-table mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th style="width: 15%;">Type</th>
-                                <th style="width: 35%;">Description</th>
-                                <th style="width: 20%;">Who</th>
-                                <th style="width: 12%;">ETA</th>
-                                <th style="width: 12%;">Status</th>
-                                <th style="width: 6%;"></th>
+                                <th style="width: 10%;">Type</th>
+                                <th style="width: 30%;">WHAT</th>
+                                <th style="width: 15%;">Who</th>
+                                <th style="width: 15%;">Raised By</th>
+                                <th style="width: 10%;">WHEN</th>
+                                <th style="width: 10%;">Status</th>
+                                <th style="width: 10%;"></th>
                             </tr>
                         </thead>
                         <tbody>
-                    {% for update in updates %}
+                        {% for update in updates %}
                             <tr>
                                 <td>
                                     <select class="form-select form-select-sm autosave-update-input" data-id="{{ update.id }}" data-field="push_pull_type">
@@ -756,12 +765,20 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="text" value="{{ update.text }}">
+                                    <textarea class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="text" rows="1" style="resize: none; min-height: 30px; overflow: hidden;" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'">{{ update.text }}</textarea>
                                 </td>
                                 <td>
                                     <select class="form-select form-select-sm select2-update-who" multiple data-id="{{ update.id }}" data-field="who_contact">
                                         {% for person in contact_persons %}
                                         <option value="{{ person.id }}" {% if person in update.who_contact.all %}selected{% endif %}>{{ person.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm select2-update-raised-by" data-id="{{ update.id }}" data-field="raised_by">
+                                        <option value="">Select</option>
+                                        {% for person in contact_persons %}
+                                        <option value="{{ person.id }}" {% if update.raised_by.id == person.id %}selected{% endif %}>{{ person.name }}</option>
                                         {% endfor %}
                                     </select>
                                 </td>
@@ -776,23 +793,15 @@
                                     </select>
                                 </td>
                                 <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-bs-toggle="modal" data-bs-target="#localUpdateRemarksModal{{ update.id }}" title="View Details"><i class="fas fa-eye"></i></button>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            <li><a class="dropdown-item text-danger" href="{% url 'delete_project_update' update.id %}"><i class="far fa-trash-alt me-2"></i>Delete</a></li>
-                                        </ul>
-                                    </div>
+                                    <button type="button" class="btn btn-sm btn-link text-primary p-0 me-3" data-bs-toggle="modal" data-bs-target="#localUpdateRemarksModal{{ update.id }}" title="View Details"><i class="fas fa-eye"></i></button>
                                     <a href="{% url 'delete_project_update' update.id %}" class="btn btn-sm btn-link text-danger p-0" title="Delete" onclick="return confirm('Are you sure you want to delete this item?');"><i class="far fa-trash-alt"></i></a>
-                                    <span id="update-indicator-{{ update.id }}" class="ms-1"></span>
+                                    <span id="update-indicator-{{ update.id }}" class="ms-2" style="display:inline-block; width:15px;"></span>
                                 </td>
                             </tr>
-                    {% endfor %}
+                        {% endfor %}
                             
                             <!-- New Row (Hidden by default) -->
                             <tr id="new-update-row" style="display: none; background-color: #f8f9fa;">
-                                <form id="new-update-form" action="{% url 'add_project_update' project.id %}" method="post">
-                                    {% csrf_token %}
                                     <td>
                                         <select name="push_pull_type" class="form-select form-select-sm" form="new-update-form">
                                             <option value="Pull" selected>Pull Content</option>
@@ -800,10 +809,18 @@
                                         </select>
                                     </td>
                                     <td>
-                                        <input type="text" name="update_text" class="form-control form-control-sm" placeholder="Description" required form="new-update-form">
+                                        <textarea name="update_text" class="form-control form-control-sm" placeholder="Description" required form="new-update-form" rows="1" style="resize: none; min-height: 30px; overflow: hidden;" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"></textarea>
                                     </td>
                                     <td>
                                         <select name="who_contact" class="form-select form-select-sm select2-new-who" multiple form="new-update-form">
+                                            {% for person in contact_persons %}
+                                                <option value="{{ person.id }}">{{ person.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="raised_by" class="form-select form-select-sm select2-new-raised-by" form="new-update-form">
+                                            <option value="">Select</option>
                                             {% for person in contact_persons %}
                                                 <option value="{{ person.id }}">{{ person.name }}</option>
                                             {% endfor %}
@@ -818,11 +835,14 @@
                                     <td class="text-end">
                                         <button type="submit" class="btn btn-sm btn-primary" form="new-update-form"><i class="fas fa-plus"></i></button>
                                     </td>
-                                </form>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+                <!-- Hidden form for the new row, placed outside the table for valid HTML -->
+                <form id="new-update-form" action="{% url 'add_project_update' project.id %}" method="post" style="display:none;">
+                    {% csrf_token %}
+                </form>
                 <div class="p-2 border-top">
                     <button class="btn btn-sm btn-light text-primary fw-bold" onclick="document.getElementById('new-update-row').style.display = 'table-row'; this.style.display='none';">
                         <i class="fas fa-plus me-1"></i> Add Row
@@ -967,6 +987,56 @@
             }
         });
         
+        // Initialize Select2 for "Raised By" in new row
+        $('.select2-new-raised-by').select2({
+            tags: true,
+            theme: 'bootstrap-5',
+            placeholder: "Select person",
+            width: '100%',
+            createTag: function(params) {
+                const term = $.trim(params.term);
+                if (term === '' || $.isNumeric(term)) return null;
+                const existingOptions = $(this).find('option');
+                const isExisting = existingOptions.filter(function() {
+                    return $.trim($(this).text()).toLowerCase() === term.toLowerCase();
+                }).length > 0;
+                if (isExisting) return null;
+                return { id: term, text: term, new: true };
+            },
+            templateResult: function (data) {
+                if (data.new) return $('<span><b>(New)</b> ' + data.text + '</span>');
+                return data.text;
+            }
+        });
+
+        // Handle new tags for "Raised By" via AJAX
+        $('.select2-new-raised-by').on('select2:select', function (e) {
+            const data = e.params.data;
+            if (data.new) {
+                const $select = $(this);
+                $.ajax({
+                    url: "{% url 'add_contact_person_ajax' %}",
+                    method: 'POST',
+                    data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                    success: function(response) {
+                        if(response.status === 'success') {
+                            const newOption = new Option(response.name, response.id, false, false);
+                            $select.find(`option[value="${data.id}"]`).remove();
+                            $select.append(newOption).trigger('change');
+                            $select.val(response.id).trigger('change');
+                        } else {
+                            alert('Error creating new contact.');
+                            $select.val('').trigger('change');
+                        }
+                    },
+                    error: function() {
+                        alert('Error creating new contact.');
+                        $select.val('').trigger('change');
+                    }
+                });
+            }
+        });
+
         // Handle new tags (persons) being added via AJAX
         $('.select2-new-who').on('select2:select', function (e) {
             const data = e.params.data;
@@ -1024,6 +1094,56 @@
                 const updateId = select.dataset.id;
                 const field = select.dataset.field;
                 const value = $(select).val(); // Array of IDs
+                handleUpdateAutosave(updateId, field, value);
+            }).on('select2:select', function(e) {
+                // Handle new tag creation via AJAX inside the table
+                const data = e.params.data;
+                if (data.new) {
+                    const $select = $(this);
+                    $.ajax({
+                        url: "{% url 'add_contact_person_ajax' %}",
+                        method: 'POST',
+                        data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
+                        success: function(response) {
+                            if(response.status === 'success') {
+                                const newOption = new Option(response.name, response.id, false, false);
+                                $select.find(`option[value="${data.id}"]`).remove();
+                                $select.append(newOption).trigger('change');
+                                // The change event above will handle the autosave
+                            } else {
+                                alert('Error creating new contact.');
+                            }
+                        },
+                        error: function() {
+                            alert('Error creating new contact.');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Initialize Select2 for "Raised By" in existing rows (Inline Editing)
+        $('.select2-update-raised-by').each(function() {
+            $(this).select2({
+                tags: true,
+                theme: 'bootstrap-5',
+                placeholder: "Select person",
+                width: '100%',
+                createTag: function(params) {
+                    const term = $.trim(params.term);
+                    if (term === '' || $.isNumeric(term)) return null;
+                    return { id: term, text: term, new: true };
+                },
+                templateResult: function (data) {
+                    if (data.new) return $('<span><b>(New)</b> ' + data.text + '</span>');
+                    return data.text;
+                }
+            }).on('change', function(e) {
+                // Trigger autosave manually on change
+                const select = e.target;
+                const updateId = select.dataset.id;
+                const field = select.dataset.field;
+                const value = $(select).val();
                 handleUpdateAutosave(updateId, field, value);
             }).on('select2:select', function(e) {
                 // Handle new tag creation via AJAX inside the table
@@ -1177,6 +1297,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (response.ok && data.status === 'success') {
                 indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+                
+                // Update actual date input if the backend auto-filled or cleared it
+                if (data.updated_actual_date !== undefined) {
+                    const actualDateInput = document.querySelector(`input[name="actual_date_${stageId}"]`);
+                    if (actualDateInput) {
+                        actualDateInput.value = data.updated_actual_date;
+                    }
+                }
             } else {
                 indicator.innerHTML = `<i class="fas fa-times-circle text-danger" title="${data.message || 'Unknown error'}"></i>`;
                 alert(`Error saving stage: ${data.message}`);
@@ -1375,6 +1503,25 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // Auto-resize textareas on load
+    function resizeAllTextareas() {
+        document.querySelectorAll('textarea.autosave-update-input').forEach(textarea => {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        });
+    }
+
+    // Resize on load
+    resizeAllTextareas();
+
+    // Resize when the Push-Pull tab is shown (fix for hidden elements having 0 height)
+    const pushPullTab = document.getElementById('push-pull-tab');
+    if (pushPullTab) {
+        pushPullTab.addEventListener('shown.bs.tab', function (e) {
+            resizeAllTextareas();
+        });
+    }
 });
 </script>
 {% endblock %}

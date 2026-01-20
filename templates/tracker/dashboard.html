@@ -11,9 +11,6 @@
             <h1 class="page-title"><i class="fas fa-tachometer-alt me-2"></i>Project Dashboard</h1>
             <p class="page-subtitle">Monitor and manage all your projects in one place</p>
         </div>
-        <a href="{% url 'tracker_new_project' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i>New Project
-        </a>
     </div>
 </div>
 
@@ -25,13 +22,11 @@
                     <i class="fas fa-calendar-alt me-2"></i> {{ selected_period_display }}
                 </button>
                 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=all">All Time</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_month">Current Month</a></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=this_year">Current Year</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=7d">Last 7 Days</a></li>
-                    <li><a class="dropdown-item" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period=30d">Last 30 Days</a></li>
+                    {% for key, value in period_filter_options.items %}
+                    <li>
+                        <a class="dropdown-item {% if selected_period_key == key %}active{% endif %}" href="?{{ request.GET.urlencode|cut:'period'|cut:'start_date_custom'|cut:'end_date_custom' }}&period={{ key }}">{{ value.0 }}</a>
+                    </li>
+                    {% endfor %}
                 </ul>
             </div>
             
@@ -67,8 +62,8 @@
 </div>
 
 <div class="row">
-    <div class="col-lg-8">
-        <div class="card h-100">
+    <div class="col-12">
+        <div class="card mb-4">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Project Completion (Live in Period)</h5></div>
 
             
@@ -83,15 +78,60 @@
 
         </div>
     </div>
-    <div class="col-lg-4">
+</div>
+
+<div class="row">
+    <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution (Live in Period)</h5></div>
-            <div class="card-body"><canvas id="statusChart" height="200"></canvas></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="statusChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-layer-group"></i>Projects by Segment</h5></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="segmentChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-users"></i>Projects by Team Lead</h5></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="teamLeadChart"></canvas></div></div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-indian-rupee-sign"></i> Value by Segment</h5></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="segmentValueChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-user-tie"></i> Value by Team Lead</h5></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="teamLeadValueChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i> Value by Status</h5></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="statusValueChart"></canvas></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title"><i class="fas fa-hourglass-half"></i> Project Age Distribution</h5></div>
+            <div class="card-body"><div style="height: 300px; position: relative;"><canvas id="ageChart"></canvas></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
@@ -198,12 +238,32 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 
 {% block scripts %}
 {{ block.super }}
 <script>
+// --- Table Filtering Function ---
+function filterDashboardTables(input) {
+    const filterValue = input.value.toLowerCase();
+    const table = input.closest('table');
+    const columnIndex = input.closest('th').cellIndex;
+    const rows = table.querySelectorAll('tbody tr');
+
+    rows.forEach(row => {
+        // Skip "No projects found" rows
+        if (row.cells.length <= 1) return;
+        
+        const cell = row.cells[columnIndex];
+        if (cell) {
+            const text = cell.textContent || cell.innerText;
+            row.style.display = text.toLowerCase().indexOf(filterValue) > -1 ? '' : 'none';
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     Chart.register(ChartDataLabels);
 
@@ -217,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const heightPerProject = 40; // The desired height for each project's bar
 
     // 2. Calculate the total height the chart CONTENT needs to be
-    const projectsCount = {{ labels|safe }}.length;
+    const projectsCount = {{ labels|length }};
     const totalContentHeight = projectsCount * heightPerProject;
 
     // 3. Determine the final height for the chart's container
@@ -231,7 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(progressCtx, {
         type: 'bar',
         data: { 
-            labels: {{ labels|safe }}, 
+            labels: [{% for label in labels %}"{{ label|escapejs }}",{% endfor %}], 
             datasets: [ 
                 { label: 'On Track (>= 80%)', data: {{ on_track_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)', borderWidth: 1 }, 
                 { label: 'At Risk (40-79%)', data: {{ at_risk_data|safe }}, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderWidth: 1 }, 
@@ -262,26 +322,188 @@ document.addEventListener('DOMContentLoaded', function() {
         new Chart(statusCtx, {
             type: 'pie',
             data: { 
-                labels: {{ status_labels|safe }}, 
+                labels: [{% for label in status_labels %}"{{ label|escapejs }}",{% endfor %}], 
                 datasets: [{ 
                     label: 'Project Status', 
                     data: {{ status_data|safe }}, 
-                    backgroundColor: [
-                        'rgba(40, 167, 69, 0.7)',   // On Track
-                        'rgba(255, 193, 7, 0.7)',   // At Risk
-                        'rgba(220, 53, 69, 0.7)',   // Delayed
-                        'rgba(108, 117, 125, 0.7)'  // On Hold / Other
-                    ] 
+                    backgroundColor: [{% for color in status_colors %}"{{ color|escapejs }}",{% endfor %}]
                 }] 
             },
             options: { 
-                responsive: true, 
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: { 
-                    legend: { position: 'top' } 
+                    legend: { position: 'top' },
+                    datalabels: { color: '#ffffff', font: { weight: 'bold' } }
                 } 
             }
         });
     }
+
+    // --- Segment Chart ---
+    const segmentCtx = document.getElementById('segmentChart').getContext('2d');
+    new Chart(segmentCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [{% for label in segment_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                data: {{ segment_data|safe }},
+                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { position: 'right' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) { label += ': '; }
+                            if (context.parsed !== null) { label += '₹' + context.parsed.toFixed(2) + ' Cr'; }
+                            return label;
+                        }
+                    }
+                },
+                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
+            }
+        }
+    });
+
+    // --- Team Lead Chart ---
+    const teamLeadCtx = document.getElementById('teamLeadChart').getContext('2d');
+    new Chart(teamLeadCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for label in team_lead_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                label: 'Projects',
+                data: {{ team_lead_data|safe }},
+                backgroundColor: '#36b9cc',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: {
+                legend: { display: false },
+                datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' } }
+            }
+        }
+    });
+
+    // --- NEW: Segment Value Chart ---
+    const segmentValueCtx = document.getElementById('segmentValueChart').getContext('2d');
+    new Chart(segmentValueCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [{% for label in segment_value_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                data: {{ segment_value_data|safe }},
+                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'right' }, datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } } }
+        }
+    });
+
+    // --- NEW: Team Lead Value Chart ---
+    const teamLeadValueCtx = document.getElementById('teamLeadValueChart').getContext('2d');
+    new Chart(teamLeadValueCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for label in team_lead_value_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                label: 'Total Value (Cr)',
+                data: {{ team_lead_value_data|safe }},
+                backgroundColor: '#4e73df',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += '₹' + context.parsed.y.toFixed(2) + ' Cr';
+                            }
+                            return label;
+                        }
+                    }
+                },
+                datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
+            }
+        }
+    });
+
+    // --- NEW: Status Value Chart ---
+    const statusValueCtx = document.getElementById('statusValueChart').getContext('2d');
+    new Chart(statusValueCtx, {
+        type: 'pie',
+        data: {
+            labels: [{% for label in status_value_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                data: {{ status_value_data|safe }},
+                backgroundColor: [{% for color in status_value_colors %}"{{ color|escapejs }}",{% endfor %}]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { position: 'right' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed !== null) {
+                                label += '₹' + context.parsed.toFixed(2) + ' Cr';
+                            }
+                            return label;
+                        }
+                    }
+                },
+                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
+            }
+        }
+    });
+
+    // --- NEW: Project Age Chart ---
+    const ageCtx = document.getElementById('ageChart').getContext('2d');
+    new Chart(ageCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for label in age_labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [{
+                label: 'Number of Projects',
+                data: {{ age_data|safe }},
+                backgroundColor: '#fd7e14', // Orange
+            }]
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: { legend: { display: false }, datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' } } }
+        }
+    });
 });
 </script>
 {% endblock %}

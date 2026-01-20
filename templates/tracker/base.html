@@ -233,7 +233,6 @@
                     {% if user.is_authenticated %}
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_dashboard' %}active{% endif %}" href="{% url 'tracker_dashboard' %}"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_index' or request.resolver_match.url_name == 'tracker_project_detail' %}active{% endif %}" href="{% url 'tracker_index' %}"><i class="fas fa-list-ul"></i>Projects</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_new_project' %}active{% endif %}" href="{% url 'tracker_new_project' %}"><i class="fas fa-plus-circle"></i>Add Project</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'project_reports' %}active{% endif %}" href="{% url 'project_reports' %}"><i class="fas fa-chart-bar"></i>Reports</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_upcoming_milestones' %}active{% endif %}" href="{% url 'tracker_upcoming_milestones' %}"><i class="fas fa-calendar-alt"></i>Upcoming Milestones</a></li>
                         <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'all_push_pull_content' %}active{% endif %}" href="{% url 'all_push_pull_content' %}"><i class="fas fa-arrows-alt-h"></i>Push-Pull Content</a></li>

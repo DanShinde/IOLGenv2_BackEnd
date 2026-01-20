@@ -43,9 +43,11 @@ def get_final_project_otif(stages):
 def get_overall_status(stages):
     if any(s.status == 'Hold' for s in stages):
         return 'Hold'
-    # Check if the *last* stage in the list is Completed. Assumes handover is last.
-    if stages and stages[-1].name == 'Handover' and stages[-1].status == 'Completed':
+    
+    handover = next((s for s in stages if s.name == 'Handover'), None)
+    if handover and handover.status == 'Completed':
         return 'Completed'
+        
     if any(s.status not in ['Not started', 'Hold', 'Not Applicable'] for s in stages):
         return 'In Progress'
     return 'Not started'

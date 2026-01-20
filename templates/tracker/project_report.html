@@ -41,44 +41,12 @@
 
 <div id="report-content">
 
-    <div class="row mb-4">
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon"><i class="fas fa-project-diagram"></i></div>
-                <div class="metric-value">{{ total_projects_found }}</div>
-                <div class="metric-label">Projects Found</div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon"><i class="fas fa-indian-rupee-sign"></i></div>
-                <div class="metric-value">₹{{ total_portfolio_value|intcomma }}</div>
-                <div class="metric-label">Total Value of Found Projects in Cr.</div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon"><i class="fas fa-tasks"></i></div>
-                <div class="metric-value">{{ average_completion|floatformat:1 }}%</div>
-                <div class="metric-label">Average Completion</div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3 d-flex">
-            <div class="metric-card h-100 w-100">
-                <div class="metric-icon" style="color: #28a745; background: rgba(40, 167, 69, 0.1);"><i class="fas fa-check-double"></i></div>
-                <div class="metric-value">{{ on_time_completion_rate|floatformat:1 }}%</div>
-                <div class="metric-label">On-Time Completion</div>
-            </div>
-        </div>
-    </div>
-
     <form method="get">
         {% if hide_completed_active %}
         <input type="hidden" name="hide_completed" value="1">
         {% endif %}
         <input type="hidden" name="chart_view" id="input_chart_view" value="monthly">
         <input type="hidden" name="chart_stage" id="input_chart_stage" value="">
-        <input type="hidden" name="chart_year" id="input_chart_year" value="">
         <div class="card mb-4">
             <a href="#filterCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button">
                 <h5 class="card-header-title mb-0"><i class="fas fa-sliders-h me-2"></i>Filter Options</h5>
@@ -90,20 +58,29 @@
                         <legend class="h6">General Filters</legend>
                         <div class="row">
                             <div class="col-md-3 mb-3">
+                                <label class="form-label">Financial Year</label>
+                                <select name="financial_year" class="form-select">
+                                    <option value="">All Years</option>
+                                    {% for val, label in fy_options %}
+                                    <option value="{{ val }}" {% if selected_fy == val %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
                                 <label class="form-label">Segments</label>
                                 <select name="segments" class="form-select" multiple size="4">
                                     {% for segment in all_segments %}<option value="{{ segment.id }}" {% if segment.id in selected_segment_ids %}selected{% endif %}>{{ segment.name }}</option>{% endfor %}
                                 </select>
                                 <small class="text-muted">Hold Ctrl or Cmd to select multiple.</small>
                             </div>
-                            <div class="col-md-3 mb-3">
+                            <div class="col-md-2 mb-3">
                                 <label class="form-label">Team Leads (PACe)</label>
                                 <select name="team_leads" class="form-select" multiple size="4">
                                     {% for employee in all_team_leads %}<option value="{{ employee.id }}" {% if employee.id in selected_team_lead_ids %}selected{% endif %}>{{ employee.name }}</option>{% endfor %}
                                 </select>
                                 <small class="text-muted">Hold Ctrl or Cmd to select multiple.</small>
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label">SO Punch Date Range</label>
                                 <div class="input-group">
                                     <span class="input-group-text">From</span>
@@ -181,7 +158,10 @@
 
     <div class="card">
         <a href="#resultsCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button" aria-expanded="false" aria-controls="resultsCollapse">
-            <h5 class="card-header-title mb-0"><i class="fas fa-table me-2"></i>Filtered Results</h5>
+            <div class="d-flex align-items-center">
+                <h5 class="card-header-title mb-0"><i class="fas fa-table me-2"></i>Filtered Results</h5>
+                <span class="badge bg-secondary ms-2" id="project-count-badge">{{ projects_with_details|length }} Found</span>
+            </div>
             <i class="fas fa-chevron-down"></i>
         </a>
         <div class="collapse" id="resultsCollapse">
@@ -364,13 +344,6 @@
                             <option value="quarterly">Quarterly</option>
                         </select>
                     </div>
-
-                    <div class="d-flex align-items-center gap-2">
-                        <label class="small fw-bold">Year:</label>
-                        <select id="commonYearSelector" class="form-select form-select-sm w-auto" style="display: none;" onchange="handleCommonFilterChange()">
-                            <!-- Populated by JS -->
-                        </select>
-                    </div>
                 </div>
             </div>
         </div>
@@ -430,32 +403,33 @@
 <script>
 // ✅ NEW: Function to make cards in a row the same height
 function equalizeChartCardHeights() {
-    const chartRow = document.querySelector('.row.mt-4');
-    if (!chartRow) return;
+    const chartRows = document.querySelectorAll('.row.mt-4');
+    
+    chartRows.forEach(row => {
+        const cards = row.querySelectorAll('.card');
+        if (cards.length < 2) return;
 
-    const cards = chartRow.querySelectorAll('.card');
-    if (cards.length < 2) return;
+        // Use a small timeout to ensure charts have rendered before we measure them
+        setTimeout(() => {
+            let maxHeight = 0;
+            // First, reset any previously set heights to get the natural height
+            cards.forEach(card => {
+                card.style.height = 'auto';
+            });
 
-    // Use a small timeout to ensure charts have rendered before we measure them
-    setTimeout(() => {
-        let maxHeight = 0;
-        // First, reset any previously set heights to get the natural height
-        cards.forEach(card => {
-            card.style.height = 'auto';
-        });
+            // Find the height of the tallest card
+            cards.forEach(card => {
+                if (card.offsetHeight > maxHeight) {
+                    maxHeight = card.offsetHeight;
+                }
+            });
 
-        // Find the height of the tallest card
-        cards.forEach(card => {
-            if (card.offsetHeight > maxHeight) {
-                maxHeight = card.offsetHeight;
-            }
-        });
-
-        // Set all cards to the height of the tallest one
-        cards.forEach(card => {
-            card.style.height = `${maxHeight}px`;
-        });
-    }, 200); // 200ms delay
+            // Set all cards to the height of the tallest one
+            cards.forEach(card => {
+                card.style.height = `${maxHeight}px`;
+            });
+        }, 200); // 200ms delay
+    });
 }
 
 
@@ -581,7 +555,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const filterType = urlParams.get('chart_filter_type');
     const chartViewParam = urlParams.get('chart_view');
     const chartStageParam = urlParams.get('chart_stage');
-    const chartYearParam = urlParams.get('chart_year');
 
     function getFYFromDateStr(dateStr) {
         if (!dateStr) return null;
@@ -598,7 +571,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('commonStageSelector')) {
         const stageSelector = document.getElementById('commonStageSelector');
         const viewSelector = document.getElementById('commonViewSelector');
-        const yearSelector = document.getElementById('commonYearSelector');
         
         // 1. Set Stage
         // Priority: Explicit chart_stage > Click filter stage
@@ -610,19 +582,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // 2. Set View
         if (chartViewParam) {
             viewSelector.value = chartViewParam;
-        }
-
-        // 3. Populate Years based on Stage
-        populateCommonYearSelector();
-
-        // 4. Set Year
-        // Priority: Explicit chart_year > Derived from click filter month
-        let targetYear = chartYearParam;
-        if (!targetYear && filterMonth) {
-            targetYear = getFYFromDateStr(filterMonth);
-        }
-        if (targetYear && [...yearSelector.options].some(o => o.value === targetYear)) {
-            yearSelector.value = targetYear;
         }
 
         // 5. Update Charts
@@ -638,85 +597,33 @@ const allTrendData = JSON.parse('{{ stage_trend_data|escapejs }}');
 let trendChart = null;
 
 function handleCommonFilterChange() {
-    populateCommonYearSelector();
     updateTrendChart();
     updateOtifChart();
     updateEmuChart();
 }
 
-function populateCommonYearSelector() {
-    const stageSelector = document.getElementById('commonStageSelector');
-    const yearSelector = document.getElementById('commonYearSelector');
-    
-    // Store current selection before clearing
-    const currentSelection = yearSelector.value;
-
-    const selectedStage = stageSelector.value;
-    const trendData = allTrendData[selectedStage];
-    const otifData = allOtifData[selectedStage];
-    const emuData = emuTimingData; // Global variable from below
-
-    yearSelector.innerHTML = '';
-    
-    // Combine years from both datasets to ensure coverage
-    let years = [];
-    if (trendData && trendData.financial_years) years = [...years, ...trendData.financial_years];
-    if (otifData && otifData.financial_years) years = [...years, ...otifData.financial_years];
-    if (emuData && emuData.financial_years) years = [...years, ...emuData.financial_years];
-
-    if (years.length === 0) {
-        yearSelector.style.display = 'none';
-        return;
-    }
-
-    // Extract unique FYs and sort descending
-    const uniqueFYs = [...new Set(years)].sort().reverse();
-    
-    // Only show selector if we have data
-    if (uniqueFYs.length > 0) {
-        yearSelector.style.display = 'block';
-        uniqueFYs.forEach(fy => {
-            const option = document.createElement('option');
-            option.value = fy;
-            option.text = fy;
-            yearSelector.appendChild(option);
-        });
-        
-        // Try to retain selection, otherwise default to latest
-        if (currentSelection && uniqueFYs.includes(currentSelection)) {
-            yearSelector.value = currentSelection;
-        } else {
-            yearSelector.value = uniqueFYs[0];
-        }
-    } else {
-        yearSelector.style.display = 'none';
-    }
-}
+// Removed populateCommonYearSelector as filtering is now server-side
 
 function updateTrendChart() {
     if (!trendCtx) return;
     
     const stageSelector = document.getElementById('commonStageSelector');
     const viewSelector = document.getElementById('commonViewSelector');
-    const yearSelector = document.getElementById('commonYearSelector');
     const selectedStage = stageSelector.value;
     const viewType = viewSelector ? viewSelector.value : 'monthly';
-    const selectedFY = yearSelector.value;
 
     // Update hidden input and URL state for persistence
     if (document.getElementById('input_chart_view')) document.getElementById('input_chart_view').value = viewType;
     if (document.getElementById('input_chart_stage')) document.getElementById('input_chart_stage').value = selectedStage;
-    if (document.getElementById('input_chart_year')) document.getElementById('input_chart_year').value = selectedFY;
 
     const url = new URL(window.location.href);
     url.searchParams.set('chart_view', viewType);
     url.searchParams.set('chart_stage', selectedStage);
-    url.searchParams.set('chart_year', selectedFY);
     window.history.replaceState({}, '', url);
     
     const rawData = allTrendData[selectedStage] || { labels: [], years: [], financial_years: [], months: [], planned: [], actual: [] };
     
-    // Filter data based on selected year
+    // Use all data provided by server (already filtered by project)
     let filteredLabels = [];
     let filteredPlanned = [];
     let filteredActual = [];
@@ -724,41 +631,41 @@ function updateTrendChart() {
     let filteredMonths = [];
 
     if (viewType === 'monthly') {
-        if (rawData.financial_years) {
-            for (let i = 0; i < rawData.financial_years.length; i++) {
-                if (rawData.financial_years[i] === selectedFY) {
-                    filteredLabels.push(rawData.labels[i]);
-                    filteredPlanned.push(rawData.planned[i]);
-                    filteredActual.push(rawData.actual[i]);
-                    filteredYears.push(rawData.years[i]);
-                    filteredMonths.push(rawData.months[i]);
-                }
-            }
-        }
+        // Directly use raw data arrays
+        filteredLabels = rawData.labels || [];
+        filteredPlanned = rawData.planned || [];
+        filteredActual = rawData.actual || [];
+        filteredYears = rawData.years || [];
+        filteredMonths = rawData.months || [];
     } else {
         // Quarterly Aggregation
-        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
-        filteredPlanned = [0, 0, 0, 0];
-        filteredActual = [0, 0, 0, 0];
+        let quarterlyData = {};
+        let keysOrder = [];
         
         if (rawData.financial_years) {
             for (let i = 0; i < rawData.financial_years.length; i++) {
-                if (rawData.financial_years[i] === selectedFY) {
-                    const month = rawData.months[i]; // 1-12
-                    
-                    // Indian Financial Year Logic: Q1=Apr-Jun
-                    let quarterIndex;
-                    if (month >= 4) {
-                        quarterIndex = Math.floor((month - 4) / 3); // 4-6->0, 7-9->1, 10-12->2
-                    } else {
-                        quarterIndex = 3; // 1-3 -> 3 (Q4)
-                    }
-                    
-                    filteredPlanned[quarterIndex] += rawData.planned[i];
-                    filteredActual[quarterIndex] += rawData.actual[i];
+                const fy = rawData.financial_years[i];
+                const month = rawData.months[i]; // 1-12
+                
+                let qIndex, monthRange;
+                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+                
+                const key = `${fy}_Q${qIndex}`;
+                if (!quarterlyData[key]) {
+                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, planned: 0, actual: 0 };
+                    keysOrder.push(key);
                 }
+                
+                quarterlyData[key].planned += rawData.planned[i];
+                quarterlyData[key].actual += rawData.actual[i];
             }
         }
+        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
+        filteredPlanned = keysOrder.map(k => quarterlyData[k].planned);
+        filteredActual = keysOrder.map(k => quarterlyData[k].actual);
     }
 
     if (trendChart) {
@@ -851,10 +758,8 @@ function updateOtifChart() {
     
     const stageSelector = document.getElementById('commonStageSelector');
     const viewSelector = document.getElementById('commonViewSelector');
-    const yearSelector = document.getElementById('commonYearSelector');
     const selectedStage = stageSelector.value;
     const viewType = viewSelector ? viewSelector.value : 'monthly';
-    const selectedFY = yearSelector.value;
 
     // Hidden inputs and URL state are already updated by updateTrendChart, 
     // but we can leave them here or remove them. 
@@ -870,47 +775,53 @@ function updateOtifChart() {
     let filteredMonths = [];
 
     if (viewType === 'monthly') {
-        if (rawData.financial_years) {
-            for (let i = 0; i < rawData.financial_years.length; i++) {
-                if (rawData.financial_years[i] === selectedFY) {
-                    filteredLabels.push(rawData.labels[i]);
-                    const total = rawData.total[i];
-                    const onTime = rawData.on_time[i];
-                    const percentage = total > 0 ? (onTime / total) * 100 : 0;
-                    filteredData.push(percentage);
-                    filteredTotal.push(total);
-                    filteredOnTime.push(onTime);
-                    filteredYears.push(rawData.years[i]);
-                    filteredMonths.push(rawData.months[i]);
-                }
+        if (rawData.labels) {
+            filteredLabels = rawData.labels;
+            filteredYears = rawData.years;
+            filteredMonths = rawData.months;
+            
+            for (let i = 0; i < rawData.total.length; i++) {
+                const total = rawData.total[i];
+                const onTime = rawData.on_time[i];
+                const percentage = total > 0 ? (onTime / total) * 100 : 0;
+                filteredData.push(percentage);
+                filteredTotal.push(total);
+                filteredOnTime.push(onTime);
             }
         }
     } else {
         // Quarterly Aggregation (IFY)
-        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
-        let qTotal = [0, 0, 0, 0];
-        let qOnTime = [0, 0, 0, 0];
+        let quarterlyData = {};
+        let keysOrder = [];
         
         if (rawData.financial_years) {
             for (let i = 0; i < rawData.financial_years.length; i++) {
-                if (rawData.financial_years[i] === selectedFY) {
-                    const month = rawData.months[i];
-                    let quarterIndex;
-                    if (month >= 4) {
-                        quarterIndex = Math.floor((month - 4) / 3);
-                    } else {
-                        quarterIndex = 3;
-                    }
-                    qTotal[quarterIndex] += rawData.total[i];
-                    qOnTime[quarterIndex] += rawData.on_time[i];
+                const fy = rawData.financial_years[i];
+                const month = rawData.months[i];
+                
+                let qIndex, monthRange;
+                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+                
+                const key = `${fy}_Q${qIndex}`;
+                if (!quarterlyData[key]) {
+                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, total: 0, on_time: 0 };
+                    keysOrder.push(key);
                 }
+                quarterlyData[key].total += rawData.total[i];
+                quarterlyData[key].on_time += rawData.on_time[i];
             }
         }
         
-        // Calculate percentages for quarters
-        filteredData = qTotal.map((total, index) => total > 0 ? (qOnTime[index] / total) * 100 : 0);
-        filteredTotal = qTotal;
-        filteredOnTime = qOnTime;
+        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
+        filteredTotal = keysOrder.map(k => quarterlyData[k].total);
+        filteredOnTime = keysOrder.map(k => quarterlyData[k].on_time);
+        filteredData = keysOrder.map(k => {
+            const t = quarterlyData[k].total;
+            return t > 0 ? (quarterlyData[k].on_time / t) * 100 : 0;
+        });
     }
 
     if (otifChart) {
@@ -1022,9 +933,7 @@ function updateEmuChart() {
     if (!emuTimingCtx) return;
 
     const viewSelector = document.getElementById('commonViewSelector');
-    const yearSelector = document.getElementById('commonYearSelector');
     const viewType = viewSelector ? viewSelector.value : 'monthly';
-    const selectedFY = yearSelector.value;
 
     const rawData = emuTimingData || { labels: [], financial_years: [], months: [], cat1: [], cat2: [], cat3: [] };
 
@@ -1034,39 +943,40 @@ function updateEmuChart() {
     let filteredCat3 = [];
 
     if (viewType === 'monthly') {
-        if (rawData.financial_years) {
-            for (let i = 0; i < rawData.financial_years.length; i++) {
-                if (rawData.financial_years[i] === selectedFY) {
-                    filteredLabels.push(rawData.labels[i]);
-                    filteredCat1.push(rawData.cat1[i]);
-                    filteredCat2.push(rawData.cat2[i]);
-                    filteredCat3.push(rawData.cat3[i]);
-                }
-            }
-        }
+        filteredLabels = rawData.labels || [];
+        filteredCat1 = rawData.cat1 || [];
+        filteredCat2 = rawData.cat2 || [];
+        filteredCat3 = rawData.cat3 || [];
     } else {
         // Quarterly Aggregation
-        filteredLabels = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'];
-        filteredCat1 = [0, 0, 0, 0];
-        filteredCat2 = [0, 0, 0, 0];
-        filteredCat3 = [0, 0, 0, 0];
+        let quarterlyData = {};
+        let keysOrder = [];
 
         if (rawData.financial_years) {
             for (let i = 0; i < rawData.financial_years.length; i++) {
-                if (rawData.financial_years[i] === selectedFY) {
-                    const month = rawData.months[i];
-                    let quarterIndex;
-                    if (month >= 4) {
-                        quarterIndex = Math.floor((month - 4) / 3);
-                    } else {
-                        quarterIndex = 3;
-                    }
-                    filteredCat1[quarterIndex] += rawData.cat1[i];
-                    filteredCat2[quarterIndex] += rawData.cat2[i];
-                    filteredCat3[quarterIndex] += rawData.cat3[i];
+                const fy = rawData.financial_years[i];
+                const month = rawData.months[i];
+                
+                let qIndex, monthRange;
+                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+                
+                const key = `${fy}_Q${qIndex}`;
+                if (!quarterlyData[key]) {
+                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, cat1: 0, cat2: 0, cat3: 0 };
+                    keysOrder.push(key);
                 }
+                quarterlyData[key].cat1 += rawData.cat1[i];
+                quarterlyData[key].cat2 += rawData.cat2[i];
+                quarterlyData[key].cat3 += rawData.cat3[i];
             }
         }
+        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
+        filteredCat1 = keysOrder.map(k => quarterlyData[k].cat1);
+        filteredCat2 = keysOrder.map(k => quarterlyData[k].cat2);
+        filteredCat3 = keysOrder.map(k => quarterlyData[k].cat3);
     }
 
     if (emuChart) {
@@ -1188,6 +1098,11 @@ function clearStageRow(btn) {
         }
         if (noResultsRow) {
             noResultsRow.style.display = (visibleProjectCount === 0) ? 'table-row' : 'none';
+        }
+
+        const countBadge = document.getElementById('project-count-badge');
+        if (countBadge) {
+            countBadge.textContent = visibleProjectCount + ' Found';
         }
     }
 </script>
