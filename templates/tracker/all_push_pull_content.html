@@ -496,13 +496,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         $selectElement.find(`option[value="${data.id}"]`).remove();
                         $selectElement.append(newOption);
                         
-                        // Reselect with real ID
-                        const currentSelection = $selectElement.val() || [];
-                        // Filter out the temp ID if it stuck (select2 might keep it in val() sometimes)
-                        const cleanSelection = currentSelection.filter(id => id !== data.id);
-                        cleanSelection.push(response.id);
-                        
-                        $selectElement.val(cleanSelection).trigger('change');
+                        // Handle selection based on whether it's multiple or single select
+                        if ($selectElement.prop('multiple')) {
+                            // For Multiple Select (Who)
+                            const currentSelection = $selectElement.val() || [];
+                            // Filter out the temp ID if it stuck
+                            const cleanSelection = currentSelection.filter(id => id !== data.id);
+                            cleanSelection.push(response.id);
+                            $selectElement.val(cleanSelection).trigger('change');
+                        } else {
+                            // For Single Select (Raised By)
+                            $selectElement.val(response.id).trigger('change');
+                        }
                     } else {
                         alert('Error creating new contact.');
                     }
