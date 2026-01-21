@@ -878,8 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // NEW: Leave Logic
         const leavesMap = new Map(Object.entries(data.leaves || {}));
         
-        const dailyOccupancy = new Map();
-        const overlaps = new Map();
+        const dailyOccupancy = new Map(); // Map<dateStr, Map<assignee, Array<activity>>>
         const allWorkDays = new Map();
 
         activitiesMap.forEach(act => {
@@ -891,18 +890,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (act.assignee) {
                 workDays.forEach(dateStr => {
                     if (!dailyOccupancy.has(dateStr)) {
-                        dailyOccupancy.set(dateStr, new Set());
+                        dailyOccupancy.set(dateStr, new Map());
                     }
-                    const occupants = dailyOccupancy.get(dateStr);
+                    const dayMap = dailyOccupancy.get(dateStr);
                     
-                    if (occupants.has(act.assignee)) {
-                        if (!overlaps.has(dateStr)) {
-                            overlaps.set(dateStr, new Set());
-                        }
-                        overlaps.get(dateStr).add(act.assignee);
-                    } else {
-                        occupants.add(act.assignee);
+                    if (!dayMap.has(act.assignee)) {
+                        dayMap.set(act.assignee, []);
                     }
+                    dayMap.get(act.assignee).push(act);
                 });
             }
         });
@@ -966,13 +961,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         const assigneeLeaves = leavesMap.get(act.assignee);
                         const isLeave = assigneeLeaves && assigneeLeaves.includes(dateStr);
 
+                        // Check for Overlaps
+                        let overlapText = '';
+                        const dayMap = dailyOccupancy.get(dateStr);
+                        const actsOnDay = (dayMap && act.assignee) ? dayMap.get(act.assignee) : [];
+                        const isOverlap = actsOnDay && actsOnDay.length > 1;
+
                         if (isLeave) {
                             barClass = 'leave-bar'; // Orange color
                             title = `🏖️ On Leave: ${act.assignee}\n` + title;
                         }
-                        else if (act.assignee && overlaps.has(dateStr) && overlaps.get(dateStr).has(act.assignee)) {
+                        else if (isOverlap) {
                             barClass = 'overlap-bar';
-                            title = `⚠️ OVERLAP: ${act.assignee} on ${dateStr}\n` + title;
+                            const others = actsOnDay.filter(a => a.pk !== act.pk);
+                            others.forEach(other => {
+                                overlapText += `Overlap with activity ${other.name} of project ${other.project}\n`;
+                            });
+                            title = overlapText + title;
                         }
                         
                         const barDiv = document.createElement('div');

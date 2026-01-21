@@ -250,6 +250,7 @@ def consolidated_planner_view(request):
             {
                 'pk': act.pk,
                 'name': act.activity_name,
+                'project': act.project.project_id,
                 'assignee': getattr(act.assignee, 'full_name', act.assignee.name) if act.assignee else None,
                 'start_date': act.start_date.isoformat() if act.start_date else None,
                 'end_date': act.end_date.isoformat() if act.end_date else None,
@@ -293,6 +294,7 @@ def activity_planner_view(request, project_pk):
             {
                 'pk': act.pk,
                 'name': act.activity_name,
+                'project': act.project.project_id,
                 'assignee': getattr(act.assignee, 'full_name', act.assignee.name) if act.assignee else None,
                 'start_date': act.start_date.isoformat() if act.start_date else None,
                 'end_date': act.end_date.isoformat() if act.end_date else None,
