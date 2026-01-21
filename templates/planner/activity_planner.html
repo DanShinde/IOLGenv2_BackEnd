@@ -280,16 +280,16 @@
                 </div>
             </div>
 
-            <table class="w-full table-auto {% if project or grouping_method == 'engineer' %}no-project-col{% endif %}" style="min-width: 4000px;">
+            <table class="w-full table-auto {% if project %}no-project-col{% endif %}" style="min-width: 4000px;">
                 <thead class="bg-gray-50 sticky top-0 z-50">
                     <tr class="h-6">
-                        <th colspan="{% if not project and grouping_method != 'engineer' %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
+                        <th colspan="{% if not project %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
                             <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
                         </th>
                         {% for month, day_count in gantt_data.months.items %}<th colspan="{{ day_count }}" class="px-2 py-1 text-center text-xs font-semibold border-l bg-gradient-to-r from-indigo-500 to-purple-600 text-white">{{ month }}</th>{% endfor %}
                     </tr>
                     <tr class="h-8">
-                        {% if not project and grouping_method != 'engineer' %}<th class="sticky-cell col-project px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Project</th>{% endif %}
+                        {% if not project %}<th class="sticky-cell col-project px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Project</th>{% endif %}
                         <th class="sticky-cell col-activity px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
                         <th class="sticky-cell col-assignee px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Assignee</th>
                         <th class="sticky-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
@@ -298,7 +298,7 @@
                         {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" data-date="{{ d|date:'Y-m-d' }}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
                     </tr>
                     <tr class="h-8">
-                        {% if not project and grouping_method != 'engineer' %}<th class="sticky-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
+                        {% if not project %}<th class="sticky-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
                         <th class="sticky-cell col-activity p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="activity" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-assignee p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="assignee" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-start p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="start" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
@@ -315,7 +315,7 @@
                             {% if grouping_method != 'none' %}
                             {% with group_data=group_gantt_data|get_item:group_name %}
                             <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}">
-                                <td colspan="{% if grouping_method == 'project' %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
+                                <td colspan="6" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
                                     <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                 </td>
                                 <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
@@ -324,7 +324,7 @@
                             </tr>
                             {% endwith %}
                             {% endif %}
-                            {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method=grouping_method %}
+                            {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' %}
                         {% empty %}
                             <tr><td colspan="99" class="text-center text-gray-500 py-8"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg><h3 class="mt-2 text-sm font-medium text-gray-900">No activities found</h3><p class="mt-1 text-sm text-gray-500">Create your first activity to start planning.</p></td></tr>
                         {% endfor %}
