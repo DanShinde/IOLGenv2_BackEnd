@@ -12,7 +12,8 @@
     data-customer="{{ activity.project.customer_name|lower }}"
     data-segment="{{ activity.project.segment.name|lower|default:'' }}"
     data-team-lead="{{ activity.project.team_lead.name|lower|default:'' }}"
-    data-assignee="{{ activity.assignee.name|lower|default:'unassigned' }}"
+    data-assignee="{{ activity.assignee.name|title|default:'Unassigned' }}"
+    data-assignee-full="{{ activity.assignee.full_name|title|default:'Unassigned' }}"
     data-activity-name="{{ activity.activity_name|lower }}">
     
     {% comment %} --- STICKY CELLS WITH DATA ATTRIBUTES FOR FILTERING --- {% endcomment %}

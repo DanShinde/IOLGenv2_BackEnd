@@ -21,6 +21,14 @@ from itertools import groupby
 # Define this constant at the top of the file to avoid "magic numbers"
 CR = 10_000_000
 
+# --- Helper to shorten names ---
+def _shorten_name(name):
+    if not name: return name
+    parts = name.strip().split()
+    if len(parts) > 1:
+        return f"{parts[0]} {parts[-1][0]}."
+    return name
+
 # --- Helper to prepare leaves map for Gantt ---
 def _get_leaves_map():
     """
@@ -43,6 +51,12 @@ def _get_leaves_map():
 def _prepare_gantt_context(activities_qs):
     activities_list = list(activities_qs)
     today = date.today()
+    
+    # Shorten assignee names for display
+    for activity in activities_list:
+        if activity.assignee:
+            activity.assignee.full_name = activity.assignee.name
+            activity.assignee.name = _shorten_name(activity.assignee.name)
     
     holidays_map = {h.date: h.description for h in Holiday.objects.all()}
 
@@ -202,6 +216,7 @@ def consolidated_planner_view(request):
     all_projects = Project.objects.all()
     segments = Segment.objects.filter(project__in=all_projects).distinct().order_by('name')
     team_leads = Employee.objects.filter(led_projects__in=all_projects).distinct().order_by('name')
+    
     assignees = Employee.objects.filter(is_active=True).order_by('name')
 
     display_data = defaultdict(list)
@@ -235,7 +250,8 @@ def consolidated_planner_view(request):
             {
                 'pk': act.pk,
                 'name': act.activity_name,
-                'assignee': act.assignee.name if act.assignee else None,
+                'project': act.project.project_id,
+                'assignee': getattr(act.assignee, 'full_name', act.assignee.name) if act.assignee else None,
                 'start_date': act.start_date.isoformat() if act.start_date else None,
                 'end_date': act.end_date.isoformat() if act.end_date else None,
             } for act in context['activities']
@@ -278,7 +294,8 @@ def activity_planner_view(request, project_pk):
             {
                 'pk': act.pk,
                 'name': act.activity_name,
-                'assignee': act.assignee.name if act.assignee else None,
+                'project': act.project.project_id,
+                'assignee': getattr(act.assignee, 'full_name', act.assignee.name) if act.assignee else None,
                 'start_date': act.start_date.isoformat() if act.start_date else None,
                 'end_date': act.end_date.isoformat() if act.end_date else None,
             } for act in context['activities']

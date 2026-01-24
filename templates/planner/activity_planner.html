@@ -86,16 +86,16 @@
 
     .col-project    { width: 100px; min-width: 100px; max-width: 100px; left: 0px; }
     .col-activity   { width: 180px; min-width: 180px; max-width: 180px; left: 100px; }
-    .col-assignee   { width: 60px; min-width: 60px; max-width: 60px; left: 280px; text-align: center; }
-    .col-start      { width: 60px;  min-width: 60px;  max-width: 60px;  left: 340px; }
-    .col-end        { width: 60px;  min-width: 60px;  max-width: 60px;  left: 400px; }
-    .col-actions    { width: 60px;  min-width: 60px;  max-width: 60px;  left: 460px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
+    .col-assignee   { width: 100px; min-width: 100px; max-width: 100px; left: 280px; text-align: center; }
+    .col-start      { width: 60px;  min-width: 60px;  max-width: 60px;  left: 380px; }
+    .col-end        { width: 60px;  min-width: 60px;  max-width: 60px;  left: 440px; }
+    .col-actions    { width: 60px;  min-width: 60px;  max-width: 60px;  left: 500px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
 
     .no-project-col .col-activity { width: 200px; min-width: 200px; max-width: 200px; left: 0px; } 
     .no-project-col .col-assignee { left: 200px; }
-    .no-project-col .col-start    { left: 260px; }
-    .no-project-col .col-end      { left: 320px; }
-    .no-project-col .col-actions  { left: 380px; }
+    .no-project-col .col-start    { left: 300px; }
+    .no-project-col .col-end      { left: 360px; }
+    .no-project-col .col-actions  { left: 420px; }
 
     .group-header .sticky-cell { 
         background-color: #f8fafc; 
@@ -164,7 +164,7 @@
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <div id="segmentMenu" class="hidden origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 filter-dropdown-menu">
+                        <div id="segmentMenu" class="hidden origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 filter-dropdown-menu" style="z-index: 100;">
                             <div class="p-1 space-y-0.5">
                                 {% for segment in segments %}
                                 <label class="flex items-center space-x-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer">
@@ -183,7 +183,7 @@
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <div id="leadMenu" class="hidden origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 filter-dropdown-menu">
+                        <div id="leadMenu" class="hidden origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 filter-dropdown-menu" style="z-index: 100;">
                             <div class="p-1 space-y-0.5">
                                 {% for lead in team_leads %}
                                 <label class="flex items-center space-x-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer">
@@ -202,7 +202,7 @@
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <div id="assigneeMenu" class="hidden origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 filter-dropdown-menu">
+                        <div id="assigneeMenu" class="hidden origin-top-right absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 filter-dropdown-menu" style="z-index: 100;">
                             <div class="p-1 space-y-0.5">
                                 {% for assignee in assignees %}
                                 <label class="flex items-center space-x-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer">
@@ -280,16 +280,16 @@
                 </div>
             </div>
 
-            <table class="w-full table-auto {% if project or grouping_method == 'engineer' %}no-project-col{% endif %}" style="min-width: 4000px;">
+            <table class="w-full table-auto {% if project %}no-project-col{% endif %}" style="min-width: 4000px;">
                 <thead class="bg-gray-50 sticky top-0 z-50">
                     <tr class="h-6">
-                        <th colspan="{% if not project and grouping_method != 'engineer' %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
+                        <th colspan="{% if not project %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
                             <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
                         </th>
                         {% for month, day_count in gantt_data.months.items %}<th colspan="{{ day_count }}" class="px-2 py-1 text-center text-xs font-semibold border-l bg-gradient-to-r from-indigo-500 to-purple-600 text-white">{{ month }}</th>{% endfor %}
                     </tr>
                     <tr class="h-8">
-                        {% if not project and grouping_method != 'engineer' %}<th class="sticky-cell col-project px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Project</th>{% endif %}
+                        {% if not project %}<th class="sticky-cell col-project px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Project</th>{% endif %}
                         <th class="sticky-cell col-activity px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
                         <th class="sticky-cell col-assignee px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Assignee</th>
                         <th class="sticky-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
@@ -298,7 +298,7 @@
                         {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" data-date="{{ d|date:'Y-m-d' }}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
                     </tr>
                     <tr class="h-8">
-                        {% if not project and grouping_method != 'engineer' %}<th class="sticky-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
+                        {% if not project %}<th class="sticky-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
                         <th class="sticky-cell col-activity p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="activity" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-assignee p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="assignee" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-start p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="start" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
@@ -315,7 +315,7 @@
                             {% if grouping_method != 'none' %}
                             {% with group_data=group_gantt_data|get_item:group_name %}
                             <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}">
-                                <td colspan="{% if grouping_method == 'project' %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
+                                <td colspan="6" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
                                     <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                 </td>
                                 <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
@@ -324,7 +324,7 @@
                             </tr>
                             {% endwith %}
                             {% endif %}
-                            {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method=grouping_method %}
+                            {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' %}
                         {% empty %}
                             <tr><td colspan="99" class="text-center text-gray-500 py-8"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg><h3 class="mt-2 text-sm font-medium text-gray-900">No activities found</h3><p class="mt-1 text-sm text-gray-500">Create your first activity to start planning.</p></td></tr>
                         {% endfor %}
@@ -436,6 +436,18 @@ function toggleFilterMenu(menuId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Fix Assignee Column Display ---
+    // Replace avatar/initials with shortened name text (First L.)
+    document.querySelectorAll('.gantt-activity-row').forEach(row => {
+        const assigneeName = row.dataset.assignee;
+        const assigneeFullName = row.dataset.assigneeFull || assigneeName;
+        const cell = row.querySelector('.col-assignee');
+        if (cell && assigneeName) {
+            // Replace content with text
+            cell.innerHTML = `<div class="text-xs font-medium text-gray-700 truncate px-1" title="${assigneeFullName}">${assigneeName}</div>`;
+        }
+    });
+
     // --- Modal Management ---
     const modal = document.getElementById('addActivityModal');
     const openBtn = document.getElementById('openModalBtn');
@@ -866,8 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // NEW: Leave Logic
         const leavesMap = new Map(Object.entries(data.leaves || {}));
         
-        const dailyOccupancy = new Map();
-        const overlaps = new Map();
+        const dailyOccupancy = new Map(); // Map<dateStr, Map<assignee, Array<activity>>>
         const allWorkDays = new Map();
 
         activitiesMap.forEach(act => {
@@ -879,18 +890,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (act.assignee) {
                 workDays.forEach(dateStr => {
                     if (!dailyOccupancy.has(dateStr)) {
-                        dailyOccupancy.set(dateStr, new Set());
+                        dailyOccupancy.set(dateStr, new Map());
                     }
-                    const occupants = dailyOccupancy.get(dateStr);
+                    const dayMap = dailyOccupancy.get(dateStr);
                     
-                    if (occupants.has(act.assignee)) {
-                        if (!overlaps.has(dateStr)) {
-                            overlaps.set(dateStr, new Set());
-                        }
-                        overlaps.get(dateStr).add(act.assignee);
-                    } else {
-                        occupants.add(act.assignee);
+                    if (!dayMap.has(act.assignee)) {
+                        dayMap.set(act.assignee, []);
                     }
+                    dayMap.get(act.assignee).push(act);
                 });
             }
         });
@@ -954,13 +961,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         const assigneeLeaves = leavesMap.get(act.assignee);
                         const isLeave = assigneeLeaves && assigneeLeaves.includes(dateStr);
 
+                        // Check for Overlaps
+                        let overlapText = '';
+                        const dayMap = dailyOccupancy.get(dateStr);
+                        const actsOnDay = (dayMap && act.assignee) ? dayMap.get(act.assignee) : [];
+                        const isOverlap = actsOnDay && actsOnDay.length > 1;
+
                         if (isLeave) {
                             barClass = 'leave-bar'; // Orange color
                             title = `🏖️ On Leave: ${act.assignee}\n` + title;
                         }
-                        else if (act.assignee && overlaps.has(dateStr) && overlaps.get(dateStr).has(act.assignee)) {
+                        else if (isOverlap) {
                             barClass = 'overlap-bar';
-                            title = `⚠️ OVERLAP: ${act.assignee} on ${dateStr}\n` + title;
+                            const others = actsOnDay.filter(a => a.pk !== act.pk);
+                            others.forEach(other => {
+                                overlapText += `Overlap with activity ${other.name} of project ${other.project}\n`;
+                            });
+                            title = overlapText + title;
                         }
                         
                         const barDiv = document.createElement('div');
