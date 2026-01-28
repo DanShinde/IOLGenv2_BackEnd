@@ -35,7 +35,7 @@
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     .weekend-cell { background-color: #f8fafc; }
     .holiday-cell { background-color: #fef9c3; }
-    .today-cell { border-left: 2px solid #ef4444 !important; border-right: 2px solid #ef4444 !important; background-color: #fee2e2; }
+    .today-cell { background-color: #fee2e2; }
     
     /* ACTION BUTTON STYLES */
     .action-btn { background: transparent; transition: all 0.2s ease; }
@@ -132,7 +132,7 @@
             </div>
             <div class="flex items-center space-x-4">
                 {% if project %}
-                <a href="{% url 'tracker_project_detail' project.id %}" class="bg-white bg-opacity-20 backdrop-blur-sm text-white py-1.5 px-4 rounded-lg hover:bg-opacity-30 transition-all duration-200 flex items-center text-xs font-medium"><svg class="icon mr-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>Back to Project</a>
+                <a href="{% url 'tracker_project_detail' project.id %}" class="bg-white bg-opacity-20 backdrop-blur-sm text-white py-1.5 px-4 rounded-lg hover:bg-opacity-30 transition-all duration-200 flex items-center text-xs font-medium"><svg class="icon mr-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>Go to Project Dashboard</a>
                 {% endif %}
                 <a href="{% url 'planner_project_list' %}" class="bg-white bg-opacity-20 backdrop-blur-sm text-white py-1.5 px-4 rounded-lg hover:bg-opacity-30 transition-all duration-200 flex items-center text-xs font-medium"><svg class="icon mr-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Back to Projects</a>
             </div>
@@ -691,6 +691,28 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('beforeunload', saveState);
     // --- STATE PERSISTENCE END ---
 
+    function drawTodayMarker() {
+        const container = document.querySelector('.table-container');
+        const todayCell = document.querySelector('th.today-cell');
+        const table = container ? container.querySelector('table') : null;
+        
+        const existing = document.getElementById('today-marker-line');
+        if (existing) existing.remove();
+
+        if (container && todayCell && table) {
+            const line = document.createElement('div');
+            line.id = 'today-marker-line';
+            // This is now a full-column, semi-transparent highlight instead of a line.
+            line.className = 'absolute top-0 bg-red-500 bg-opacity-25 pointer-events-none';
+            line.style.zIndex = '5'; // Low z-index to appear behind gantt bars
+            line.style.left = `${todayCell.offsetLeft}px`;
+            line.style.width = `${todayCell.offsetWidth}px`;
+            line.style.height = `${table.offsetHeight}px`;
+            
+            container.appendChild(line);
+        }
+    }
+
     function applyFilters() {
         const globalSearch = searchInput ? searchInput.value.toLowerCase().trim() : '';
         
@@ -747,6 +769,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Trigger Virtual Render
         renderVirtualWindow(true);
+        
+        // Update Today Marker
+        requestAnimationFrame(drawTodayMarker);
     }
 
     function checkRowFilters(row, globalSearch, colFilters, selectedSegments, selectedLeaders, selectedAssignees) {
@@ -911,12 +936,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Border
             ctx.fillStyle = '#f1f5f9'; // border-gray-100
             ctx.fillRect(x + colWidth - 1, 0, 1, 1);
-
-            if (isToday) {
-                ctx.fillStyle = '#ef4444'; // Red border
-                ctx.fillRect(x, 0, 2, 1); // Left
-                ctx.fillRect(x + colWidth - 2, 0, 2, 1); // Right
-            }
         });
         return canvas.toDataURL();
     }
