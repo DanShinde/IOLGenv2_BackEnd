@@ -486,26 +486,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const container = document.querySelector('.table-container');
             
             if (todayCell && container) {
-                // Calculate width of sticky columns to offset the scroll
-                // The last sticky column is .col-actions
-                const stickyActionCol = document.querySelector('.col-actions');
-                let stickyOffset = 0;
+                const containerRect = container.getBoundingClientRect();
+                const todayRect = todayCell.getBoundingClientRect();
+                
+                // Find the sticky column boundary (right edge of the last sticky column)
+                const stickyActionCol = document.querySelector('thead .col-actions');
+                let stickyRightEdge = containerRect.left;
+                
                 if (stickyActionCol) {
-                    // Use the left position + width from CSS/Computed style or offsetLeft + offsetWidth
-                    stickyOffset = stickyActionCol.offsetLeft + stickyActionCol.offsetWidth;
+                    const stickyRect = stickyActionCol.getBoundingClientRect();
+                    stickyRightEdge = stickyRect.right;
                 }
-
-                // Calculate position to center the today cell in the viewable area
-                const viewableWidth = container.clientWidth - stickyOffset;
-                const targetScroll = todayCell.offsetLeft - stickyOffset - (viewableWidth / 2) + (todayCell.offsetWidth / 2);
-
-                container.scrollTo({
-                    left: Math.max(0, targetScroll),
+                
+                // Calculate the center of the visible scrollable area (between sticky cols and right edge)
+                const visibleWidth = containerRect.right - stickyRightEdge;
+                const visibleCenter = stickyRightEdge + (visibleWidth / 2);
+                
+                // Calculate the center of the today cell
+                const todayCenter = todayRect.left + (todayRect.width / 2);
+                
+                // Calculate delta and scroll
+                const delta = todayCenter - visibleCenter;
+                
+                container.scrollBy({
+                    left: delta,
                     behavior: 'smooth'
                 });
-            } else {
-                // Optional: Feedback if today is not in range
-                console.log("Today's date is not within the current view range.");
             }
         });
     }
