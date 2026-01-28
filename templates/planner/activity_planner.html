@@ -1073,6 +1073,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         barDiv.style.left = `${index * COL_WIDTH}px`;
                         barDiv.style.width = `${COL_WIDTH - 8}px`; // mx-1 = 4px margin on sides
                         barDiv.title = title;
+
+                        if (isLeave) {
+                            barDiv.style.cursor = 'help';
+                            barDiv.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                alert(`🏖️ ON LEAVE\n\nUser: ${act.assignee}\nDate: ${dateStr}\nAffected Activity: ${act.name}\n\nThis resource is unavailable due to leave.`);
+                            });
+                        }
+
                         container.appendChild(barDiv);
                 }
             });
