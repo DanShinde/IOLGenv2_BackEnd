@@ -633,6 +633,61 @@ document.addEventListener('DOMContentLoaded', () => {
     let isVirtualScrollActive = false;
     let isRenderPending = false;
 
+    // --- STATE PERSISTENCE START ---
+    function saveState() {
+        const container = document.querySelector('.table-container');
+        const currentScroll = container ? container.scrollTop : 0;
+        
+        const state = {
+            search: searchInput ? searchInput.value : '',
+            filters: {},
+            segments: Array.from(segmentCheckboxes).filter(c => c.checked).map(c => c.value),
+            leads: Array.from(leaderCheckboxes).filter(c => c.checked).map(c => c.value),
+            assignees: Array.from(assigneeCheckboxes).filter(c => c.checked).map(c => c.value),
+            collapsedGroups: Array.from(vsCollapsedGroups),
+            scrollTop: currentScroll || window.pendingScrollTop || 0
+        };
+        
+        filterInputs.forEach(input => {
+            const col = input.dataset.filterColumn;
+            if (input.value) state.filters[col] = input.value;
+        });
+        
+        // Use current path to separate state for different views
+        const key = 'planner_state_' + window.location.pathname;
+        sessionStorage.setItem(key, JSON.stringify(state));
+    }
+
+    function restoreState() {
+        try {
+            const key = 'planner_state_' + window.location.pathname;
+            const raw = sessionStorage.getItem(key);
+            if (!raw) return;
+            const state = JSON.parse(raw);
+            
+            if (searchInput) searchInput.value = state.search || '';
+            filterInputs.forEach(input => {
+                const col = input.dataset.filterColumn;
+                if (state.filters && state.filters[col]) input.value = state.filters[col];
+            });
+            if (state.segments) segmentCheckboxes.forEach(cb => cb.checked = state.segments.includes(cb.value));
+            if (state.leads) leaderCheckboxes.forEach(cb => cb.checked = state.leads.includes(cb.value));
+            if (state.assignees) assigneeCheckboxes.forEach(cb => cb.checked = state.assignees.includes(cb.value));
+            if (state.collapsedGroups) {
+                state.collapsedGroups.forEach(id => {
+                    vsCollapsedGroups.add(id);
+                    const header = document.querySelector(`.group-header[data-group-id="${id}"]`);
+                    if (header) header.classList.add('collapsed');
+                });
+            }
+            if (state.scrollTop) window.pendingScrollTop = state.scrollTop;
+        } catch (e) { console.error("Error restoring state", e); }
+    }
+    
+    restoreState();
+    window.addEventListener('beforeunload', saveState);
+    // --- STATE PERSISTENCE END ---
+
     function applyFilters() {
         const globalSearch = searchInput ? searchInput.value.toLowerCase().trim() : '';
         
@@ -1117,6 +1172,12 @@ function initVirtualScroll() {
     // 4. Initial Filter & Render
     isVirtualScrollActive = true;
     applyFilters(); // This will populate vsVisibleRows and call renderVirtualWindow
+    
+    // Restore scroll position if saved
+    if (window.pendingScrollTop) {
+        tableContainer.scrollTop = window.pendingScrollTop;
+        delete window.pendingScrollTop;
+    }
 
     // 5. Scroll Listener
     tableContainer.addEventListener('scroll', () => {
