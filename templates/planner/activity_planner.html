@@ -488,9 +488,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     stickyOffset = stickyActionCol.offsetLeft + stickyActionCol.offsetWidth;
                 }
 
-                // Scroll to the cell, minus the sticky header width, plus a little padding (20px)
+                // Calculate position to center the today cell in the viewable area
+                const viewableWidth = container.clientWidth - stickyOffset;
+                const targetScroll = todayCell.offsetLeft - stickyOffset - (viewableWidth / 2) + (todayCell.offsetWidth / 2);
+
                 container.scrollTo({
-                    left: todayCell.offsetLeft - stickyOffset + 20,
+                    left: Math.max(0, targetScroll),
                     behavior: 'smooth'
                 });
             } else {
