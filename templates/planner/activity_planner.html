@@ -19,7 +19,7 @@
     
     /* Bar Colors */
     .activity-bar { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
-    .leave-bar { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); /* Orange */ }
+    .leave-bar { background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%); /* Yellow */ }
     .overlap-bar { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); animation: pulse 2s infinite; }
     
     /* Summary Bar Styling */
@@ -35,7 +35,7 @@
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     .weekend-cell { background-color: #f8fafc; }
     .holiday-cell { background-color: #fef9c3; }
-    .today-cell { border-left: 2px solid #ef4444 !important; border-right: 2px solid #ef4444 !important; background-color: #fee2e2; }
+    .today-cell { background-color: #fee2e2; }
     
     /* ACTION BUTTON STYLES */
     .action-btn { background: transparent; transition: all 0.2s ease; }
@@ -131,6 +131,9 @@
                 </div>
             </div>
             <div class="flex items-center space-x-4">
+                {% if project %}
+                <a href="{% url 'tracker_project_detail' project.id %}" class="bg-white bg-opacity-20 backdrop-blur-sm text-white py-1.5 px-4 rounded-lg hover:bg-opacity-30 transition-all duration-200 flex items-center text-xs font-medium"><svg class="icon mr-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>Go to Project Dashboard</a>
+                {% endif %}
                 <a href="{% url 'planner_project_list' %}" class="bg-white bg-opacity-20 backdrop-blur-sm text-white py-1.5 px-4 rounded-lg hover:bg-opacity-30 transition-all duration-200 flex items-center text-xs font-medium"><svg class="icon mr-1.5 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Back to Projects</a>
             </div>
         </div>
@@ -339,6 +342,13 @@
                 </tbody>
             </table>
         </div>
+        <div class="bg-gray-50 px-4 py-2 border-t border-gray-200 flex flex-wrap items-center justify-end gap-4 text-xs text-gray-600">
+            <span class="font-semibold text-gray-700">Legend:</span>
+            <div class="flex items-center"><div class="w-3 h-3 rounded mr-1.5" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);"></div> Standard Activity</div>
+            <div class="flex items-center"><div class="w-3 h-3 rounded mr-1.5" style="background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%);"></div> On Leave</div>
+            <div class="flex items-center"><div class="w-3 h-3 rounded mr-1.5" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"></div> Overlap</div>
+            <div class="flex items-center"><div class="w-3 h-3 mr-1.5" style="background: #bfdbfe; border-left: 2px solid #3b82f6; border-right: 2px solid #3b82f6;"></div> Group Summary</div>
+        </div>
     </div>
 </div>
 
@@ -476,23 +486,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const container = document.querySelector('.table-container');
             
             if (todayCell && container) {
-                // Calculate width of sticky columns to offset the scroll
-                // The last sticky column is .col-actions
-                const stickyActionCol = document.querySelector('.col-actions');
-                let stickyOffset = 0;
+                const containerRect = container.getBoundingClientRect();
+                const todayRect = todayCell.getBoundingClientRect();
+                
+                // Find the sticky column boundary (right edge of the last sticky column)
+                const stickyActionCol = document.querySelector('thead .col-actions');
+                let stickyRightEdge = containerRect.left;
+                
                 if (stickyActionCol) {
-                    // Use the left position + width from CSS/Computed style or offsetLeft + offsetWidth
-                    stickyOffset = stickyActionCol.offsetLeft + stickyActionCol.offsetWidth;
+                    const stickyRect = stickyActionCol.getBoundingClientRect();
+                    stickyRightEdge = stickyRect.right;
                 }
-
-                // Scroll to the cell, minus the sticky header width, plus a little padding (20px)
-                container.scrollTo({
-                    left: todayCell.offsetLeft - stickyOffset + 20,
+                
+                // Calculate the center of the visible scrollable area (between sticky cols and right edge)
+                const visibleWidth = containerRect.right - stickyRightEdge;
+                const visibleCenter = stickyRightEdge + (visibleWidth / 2);
+                
+                // Calculate the center of the today cell
+                const todayCenter = todayRect.left + (todayRect.width / 2);
+                
+                // Calculate delta and scroll
+                const delta = todayCenter - visibleCenter;
+                
+                container.scrollBy({
+                    left: delta,
                     behavior: 'smooth'
                 });
-            } else {
-                // Optional: Feedback if today is not in range
-                console.log("Today's date is not within the current view range.");
             }
         });
     }
@@ -633,6 +652,83 @@ document.addEventListener('DOMContentLoaded', () => {
     let isVirtualScrollActive = false;
     let isRenderPending = false;
 
+    // --- STATE PERSISTENCE START ---
+    function saveState() {
+        const container = document.querySelector('.table-container');
+        const currentScroll = container ? container.scrollTop : 0;
+        
+        const state = {
+            search: searchInput ? searchInput.value : '',
+            filters: {},
+            segments: Array.from(segmentCheckboxes).filter(c => c.checked).map(c => c.value),
+            leads: Array.from(leaderCheckboxes).filter(c => c.checked).map(c => c.value),
+            assignees: Array.from(assigneeCheckboxes).filter(c => c.checked).map(c => c.value),
+            collapsedGroups: Array.from(vsCollapsedGroups),
+            scrollTop: currentScroll || window.pendingScrollTop || 0
+        };
+        
+        filterInputs.forEach(input => {
+            const col = input.dataset.filterColumn;
+            if (input.value) state.filters[col] = input.value;
+        });
+        
+        // Use current path to separate state for different views
+        const key = 'planner_state_' + window.location.pathname;
+        sessionStorage.setItem(key, JSON.stringify(state));
+    }
+
+    function restoreState() {
+        try {
+            const key = 'planner_state_' + window.location.pathname;
+            const raw = sessionStorage.getItem(key);
+            if (!raw) return;
+            const state = JSON.parse(raw);
+            
+            if (searchInput) searchInput.value = state.search || '';
+            filterInputs.forEach(input => {
+                const col = input.dataset.filterColumn;
+                if (state.filters && state.filters[col]) input.value = state.filters[col];
+            });
+            if (state.segments) segmentCheckboxes.forEach(cb => cb.checked = state.segments.includes(cb.value));
+            if (state.leads) leaderCheckboxes.forEach(cb => cb.checked = state.leads.includes(cb.value));
+            if (state.assignees) assigneeCheckboxes.forEach(cb => cb.checked = state.assignees.includes(cb.value));
+            if (state.collapsedGroups) {
+                state.collapsedGroups.forEach(id => {
+                    vsCollapsedGroups.add(id);
+                    const header = document.querySelector(`.group-header[data-group-id="${id}"]`);
+                    if (header) header.classList.add('collapsed');
+                });
+            }
+            if (state.scrollTop) window.pendingScrollTop = state.scrollTop;
+        } catch (e) { console.error("Error restoring state", e); }
+    }
+    
+    restoreState();
+    window.addEventListener('beforeunload', saveState);
+    // --- STATE PERSISTENCE END ---
+
+    function drawTodayMarker() {
+        const container = document.querySelector('.table-container');
+        const todayCell = document.querySelector('th.today-cell');
+        const table = container ? container.querySelector('table') : null;
+        
+        const existing = document.getElementById('today-marker-line');
+        if (existing) existing.remove();
+
+        if (container && todayCell && table) {
+            const line = document.createElement('div');
+            line.id = 'today-marker-line';
+            // This is now a full-column, semi-transparent highlight instead of a line.
+            line.className = 'absolute top-0 bg-red-500 bg-opacity-25 pointer-events-none';
+            line.style.zIndex = '5'; // Low z-index to appear behind gantt bars
+            line.style.left = `${todayCell.offsetLeft}px`;
+            line.style.width = `${todayCell.offsetWidth}px`;
+            line.style.height = `${table.offsetHeight}px`;
+            
+            container.appendChild(line);
+        }
+    }
+
     function applyFilters() {
         const globalSearch = searchInput ? searchInput.value.toLowerCase().trim() : '';
         
@@ -689,6 +785,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Trigger Virtual Render
         renderVirtualWindow(true);
+        
+        // Update Today Marker
+        requestAnimationFrame(drawTodayMarker);
     }
 
     function checkRowFilters(row, globalSearch, colFilters, selectedSegments, selectedLeaders, selectedAssignees) {
@@ -853,12 +952,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Border
             ctx.fillStyle = '#f1f5f9'; // border-gray-100
             ctx.fillRect(x + colWidth - 1, 0, 1, 1);
-
-            if (isToday) {
-                ctx.fillStyle = '#ef4444'; // Red border
-                ctx.fillRect(x, 0, 2, 1); // Left
-                ctx.fillRect(x + colWidth - 2, 0, 2, 1); // Right
-            }
         });
         return canvas.toDataURL();
     }
@@ -968,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const isOverlap = actsOnDay && actsOnDay.length > 1;
 
                         if (isLeave) {
-                            barClass = 'leave-bar'; // Orange color
+                            barClass = 'leave-bar'; // Yellow color
                             title = `🏖️ On Leave: ${act.assignee}\n` + title;
                         }
                         else if (isOverlap) {
@@ -986,6 +1079,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         barDiv.style.left = `${index * COL_WIDTH}px`;
                         barDiv.style.width = `${COL_WIDTH - 8}px`; // mx-1 = 4px margin on sides
                         barDiv.title = title;
+
+                        if (isLeave) {
+                            barDiv.style.cursor = 'help';
+                            barDiv.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                alert(`🏖️ ON LEAVE\n\nUser: ${act.assignee}\nDate: ${dateStr}\nAffected Activity: ${act.name}\n\nThis resource is unavailable due to leave.`);
+                            });
+                        }
+
                         container.appendChild(barDiv);
                 }
             });
@@ -1117,6 +1219,12 @@ function initVirtualScroll() {
     // 4. Initial Filter & Render
     isVirtualScrollActive = true;
     applyFilters(); // This will populate vsVisibleRows and call renderVirtualWindow
+    
+    // Restore scroll position if saved
+    if (window.pendingScrollTop) {
+        tableContainer.scrollTop = window.pendingScrollTop;
+        delete window.pendingScrollTop;
+    }
 
     // 5. Scroll Listener
     tableContainer.addEventListener('scroll', () => {
