@@ -19,7 +19,7 @@
     
     /* Bar Colors */
     .activity-bar { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
-    .leave-bar { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); /* Orange */ }
+    .leave-bar { background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%); /* Yellow */ }
     .overlap-bar { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); animation: pulse 2s infinite; }
     
     /* Summary Bar Styling */
@@ -341,6 +341,13 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+        <div class="bg-gray-50 px-4 py-2 border-t border-gray-200 flex flex-wrap items-center justify-end gap-4 text-xs text-gray-600">
+            <span class="font-semibold text-gray-700">Legend:</span>
+            <div class="flex items-center"><div class="w-3 h-3 rounded mr-1.5" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);"></div> Standard Activity</div>
+            <div class="flex items-center"><div class="w-3 h-3 rounded mr-1.5" style="background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%);"></div> On Leave</div>
+            <div class="flex items-center"><div class="w-3 h-3 rounded mr-1.5" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"></div> Overlap</div>
+            <div class="flex items-center"><div class="w-3 h-3 mr-1.5" style="background: #bfdbfe; border-left: 2px solid #3b82f6; border-right: 2px solid #3b82f6;"></div> Group Summary</div>
         </div>
     </div>
 </div>
@@ -1048,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const isOverlap = actsOnDay && actsOnDay.length > 1;
 
                         if (isLeave) {
-                            barClass = 'leave-bar'; // Orange color
+                            barClass = 'leave-bar'; // Yellow color
                             title = `🏖️ On Leave: ${act.assignee}\n` + title;
                         }
                         else if (isOverlap) {
