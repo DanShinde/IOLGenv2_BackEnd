@@ -163,7 +163,7 @@ def project_detail(request, project_id):
             
             if note_text:
                 ProjectComment.objects.create(project=project, text=note_text, added_by=request.user)
-                messages.success(request, "Note added successfully.")
+                # messages.success(request, "Note added successfully.")
             else:
                 messages.error(request, "Please enter a note to save.")
             
@@ -269,6 +269,7 @@ def project_detail(request, project_id):
     
     updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()[:5]
     updates_count = project.updates.count()
+    open_updates_count = project.updates.exclude(status='Closed').count()
     
     recent_activity = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')[:5]
     last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
@@ -303,6 +304,7 @@ def project_detail(request, project_id):
         'emulation_stages': emulation_stages,
         'updates': updates,
         'updates_count': updates_count,
+        'open_updates_count': open_updates_count,
         'completion_percentage': get_completion_percentage(all_stages),
         'timeline_progress_auto': timeline_progress_auto,
         'timeline_progress_emu': timeline_progress_emu,
@@ -1296,11 +1298,11 @@ def add_project_update(request, project_id):
                     except ContactPerson.DoesNotExist:
                         pass
 
-            messages.success(request, "Push-Pull content added successfully.")
+            # messages.success(request, "Push-Pull content added successfully.")
         else:
             messages.error(request, "Update text and type are required.")
     
-    return redirect('tracker_project_detail', project_id=project.id)
+    return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project.id])}?bottom_tab=push_pull#project-notes")
 
 @login_required
 def add_general_update(request):
@@ -1375,7 +1377,7 @@ def edit_project_update(request, update_id):
                         except ContactPerson.DoesNotExist:
                             pass
 
-            messages.success(request, "Push-Pull content saved successfully.")
+            # messages.success(request, "Push-Pull content saved successfully.")
         
         referer = request.META.get('HTTP_REFERER')
         if referer and 'all-push-pull-content' in referer:
@@ -1386,7 +1388,7 @@ def edit_project_update(request, update_id):
                 filter_type = 'general'
             return redirect('all_push_pull_content_filtered', filter=filter_type)
         if update.project:
-            return redirect('tracker_project_detail', project_id=update.project.id)
+            return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[update.project.id])}?bottom_tab=push_pull#project-notes")
         else:
             return redirect('all_push_pull_content_filtered', filter='general')
     else:
@@ -1414,7 +1416,7 @@ def delete_project_update(request, update_id):
             return redirect('all_push_pull_content_filtered', filter=filter_type)
         
         if project_id:
-            return redirect('tracker_project_detail', project_id=project_id)
+            return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project_id])}?bottom_tab=push_pull#project-notes")
         else:
             return redirect('all_push_pull_content')
     else:
