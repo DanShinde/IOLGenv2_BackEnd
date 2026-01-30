@@ -208,7 +208,14 @@ def consolidated_planner_view(request):
             activity = form.save(commit=False)
             end_date_str = request.POST.get('end_date')
             if end_date_str:
-                activity.end_date = parse_date(end_date_str)
+                dt = parse_date(end_date_str)
+                if not dt:
+                    try:
+                        dt = datetime.strptime(end_date_str, '%d-%m-%Y').date()
+                    except ValueError:
+                        pass
+                if dt:
+                    activity.end_date = dt
             activity.save()
             query_params = {'group_by': grouping_method}
             if sort_order: query_params['sort'] = sort_order
@@ -288,7 +295,14 @@ def activity_planner_view(request, project_pk):
             activity = form.save(commit=False)
             end_date_str = request.POST.get('end_date')
             if end_date_str:
-                activity.end_date = parse_date(end_date_str)
+                dt = parse_date(end_date_str)
+                if not dt:
+                    try:
+                        dt = datetime.strptime(end_date_str, '%d-%m-%Y').date()
+                    except ValueError:
+                        pass
+                if dt:
+                    activity.end_date = dt
             activity.save()
             return redirect('planner_activity_planner', project_pk=project.pk)
 
@@ -470,7 +484,17 @@ def edit_activity_view(request, pk):
             act = form.save(commit=False)
             end_date_str = request.POST.get('end_date')
             if end_date_str:
-                act.end_date = parse_date(end_date_str)
+                dt = parse_date(end_date_str)
+                if not dt:
+                    try:
+                        dt = datetime.strptime(end_date_str, '%d-%m-%Y').date()
+                    except ValueError:
+                        pass
+                if dt:
+                    act.end_date = dt
+            elif 'end_date' in request.POST:
+                # If field is present but empty, user cleared it -> trigger auto-calc in model
+                act.end_date = None
             act.save()
             return redirect(next_url or default_redirect_url)
     else:

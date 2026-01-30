@@ -87,6 +87,10 @@ class Activity(models.Model):
         # 3. Logic: If End Date is provided (manual override), recalculate Duration.
         #    Otherwise, calculate End Date from Duration.
         if self.end_date:
+            # Ensure End Date is not before Start Date
+            if self.end_date < self.start_date:
+                self.end_date = self.start_date
+                
             # Recalculate duration based on start_date and end_date
             # count_working_days returns total working days (excluding weekends/holidays)
             raw_duration = count_working_days(self.start_date, self.end_date, holidays)

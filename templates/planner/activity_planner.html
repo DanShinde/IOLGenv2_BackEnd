@@ -353,15 +353,20 @@
 </div>
 
 <div id="addActivityModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-    <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-        <div class="flex justify-between items-center pb-3 border-b bg-gradient-to-r from-indigo-600 to-purple-700 -m-5 p-5 rounded-t-md">
-            <h3 class="text-2xl font-semibold text-white flex items-center">
-                <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                Add New Activity
+    <div class="relative mx-auto w-full max-w-2xl shadow-2xl rounded-xl bg-white overflow-hidden transform transition-all">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center px-6 py-4 bg-indigo-600">
+            <h3 class="text-lg font-bold text-white flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Add Activity
             </h3>
-            <button id="closeModalBtn" type="button" class="text-white hover:text-gray-200 text-3xl font-bold">&times;</button>
+            <button id="closeModalBtn" type="button" class="text-white hover:text-indigo-200 focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
         </div>
-        <div class="mt-5">
+        
+        <!-- Modal Body -->
+        <div class="p-6 bg-gray-50">
             <form method="POST" id="addActivityForm" class="space-y-6">
                 {% csrf_token %}
                 <input type="hidden" name="add_activity" value="true">
@@ -369,70 +374,58 @@
                 {% if project %}
                     <div style="display: none;">{{ form.project }}</div>
                 {% else %}
-                <div class="p-4 border rounded-lg bg-gray-50">
-                    <h4 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Core Details
-                    </h4>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Parent Project *</label>
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Parent Project <span class="text-red-500">*</span></label>
+                    <div class="mt-1">
                         {{ form.project }}
                     </div>
                 </div>
                 {% endif %}
 
-                <div class="p-4 border rounded-lg bg-gray-50">
-                    <label class="block text-sm font-medium text-gray-700">Activity Name *</label>
-                    {{ form.activity_name }}
-                </div>
-
-                <div class="p-4 border rounded-lg bg-gray-50">
-                    <h4 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                        Classification & Assignment
-                    </h4>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Assignee</label>
-                        {{ form.assignee }}
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Activity Name <span class="text-red-500">*</span></label>
+                            {{ form.activity_name }}
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Assignee</label>
+                            {{ form.assignee }}
+                        </div>
                     </div>
                 </div>
 
-                <div class="p-4 border rounded-lg bg-gray-50">
-                    <h4 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h4 class="text-sm font-bold text-gray-800 uppercase tracking-wide mb-3 flex items-center">
                         <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        Scheduling
+                        Schedule
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Start Date *</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Start Date <span class="text-red-500">*</span></label>
                             {{ form.start_date }}
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Duration (Working Days) *</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Duration <span class="text-xs font-normal text-gray-500">(Days)</span> <span class="text-red-500">*</span></label>
                             {{ form.duration }}
-                            <p class="text-xs text-gray-500">Excludes weekends and holidays</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">End Date</label>
-                            <input type="date" name="end_date" id="id_end_date" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">End Date</label>
+                            <input type="date" name="end_date" id="id_end_date" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
                         </div>
                     </div>
                 </div>
 
-                <div class="p-4 border rounded-lg bg-gray-50">
-                    <h4 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 01-2-2h14a2 2 0 012 2v9a2 2 0 01-2 2h-5l-4 4z"></path></svg>
-                        Additional Information
-                    </h4>
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Remarks</label>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Remarks</label>
                         {{ form.remark }}
                     </div>
                 </div>
 
-                <div class="mt-6 pt-4 border-t flex justify-end space-x-4">
-                    <button id="cancelModalBtn" type="button" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700">Add Activity</button>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button id="cancelModalBtn" type="button" class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Add Activity</button>
                 </div>
             </form>
         </div>
@@ -450,6 +443,17 @@ function toggleFilterMenu(menuId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Apply styles to Django form fields in Modal
+    const modalForm = document.getElementById('addActivityForm');
+    if (modalForm) {
+        const inputs = modalForm.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), select, textarea');
+        inputs.forEach(input => {
+            if (!input.classList.contains('w-full')) {
+                input.classList.add('w-full', 'rounded-md', 'border', 'border-gray-300', 'px-3', 'py-2', 'text-sm', 'focus:outline-none', 'focus:ring-2', 'focus:ring-indigo-500', 'focus:border-indigo-500', 'transition-colors');
+            }
+        });
+    }
+
     // --- Date Calculation Logic ---
     const startInput = document.getElementById('id_start_date');
     const durationInput = document.getElementById('id_duration');
@@ -501,6 +505,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (endInput) {
         endInput.addEventListener('change', () => {
             if (startInput.value && endInput.value) {
+                if (endInput.value < startInput.value) {
+                    alert("End Date cannot be before Start Date.");
+                    endInput.value = startInput.value;
+                }
                 const dur = countWorkingDays(startInput.value, endInput.value);
                 durationInput.value = dur;
             }
