@@ -264,6 +264,10 @@
                         <svg class="w-3 h-3 mr-1.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         Today
                     </button>
+                    <button onclick="exportGantt()" class="bg-white text-gray-700 border border-gray-300 py-1 px-3 rounded-md font-semibold text-xs flex items-center hover:bg-gray-50 transition-colors shadow-sm" title="Export to PDF">
+                        <svg class="w-3 h-3 mr-1.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Export PDF
+                    </button>
                     <button id="openModalBtn" class="btn-success text-white py-1 px-4 rounded-md font-semibold text-xs flex items-center">
                         <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                         Add Activity
@@ -440,6 +444,25 @@ function toggleFilterMenu(menuId) {
     if (isHidden) {
         menu.classList.remove('hidden');
     }
+}
+
+function exportGantt() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'pdf');
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value) params.set('search', searchInput.value);
+    
+    const segments = Array.from(document.querySelectorAll('.segment-checkbox:checked')).map(c => c.value);
+    if (segments.length) params.set('segments', segments.join(','));
+    
+    const leads = Array.from(document.querySelectorAll('.leader-checkbox:checked')).map(c => c.value);
+    if (leads.length) params.set('leads', leads.join(','));
+    
+    const assignees = Array.from(document.querySelectorAll('.assignee-checkbox:checked')).map(c => c.value);
+    if (assignees.length) params.set('assignees', assignees.join(','));
+    
+    window.location.href = '?' + params.toString();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

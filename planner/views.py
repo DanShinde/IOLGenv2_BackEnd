@@ -7,17 +7,20 @@ from .models import (ProjectType, Segment, Category, Holiday,
                      SalesForecast, EffortBracket, Leave)
 from datetime import date, timedelta, datetime
 from collections import OrderedDict, defaultdict
-from django.db.models import Min, Max
+from django.db.models import Min, Max, Q
 from .forms import ActivityForm, ProjectForm, LeaveForm
 from django.urls import reverse
 from urllib.parse import urlencode
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 import json
 from .utils import calculate_end_date, count_working_days, calculate_effort_from_value, calculate_overlap_working_days
 import calendar
 from django.views.decorators.http import require_POST
 from itertools import groupby
 from django.utils.dateparse import parse_date
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A3, landscape
+from reportlab.lib import colors
 
 # Define this constant at the top of the file to avoid "magic numbers"
 CR = 10_000_000
@@ -197,10 +200,184 @@ def project_list_view(request):
     }
     return render(request, 'planner/project_list.html', context)
 
+def export_planner_gantt_pdf(request, project_pk=None):
+    # Base QuerySet
+    activities = Activity.objects.select_related('project__segment', 'project__team_lead', 'assignee').all()
+    
+    project_obj = None
+    
+    if project_pk:
+        activities = activities.filter(project_id=project_pk)
+        # Fetch project object for header details
+        project_obj = get_object_or_404(Project, pk=project_pk)
+
+    # Parse Filters from GET params (sent by JS)
+    search = request.GET.get('search', '').strip()
+    segments = request.GET.get('segments', '').split(',') if request.GET.get('segments') else []
+    leads = request.GET.get('leads', '').split(',') if request.GET.get('leads') else []
+    assignees = request.GET.get('assignees', '').split(',') if request.GET.get('assignees') else []
+    
+    # Apply Filters
+    if segments:
+        q = Q()
+        for s in segments: q |= Q(project__segment__name__iexact=s)
+        activities = activities.filter(q)
+        
+    if leads:
+        q = Q()
+        for l in leads: q |= Q(project__team_lead__name__iexact=l)
+        activities = activities.filter(q)
+        
+    if assignees:
+        q = Q()
+        for a in assignees: q |= Q(assignee__name__iexact=a)
+        activities = activities.filter(q)
+        
+    if search:
+        activities = activities.filter(
+            Q(project__project_id__icontains=search) |
+            Q(project__customer_name__icontains=search) |
+            Q(activity_name__icontains=search) |
+            Q(assignee__name__icontains=search)
+        )
+        
+    activities = activities.order_by('project__project_id', 'start_date')
+    
+    # PDF Setup
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"Gantt_Export_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    c = canvas.Canvas(response, pagesize=landscape(A3))
+    width, height = landscape(A3)
+    
+    # Layout Config
+    margin_left = 30
+    
+    # Adjust header space based on whether we are showing project details
+    header_height = 75 if project_obj else 45
+    margin_top = height - header_height - 25
+    
+    row_height = 20
+    
+    col_proj = 90
+    col_act = 180
+    col_ass = 90
+    col_dates = 120
+    text_width = col_proj + col_act + col_ass + col_dates
+    gantt_width = width - margin_left - text_width - 30
+    
+    # Determine Date Range
+    if activities.exists():
+        min_date = activities.aggregate(Min('start_date'))['start_date__min']
+        max_date = activities.aggregate(Max('end_date'))['end_date__max']
+    else:
+        min_date = date.today()
+        max_date = date.today() + timedelta(days=30)
+        
+    if not min_date: min_date = date.today()
+    if not max_date: max_date = min_date + timedelta(days=30)
+    
+    start_plot = min_date - timedelta(days=7)
+    end_plot = max_date + timedelta(days=7)
+    total_days = (end_plot - start_plot).days
+    if total_days < 1: total_days = 1
+    px_per_day = gantt_width / total_days
+    
+    def get_x(d):
+        if not d: return 0
+        return margin_left + text_width + ((d - start_plot).days * px_per_day)
+    
+    def draw_page_header():
+        c.setFillColor(colors.black)
+        if project_obj:
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(margin_left, height - 40, f"Project Plan: {project_obj.project_id}")
+            
+            c.setFont("Helvetica-Bold", 10)
+            # Row of details
+            c.drawString(margin_left, height - 60, f"Customer: {project_obj.customer_name}")
+            c.drawString(margin_left + 300, height - 60, f"Segment: {project_obj.segment.name if project_obj.segment else '-'}")
+            c.drawString(margin_left + 550, height - 60, f"PACe: {project_obj.team_lead.name if project_obj.team_lead else '-'}")
+        else:
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(margin_left, height - 40, "Consolidated Activity Planner")
+        
+        c.setFont("Helvetica", 9)
+        c.drawRightString(width - 30, height - 40, f"Generated: {datetime.now().strftime('%d-%b-%Y %H:%M')}")
+        c.setStrokeColor(colors.black)
+        c.line(margin_left, height - header_height - 10, width - 30, height - header_height - 10)
+
+    def draw_header(y):
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin_left, y, "Project")
+        c.drawString(margin_left + col_proj, y, "Activity")
+        c.drawString(margin_left + col_proj + col_act, y, "Assignee")
+        c.drawString(margin_left + col_proj + col_act + col_ass, y, "Schedule")
+        
+        # Timeline Header
+        curr = start_plot
+        while curr <= end_plot:
+            x = get_x(curr)
+            if curr.day == 1 or curr == start_plot:
+                c.setFont("Helvetica-Bold", 8)
+                c.drawString(x, y, curr.strftime("%b %Y"))
+                c.setStrokeColor(colors.lightgrey)
+                c.line(x, y-5, x, 30)
+            curr += timedelta(days=1)
+            
+        c.setStrokeColor(colors.black)
+        c.line(margin_left, y-5, width-30, y-5)
+        return y - 20
+
+    draw_page_header()
+    y = margin_top
+    y = draw_header(y)
+    c.setFont("Helvetica", 9)
+    
+    for act in activities:
+        if y < 50:
+            c.showPage()
+            draw_page_header()
+            y = margin_top
+            y = draw_header(y)
+            c.setFont("Helvetica", 9)
+            
+        # Columns
+        p_code = act.project.project_id if act.project else "-"
+        c.drawString(margin_left, y, p_code[:14])
+        c.drawString(margin_left + col_proj, y, act.activity_name[:35])
+        assignee = act.assignee.name if act.assignee else "-"
+        c.drawString(margin_left + col_proj + col_act, y, assignee[:18])
+        
+        d_str = ""
+        if act.start_date and act.end_date:
+            d_str = f"{act.start_date.strftime('%d/%m')} - {act.end_date.strftime('%d/%m')}"
+        c.drawString(margin_left + col_proj + col_act + col_ass, y, d_str)
+        
+        # Bar
+        if act.start_date and act.end_date:
+            x1 = get_x(act.start_date)
+            x2 = get_x(act.end_date)
+            w = max(x2 - x1, 2)
+            
+            c.setFillColor(colors.cornflowerblue)
+            c.rect(x1, y-2, w, 10, fill=1, stroke=0)
+            c.setFillColor(colors.black)
+            
+        y -= row_height
+        
+    c.save()
+    return response
+
 def consolidated_planner_view(request):
     form = ActivityForm()
     grouping_method = request.GET.get('group_by', 'project')
     sort_order = request.GET.get('sort', 'asc')
+
+    if request.GET.get('export') == 'pdf':
+        return export_planner_gantt_pdf(request)
 
     if request.method == 'POST' and 'add_activity' in request.POST:
         form = ActivityForm(request.POST)
@@ -289,6 +466,10 @@ def consolidated_planner_view(request):
 def activity_planner_view(request, project_pk):
     project = get_object_or_404(Project, pk=project_pk)
     form = ActivityForm(initial={'project': project})
+    
+    if request.GET.get('export') == 'pdf':
+        return export_planner_gantt_pdf(request, project_pk=project_pk)
+        
     if request.method == 'POST' and 'add_activity' in request.POST:
         form = ActivityForm(request.POST)
         if form.is_valid():
