@@ -1265,6 +1265,33 @@ def add_remark(request, stage_id):
     return redirect('tracker_project_detail', project_id=stage.project.id)
 
 @login_required
+def edit_project_comment(request, comment_id):
+    comment = get_object_or_404(ProjectComment, id=comment_id)
+    if request.user == comment.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            new_text = request.POST.get('note_text')
+            if new_text:
+                comment.text = new_text
+                comment.save()
+                # messages.success(request, "Note updated successfully.")
+    else:
+        messages.error(request, "You do not have permission to edit this note.")
+    
+    return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[comment.project.id])}#project-notes")
+
+@login_required
+def delete_project_comment(request, comment_id):
+    comment = get_object_or_404(ProjectComment, id=comment_id)
+    project_id = comment.project.id
+    if request.user == comment.added_by or request.user.is_staff:
+        comment.delete()
+        # messages.success(request, "Note deleted successfully.")
+    else:
+        messages.error(request, "You do not have permission to delete this note.")
+    
+    return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project_id])}#project-notes")
+
+@login_required
 def get_remarks(request, stage_id):
     stage = get_object_or_404(Stage, id=stage_id)
     return render(request, 'tracker/view_remarks_modal.html', {'stage': stage})

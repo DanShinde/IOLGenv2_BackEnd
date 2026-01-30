@@ -40,6 +40,10 @@ urlpatterns = [
     path('remark/add/<int:stage_id>/', views.add_remark, name='tracker_add_remark'),
     path('remark/view/<int:stage_id>/', views.get_remarks, name='tracker_view_remarks'),
     
+    # Project Comments (Notes)
+    path('comment/<int:comment_id>/edit/', views.edit_project_comment, name='edit_project_comment'),
+    path('comment/<int:comment_id>/delete/', views.delete_project_comment, name='delete_project_comment'),
+
     # Project Updates
     path('project/<int:project_id>/add_update/', views.add_project_update, name='add_project_update'),
     path('update/<int:update_id>/edit/', views.edit_project_update, name='edit_project_update'),
