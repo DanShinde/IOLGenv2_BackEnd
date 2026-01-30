@@ -3,7 +3,7 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
-from .utils import calculate_end_date
+from .utils import calculate_end_date, count_working_days
 from employees.models import Employee
 
 class Segment(models.Model):
@@ -84,8 +84,27 @@ class Activity(models.Model):
                     assignee_leaves.append(curr)
                     curr += timedelta(days=1)
         
-        # 3. Calculate End Date considering both
-        self.end_date = calculate_end_date(self.start_date, self.duration, holidays, assignee_leaves)
+        # 3. Logic: If End Date is provided (manual override), recalculate Duration.
+        #    Otherwise, calculate End Date from Duration.
+        if self.end_date:
+            # Recalculate duration based on start_date and end_date
+            # count_working_days returns total working days (excluding weekends/holidays)
+            raw_duration = count_working_days(self.start_date, self.end_date, holidays)
+            
+            # Subtract assignee leaves that fall on working days
+            leaves_overlap = 0
+            for leave_date in assignee_leaves:
+                if self.start_date <= leave_date <= self.end_date:
+                    # Check if leave_date is a working day (Mon-Fri and not a holiday)
+                    if leave_date.weekday() < 5 and leave_date not in holidays:
+                        leaves_overlap += 1
+            
+            # Ensure duration is at least 1
+            self.duration = max(1, raw_duration - leaves_overlap)
+        else:
+            # Standard behavior: Calculate End Date from Duration
+            self.end_date = calculate_end_date(self.start_date, self.duration, holidays, assignee_leaves)
+            
         super().save(*args, **kwargs)
         
     class Meta:

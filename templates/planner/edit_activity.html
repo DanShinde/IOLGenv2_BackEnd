@@ -241,7 +241,7 @@
                             </svg>
                             Scheduling
                         </h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
                                     <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,17 +268,15 @@
                                 {% endif %}
                                 <p class="text-xs text-gray-500 mt-1">Number of working days, excluding weekends and holidays</p>
                             </div>
-                        </div>
-                        
-                        <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <div class="flex items-center">
-                                <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                <div>
-                                    <p class="text-sm font-medium text-blue-900">Calculated End Date</p>
-                                    <p class="text-sm text-blue-700">{{ activity.end_date|date:"l, F j, Y" }} (automatically calculated excluding weekends and holidays)</p>
-                                </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    End Date
+                                </label>
+                                <input type="date" name="end_date" id="id_end_date" value="{{ activity.end_date|date:'Y-m-d' }}" class="form-input w-full py-2 px-3 text-gray-700 leading-tight">
+                                <p class="text-xs text-gray-500 mt-1">Manually setting this will recalculate duration</p>
                             </div>
                         </div>
                     </div>
@@ -327,6 +325,51 @@
 </div>
 
 <script>
+    // --- Date Calculation Logic ---
+    const startInput = document.getElementById('id_start_date');
+    const durationInput = document.getElementById('id_duration');
+    const endInput = document.getElementById('id_end_date');
+
+    function addWorkingDays(startDate, days) {
+        let current = new Date(startDate);
+        let added = 0;
+        // If duration is 1, end date is same as start date (assuming start is a working day)
+        const daysToAdd = Math.max(0, days - 1);
+        
+        while (added < daysToAdd) {
+            current.setDate(current.getDate() + 1);
+            const day = current.getDay();
+            if (day !== 0 && day !== 6) { // Skip Sunday (0) and Saturday (6)
+                added++;
+            }
+        }
+        return current;
+    }
+
+    function countWorkingDays(start, end) {
+        let count = 0;
+        let current = new Date(start);
+        const endDate = new Date(end);
+        
+        if (endDate < current) return 1;
+
+        while (current <= endDate) {
+            const day = current.getDay();
+            if (day !== 0 && day !== 6) {
+                count++;
+            }
+            current.setDate(current.getDate() + 1);
+        }
+        return count;
+    }
+
+    function updateEnd() {
+        if (startInput.value && durationInput.value) {
+            const end = addWorkingDays(startInput.value, parseInt(durationInput.value));
+            endInput.value = end.toISOString().split('T')[0];
+        }
+    }
+
 document.addEventListener('DOMContentLoaded', () => {
     // Add form validation feedback
     const form = document.querySelector('form');
@@ -351,6 +394,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
+    // Attach listeners for date calc
+    if (startInput) startInput.addEventListener('change', updateEnd);
+    if (durationInput) durationInput.addEventListener('input', updateEnd);
+    if (endInput) {
+        endInput.addEventListener('change', () => {
+            if (startInput.value && endInput.value) {
+                const dur = countWorkingDays(startInput.value, endInput.value);
+                durationInput.value = dur;
+            }
+        });
+    }
+
     // Add confirmation for form submission
     form.addEventListener('submit', (e) => {
         const submitBtn = form.querySelector('button[type="submit"]');

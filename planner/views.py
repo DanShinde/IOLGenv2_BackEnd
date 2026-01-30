@@ -17,6 +17,7 @@ from .utils import calculate_end_date, count_working_days, calculate_effort_from
 import calendar
 from django.views.decorators.http import require_POST
 from itertools import groupby
+from django.utils.dateparse import parse_date
 
 # Define this constant at the top of the file to avoid "magic numbers"
 CR = 10_000_000
@@ -204,7 +205,11 @@ def consolidated_planner_view(request):
     if request.method == 'POST' and 'add_activity' in request.POST:
         form = ActivityForm(request.POST)
         if form.is_valid():
-            form.save()
+            activity = form.save(commit=False)
+            end_date_str = request.POST.get('end_date')
+            if end_date_str:
+                activity.end_date = parse_date(end_date_str)
+            activity.save()
             query_params = {'group_by': grouping_method}
             if sort_order: query_params['sort'] = sort_order
             return redirect(f"{reverse('planner_consolidated_planner')}?{urlencode(query_params)}")
@@ -280,7 +285,11 @@ def activity_planner_view(request, project_pk):
     if request.method == 'POST' and 'add_activity' in request.POST:
         form = ActivityForm(request.POST)
         if form.is_valid():
-            form.save()
+            activity = form.save(commit=False)
+            end_date_str = request.POST.get('end_date')
+            if end_date_str:
+                activity.end_date = parse_date(end_date_str)
+            activity.save()
             return redirect('planner_activity_planner', project_pk=project.pk)
 
     activities_qs = Activity.objects.filter(project=project).select_related(
@@ -458,7 +467,11 @@ def edit_activity_view(request, pk):
     if request.method == 'POST':
         form = ActivityForm(request.POST, instance=activity)
         if form.is_valid():
-            form.save()
+            act = form.save(commit=False)
+            end_date_str = request.POST.get('end_date')
+            if end_date_str:
+                act.end_date = parse_date(end_date_str)
+            act.save()
             return redirect(next_url or default_redirect_url)
     else:
         form = ActivityForm(instance=activity)

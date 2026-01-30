@@ -402,7 +402,7 @@
                         <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         Scheduling
                     </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Start Date *</label>
                             {{ form.start_date }}
@@ -411,6 +411,10 @@
                             <label class="block text-sm font-medium text-gray-700">Duration (Working Days) *</label>
                             {{ form.duration }}
                             <p class="text-xs text-gray-500">Excludes weekends and holidays</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">End Date</label>
+                            <input type="date" name="end_date" id="id_end_date" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                     </div>
                 </div>
@@ -446,6 +450,63 @@ function toggleFilterMenu(menuId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Date Calculation Logic ---
+    const startInput = document.getElementById('id_start_date');
+    const durationInput = document.getElementById('id_duration');
+    const endInput = document.getElementById('id_end_date');
+
+    function addWorkingDays(startDate, days) {
+        let current = new Date(startDate);
+        let added = 0;
+        // If duration is 1, end date is same as start date (assuming start is a working day)
+        // So we add (days - 1)
+        const daysToAdd = Math.max(0, days - 1);
+        
+        while (added < daysToAdd) {
+            current.setDate(current.getDate() + 1);
+            const day = current.getDay();
+            if (day !== 0 && day !== 6) { // Skip Sunday (0) and Saturday (6)
+                added++;
+            }
+        }
+        return current;
+    }
+
+    function countWorkingDays(start, end) {
+        let count = 0;
+        let current = new Date(start);
+        const endDate = new Date(end);
+        
+        if (endDate < current) return 1;
+
+        while (current <= endDate) {
+            const day = current.getDay();
+            if (day !== 0 && day !== 6) {
+                count++;
+            }
+            current.setDate(current.getDate() + 1);
+        }
+        return count;
+    }
+
+    function updateEnd() {
+        if (startInput.value && durationInput.value) {
+            const end = addWorkingDays(startInput.value, parseInt(durationInput.value));
+            endInput.value = end.toISOString().split('T')[0];
+        }
+    }
+
+    if (startInput) startInput.addEventListener('change', updateEnd);
+    if (durationInput) durationInput.addEventListener('input', updateEnd);
+    if (endInput) {
+        endInput.addEventListener('change', () => {
+            if (startInput.value && endInput.value) {
+                const dur = countWorkingDays(startInput.value, endInput.value);
+                durationInput.value = dur;
+            }
+        });
+    }
+
     // --- Fix Assignee Column Display ---
     // Replace avatar/initials with shortened name text (First L.)
     document.querySelectorAll('.gantt-activity-row').forEach(row => {
