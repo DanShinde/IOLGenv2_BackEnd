@@ -500,11 +500,15 @@ def edit_activity_view(request, pk):
     else:
         form = ActivityForm(instance=activity)
         
+    holidays = list(Holiday.objects.values_list('date', flat=True))
+    holidays_iso = [h.isoformat() for h in holidays]
+
     context = {
         'activity': activity, 
         'form': form, 
         'project': activity.project,
-        'next_url': next_url or default_redirect_url
+        'next_url': next_url or default_redirect_url,
+        'holidays_json': json.dumps(holidays_iso)
     }
     return render(request, 'planner/edit_activity.html', context)
 

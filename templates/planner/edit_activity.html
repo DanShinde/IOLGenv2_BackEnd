@@ -214,16 +214,44 @@
     const durationInput = document.getElementById('id_duration');
     const endInput = document.getElementById('id_end_date');
 
+    // Holidays passed from view
+    const holidays = {{ holidays_json|safe }};
+    const holidaysSet = new Set(holidays);
+
+    function parseDateLocal(dateStr) {
+        if (!dateStr) return new Date();
+        const [y, m, d] = dateStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    }
+
+    function toISODate(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function isWorkingDay(date) {
+        const day = date.getDay();
+        const dateStr = toISODate(date);
+        return day !== 0 && day !== 6 && !holidaysSet.has(dateStr);
+    }
+
     function addWorkingDays(startDate, days) {
-        let current = new Date(startDate);
+        let current = parseDateLocal(startDate);
+        
+        // If start date is not a working day, move to the first working day
+        while (!isWorkingDay(current)) {
+            current.setDate(current.getDate() + 1);
+        }
+
         let added = 0;
-        // If duration is 1, end date is same as start date (assuming start is a working day)
+        // We are now on Day 1 (a working day). We need to add (days - 1) more working days.
         const daysToAdd = Math.max(0, days - 1);
         
         while (added < daysToAdd) {
             current.setDate(current.getDate() + 1);
-            const day = current.getDay();
-            if (day !== 0 && day !== 6) { // Skip Sunday (0) and Saturday (6)
+            if (isWorkingDay(current)) {
                 added++;
             }
         }
@@ -232,14 +260,13 @@
 
     function countWorkingDays(start, end) {
         let count = 0;
-        let current = new Date(start);
-        const endDate = new Date(end);
+        let current = parseDateLocal(start);
+        const endDate = parseDateLocal(end);
         
         if (endDate < current) return 1;
 
         while (current <= endDate) {
-            const day = current.getDay();
-            if (day !== 0 && day !== 6) {
+            if (isWorkingDay(current)) {
                 count++;
             }
             current.setDate(current.getDate() + 1);
@@ -250,12 +277,11 @@
     function updateEnd() {
         if (startInput.value && durationInput.value) {
             const end = addWorkingDays(startInput.value, parseInt(durationInput.value));
-            endInput.value = end.toISOString().split('T')[0];
+            endInput.value = toISODate(end);
         }
     }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Add form validation feedback
     const form = document.querySelector('form');
     const inputs = form.querySelectorAll('input, select, textarea');
     
@@ -287,7 +313,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (endInput.value < startInput.value) {
                     alert("End Date cannot be before Start Date.");
                     endInput.value = startInput.value;
+                    updateEnd();
+                    return;
                 }
+
+                // Check for Weekend or Holiday
+                const date = parseDateLocal(endInput.value);
+                if (!isWorkingDay(date)) {
+                    alert("Error: The selected End Date falls on a weekend or holiday.\nPlease select a working day.");
+                    updateEnd(); // Revert to calculated
+                    return;
+                }
+
                 const dur = countWorkingDays(startInput.value, endInput.value);
                 durationInput.value = dur;
             }
