@@ -7,8 +7,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Home{% endblock %}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   {# 1) Bootstrap first so theme.css can override #}
   <link 
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" 
@@ -26,8 +24,6 @@
   <link rel="stylesheet" href="{% static 'base/theme.css' %}">
 
   {% block styles %}{% endblock %}
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --primary: #4361ee;
@@ -45,7 +41,7 @@
         }
         
         body {
-            background-color: #f5f7fb;
+            background: linear-gradient(135deg, #f5f7fb 0%, #e4e9f2 100%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #333;
             min-height: 100vh;
@@ -55,9 +51,17 @@
         
         /* Navigation */
         .navbar-custom {
-            background: linear-gradient(135deg, var(--dark) 0%, #2a3a5c 100%);
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
-            padding: 0.8rem 1rem;
+            background: #0f172a !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 0.8rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .navbar-custom .navbar-nav, .navbar-custom .container-fluid, .navbar-custom .d-flex {
+            background: transparent !important;
         }
         
         .navbar-brand {
@@ -68,36 +72,131 @@
             align-items: center;
         }
         
-        .navbar-brand i {
-            margin-right: 10px;
-            background: var(--accent);
-            padding: 8px;
-            border-radius: 10px;
+        .nav-item {
+            margin: 0 2px;
         }
         
         .nav-link {
-            color: rgba(255, 255, 255, 0.85) !important;
-            font-weight: 500;
-            padding: 0.5rem 1rem !important;
+            color: #94a3b8 !important;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 0.6rem 1rem !important;
             border-radius: 8px;
-            margin: 0 3px;
-            transition: var(--transition);
+            transition: color 0.2s ease-in-out, transform 0.2s ease;
+            position: relative;
         }
         
         .nav-link:hover, .nav-link.active {
             color: white !important;
-            background: rgba(255, 255, 255, 0.15);
+            background: transparent !important;
+            transform: translateY(-1px);
+        }
+
+        .nav-link.active {
+            background: transparent !important;
+            color: #4cc9f0 !important;
+        }
+        
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            left: 1rem;
+            width: 20px;
+            height: 2px;
+            background-color: #4cc9f0;
+            border-radius: 2px;
         }
         
         .nav-link i {
-            margin-right: 8px;
-            width: 20px;
-            text-align: center;
+            font-size: 1.1rem;
+        }
+        
+        .nav-link:hover i {
+            transform: scale(1.2);
         }
         
         .user-dropdown .dropdown-toggle::after {
             display: none;
         }
+
+        /* Welcome Banner Animation */
+        .welcome-banner {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(67, 97, 238, 0.3);
+            position: relative;
+            overflow: hidden;
+            animation: slideDown 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        
+        .welcome-banner::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Navbar Buttons */
+        .btn-nav-admin {
+            background: transparent !important;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .btn-nav-admin:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-color: white;
+            color: white;
+        }
+
+        .btn-nav-logout {
+            background: transparent !important;
+            color: #ef4444;
+            border: 1px solid #ef4444;
+            font-size: 0.85rem;
+            font-weight: 600;
+            box-shadow: none;
+            transition: all 0.2s;
+        }
+        .btn-nav-logout:hover {
+            background: #ef4444 !important;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Industrial Background Animation */
+        .industrial-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+            opacity: 0.04; 
+        }
+        .industrial-background i {
+            position: absolute;
+            color: var(--dark);
+        }
+        @keyframes float-1 { 0% { transform: translate(0, 0) rotate(0deg); } 100% { transform: translate(40px, 20px) rotate(5deg); } }
+        @keyframes float-2 { 0% { transform: translate(0, 0) rotate(0deg); } 100% { transform: translate(-30px, 50px) rotate(-5deg); } }
+        @keyframes float-3 { 0% { transform: translate(0, 0) rotate(0deg); } 100% { transform: translate(20px, -40px) rotate(3deg); } }
         
 
         
@@ -122,51 +221,66 @@
 </head>
 
 <body 
-  style="background-color: var(--color-bg-page); color: var(--color-text-primary);" 
   hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
 >
+    <!-- Background Graphics -->
+    <div class="industrial-background">
+        <!-- Robot (Robotics) -->
+        <i class="bi bi-robot" style="font-size: 25rem; top: -5%; right: -5%; animation: float-1 20s infinite alternate;"></i>
+        <!-- CPU/Chip (PLC) -->
+        <i class="bi bi-cpu" style="font-size: 15rem; top: 15%; left: 5%; animation: float-2 25s infinite alternate;"></i>
+        <!-- Box (Intralogistics) -->
+        <i class="bi bi-box-seam" style="font-size: 20rem; bottom: -5%; left: -5%; animation: float-3 22s infinite alternate;"></i>
+        <!-- Graph/Activity (SCADA) -->
+        <i class="bi bi-graph-up-arrow" style="font-size: 12rem; bottom: 20%; right: 15%; animation: float-2 28s infinite alternate;"></i>
+        <!-- Gear (Drives/Mechanics) -->
+        <i class="bi bi-gear-wide-connected" style="font-size: 18rem; top: 40%; left: 40%; opacity: 0.5; animation: float-1 30s infinite alternate;"></i>
+    </div>
     
   {# ========== NAVBAR ========== #}
   <nav 
-    class="navbar navbar-expand-lg px-4" 
-    style="
-      background: linear-gradient(
-        90deg, 
-        var(--color-primary-start) 0%, 
-        var(--color-primary-end)   100%
-      );"
+    class="navbar navbar-expand-lg px-4 navbar-custom navbar-dark" 
   >
-
+    <div class="container-fluid">
       <!-- LEFT: Nav Items -->
       <ul class="navbar-nav me-auto mb-2 mb-lg-0 d-flex flex-row">
         <li class="nav-item">
-          <a class="nav-link active text-white fw-bold" href="{% url 'home' %}">Home</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
+            <i class="bi bi-house-door-fill"></i> Home
+          </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link text-white" href="{% url 'project_list' %}">IO Lists</a>
+          <a class="nav-link {% if 'iolist' in request.path %}active{% endif %}" href="{% url 'project_list' %}">
+            <i class="bi bi-cpu-fill"></i> IO Lists
+          </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link text-white" href="{% url 'tracker_index' %}">Tracker</a>
+          <a class="nav-link {% if 'tracker' in request.path %}active{% endif %}" href="{% url 'tracker_index' %}">
+            <i class="bi bi-kanban-fill"></i> Tracker
+          </a>
         </li>
           <li class="nav-item">
-          <a class="nav-link text-white" href="{% url 'inventory-dashboard' %}">Inventory</a>
+          <a class="nav-link {% if 'inventory' in request.path %}active{% endif %}" href="{% url 'inventory-dashboard' %}">
+            <i class="bi bi-box-seam-fill"></i> Inventory
+          </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link text-white" href="{% url 'downloads' %}">Downloads</a>
+          <a class="nav-link {% if 'downloads' in request.path %}active{% endif %}" href="{% url 'downloads' %}">
+            <i class="bi bi-cloud-arrow-down-fill"></i> Downloads
+          </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link text-white" href="{% url 'planner_project_list' %}">Planner</a>
+          <a class="nav-link {% if 'planner' in request.path %}active{% endif %}" href="{% url 'planner_project_list' %}">
+            <i class="bi bi-calendar-range-fill"></i> Planner
+          </a>
         </li>
                 <li class="nav-item">
-          <a class="nav-link text-white" href="{% url 'forum-home' %}">
-            <i class="fas fa-comments"></i> Knowledge Base
+          <a class="nav-link {% if 'forum' in request.path %}active{% endif %}" href="{% url 'forum-home' %}">
+            <i class="bi bi-lightbulb-fill"></i> Knowledge Base
           </a>
         </li>
       </ul>
 
-
-        </li>
-      </ul>
 
       <!-- RIGHT: Logo + Logout -->
       <div class="d-flex align-items-center">
@@ -177,16 +291,12 @@
           style="height: 40px;"
         >
 
-        <ul class="navbar-nav mb-0 d-flex flex-row align-items-center" 
-        style="background-color: dimgray;">
+        <ul class="navbar-nav mb-0 d-flex flex-row align-items-center">
           {% if user.is_staff %}
-          <li class="nav-item" 
-          style="background-color: dimgray; margin: 2px 8px 2px 1px; padding: 5px 5px 5px 5px; "
-          >
+          <li class="nav-item">
             <a 
-              class="btn btn-primary ms-2" 
+              class="btn ms-2 btn-nav-admin" 
               href="{% url 'admin:index' %}"
-                style="margin: 2px 5px 2px 5px; padding: 5px 8px 5px 8px; background-color: rgb(49, 141, 136);"
             >
               Admin
             </a>
@@ -198,8 +308,7 @@
               {# Use your .btn-primary here #}
               <button 
                 type="submit" 
-                class="btn btn-primary ms-2"
-                style="margin: 2px 8px 2px 1px; padding: 5px 5px 5px 5px; background-color: rgb(49, 141, 136);"
+                class="btn ms-2 btn-nav-logout"
               >
                 Logout
               </button>
@@ -218,6 +327,26 @@
 
   {# ========== MAIN CONTENT ========== #}
   <main class="container py-5">
+    {% if user.is_authenticated and request.resolver_match.url_name == 'home' %}
+    <div class="welcome-banner d-flex align-items-center justify-content-between">
+        <div>
+            <h2 class="fw-bold mb-2" id="dynamic-greeting">Welcome back!</h2>
+            <p class="mb-0 fs-5 opacity-90">
+                Hello <strong>{{ user.first_name|default:user.username }}</strong>, hope you have a productive day.
+            </p>
+        </div>
+        <div class="d-none d-md-block opacity-50">
+            <i class="bi bi-rocket-takeoff" style="font-size: 4rem;"></i>
+        </div>
+    </div>
+
+    <!-- Daily Quote Separated -->
+    <div class="d-flex justify-content-center mb-5">
+        <div id="daily-quote" class="text-center" style="font-size: 1.35rem; font-weight: 500; color: #334155; max-width: 800px; line-height: 1.5; font-style: italic;">
+            <!-- Quote will be inserted here -->
+        </div>
+    </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 
@@ -227,6 +356,45 @@
   </footer>
 
   {% block scripts %}{% endblock %}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const greetingElem = document.getElementById('dynamic-greeting');
+        if (greetingElem) {
+            const hour = new Date().getHours();
+            let greeting = 'Welcome back';
+            if (hour >= 5 && hour < 12) greeting = 'Good Morning';
+            else if (hour >= 12 && hour < 18) greeting = 'Good Afternoon';
+            else if (hour >= 18 || hour < 5) greeting = 'Good Evening';
+            
+            greetingElem.innerText = greeting + '!';
+        }
+
+        const quoteElem = document.getElementById('daily-quote');
+        if (quoteElem) {
+            const quotes = [
+                "Quality means doing it right when no one is looking. – Henry Ford",
+                "The only way to do great work is to love what you do. – Steve Jobs",
+                "Productivity is never an accident. It is always the result of a commitment to excellence, intelligent planning, and focused effort. – Paul J. Meyer",
+                "Automation applied to an efficient operation will magnify the efficiency. – Bill Gates",
+                "Simplicity is the ultimate sophistication. – Leonardo da Vinci",
+                "Success is the sum of small efforts, repeated day-in and day-out. – Robert Collier",
+                "The best way to predict the future is to create it. – Peter Drucker",
+                "Continuous improvement is better than delayed perfection. – Mark Twain",
+                "It always seems impossible until it's done. – Nelson Mandela",
+                "Don't watch the clock; do what it does. Keep going. – Sam Levenson",
+                "Excellence is not a skill, it’s an attitude. – Ralph Marston",
+                "Opportunities don't happen, you create them. – Chris Grosser",
+                "Focus on being productive instead of busy. – Tim Ferriss"
+            ];
+            
+            const today = new Date();
+            const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+            const quoteIndex = dayOfYear % quotes.length;
+            quoteElem.innerText = '"' + quotes[quoteIndex] + '"';
+        }
+    });
+  </script>
 
   {# Bootstrap & HTMX & jQuery #}
   <script 
