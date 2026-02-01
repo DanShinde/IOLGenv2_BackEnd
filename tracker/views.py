@@ -37,7 +37,7 @@ import json
 from django.contrib.auth import get_user_model
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
-
+from planner.models import Project as PlannerProject
 
 
 def login_view(request):
@@ -149,10 +149,11 @@ def edit_project(request, project_id):
 
 @login_required
 def project_detail(request, project_id):
-    project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
+    project = get_object_or_404(Project.objects.select_related('segment_con', 'planner_project'), pk=project_id)
 
     contact_persons = ContactPerson.objects.all()
 
+    planner_project = PlannerProject.objects.filter(tracker_project=project).first()
 
     if request.method == 'POST':
         active_tab = request.POST.get('active_tab', 'automation')
@@ -322,6 +323,7 @@ def project_detail(request, project_id):
         'contact_persons': contact_persons,
         'status_choices': Stage.STATUS_CHOICES,
         'selected_status_filter': status_filter,
+        'planner_project': planner_project,
 
     }
     
@@ -1827,25 +1829,6 @@ def add_update_remark(request, update_id):
                 text=text,
                 added_by=request.user
             )
-            
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                user_display = (remark.added_by.get_full_name() or remark.added_by.username) if remark.added_by else 'Unknown'
-                initials = "??"
-                if remark.added_by:
-                    if remark.added_by.first_name and remark.added_by.last_name:
-                        initials = (remark.added_by.first_name[0] + remark.added_by.last_name[0]).upper()
-                    else:
-                        initials = remark.added_by.username[:2].upper()
-
-                return JsonResponse({
-                    'status': 'success',
-                    'remark': {
-                        'user': user_display,
-                        'date': remark.created_at.strftime("%b %d, %H:%M"),
-                        'text': remark.text,
-                        'initials': initials
-                    }
-                })
 
             messages.success(request, "Remark added successfully.")
             
@@ -1987,44 +1970,3 @@ def public_push_pull_content(request, access_token):
         'push_pull_filter': push_pull_filter,
     }
     return render(request, 'tracker/all_push_pull_content.html', context)
-
-
-@login_required
-def update_project_update_ajax(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            update_id = data.get('id')
-            field = data.get('field')
-            value = data.get('value')
-            
-            update = ProjectUpdate.objects.get(id=update_id)
-            
-            # Simple Authorization Check
-            if request.user != update.author and not request.user.groups.filter(name='Trackers').exists() and not request.user.is_staff:
-                 return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
-
-            # Handle the specific fields
-            if field == 'who_contact':
-                # Expecting a list of IDs for Many-to-Many
-                update.who_contact.set(value)
-            elif field == 'raised_by':
-                update.raised_by_id = value if value else None
-            elif field == 'eta':
-                update.eta = parse_date(value) if value else None
-            elif field == 'push_pull_type':
-                update.push_pull_type = value
-            elif field == 'status':
-                update.status = value
-                if value == 'Closed' and update.closed_at is None:
-                    update.closed_at = timezone.now()
-                elif value != 'Closed':
-                    update.closed_at = None
-            elif field == 'text':
-                update.text = value
-            
-            update.save()
-            return JsonResponse({'status': 'success'})
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-    return JsonResponse({'status': 'error', 'message': 'Bad Request'}, status=400)

@@ -464,7 +464,7 @@ def consolidated_planner_view(request):
     return render(request, 'planner/activity_planner.html', context)
 
 def activity_planner_view(request, project_pk):
-    project = get_object_or_404(Project, pk=project_pk)
+    project = get_object_or_404(Project.objects.select_related('tracker_project'), pk=project_pk)
     form = ActivityForm(initial={'project': project})
     
     if request.GET.get('export') == 'pdf':

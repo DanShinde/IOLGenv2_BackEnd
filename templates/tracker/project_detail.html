@@ -373,9 +373,15 @@
             <p class="page-subtitle">{{project.segment_con.name|default:'No Segment'}}</p>
         </div>
         <div class="d-flex align-items-center gap-2">
-            <a href="{% url 'planner_activity_planner' project.id %}" class="btn btn-primary">
+            {% if planner_project %}
+            <a href="{% url 'planner_activity_planner' planner_project.pk %}" class="btn btn-primary">
                 <i class="fas fa-chart-bar me-2"></i>Activity Planner
             </a>
+            {% else %}
+            <button class="btn btn-primary" disabled title="No linked planner project found">
+                <i class="fas fa-chart-bar me-2"></i>Activity Planner
+            </button>
+            {% endif %}
             <a href="{% url 'tracker_edit_project' project.id %}" class="btn btn-outline-secondary">
                 <i class="fas fa-edit me-2"></i>Edit Project
             </a>
@@ -774,44 +780,29 @@
                         {% for update in updates %}
                             <tr>
                                 <td>
-                                    <select class="form-select form-select-sm autosave-update-input" data-id="{{ update.id }}" data-field="push_pull_type">
-                                        {% for val, label in update.PUSH_PULL_CHOICES %}
-                                        <option value="{{ val }}" {% if update.push_pull_type == val %}selected{% endif %}>{{ label }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    <span class="badge {% if update.push_pull_type == 'Push' %}bg-info{% else %}bg-warning text-dark{% endif %}">{{ update.get_push_pull_type_display }}</span>
                                 </td>
                                 <td>
-                                    <textarea class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="text" rows="1" style="resize: none; min-height: 30px; overflow: hidden;" oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'">{{ update.text }}</textarea>
+                                    {{ update.text|linebreaksbr }}
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm select2-update-who" multiple data-id="{{ update.id }}" data-field="who_contact">
-                                        {% for person in contact_persons %}
-                                        <option value="{{ person.id }}" {% if person in update.who_contact.all %}selected{% endif %}>{{ person.name }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    {% for person in update.who_contact.all %}
+                                        <span class="badge bg-light text-dark border me-1">{{ person.name }}</span>
+                                    {% endfor %}
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm select2-update-raised-by" data-id="{{ update.id }}" data-field="raised_by">
-                                        <option value="">Select</option>
-                                        {% for person in contact_persons %}
-                                        <option value="{{ person.id }}" {% if update.raised_by.id == person.id %}selected{% endif %}>{{ person.name }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    {{ update.raised_by.name|default:"-" }}
                                 </td>
                                 <td>
-                                    <input type="date" class="form-control form-control-sm autosave-update-input" data-id="{{ update.id }}" data-field="eta" value="{{ update.eta|date:'Y-m-d' }}">
+                                    {{ update.eta|date:'Y-m-d'|default:"-" }}
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm autosave-update-input" data-id="{{ update.id }}" data-field="status">
-                                        {% for val, label in update.STATUS_CHOICES %}
-                                        <option value="{{ val }}" {% if update.status == val %}selected{% endif %}>{{ label }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    <span class="badge {% if update.status == 'Closed' %}bg-success{% else %}bg-secondary{% endif %}">{{ update.status }}</span>
                                 </td>
                                 <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-bs-toggle="modal" data-bs-target="#editUpdateModal{{ update.id }}" title="Edit"><i class="fas fa-edit"></i></button>
                                     <button type="button" class="btn btn-sm btn-link text-primary p-0 me-3" data-bs-toggle="modal" data-bs-target="#localUpdateRemarksModal{{ update.id }}" title="View Details"><i class="fas fa-eye"></i></button>
                                     <a href="{% url 'delete_project_update' update.id %}" class="btn btn-sm btn-link text-danger p-0" title="Delete" onclick="return confirm('Are you sure you want to delete this item?');"><i class="far fa-trash-alt"></i></a>
-                                    <span id="update-indicator-{{ update.id }}" class="ms-2" style="display:inline-block; width:15px;"></span>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -945,7 +936,7 @@
                         {% endfor %}
                     </div>
                 </div>
-                <form action="{% url 'add_update_remark' update.id %}" method="POST" class="ajax-remark-form" data-update-id="{{ update.id }}">
+                <form action="{% url 'add_update_remark' update.id %}" method="POST">
                     {% csrf_token %}
                     <input type="hidden" name="redirect_to" value="project_detail">
                     <div class="d-flex gap-2">
@@ -1112,108 +1103,6 @@
                 });
             }
         });
-
-        // Initialize Select2 for existing rows (Inline Editing)
-        $('.select2-update-who').each(function() {
-            $(this).select2({
-                tags: true,
-                tokenSeparators: [','],
-                theme: 'bootstrap-5',
-                placeholder: "Select person(s)",
-                width: '100%',
-                createTag: function(params) {
-                    const term = $.trim(params.term);
-                    if (term === '' || $.isNumeric(term)) { return null; }
-                    return { id: term, text: term, new: true };
-                },
-                templateResult: function (data) {
-                    if (data.new) { return $('<span><b>(New)</b> ' + data.text + '</span>'); }
-                    return data.text;
-                }
-            }).on('change', function(e) {
-                // Trigger autosave manually on change
-                const select = e.target;
-                const updateId = select.dataset.id;
-                const field = select.dataset.field;
-                const value = $(select).val(); // Array of IDs
-                handleUpdateAutosave(updateId, field, value);
-            }).on('select2:select', function(e) {
-                // Handle new tag creation via AJAX inside the table
-                const data = e.params.data;
-                if (data.new) {
-                    const $select = $(this);
-                    $.ajax({
-                        url: "{% url 'add_contact_person_ajax' %}",
-                        method: 'POST',
-                        data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
-                        success: function(response) {
-                            if(response.status === 'success') {
-                                const newOption = new Option(response.name, response.id, false, false);
-                                $select.find(`option[value="${data.id}"]`).remove();
-                                $select.append(newOption).trigger('change');
-                                // The change event above will handle the autosave
-                            } else {
-                                alert('Error creating new contact.');
-                            }
-                        },
-                        error: function() {
-                            alert('Error creating new contact.');
-                        }
-                    });
-                }
-            });
-        });
-
-        // Initialize Select2 for "Raised By" in existing rows (Inline Editing)
-        $('.select2-update-raised-by').each(function() {
-            $(this).select2({
-                tags: true,
-                theme: 'bootstrap-5',
-                placeholder: "Select person",
-                width: '100%',
-                createTag: function(params) {
-                    const term = $.trim(params.term);
-                    if (term === '' || $.isNumeric(term)) return null;
-                    return { id: term, text: term, new: true };
-                },
-                templateResult: function (data) {
-                    if (data.new) return $('<span><b>(New)</b> ' + data.text + '</span>');
-                    return data.text;
-                }
-            }).on('change', function(e) {
-                // Trigger autosave manually on change
-                const select = e.target;
-                const updateId = select.dataset.id;
-                const field = select.dataset.field;
-                const value = $(select).val();
-                handleUpdateAutosave(updateId, field, value);
-            }).on('select2:select', function(e) {
-                // Handle new tag creation via AJAX inside the table
-                const data = e.params.data;
-                if (data.new) {
-                    const $select = $(this);
-                    $.ajax({
-                        url: "{% url 'add_contact_person_ajax' %}",
-                        method: 'POST',
-                        data: { name: data.text, csrfmiddlewaretoken: '{{ csrf_token }}' },
-                        success: function(response) {
-                            if(response.status === 'success') {
-                                const newOption = new Option(response.name, response.id, false, false);
-                                $select.find(`option[value="${data.id}"]`).remove();
-                                $select.append(newOption).trigger('change');
-                                // The change event above will handle the autosave
-                            } else {
-                                alert('Error creating new contact.');
-                            }
-                        },
-                        error: function() {
-                            alert('Error creating new contact.');
-                        }
-                    });
-                }
-            });
-        });
-
 
         // Initialize Select2 for the edit modals when they are shown
         $('.select2-multiple-edit').each(function() {
@@ -1442,109 +1331,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (notesFeed) {
         notesFeed.scrollTop = notesFeed.scrollHeight;
     }
-
-    // --- Push-Pull Content Autosave Logic ---
-    window.handleUpdateAutosave = async function(updateId, field, value) {
-        const indicator = document.getElementById(`update-indicator-${updateId}`);
-        if(indicator) indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
-
-        const url = "{% url 'update_project_update_ajax' %}";
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify({
-                    id: updateId,
-                    field: field,
-                    value: value
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.status === 'success') {
-                if(indicator) indicator.innerHTML = '<i class="fas fa-check text-success small"></i>';
-                setTimeout(() => { if(indicator) indicator.innerHTML = ''; }, 2000);
-            } else {
-                if(indicator) indicator.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i>';
-                console.error('Autosave error:', data.message);
-            }
-        } catch (error) {
-            if(indicator) indicator.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i>';
-            console.error('Autosave network error:', error);
-        }
-    };
-
-    document.querySelectorAll('.autosave-update-input').forEach(input => {
-        input.addEventListener('change', function(e) {
-            handleUpdateAutosave(this.dataset.id, this.dataset.field, this.value);
-        });
-    });
-
-    // Handle AJAX remark submission
-    document.querySelectorAll('.ajax-remark-form').forEach(form => {
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const updateId = this.dataset.updateId;
-            const container = document.getElementById(`remarks-container-${updateId}`);
-            const textarea = this.querySelector('textarea[name="remark_text"]');
-            const submitBtn = this.querySelector('button[type="submit"]');
-            
-            // Disable button
-            const originalBtnText = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-
-            const formData = new FormData(this);
-
-            try {
-                const response = await fetch(this.action, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrftoken,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    const newRemarkHtml = `
-                        <div class="note-card">
-                            <div class="note-header">
-                                <div class="d-flex align-items-center">
-                                    <div class="note-avatar-small">${data.remark.initials}</div>
-                                    <span class="note-author">${data.remark.user}</span>
-                                </div>
-                                <span class="note-time"><i class="far fa-clock me-1"></i>${data.remark.date}</span>
-                            </div>
-                            <div class="note-content">${data.remark.text.replace(/\n/g, '<br>')}</div>
-                        </div>
-                    `;
-                    
-                    const noRemarksDiv = container.querySelector('.text-center.text-muted');
-                    if (noRemarksDiv) {
-                        noRemarksDiv.remove();
-                    }
-
-                    container.insertAdjacentHTML('beforeend', newRemarkHtml);
-                    container.scrollTop = container.scrollHeight;
-                    textarea.value = '';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
-            }
-        });
-    });
 
     // Auto-resize textareas on load
     function resizeAllTextareas() {
