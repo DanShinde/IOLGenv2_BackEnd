@@ -70,6 +70,7 @@ urlpatterns = [
 
     # Ajax
     path('ajax/update-stage/<int:stage_id>/', views.update_stage_ajax, name='update_stage_ajax'),
+    path('ajax/update-project-update/', views.update_project_update_ajax, name='update_project_update_ajax'),
 
     # Remark on Update
     path('update/<int:update_id>/remark/add/', views.add_update_remark, name='add_update_remark'),

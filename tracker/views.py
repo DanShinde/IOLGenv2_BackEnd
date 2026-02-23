@@ -1815,6 +1815,59 @@ def update_stage_ajax(request, stage_id):
     
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
 
+@login_required
+def update_project_update_ajax(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            update_id = data.get('id')
+            field = data.get('field')
+            value = data.get('value')
+
+            update = get_object_or_404(ProjectUpdate, id=update_id)
+
+            # Permission check: Author, Trackers group, or Staff
+            if not (request.user == update.author or request.user.groups.filter(name='Trackers').exists() or request.user.is_staff):
+                return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+            if field == 'text':
+                update.text = value
+            elif field == 'push_pull_type':
+                update.push_pull_type = value
+            elif field == 'status':
+                if value == 'Closed' and update.status != 'Closed':
+                    update.closed_at = timezone.now()
+                elif value != 'Closed':
+                    update.closed_at = None
+                update.status = value
+            elif field == 'eta':
+                update.eta = parse_date(value) if value else None
+            elif field == 'who_contact':
+                # Value is expected to be a list of IDs from Select2
+                update.who_contact.clear()
+                if isinstance(value, list):
+                    for contact_id in value:
+                        if contact_id:
+                            try:
+                                contact = ContactPerson.objects.get(id=contact_id)
+                                update.who_contact.add(contact)
+                            except ContactPerson.DoesNotExist:
+                                pass
+            elif field == 'raised_by':
+                if value:
+                    try:
+                        contact = ContactPerson.objects.get(id=value)
+                        update.raised_by = contact
+                    except ContactPerson.DoesNotExist:
+                        pass
+                else:
+                    update.raised_by = None
+
+            update.save()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
 
 
 @login_required
