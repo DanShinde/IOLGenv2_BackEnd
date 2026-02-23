@@ -46,3 +46,12 @@ D:\Testing_All\IOLGenv2.0\
     ├── media\                      ← Git ignored (local dev only)
     └── IOLGenv2_BackEnd\
         └── settings.py             ← Updated ✓
+
+# 1) Get latest refs
+git fetch origin
+ 
+# 2) Switch to your branch
+git checkout TrackerPlanner02
+ 
+# 3) Rebase your branch onto latest main
+git rebase origin/main

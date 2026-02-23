@@ -37,7 +37,7 @@ import json
 from django.contrib.auth import get_user_model
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
-
+from planner.models import Project as PlannerProject
 
 
 def login_view(request):
@@ -149,10 +149,11 @@ def edit_project(request, project_id):
 
 @login_required
 def project_detail(request, project_id):
-    project = get_object_or_404(Project.objects.select_related('segment_con'), pk=project_id)
+    project = get_object_or_404(Project.objects.select_related('segment_con', 'planner_project'), pk=project_id)
 
     contact_persons = ContactPerson.objects.all()
 
+    planner_project = PlannerProject.objects.filter(tracker_project=project).first()
 
     if request.method == 'POST':
         active_tab = request.POST.get('active_tab', 'automation')
@@ -163,7 +164,7 @@ def project_detail(request, project_id):
             
             if note_text:
                 ProjectComment.objects.create(project=project, text=note_text, added_by=request.user)
-                messages.success(request, "Note added successfully.")
+                # messages.success(request, "Note added successfully.")
             else:
                 messages.error(request, "Please enter a note to save.")
             
@@ -269,6 +270,7 @@ def project_detail(request, project_id):
     
     updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()[:5]
     updates_count = project.updates.count()
+    open_updates_count = project.updates.exclude(status='Closed').count()
     
     recent_activity = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')[:5]
     last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
@@ -303,6 +305,7 @@ def project_detail(request, project_id):
         'emulation_stages': emulation_stages,
         'updates': updates,
         'updates_count': updates_count,
+        'open_updates_count': open_updates_count,
         'completion_percentage': get_completion_percentage(all_stages),
         'timeline_progress_auto': timeline_progress_auto,
         'timeline_progress_emu': timeline_progress_emu,
@@ -320,6 +323,7 @@ def project_detail(request, project_id):
         'contact_persons': contact_persons,
         'status_choices': Stage.STATUS_CHOICES,
         'selected_status_filter': status_filter,
+        'planner_project': planner_project,
 
     }
     
@@ -1263,6 +1267,33 @@ def add_remark(request, stage_id):
     return redirect('tracker_project_detail', project_id=stage.project.id)
 
 @login_required
+def edit_project_comment(request, comment_id):
+    comment = get_object_or_404(ProjectComment, id=comment_id)
+    if request.user == comment.added_by or request.user.is_staff:
+        if request.method == 'POST':
+            new_text = request.POST.get('note_text')
+            if new_text:
+                comment.text = new_text
+                comment.save()
+                # messages.success(request, "Note updated successfully.")
+    else:
+        messages.error(request, "You do not have permission to edit this note.")
+    
+    return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[comment.project.id])}#project-notes")
+
+@login_required
+def delete_project_comment(request, comment_id):
+    comment = get_object_or_404(ProjectComment, id=comment_id)
+    project_id = comment.project.id
+    if request.user == comment.added_by or request.user.is_staff:
+        comment.delete()
+        # messages.success(request, "Note deleted successfully.")
+    else:
+        messages.error(request, "You do not have permission to delete this note.")
+    
+    return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project_id])}#project-notes")
+
+@login_required
 def get_remarks(request, stage_id):
     stage = get_object_or_404(Stage, id=stage_id)
     return render(request, 'tracker/view_remarks_modal.html', {'stage': stage})
@@ -1296,11 +1327,11 @@ def add_project_update(request, project_id):
                     except ContactPerson.DoesNotExist:
                         pass
 
-            messages.success(request, "Push-Pull content added successfully.")
+            # messages.success(request, "Push-Pull content added successfully.")
         else:
             messages.error(request, "Update text and type are required.")
     
-    return redirect('tracker_project_detail', project_id=project.id)
+    return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project.id])}?bottom_tab=push_pull#project-notes")
 
 @login_required
 def add_general_update(request):
@@ -1375,7 +1406,7 @@ def edit_project_update(request, update_id):
                         except ContactPerson.DoesNotExist:
                             pass
 
-            messages.success(request, "Push-Pull content saved successfully.")
+            # messages.success(request, "Push-Pull content saved successfully.")
         
         referer = request.META.get('HTTP_REFERER')
         if referer and 'all-push-pull-content' in referer:
@@ -1386,7 +1417,7 @@ def edit_project_update(request, update_id):
                 filter_type = 'general'
             return redirect('all_push_pull_content_filtered', filter=filter_type)
         if update.project:
-            return redirect('tracker_project_detail', project_id=update.project.id)
+            return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[update.project.id])}?bottom_tab=push_pull#project-notes")
         else:
             return redirect('all_push_pull_content_filtered', filter='general')
     else:
@@ -1414,7 +1445,7 @@ def delete_project_update(request, update_id):
             return redirect('all_push_pull_content_filtered', filter=filter_type)
         
         if project_id:
-            return redirect('tracker_project_detail', project_id=project_id)
+            return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project_id])}?bottom_tab=push_pull#project-notes")
         else:
             return redirect('all_push_pull_content')
     else:
@@ -1784,6 +1815,59 @@ def update_stage_ajax(request, stage_id):
     
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
 
+@login_required
+def update_project_update_ajax(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            update_id = data.get('id')
+            field = data.get('field')
+            value = data.get('value')
+
+            update = get_object_or_404(ProjectUpdate, id=update_id)
+
+            # Permission check: Author, Trackers group, or Staff
+            if not (request.user == update.author or request.user.groups.filter(name='Trackers').exists() or request.user.is_staff):
+                return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+            if field == 'text':
+                update.text = value
+            elif field == 'push_pull_type':
+                update.push_pull_type = value
+            elif field == 'status':
+                if value == 'Closed' and update.status != 'Closed':
+                    update.closed_at = timezone.now()
+                elif value != 'Closed':
+                    update.closed_at = None
+                update.status = value
+            elif field == 'eta':
+                update.eta = parse_date(value) if value else None
+            elif field == 'who_contact':
+                # Value is expected to be a list of IDs from Select2
+                update.who_contact.clear()
+                if isinstance(value, list):
+                    for contact_id in value:
+                        if contact_id:
+                            try:
+                                contact = ContactPerson.objects.get(id=contact_id)
+                                update.who_contact.add(contact)
+                            except ContactPerson.DoesNotExist:
+                                pass
+            elif field == 'raised_by':
+                if value:
+                    try:
+                        contact = ContactPerson.objects.get(id=value)
+                        update.raised_by = contact
+                    except ContactPerson.DoesNotExist:
+                        pass
+                else:
+                    update.raised_by = None
+
+            update.save()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
 
 
 @login_required
@@ -1798,25 +1882,6 @@ def add_update_remark(request, update_id):
                 text=text,
                 added_by=request.user
             )
-            
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                user_display = (remark.added_by.get_full_name() or remark.added_by.username) if remark.added_by else 'Unknown'
-                initials = "??"
-                if remark.added_by:
-                    if remark.added_by.first_name and remark.added_by.last_name:
-                        initials = (remark.added_by.first_name[0] + remark.added_by.last_name[0]).upper()
-                    else:
-                        initials = remark.added_by.username[:2].upper()
-
-                return JsonResponse({
-                    'status': 'success',
-                    'remark': {
-                        'user': user_display,
-                        'date': remark.created_at.strftime("%b %d, %H:%M"),
-                        'text': remark.text,
-                        'initials': initials
-                    }
-                })
 
             messages.success(request, "Remark added successfully.")
             
@@ -1958,44 +2023,3 @@ def public_push_pull_content(request, access_token):
         'push_pull_filter': push_pull_filter,
     }
     return render(request, 'tracker/all_push_pull_content.html', context)
-
-
-@login_required
-def update_project_update_ajax(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            update_id = data.get('id')
-            field = data.get('field')
-            value = data.get('value')
-            
-            update = ProjectUpdate.objects.get(id=update_id)
-            
-            # Simple Authorization Check
-            if request.user != update.author and not request.user.groups.filter(name='Trackers').exists() and not request.user.is_staff:
-                 return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
-
-            # Handle the specific fields
-            if field == 'who_contact':
-                # Expecting a list of IDs for Many-to-Many
-                update.who_contact.set(value)
-            elif field == 'raised_by':
-                update.raised_by_id = value if value else None
-            elif field == 'eta':
-                update.eta = parse_date(value) if value else None
-            elif field == 'push_pull_type':
-                update.push_pull_type = value
-            elif field == 'status':
-                update.status = value
-                if value == 'Closed' and update.closed_at is None:
-                    update.closed_at = timezone.now()
-                elif value != 'Closed':
-                    update.closed_at = None
-            elif field == 'text':
-                update.text = value
-            
-            update.save()
-            return JsonResponse({'status': 'success'})
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-    return JsonResponse({'status': 'error', 'message': 'Bad Request'}, status=400)
