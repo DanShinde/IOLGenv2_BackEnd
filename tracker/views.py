@@ -286,10 +286,9 @@ def project_detail(request, project_id):
 
     all_stages = automation_stages + emulation_stages
     
-    updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()[:5]
     updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()[:5]
     updates_count = project.updates.count()
-    open_updates_count = project.updates.exclude(status='Closed').count()
+    open_updates_count = project.updates.filter(status__in=['Open', 'In Progress']).count()
     
     recent_activity = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')[:5]
     last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
