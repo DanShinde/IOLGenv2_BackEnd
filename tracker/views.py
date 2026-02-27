@@ -39,6 +39,7 @@ from django.contrib.auth import get_user_model
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
 from planner.models import Project as PlannerProject
+from django.utils.html import escape
 
 
 def login_view(request):
@@ -1674,7 +1675,6 @@ def export_push_pull_excel(request):
 @login_required
 def export_push_pull_pdf(request):
 
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
     updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by')
     filter = request.GET.get('filter')
 
@@ -1728,26 +1728,43 @@ def export_push_pull_pdf(request):
     
     for update in updates:
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_list = []
-        for r in update.remarks.all():
-            user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
-            remarks_list.append(f"• {user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}")
         
-        what_cell = Paragraph(update.text, long_text_style)
-        who_cell = Paragraph(who_contacts_str if who_contacts_str else '-', long_text_style)
-        remarks_cell = Paragraph("<br/>".join(remarks_list), long_text_style) if remarks_list else '-'
+        safe_update_text = escape(update.text).replace('\n', '<br/>') if update.text else ""
+        safe_who_str = escape(who_contacts_str) if who_contacts_str else "-"
+        safe_raised_by = escape(update.raised_by.name) if update.raised_by else "-"
+
+        project_code = update.project.code if update.project else 'N/A'
+        type_display = update.get_push_pull_type_display()
+        what_cell = Paragraph(safe_update_text, long_text_style)
+        who_cell = Paragraph(safe_who_str, long_text_style)
+        raised_by_cell = Paragraph(safe_raised_by, long_text_style)
+        eta_str = update.eta.strftime('%Y-%m-%d') if update.eta else '-'
+        status_str = update.status
         
-        row = [
-            update.project.code if update.project else 'N/A',
-            update.get_push_pull_type_display(),
-            what_cell,
-            who_cell,
-            Paragraph(update.raised_by.name if update.raised_by else '-', long_text_style),
-            update.eta.strftime('%Y-%m-%d') if update.eta else '-',
-            update.status,
-            remarks_cell
-        ]
-        table_data.append(row)
+        remarks = list(update.remarks.order_by('created_at'))
+        
+        if not remarks:
+            row = [
+                project_code, type_display, what_cell, who_cell, 
+                raised_by_cell, eta_str, status_str, '-'
+            ]
+            table_data.append(row)
+        else:
+            for i, r in enumerate(remarks):
+                user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
+                safe_remark_text = escape(r.text).replace('\n', '<br/>')
+                safe_user_str = escape(user_str)
+                remark_str = f"• {safe_user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {safe_remark_text}"
+                remark_cell = Paragraph(remark_str, long_text_style)
+                
+                if i == 0:
+                    row = [
+                        project_code, type_display, what_cell, who_cell, 
+                        raised_by_cell, eta_str, status_str, remark_cell
+                    ]
+                else:
+                    row = ['', '', '', '', '', '', '', remark_cell]
+                table_data.append(row)
         
     col_widths = [1.8*cm, 2.5*cm, 4*cm, 2*cm, 2*cm, 2.5*cm, 2.5*cm, 5.2*cm]
     
