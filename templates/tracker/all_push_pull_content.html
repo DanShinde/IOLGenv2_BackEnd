@@ -142,6 +142,33 @@
                         <th style="width: 5%;">Actions</th>
                         {% endif %}
                     </tr>
+                    <!-- Filter Row -->
+                    <tr class="filter-row bg-light">
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="0" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2">
+                            <select class="form-select form-select-sm filter-input shadow-none border" data-col="1" style="font-size: 0.75rem;">
+                                <option value="">All</option>
+                                <option value="push">Push</option>
+                                <option value="pull">Pull</option>
+                            </select>
+                        </th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="2" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="3" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="4" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="5" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2">
+                            <select class="form-select form-select-sm filter-input shadow-none border" data-col="6" style="font-size: 0.75rem;">
+                                <option value="">All</option>
+                                <option value="open">Open</option>
+                                <option value="in progress">In Progress</option>
+                                <option value="closed">Closed</option>
+                            </select>
+                        </th>
+                        <th class="p-2"></th>
+                        {% if not is_public_view %}
+                        <th class="p-2"></th>
+                        {% endif %}
+                    </tr>
                 </thead>
                 <tbody class="small">
                     {% for update in updates %}
@@ -515,6 +542,55 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+
+    // Table Column Filtering
+    $('.filter-input').on('keyup change', function() {
+        var filters = [];
+        $('.filter-input').each(function() {
+            var $input = $(this);
+            var colIndex = $input.data('col');
+            var val = $input.val().toLowerCase();
+            if (val) {
+                filters.push({ col: colIndex, val: val });
+            }
+        });
+
+        var $rows = $('#pushPullTable tbody tr');
+        
+        $rows.each(function() {
+            var $row = $(this);
+            var show = true;
+            
+            for (var i = 0; i < filters.length; i++) {
+                var filter = filters[i];
+                var $cell = $row.find('td').eq(filter.col);
+                var text = "";
+
+                var $select = $cell.find('select');
+                var $textarea = $cell.find('textarea');
+                var $input = $cell.find('input').not('[type="hidden"]');
+
+                if ($select.length) {
+                    var selectedOptions = $select.find('option:selected');
+                    var selectedText = [];
+                    selectedOptions.each(function(){ selectedText.push($(this).text()); });
+                    text = selectedText.join(" ") + " " + $select.val();
+                } else if ($textarea.length) {
+                    text = $textarea.val();
+                } else if ($input.length) {
+                    text = $input.val();
+                } else {
+                    text = $cell.text();
+                }
+                
+                if (text.toLowerCase().indexOf(filter.val) === -1) {
+                    show = false;
+                    break;
+                }
+            }
+            $row.toggle(show);
+        });
+    });
 });
 </script>
 {% endblock %}

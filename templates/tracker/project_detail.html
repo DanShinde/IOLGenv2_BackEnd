@@ -767,6 +767,29 @@
                                 <th style="width: 10%;">Status</th>
                                 <th style="width: 10%;"></th>
                             </tr>
+                            <!-- Filter Row -->
+                            <tr class="filter-row bg-light">
+                                <th class="p-2">
+                                    <select class="form-select form-select-sm filter-input shadow-none border" data-col="0" style="font-size: 0.75rem;">
+                                        <option value="">All</option>
+                                        <option value="push">Push</option>
+                                        <option value="pull">Pull</option>
+                                    </select>
+                                </th>
+                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="1" placeholder="Search..." style="font-size: 0.75rem;"></th>
+                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="2" placeholder="Search..." style="font-size: 0.75rem;"></th>
+                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="3" placeholder="Search..." style="font-size: 0.75rem;"></th>
+                                <th class="p-2"></th>
+                                <th class="p-2">
+                                    <select class="form-select form-select-sm filter-input shadow-none border" data-col="5" style="font-size: 0.75rem;">
+                                        <option value="">All</option>
+                                        <option value="open">Open</option>
+                                        <option value="in progress">In Progress</option>
+                                        <option value="closed">Closed</option>
+                                    </select>
+                                </th>
+                                <th class="p-2"></th>
+                            </tr>
                         </thead>
                         <tbody>
                         {% for update in updates %}
@@ -1386,6 +1409,37 @@ document.addEventListener('DOMContentLoaded', function () {
                     btn.prop('disabled', false).html('<i class="fas fa-history me-1"></i> Load Older Notes');
                 }
             }
+        });
+    });
+
+    // Table Column Filtering
+    $('.filter-input').on('keyup change', function() {
+        var filters = [];
+        $('.filter-input').each(function() {
+            var $input = $(this);
+            var colIndex = $input.data('col');
+            var val = $input.val().toLowerCase();
+            if (val) {
+                filters.push({ col: colIndex, val: val });
+            }
+        });
+
+        var $rows = $('.loop-table tbody tr').not('#new-update-row');
+        
+        $rows.each(function() {
+            var $row = $(this);
+            var show = true;
+            
+            for (var i = 0; i < filters.length; i++) {
+                var filter = filters[i];
+                var $cell = $row.find('td').eq(filter.col);
+                var text = $cell.text().toLowerCase();
+                if (text.indexOf(filter.val) === -1) {
+                    show = false;
+                    break;
+                }
+            }
+            $row.toggle(show);
         });
     });
 });

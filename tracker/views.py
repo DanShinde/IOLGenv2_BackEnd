@@ -1554,7 +1554,7 @@ def all_push_pull_content(request, filter=None):
 
     # Apply status filtering
     if status_filter == 'open':
-        updates_qs = updates_qs.filter(status='Open')
+        updates_qs = updates_qs.exclude(status='Closed')
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
 
@@ -2003,7 +2003,7 @@ def public_push_pull_content(request, access_token):
         updates_qs = updates_qs.filter(push_pull_type='Pull')
         
     if status_filter == 'open':
-        updates_qs = updates_qs.filter(status='Open')
+        updates_qs = updates_qs.exclude(status='Closed')
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
 
