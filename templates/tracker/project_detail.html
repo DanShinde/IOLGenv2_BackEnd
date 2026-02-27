@@ -279,7 +279,8 @@
 
     /* Project Notes Styling */
     .project-notes-feed {
-        height: 500px; /* Fixed height window */
+        max-height: 500px; /* Maximum height before scrolling */
+        min-height: 200px;
         overflow-y: auto;
         padding: 15px;
         background: #fff;
@@ -887,7 +888,11 @@
                     </div>
                     <div class="col-md-3 mb-3">
                         <h6 class="text-muted small text-uppercase">Status</h6>
-                        <span class="badge {% if update.status == 'Closed' %}bg-success{% else %}bg-secondary{% endif %}">{{ update.status }}</span>
+                        <select class="form-select form-select-sm autosave-update-input" data-update-id="{{ update.id }}" data-field="status">
+                            {% for val, label in update_status_choices %}
+                                <option value="{{ val }}" {% if update.status == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="col-md-6">
                         <h6 class="text-muted small text-uppercase">Who</h6>
@@ -1350,6 +1355,43 @@ document.addEventListener('DOMContentLoaded', function () {
             resizeAllTextareas();
         });
     }
+
+    // Handle changes on autosave-update-input fields (Status, ETA, Who)
+    $(document).on('change', '.autosave-update-input', async function(event) {
+        const input = this;
+        const updateId = input.dataset.updateId;
+        const field = input.dataset.field;
+        let value = $(input).val();
+
+        const url = "{% url 'update_project_update_ajax' %}";
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    id: updateId,
+                    field: field,
+                    value: value
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.status === 'success') {
+                $(input).addClass('is-valid');
+                setTimeout(() => $(input).removeClass('is-valid'), 1000);
+            } else {
+                alert(`Error saving: ${data.message}`);
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    });
 });
 </script>
 {% endblock %}

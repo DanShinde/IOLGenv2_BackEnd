@@ -149,7 +149,7 @@ def edit_project(request, project_id):
 
 @login_required
 def project_detail(request, project_id):
-    project = get_object_or_404(Project.objects.select_related('segment_con', 'planner_project'), pk=project_id)
+    project = get_object_or_404(Project.objects.select_related('segment_con', 'team_lead'), pk=project_id)
 
     contact_persons = ContactPerson.objects.all()
 
@@ -256,6 +256,8 @@ def project_detail(request, project_id):
 
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
+    automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks__added_by', 'history__changed_by')
+    emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks__added_by', 'history__changed_by')
     
     if status_filter:
         automation_stages_qs = automation_stages_qs.filter(status=status_filter)
@@ -269,6 +271,7 @@ def project_detail(request, project_id):
     all_stages = automation_stages + emulation_stages
     
     updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()[:5]
+    updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()[:5]
     updates_count = project.updates.count()
     open_updates_count = project.updates.exclude(status='Closed').count()
     
@@ -324,6 +327,7 @@ def project_detail(request, project_id):
         'status_choices': Stage.STATUS_CHOICES,
         'selected_status_filter': status_filter,
         'planner_project': planner_project,
+        'update_status_choices': ProjectUpdate.STATUS_CHOICES,
 
     }
     
@@ -1481,6 +1485,7 @@ def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
 
     updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()
+    updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()
     contact_persons = ContactPerson.objects.all()
 
 
@@ -1514,6 +1519,7 @@ def all_push_pull_content(request, filter=None):
 
 
     updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1569,6 +1575,7 @@ def add_contact_person_ajax(request):
 @login_required
 def export_push_pull_excel(request):
     updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by')
     filter = request.GET.get('filter')
 
     if filter == 'project':
@@ -1636,6 +1643,7 @@ def export_push_pull_excel(request):
 def export_push_pull_pdf(request):
 
     updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by')
     filter = request.GET.get('filter')
 
     if filter == 'project':
