@@ -29,6 +29,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 
+from django.template.loader import render_to_string
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse, QueryDict
 import csv
 from itertools import groupby
@@ -154,6 +155,20 @@ def project_detail(request, project_id):
     contact_persons = ContactPerson.objects.all()
 
     planner_project = PlannerProject.objects.filter(tracker_project=project).first()
+
+    # Handle AJAX request for loading more comments
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' and request.GET.get('action') == 'load_comments':
+        offset = int(request.GET.get('offset', 0))
+        limit = 5
+        comments_qs = project.comments.select_related('added_by').order_by('-created_at')[offset:offset+limit]
+        comments = sorted(list(comments_qs), key=lambda x: x.created_at)
+        for comment in comments:
+            if comment.added_by:
+                comment.added_by.username = comment.added_by.get_full_name() or comment.added_by.username
+        
+        html = render_to_string('tracker/partials/project_comments_partial.html', {'comments': comments, 'request': request}, request=request)
+        modals_html = render_to_string('tracker/partials/project_comments_modals_partial.html', {'comments': comments, 'request': request}, request=request)
+        return JsonResponse({'html': html, 'modals_html': modals_html, 'has_more': project.comments.count() > (offset + limit)})
 
     if request.method == 'POST':
         active_tab = request.POST.get('active_tab', 'automation')
@@ -297,7 +312,10 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    project_comments = list(project.comments.select_related('added_by').order_by('created_at'))
+    total_comments_count = project.comments.count()
+    initial_limit = 5
+    recent_comments = project.comments.select_related('added_by').order_by('-created_at')[:initial_limit]
+    project_comments = sorted(list(recent_comments), key=lambda x: x.created_at)
     for comment in project_comments:
         if comment.added_by:
             comment.added_by.username = comment.added_by.get_full_name() or comment.added_by.username
@@ -322,6 +340,8 @@ def project_detail(request, project_id):
         'last_update_time': last_update_time,
         'recent_activity': recent_activity,
         'project_comments': project_comments,
+        'total_comments_count': total_comments_count,
+        'initial_comments_limit': initial_limit,
 
         'contact_persons': contact_persons,
         'status_choices': Stage.STATUS_CHOICES,

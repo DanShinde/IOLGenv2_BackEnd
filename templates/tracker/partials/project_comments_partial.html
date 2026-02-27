@@ -1,0 +1,23 @@
+{% load humanize %}
+{% for comment in comments %}
+    <div class="note-card">
+        <div class="note-header">
+            <div class="d-flex align-items-center">
+                <div class="note-avatar-small">{{ comment.added_by.username|slice:":2"|upper }}</div>
+                <span class="note-author">{{ comment.added_by.username|default:'Unknown' }}</span>
+            </div>
+            <div class="d-flex align-items-center">
+                <span class="note-time me-2"><i class="far fa-clock me-1"></i>{{ comment.created_at|naturaltime }}</span>
+                {% if request.user == comment.added_by or request.user.is_staff %}
+                    <button type="button" class="btn btn-link text-primary p-0 me-2" data-bs-toggle="modal" data-bs-target="#editNoteModal{{ comment.id }}" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <a href="{% url 'delete_project_comment' comment.id %}" class="btn btn-link text-danger p-0" onclick="return confirm('Delete this note?');" title="Delete">
+                        <i class="far fa-trash-alt"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="note-content">{{ comment.text|linebreaksbr }}</div>
+    </div>
+{% endfor %}
