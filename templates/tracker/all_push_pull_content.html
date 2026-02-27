@@ -87,7 +87,16 @@
 
 <div class="card">
 
-    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-table me-2"></i>Content Summary</h5></div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-header-title mb-0"><i class="fas fa-table me-2"></i>Content Summary</h5>
+        <div>
+            {% if status_filter == 'archived' %}
+                <a href="?status_filter=all&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back to Active</a>
+            {% else %}
+                <a href="?status_filter=archived&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i> View Archive</a>
+            {% endif %}
+        </div>
+    </div>
 
     <div class="card-body">
         <div class="d-flex flex-wrap gap-3 mb-4">
@@ -272,14 +281,15 @@
                         <td>
                             {% if not is_public_view %}
                                 <select class="form-select form-select-sm border-0 bg-transparent shadow-none ps-0 fw-bold 
-                                    {% if update.status == 'Open' %}text-success{% elif update.status == 'In Progress' %}text-warning{% else %}text-secondary{% endif %}" 
+                                    {% if update.status == 'Open' %}text-success{% elif update.status == 'In Progress' %}text-warning{% elif update.status == 'Archived' %}text-muted{% else %}text-secondary{% endif %}" 
                                     onchange="updateField({{ update.id }}, 'status', this.value)">
                                     <option value="Open" {% if update.status == 'Open' %}selected{% endif %}>Open</option>
                                     <option value="In Progress" {% if update.status == 'In Progress' %}selected{% endif %}>In Progress</option>
                                     <option value="Closed" {% if update.status == 'Closed' %}selected{% endif %}>Closed</option>
+                                    <option value="Archived" {% if update.status == 'Archived' %}selected{% endif %}>Archived</option>
                                 </select>
                             {% else %}
-                                <span class="badge {% if update.status == 'Open' %}bg-success{% elif update.status == 'In Progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                <span class="badge {% if update.status == 'Open' %}bg-success{% elif update.status == 'In Progress' %}bg-warning text-dark{% elif update.status == 'Archived' %}bg-secondary bg-opacity-50{% else %}bg-secondary{% endif %}">
                                     {{ update.status }}
                                 </span>
                             {% endif %}

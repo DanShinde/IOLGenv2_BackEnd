@@ -1550,6 +1550,10 @@ def all_push_pull_content(request, filter=None):
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
 
+    # Auto-archive logic: Move 'Closed' items older than 30 days to 'Archived'
+    archive_threshold = timezone.now() - timedelta(days=30)
+    ProjectUpdate.objects.filter(status='Closed', closed_at__lt=archive_threshold).update(status='Archived')
+
 
     updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks').order_by('-created_at')
     updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
@@ -1567,9 +1571,13 @@ def all_push_pull_content(request, filter=None):
 
     # Apply status filtering
     if status_filter == 'open':
-        updates_qs = updates_qs.exclude(status='Closed')
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else: # 'all'
+        updates_qs = updates_qs.exclude(status='Archived')
 
     updates = list(updates_qs.all())
     for update in updates:
@@ -1687,7 +1695,7 @@ def export_push_pull_pdf(request):
 
     
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=0.5*cm, rightMargin=0.5*cm, topMargin=1.0*cm, bottomMargin=1.0*cm)
     elements = []
     styles = getSampleStyleSheet()
 
@@ -1696,9 +1704,10 @@ def export_push_pull_pdf(request):
         parent=styles['Normal'],
         wordWrap='CJK',
         spaceAfter=6,
-        alignment=4,
+        alignment=0,
         textColor=colors.black,
         fontName='Helvetica',
+        fontSize=9,
     )
     
     header_style = ParagraphStyle(
@@ -1735,18 +1744,23 @@ def export_push_pull_pdf(request):
 
         project_code = update.project.code if update.project else 'N/A'
         type_display = update.get_push_pull_type_display()
+        
+        project_code_cell = Paragraph(escape(project_code), long_text_style)
+        type_cell = Paragraph(type_display, long_text_style)
         what_cell = Paragraph(safe_update_text, long_text_style)
         who_cell = Paragraph(safe_who_str, long_text_style)
         raised_by_cell = Paragraph(safe_raised_by, long_text_style)
         eta_str = update.eta.strftime('%Y-%m-%d') if update.eta else '-'
+        eta_cell = Paragraph(eta_str, long_text_style)
         status_str = update.status
+        status_cell = Paragraph(status_str, long_text_style)
         
         remarks = list(update.remarks.order_by('created_at'))
         
         if not remarks:
             row = [
-                project_code, type_display, what_cell, who_cell, 
-                raised_by_cell, eta_str, status_str, '-'
+                project_code_cell, type_cell, what_cell, who_cell, 
+                raised_by_cell, eta_cell, status_cell, '-'
             ]
             table_data.append(row)
         else:
@@ -1759,14 +1773,14 @@ def export_push_pull_pdf(request):
                 
                 if i == 0:
                     row = [
-                        project_code, type_display, what_cell, who_cell, 
-                        raised_by_cell, eta_str, status_str, remark_cell
+                        project_code_cell, type_cell, what_cell, who_cell, 
+                        raised_by_cell, eta_cell, status_cell, remark_cell
                     ]
                 else:
                     row = ['', '', '', '', '', '', '', remark_cell]
                 table_data.append(row)
         
-    col_widths = [1.8*cm, 2.5*cm, 4*cm, 2*cm, 2*cm, 2.5*cm, 2.5*cm, 5.2*cm]
+    col_widths = [2.5*cm, 2.5*cm, 6.5*cm, 2.5*cm, 2.0*cm, 2.2*cm, 2.5*cm, 7.4*cm]
     
     table_style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -2032,9 +2046,13 @@ def public_push_pull_content(request, access_token):
         updates_qs = updates_qs.filter(push_pull_type='Pull')
         
     if status_filter == 'open':
-        updates_qs = updates_qs.exclude(status='Closed')
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else:
+        updates_qs = updates_qs.exclude(status='Archived')
 
     updates = list(updates_qs.all())
     for update in updates:
@@ -2079,4 +2097,6 @@ def public_push_pull_content(request, access_token):
         'status_filter': status_filter,
         'push_pull_filter': push_pull_filter,
     }
+    return render(request, 'tracker/all_push_pull_content.html', context)
+    
     return render(request, 'tracker/all_push_pull_content.html', context)

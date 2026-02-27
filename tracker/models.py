@@ -205,6 +205,7 @@ class ProjectUpdate(models.Model):
         ('Open', 'Open'),
         ('In Progress', 'In Progress'),
         ('Closed', 'Closed'),
+        ('Archived', 'Archived'),
     ]
 
     PUSH_PULL_CHOICES = [
