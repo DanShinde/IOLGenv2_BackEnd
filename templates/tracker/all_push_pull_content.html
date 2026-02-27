@@ -30,20 +30,29 @@
 
 {% if not is_public_view %}
 <div class="card mb-4">
-    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-plus-circle me-2"></i>Add General Push-Pull Content</h5></div>
+    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-plus-circle me-2"></i>Add Push-Pull Content</h5></div>
     <div class="card-body">
         <form action="{% url 'add_general_update' %}" method="post" class="p-3 bg-light rounded">
             {% csrf_token %}
             <div class="mb-3">
                 <label for="update_text" class="form-label fw-bold">Content Text</label>
-                <textarea name="update_text" id="update_text" rows="3" class="form-control" placeholder="Share a new general update..." required></textarea>
+                <textarea name="update_text" id="update_text" rows="3" class="form-control" placeholder="Share a new update..." required></textarea>
             </div>
             <div class="row g-3 align-items-center">
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label for="project_id" class="form-label small mb-0">Project</label>
+                    <select name="project_id" id="project_id" class="form-select form-select-sm">
+                        <option value="general">General</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}">{{ project.code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label for="push_pull_type" class="form-label small mb-0">Type</label>
                     <select name="push_pull_type" id="push_pull_type" class="form-select form-select-sm">
-                        <option value="Push">Push Content</option>
                         <option value="Pull">Pull Content</option>
+                        <option value="Push">Push Content</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -63,12 +72,12 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="eta_date" class="form-label small mb-0">WHEN</label>
                     <input type="date" name="eta_date" id="eta_date" class="form-control form-control-sm">
                 </div>
                 <div class="col-12 text-end">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save General Content</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save Content</button>
                 </div>
             </div>
         </form>
@@ -186,8 +195,8 @@
                         <td>
                             {% if not is_public_view %}
                                 <select class="form-select form-select-sm border-0 bg-transparent shadow-none ps-0" onchange="updateField({{ update.id }}, 'push_pull_type', this.value)">
-                                    <option value="Push" {% if update.push_pull_type == 'Push' %}selected{% endif %}>Push</option>
                                     <option value="Pull" {% if update.push_pull_type == 'Pull' %}selected{% endif %}>Pull</option>
+                                    <option value="Push" {% if update.push_pull_type == 'Push' %}selected{% endif %}>Push</option>
                                 </select>
                             {% else %}
                                 {% if update.push_pull_type == 'Push' %}

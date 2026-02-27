@@ -1364,17 +1364,29 @@ def add_general_update(request):
         push_pull_type = request.POST.get('push_pull_type')
         who_contact_ids = request.POST.getlist('who_contact')
         raised_by_id = request.POST.get('raised_by')
+        project_id = request.POST.get('project_id')
 
         eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
 
         if text and push_pull_type:
+            content_type = 'General'
+            project = None
+            
+            if project_id and project_id != 'general':
+                try:
+                    project = Project.objects.get(pk=project_id)
+                    content_type = 'Project'
+                except Project.DoesNotExist:
+                    pass
+
             update = ProjectUpdate.objects.create(
                 author=request.user,
                 text=text,
                 push_pull_type=push_pull_type,
                 eta=eta,
                 raised_by_id=raised_by_id if raised_by_id else None,
-                content_type='General',
+                content_type=content_type,
+                project=project,
             )
             for contact_id in who_contact_ids:
                 if contact_id:
@@ -1384,11 +1396,11 @@ def add_general_update(request):
                     except ContactPerson.DoesNotExist:
                         pass
 
-            messages.success(request, "General content added successfully.")
+            messages.success(request, "Content added successfully.")
         else:
             messages.error(request, "Update text and type are required.")
 
-    return redirect('all_push_pull_content_filtered', filter='general')
+    return redirect('all_push_pull_content')
 
 
 @login_required
