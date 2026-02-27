@@ -1614,14 +1614,31 @@ def add_contact_person_ajax(request):
 
 @login_required
 def export_push_pull_excel(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
     filter = request.GET.get('filter')
 
     if filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
     elif filter == 'general':
         updates_qs = updates_qs.filter(content_type='General')
+
+    # Apply push/pull filtering
+    push_pull_filter = request.GET.get('push_pull_filter')
+    if push_pull_filter == 'push':
+        updates_qs = updates_qs.filter(push_pull_type='Push')
+    elif push_pull_filter == 'pull':
+        updates_qs = updates_qs.filter(push_pull_type='Pull')
+
+    # Apply status filtering
+    status_filter = request.GET.get('status_filter')
+    if status_filter == 'open':
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
+    elif status_filter == 'closed':
+        updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else: # 'all' or None
+        updates_qs = updates_qs.exclude(status='Archived')
 
     updates = updates_qs.all()
     
@@ -1681,8 +1698,7 @@ def export_push_pull_excel(request):
 
 @login_required
 def export_push_pull_pdf(request):
-
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
     filter = request.GET.get('filter')
 
     if filter == 'project':
@@ -1690,123 +1706,101 @@ def export_push_pull_pdf(request):
     elif filter == 'general':
         updates_qs = updates_qs.filter(content_type='General')
 
+    # Apply push/pull filtering
+    push_pull_filter = request.GET.get('push_pull_filter')
+    if push_pull_filter == 'push':
+        updates_qs = updates_qs.filter(push_pull_type='Push')
+    elif push_pull_filter == 'pull':
+        updates_qs = updates_qs.filter(push_pull_type='Pull')
+
+    # Apply status filtering
+    status_filter = request.GET.get('status_filter')
+    if status_filter == 'open':
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
+    elif status_filter == 'closed':
+        updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else: # 'all' or None
+        updates_qs = updates_qs.exclude(status='Archived')
+
     updates = updates_qs.all()
 
-    
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=0.5*cm, rightMargin=0.5*cm, topMargin=1.0*cm, bottomMargin=1.0*cm)
+    # Use portrait A4 for a list-style report
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
     elements = []
     styles = getSampleStyleSheet()
 
-    long_text_style = ParagraphStyle(
-        'long_text_style',
+    # Custom styles for a cleaner report
+    body_style = ParagraphStyle(
+        'body_style',
         parent=styles['Normal'],
-        wordWrap='CJK',
+        spaceBefore=6,
         spaceAfter=6,
-        alignment=0,
-        textColor=colors.black,
-        fontName='Helvetica',
-        fontSize=9,
+        leading=14,
     )
-    
-    header_style = ParagraphStyle(
-        'header_style',
+    section_header_style = ParagraphStyle(
+        'section_header_style',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        textColor=colors.whitesmoke,
-        alignment=1,
+        spaceBefore=12,
+        spaceAfter=2,
     )
-    
+
     elements.append(Paragraph("All Push-Pull Contents", styles['Title']))
     elements.append(Paragraph(f"Report Generated on: {timezone.now().strftime('%d-%b-%Y %I:%M %p')}", styles['Normal']))
-    elements.append(Spacer(1, 0.5*cm))
+    elements.append(Spacer(1, 1*cm))
 
-    table_data = [
-        [
-            Paragraph('Project Code', header_style),
-            Paragraph('Type', header_style),
-            Paragraph('What', header_style),
-            Paragraph('Who', header_style),
-            Paragraph('Raised By', header_style),
-            Paragraph('ETA', header_style),
-            Paragraph('Status', header_style),
-            Paragraph('Remarks', header_style)
-        ]
-    ]
-    
     for update in updates:
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        
-        safe_update_text = escape(update.text).replace('\n', '<br/>') if update.text else ""
-        safe_who_str = escape(who_contacts_str) if who_contacts_str else "-"
-        safe_raised_by = escape(update.raised_by.name) if update.raised_by else "-"
 
-        project_code = update.project.code if update.project else 'N/A'
-        type_display = update.get_push_pull_type_display()
-        
-        project_code_cell = Paragraph(escape(project_code), long_text_style)
-        type_cell = Paragraph(type_display, long_text_style)
-        what_cell = Paragraph(safe_update_text, long_text_style)
-        who_cell = Paragraph(safe_who_str, long_text_style)
-        raised_by_cell = Paragraph(safe_raised_by, long_text_style)
-        eta_str = update.eta.strftime('%Y-%m-%d') if update.eta else '-'
-        eta_cell = Paragraph(eta_str, long_text_style)
-        status_str = update.status
-        status_cell = Paragraph(status_str, long_text_style)
-        
+        # Create a small table for the metadata of each update
+        details_data = [
+            [Paragraph('<b>Project:</b>', styles['Normal']), Paragraph(escape(update.project.code if update.project else 'General'), styles['Normal'])],
+            [Paragraph('<b>Type:</b>', styles['Normal']), Paragraph(update.get_push_pull_type_display(), styles['Normal'])],
+            [Paragraph('<b>Status:</b>', styles['Normal']), Paragraph(update.status, styles['Normal'])],
+            [Paragraph('<b>ETA:</b>', styles['Normal']), Paragraph(update.eta.strftime('%Y-%m-%d') if update.eta else '-', styles['Normal'])],
+            [Paragraph('<b>Raised By:</b>', styles['Normal']), Paragraph(escape(update.raised_by.name if update.raised_by else '-'), styles['Normal'])],
+            [Paragraph('<b>Who:</b>', styles['Normal']), Paragraph(escape(who_contacts_str) if who_contacts_str else '-', body_style)],
+        ]
+        details_table = Table(details_data, colWidths=[3*cm, None])
+        details_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(details_table)
+
+        # Add the "What" description as a separate, splittable Paragraph
+        elements.append(Paragraph('What (Description):', section_header_style))
+        what_text = escape(update.text).replace('\n', '<br/>') if update.text else "-"
+        elements.append(Paragraph(what_text, body_style))
+
+        # Add Remarks as a series of splittable Paragraphs
+        elements.append(Paragraph('Remarks:', section_header_style))
         remarks = list(update.remarks.order_by('created_at'))
-        
         if not remarks:
-            row = [
-                project_code_cell, type_cell, what_cell, who_cell, 
-                raised_by_cell, eta_cell, status_cell, '-'
-            ]
-            table_data.append(row)
+            elements.append(Paragraph('-', body_style))
         else:
-            for i, r in enumerate(remarks):
+            for r in remarks:
                 user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
                 safe_remark_text = escape(r.text).replace('\n', '<br/>')
                 safe_user_str = escape(user_str)
-                remark_str = f"• {safe_user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {safe_remark_text}"
-                remark_cell = Paragraph(remark_str, long_text_style)
-                
-                if i == 0:
-                    row = [
-                        project_code_cell, type_cell, what_cell, who_cell, 
-                        raised_by_cell, eta_cell, status_cell, remark_cell
-                    ]
-                else:
-                    row = ['', '', '', '', '', '', '', remark_cell]
-                table_data.append(row)
-        
-    col_widths = [2.5*cm, 2.5*cm, 6.5*cm, 2.5*cm, 2.0*cm, 2.2*cm, 2.5*cm, 7.4*cm]
-    
-    table_style = TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('LEFTPADDING', (0, 0), (-1,-1), 6),
-        ('RIGHTPADDING', (0, 0), (-1,-1), 6),
-        ('WORDWRAP', (0, 0), (-1, -1), 1),
-    ])
+                remark_str = f"• <b>{safe_user_str}</b> ({r.created_at.strftime('%b %d, %H:%M')}): {safe_remark_text}"
+                elements.append(Paragraph(remark_str, body_style))
 
-    table = Table(table_data, colWidths=col_widths)
-    table.setStyle(table_style)
-    elements.append(table)
-    
+        # Add a separator before the next update
+        elements.append(Spacer(1, 1*cm))
+
     doc.build(elements)
     buffer.seek(0)
-    
+
     response = HttpResponse(buffer, content_type='application/pdf')
     filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.pdf"
     response['Content-Disposition'] = f'attachment; filename={filename}'
-    
+
     return response
 
 

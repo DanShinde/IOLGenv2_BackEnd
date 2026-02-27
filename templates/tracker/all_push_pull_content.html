@@ -13,8 +13,8 @@
         <div class="d-flex gap-2">
 
             {% if not is_public_view %}
-                <a href="{% url 'export_push_pull_excel' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
-                <a href="{% url 'export_push_pull_pdf' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
+                <a href="{% url 'export_push_pull_excel' %}?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
+                <a href="{% url 'export_push_pull_pdf' %}?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
             {% endif %}
 
             {% if not is_public_view %}
