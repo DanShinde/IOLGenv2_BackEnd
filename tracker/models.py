@@ -205,11 +205,12 @@ class ProjectUpdate(models.Model):
         ('Open', 'Open'),
         ('In Progress', 'In Progress'),
         ('Closed', 'Closed'),
+        ('Archived', 'Archived'),
     ]
 
     PUSH_PULL_CHOICES = [
-        ('Push', 'Push Content'),
         ('Pull', 'Pull Content'),
+        ('Push', 'Push Content'),
     ]
 
 
@@ -232,7 +233,7 @@ class ProjectUpdate(models.Model):
 
 
     # ✅ UPDATED FIELD: Using the new ContactPerson model
-    push_pull_type = models.CharField(max_length=10, choices=PUSH_PULL_CHOICES, default='Push')
+    push_pull_type = models.CharField(max_length=10, choices=PUSH_PULL_CHOICES, default='Pull')
     who_contact = models.ManyToManyField(ContactPerson, blank=True, related_name='updates_assigned_to')
     raised_by = models.ForeignKey(ContactPerson, on_delete=models.SET_NULL, null=True, blank=True, related_name='updates_raised_by')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')

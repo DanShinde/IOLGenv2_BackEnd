@@ -55,3 +55,7 @@ git checkout TrackerPlanner02
  
 # 3) Rebase your branch onto latest main
 git rebase origin/main
+
+git fetch origin 
+git checkout TrackerPlanner02
+git reset --hard origin/main

@@ -29,6 +29,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 
+from django.template.loader import render_to_string
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse, QueryDict
 import csv
 from itertools import groupby
@@ -38,6 +39,7 @@ from django.contrib.auth import get_user_model
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
 from planner.models import Project as PlannerProject
+from django.utils.html import escape
 
 
 def login_view(request):
@@ -149,11 +151,25 @@ def edit_project(request, project_id):
 
 @login_required
 def project_detail(request, project_id):
-    project = get_object_or_404(Project.objects.select_related('segment_con', 'planner_project'), pk=project_id)
+    project = get_object_or_404(Project.objects.select_related('segment_con', 'team_lead'), pk=project_id)
 
     contact_persons = ContactPerson.objects.all()
 
     planner_project = PlannerProject.objects.filter(tracker_project=project).first()
+
+    # Handle AJAX request for loading more comments
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' and request.GET.get('action') == 'load_comments':
+        offset = int(request.GET.get('offset', 0))
+        limit = 5
+        comments_qs = project.comments.select_related('added_by').order_by('-created_at')[offset:offset+limit]
+        comments = sorted(list(comments_qs), key=lambda x: x.created_at)
+        for comment in comments:
+            if comment.added_by:
+                comment.added_by.username = comment.added_by.get_full_name() or comment.added_by.username
+        
+        html = render_to_string('tracker/partials/project_comments_partial.html', {'comments': comments, 'request': request}, request=request)
+        modals_html = render_to_string('tracker/partials/project_comments_modals_partial.html', {'comments': comments, 'request': request}, request=request)
+        return JsonResponse({'html': html, 'modals_html': modals_html, 'has_more': project.comments.count() > (offset + limit)})
 
     if request.method == 'POST':
         active_tab = request.POST.get('active_tab', 'automation')
@@ -256,6 +272,8 @@ def project_detail(request, project_id):
 
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
+    automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks__added_by', 'history__changed_by')
+    emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks__added_by', 'history__changed_by')
     
     if status_filter:
         automation_stages_qs = automation_stages_qs.filter(status=status_filter)
@@ -268,9 +286,9 @@ def project_detail(request, project_id):
 
     all_stages = automation_stages + emulation_stages
     
-    updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()[:5]
+    updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()[:5]
     updates_count = project.updates.count()
-    open_updates_count = project.updates.exclude(status='Closed').count()
+    open_updates_count = project.updates.filter(status__in=['Open', 'In Progress']).count()
     
     recent_activity = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')[:5]
     last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
@@ -294,7 +312,10 @@ def project_detail(request, project_id):
     if last_completed_emu_index >= 0 and total_emu_segments > 0:
         timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
 
-    project_comments = list(project.comments.select_related('added_by').order_by('created_at'))
+    total_comments_count = project.comments.count()
+    initial_limit = 5
+    recent_comments = project.comments.select_related('added_by').order_by('-created_at')[:initial_limit]
+    project_comments = sorted(list(recent_comments), key=lambda x: x.created_at)
     for comment in project_comments:
         if comment.added_by:
             comment.added_by.username = comment.added_by.get_full_name() or comment.added_by.username
@@ -319,11 +340,14 @@ def project_detail(request, project_id):
         'last_update_time': last_update_time,
         'recent_activity': recent_activity,
         'project_comments': project_comments,
+        'total_comments_count': total_comments_count,
+        'initial_comments_limit': initial_limit,
 
         'contact_persons': contact_persons,
         'status_choices': Stage.STATUS_CHOICES,
         'selected_status_filter': status_filter,
         'planner_project': planner_project,
+        'update_status_choices': ProjectUpdate.STATUS_CHOICES,
 
     }
     
@@ -1340,17 +1364,29 @@ def add_general_update(request):
         push_pull_type = request.POST.get('push_pull_type')
         who_contact_ids = request.POST.getlist('who_contact')
         raised_by_id = request.POST.get('raised_by')
+        project_id = request.POST.get('project_id')
 
         eta = parse_date(request.POST.get('eta_date')) if request.POST.get('eta_date') else None
 
         if text and push_pull_type:
+            content_type = 'General'
+            project = None
+            
+            if project_id and project_id != 'general':
+                try:
+                    project = Project.objects.get(pk=project_id)
+                    content_type = 'Project'
+                except Project.DoesNotExist:
+                    pass
+
             update = ProjectUpdate.objects.create(
                 author=request.user,
                 text=text,
                 push_pull_type=push_pull_type,
                 eta=eta,
                 raised_by_id=raised_by_id if raised_by_id else None,
-                content_type='General',
+                content_type=content_type,
+                project=project,
             )
             for contact_id in who_contact_ids:
                 if contact_id:
@@ -1360,11 +1396,11 @@ def add_general_update(request):
                     except ContactPerson.DoesNotExist:
                         pass
 
-            messages.success(request, "General content added successfully.")
+            messages.success(request, "Content added successfully.")
         else:
             messages.error(request, "Update text and type are required.")
 
-    return redirect('all_push_pull_content_filtered', filter='general')
+    return redirect('all_push_pull_content')
 
 
 @login_required
@@ -1481,6 +1517,7 @@ def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
 
     updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()
+    updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()
     contact_persons = ContactPerson.objects.all()
 
 
@@ -1512,8 +1549,13 @@ def all_push_pull_content(request, filter=None):
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
 
+    # Auto-archive logic: Move 'Closed' items older than 30 days to 'Archived'
+    archive_threshold = timezone.now() - timedelta(days=30)
+    ProjectUpdate.objects.filter(status='Closed', closed_at__lt=archive_threshold).update(status='Archived')
+
 
     updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1528,9 +1570,13 @@ def all_push_pull_content(request, filter=None):
 
     # Apply status filtering
     if status_filter == 'open':
-        updates_qs = updates_qs.filter(status='Open')
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else: # 'all'
+        updates_qs = updates_qs.exclude(status='Archived')
 
     updates = list(updates_qs.all())
     for update in updates:
@@ -1568,13 +1614,31 @@ def add_contact_person_ajax(request):
 
 @login_required
 def export_push_pull_excel(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
     filter = request.GET.get('filter')
 
     if filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
     elif filter == 'general':
         updates_qs = updates_qs.filter(content_type='General')
+
+    # Apply push/pull filtering
+    push_pull_filter = request.GET.get('push_pull_filter')
+    if push_pull_filter == 'push':
+        updates_qs = updates_qs.filter(push_pull_type='Push')
+    elif push_pull_filter == 'pull':
+        updates_qs = updates_qs.filter(push_pull_type='Pull')
+
+    # Apply status filtering
+    status_filter = request.GET.get('status_filter')
+    if status_filter == 'open':
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
+    elif status_filter == 'closed':
+        updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else: # 'all' or None
+        updates_qs = updates_qs.exclude(status='Archived')
 
     updates = updates_qs.all()
     
@@ -1634,8 +1698,7 @@ def export_push_pull_excel(request):
 
 @login_required
 def export_push_pull_pdf(request):
-
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
     filter = request.GET.get('filter')
 
     if filter == 'project':
@@ -1643,100 +1706,101 @@ def export_push_pull_pdf(request):
     elif filter == 'general':
         updates_qs = updates_qs.filter(content_type='General')
 
+    # Apply push/pull filtering
+    push_pull_filter = request.GET.get('push_pull_filter')
+    if push_pull_filter == 'push':
+        updates_qs = updates_qs.filter(push_pull_type='Push')
+    elif push_pull_filter == 'pull':
+        updates_qs = updates_qs.filter(push_pull_type='Pull')
+
+    # Apply status filtering
+    status_filter = request.GET.get('status_filter')
+    if status_filter == 'open':
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
+    elif status_filter == 'closed':
+        updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else: # 'all' or None
+        updates_qs = updates_qs.exclude(status='Archived')
+
     updates = updates_qs.all()
 
-    
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1*cm, rightMargin=1*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    # Use portrait A4 for a list-style report
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
     elements = []
     styles = getSampleStyleSheet()
 
-    long_text_style = ParagraphStyle(
-        'long_text_style',
+    # Custom styles for a cleaner report
+    body_style = ParagraphStyle(
+        'body_style',
         parent=styles['Normal'],
-        wordWrap='CJK',
+        spaceBefore=6,
         spaceAfter=6,
-        alignment=4,
-        textColor=colors.black,
-        fontName='Helvetica',
+        leading=14,
     )
-    
-    header_style = ParagraphStyle(
-        'header_style',
+    section_header_style = ParagraphStyle(
+        'section_header_style',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        textColor=colors.whitesmoke,
-        alignment=1,
+        spaceBefore=12,
+        spaceAfter=2,
     )
-    
+
     elements.append(Paragraph("All Push-Pull Contents", styles['Title']))
     elements.append(Paragraph(f"Report Generated on: {timezone.now().strftime('%d-%b-%Y %I:%M %p')}", styles['Normal']))
-    elements.append(Spacer(1, 0.5*cm))
+    elements.append(Spacer(1, 1*cm))
 
-    table_data = [
-        [
-            Paragraph('Project Code', header_style),
-            Paragraph('Type', header_style),
-            Paragraph('What', header_style),
-            Paragraph('Who', header_style),
-            Paragraph('Raised By', header_style),
-            Paragraph('ETA', header_style),
-            Paragraph('Status', header_style),
-            Paragraph('Remarks', header_style)
-        ]
-    ]
-    
     for update in updates:
         who_contacts_str = ", ".join([p.name for p in update.who_contact.all()])
-        remarks_list = []
-        for r in update.remarks.all():
-            user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
-            remarks_list.append(f"• {user_str} ({r.created_at.strftime('%Y-%m-%d %H:%M')}): {r.text}")
-        
-        what_cell = Paragraph(update.text, long_text_style)
-        who_cell = Paragraph(who_contacts_str if who_contacts_str else '-', long_text_style)
-        remarks_cell = Paragraph("<br/>".join(remarks_list), long_text_style) if remarks_list else '-'
-        
-        row = [
-            update.project.code if update.project else 'N/A',
-            update.get_push_pull_type_display(),
-            what_cell,
-            who_cell,
-            Paragraph(update.raised_by.name if update.raised_by else '-', long_text_style),
-            update.eta.strftime('%Y-%m-%d') if update.eta else '-',
-            update.status,
-            remarks_cell
-        ]
-        table_data.append(row)
-        
-    col_widths = [1.8*cm, 2.5*cm, 4*cm, 2*cm, 2*cm, 2.5*cm, 2.5*cm, 5.2*cm]
-    
-    table_style = TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('LEFTPADDING', (0, 0), (-1,-1), 6),
-        ('RIGHTPADDING', (0, 0), (-1,-1), 6),
-        ('WORDWRAP', (0, 0), (-1, -1), 1),
-    ])
 
-    table = Table(table_data, colWidths=col_widths)
-    table.setStyle(table_style)
-    elements.append(table)
-    
+        # Create a small table for the metadata of each update
+        details_data = [
+            [Paragraph('<b>Project:</b>', styles['Normal']), Paragraph(escape(update.project.code if update.project else 'General'), styles['Normal'])],
+            [Paragraph('<b>Type:</b>', styles['Normal']), Paragraph(update.get_push_pull_type_display(), styles['Normal'])],
+            [Paragraph('<b>Status:</b>', styles['Normal']), Paragraph(update.status, styles['Normal'])],
+            [Paragraph('<b>ETA:</b>', styles['Normal']), Paragraph(update.eta.strftime('%Y-%m-%d') if update.eta else '-', styles['Normal'])],
+            [Paragraph('<b>Raised By:</b>', styles['Normal']), Paragraph(escape(update.raised_by.name if update.raised_by else '-'), styles['Normal'])],
+            [Paragraph('<b>Who:</b>', styles['Normal']), Paragraph(escape(who_contacts_str) if who_contacts_str else '-', body_style)],
+        ]
+        details_table = Table(details_data, colWidths=[3*cm, None])
+        details_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(details_table)
+
+        # Add the "What" description as a separate, splittable Paragraph
+        elements.append(Paragraph('What (Description):', section_header_style))
+        what_text = escape(update.text).replace('\n', '<br/>') if update.text else "-"
+        elements.append(Paragraph(what_text, body_style))
+
+        # Add Remarks as a series of splittable Paragraphs
+        elements.append(Paragraph('Remarks:', section_header_style))
+        remarks = list(update.remarks.order_by('created_at'))
+        if not remarks:
+            elements.append(Paragraph('-', body_style))
+        else:
+            for r in remarks:
+                user_str = (r.added_by.get_full_name() or r.added_by.username) if r.added_by else "Unknown"
+                safe_remark_text = escape(r.text).replace('\n', '<br/>')
+                safe_user_str = escape(user_str)
+                remark_str = f"• <b>{safe_user_str}</b> ({r.created_at.strftime('%b %d, %H:%M')}): {safe_remark_text}"
+                elements.append(Paragraph(remark_str, body_style))
+
+        # Add a separator before the next update
+        elements.append(Spacer(1, 1*cm))
+
     doc.build(elements)
     buffer.seek(0)
-    
+
     response = HttpResponse(buffer, content_type='application/pdf')
     filename = f"all_push_pull_contents_{timezone.now().strftime('%Y-%m-%d')}.pdf"
     response['Content-Disposition'] = f'attachment; filename={filename}'
-    
+
     return response
 
 
@@ -1975,9 +2039,13 @@ def public_push_pull_content(request, access_token):
         updates_qs = updates_qs.filter(push_pull_type='Pull')
         
     if status_filter == 'open':
-        updates_qs = updates_qs.filter(status='Open')
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
         updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else:
+        updates_qs = updates_qs.exclude(status='Archived')
 
     updates = list(updates_qs.all())
     for update in updates:
@@ -2022,4 +2090,6 @@ def public_push_pull_content(request, access_token):
         'status_filter': status_filter,
         'push_pull_filter': push_pull_filter,
     }
+    return render(request, 'tracker/all_push_pull_content.html', context)
+    
     return render(request, 'tracker/all_push_pull_content.html', context)

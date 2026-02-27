@@ -13,8 +13,8 @@
         <div class="d-flex gap-2">
 
             {% if not is_public_view %}
-                <a href="{% url 'export_push_pull_excel' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
-                <a href="{% url 'export_push_pull_pdf' %}?filter={{ filter|default:'all' }}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
+                <a href="{% url 'export_push_pull_excel' %}?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
+                <a href="{% url 'export_push_pull_pdf' %}?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
             {% endif %}
 
             {% if not is_public_view %}
@@ -30,20 +30,29 @@
 
 {% if not is_public_view %}
 <div class="card mb-4">
-    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-plus-circle me-2"></i>Add General Push-Pull Content</h5></div>
+    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-plus-circle me-2"></i>Add Push-Pull Content</h5></div>
     <div class="card-body">
         <form action="{% url 'add_general_update' %}" method="post" class="p-3 bg-light rounded">
             {% csrf_token %}
             <div class="mb-3">
                 <label for="update_text" class="form-label fw-bold">Content Text</label>
-                <textarea name="update_text" id="update_text" rows="3" class="form-control" placeholder="Share a new general update..." required></textarea>
+                <textarea name="update_text" id="update_text" rows="3" class="form-control" placeholder="Share a new update..." required></textarea>
             </div>
             <div class="row g-3 align-items-center">
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label for="project_id" class="form-label small mb-0">Project</label>
+                    <select name="project_id" id="project_id" class="form-select form-select-sm">
+                        <option value="general">General</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}">{{ project.code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label for="push_pull_type" class="form-label small mb-0">Type</label>
                     <select name="push_pull_type" id="push_pull_type" class="form-select form-select-sm">
-                        <option value="Push">Push Content</option>
                         <option value="Pull">Pull Content</option>
+                        <option value="Push">Push Content</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -63,12 +72,12 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="eta_date" class="form-label small mb-0">WHEN</label>
                     <input type="date" name="eta_date" id="eta_date" class="form-control form-control-sm">
                 </div>
                 <div class="col-12 text-end">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save General Content</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save Content</button>
                 </div>
             </div>
         </form>
@@ -78,7 +87,16 @@
 
 <div class="card">
 
-    <div class="card-header"><h5 class="card-header-title"><i class="fas fa-table me-2"></i>Content Summary</h5></div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-header-title mb-0"><i class="fas fa-table me-2"></i>Content Summary</h5>
+        <div>
+            {% if status_filter == 'archived' %}
+                <a href="?status_filter=all&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back to Active</a>
+            {% else %}
+                <a href="?status_filter=archived&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-archive me-1"></i> View Archive</a>
+            {% endif %}
+        </div>
+    </div>
 
     <div class="card-body">
         <div class="d-flex flex-wrap gap-3 mb-4">
@@ -142,6 +160,33 @@
                         <th style="width: 5%;">Actions</th>
                         {% endif %}
                     </tr>
+                    <!-- Filter Row -->
+                    <tr class="filter-row bg-light">
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="0" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2">
+                            <select class="form-select form-select-sm filter-input shadow-none border" data-col="1" style="font-size: 0.75rem;">
+                                <option value="">All</option>
+                                <option value="push">Push</option>
+                                <option value="pull">Pull</option>
+                            </select>
+                        </th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="2" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="3" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="4" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="5" placeholder="Filter..." style="font-size: 0.75rem;"></th>
+                        <th class="p-2">
+                            <select class="form-select form-select-sm filter-input shadow-none border" data-col="6" style="font-size: 0.75rem;">
+                                <option value="">All</option>
+                                <option value="open">Open</option>
+                                <option value="in progress">In Progress</option>
+                                <option value="closed">Closed</option>
+                            </select>
+                        </th>
+                        <th class="p-2"></th>
+                        {% if not is_public_view %}
+                        <th class="p-2"></th>
+                        {% endif %}
+                    </tr>
                 </thead>
                 <tbody class="small">
                     {% for update in updates %}
@@ -159,8 +204,8 @@
                         <td>
                             {% if not is_public_view %}
                                 <select class="form-select form-select-sm border-0 bg-transparent shadow-none ps-0" onchange="updateField({{ update.id }}, 'push_pull_type', this.value)">
-                                    <option value="Push" {% if update.push_pull_type == 'Push' %}selected{% endif %}>Push</option>
                                     <option value="Pull" {% if update.push_pull_type == 'Pull' %}selected{% endif %}>Pull</option>
+                                    <option value="Push" {% if update.push_pull_type == 'Push' %}selected{% endif %}>Push</option>
                                 </select>
                             {% else %}
                                 {% if update.push_pull_type == 'Push' %}
@@ -236,14 +281,15 @@
                         <td>
                             {% if not is_public_view %}
                                 <select class="form-select form-select-sm border-0 bg-transparent shadow-none ps-0 fw-bold 
-                                    {% if update.status == 'Open' %}text-success{% elif update.status == 'In Progress' %}text-warning{% else %}text-secondary{% endif %}" 
+                                    {% if update.status == 'Open' %}text-success{% elif update.status == 'In Progress' %}text-warning{% elif update.status == 'Archived' %}text-muted{% else %}text-secondary{% endif %}" 
                                     onchange="updateField({{ update.id }}, 'status', this.value)">
                                     <option value="Open" {% if update.status == 'Open' %}selected{% endif %}>Open</option>
                                     <option value="In Progress" {% if update.status == 'In Progress' %}selected{% endif %}>In Progress</option>
                                     <option value="Closed" {% if update.status == 'Closed' %}selected{% endif %}>Closed</option>
+                                    <option value="Archived" {% if update.status == 'Archived' %}selected{% endif %}>Archived</option>
                                 </select>
                             {% else %}
-                                <span class="badge {% if update.status == 'Open' %}bg-success{% elif update.status == 'In Progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                <span class="badge {% if update.status == 'Open' %}bg-success{% elif update.status == 'In Progress' %}bg-warning text-dark{% elif update.status == 'Archived' %}bg-secondary bg-opacity-50{% else %}bg-secondary{% endif %}">
                                     {{ update.status }}
                                 </span>
                             {% endif %}
@@ -515,6 +561,55 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+
+    // Table Column Filtering
+    $('.filter-input').on('keyup change', function() {
+        var filters = [];
+        $('.filter-input').each(function() {
+            var $input = $(this);
+            var colIndex = $input.data('col');
+            var val = $input.val().toLowerCase();
+            if (val) {
+                filters.push({ col: colIndex, val: val });
+            }
+        });
+
+        var $rows = $('#pushPullTable tbody tr');
+        
+        $rows.each(function() {
+            var $row = $(this);
+            var show = true;
+            
+            for (var i = 0; i < filters.length; i++) {
+                var filter = filters[i];
+                var $cell = $row.find('td').eq(filter.col);
+                var text = "";
+
+                var $select = $cell.find('select');
+                var $textarea = $cell.find('textarea');
+                var $input = $cell.find('input').not('[type="hidden"]');
+
+                if ($select.length) {
+                    var selectedOptions = $select.find('option:selected');
+                    var selectedText = [];
+                    selectedOptions.each(function(){ selectedText.push($(this).text()); });
+                    text = selectedText.join(" ") + " " + $select.val();
+                } else if ($textarea.length) {
+                    text = $textarea.val();
+                } else if ($input.length) {
+                    text = $input.val();
+                } else {
+                    text = $cell.text();
+                }
+                
+                if (text.toLowerCase().indexOf(filter.val) === -1) {
+                    show = false;
+                    break;
+                }
+            }
+            $row.toggle(show);
+        });
+    });
 });
 </script>
 {% endblock %}
