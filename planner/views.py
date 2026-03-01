@@ -672,7 +672,13 @@ def delete_holiday_view(request, pk):
 
 def edit_activity_view(request, pk):
     activity = get_object_or_404(Activity, pk=pk)
-    next_url = request.GET.get('next')
+    next_url = request.POST.get('next') or request.GET.get('next')
+    
+    if not next_url and request.method == 'GET':
+        referer = request.META.get('HTTP_REFERER')
+        if referer and request.path not in referer:
+            next_url = referer
+
     default_redirect_url = reverse('planner_activity_planner', kwargs={'project_pk': activity.project.pk})
     
     if request.method == 'POST':
@@ -712,7 +718,7 @@ def edit_activity_view(request, pk):
 def delete_activity_view(request, pk):
     activity = get_object_or_404(Activity, pk=pk)
     project_pk = activity.project.pk
-    next_url = request.POST.get('next')
+    next_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER')
     activity.delete()
     default_redirect_url = reverse('planner_activity_planner', kwargs={'project_pk': project_pk})
     return redirect(next_url or default_redirect_url)
