@@ -52,6 +52,21 @@ def _get_leaves_map():
     # Convert sets to lists for JSON serialization
     return {k: list(v) for k, v in leaves_map.items()}
 
+def _ensure_unassigned_employees():
+    """Ensures placeholder employees exist for capacity planning of unassigned work."""
+    placeholders = [
+        ('Unassigned Engineer', 'ENGINEER'),
+        ('Unassigned Team Lead', 'TEAM_LEAD'),
+        ('Unassigned Manager', 'MANAGER')
+    ]
+    for name, designation in placeholders:
+        # We use get_or_create to avoid duplicates. 
+        # We ensure they are active so they appear in dropdowns.
+        Employee.objects.get_or_create(
+            name=name,
+            defaults={'designation': designation, 'is_active': True}
+        )
+
 def _prepare_gantt_context(activities_qs):
     activities_list = list(activities_qs)
     today = date.today()
@@ -522,9 +537,9 @@ def _get_workforce_context():
     today = date.today()
     return {
         'workforce_counts': {
-            'engineers': Employee.objects.filter(designation='ENGINEER', is_active=True).count(),
-            'team_leads': Employee.objects.filter(designation='TEAM_LEAD', is_active=True).count(),
-            'managers': Employee.objects.filter(designation='MANAGER', is_active=True).count(),
+            'engineers': Employee.objects.filter(designation='ENGINEER', is_active=True).exclude(name__startswith='Unassigned').count(),
+            'team_leads': Employee.objects.filter(designation='TEAM_LEAD', is_active=True).exclude(name__startswith='Unassigned').count(),
+            'managers': Employee.objects.filter(designation='MANAGER', is_active=True).exclude(name__startswith='Unassigned').count(),
         },
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
@@ -533,6 +548,7 @@ def _get_workforce_context():
     }
 
 def workforce_view(request):
+    _ensure_unassigned_employees()
     error_message = None
     entered_data = {}
     active_tab = request.GET.get('tab', 'employees')
@@ -656,7 +672,13 @@ def delete_holiday_view(request, pk):
 
 def edit_activity_view(request, pk):
     activity = get_object_or_404(Activity, pk=pk)
-    next_url = request.GET.get('next')
+    next_url = request.POST.get('next') or request.GET.get('next')
+    
+    if not next_url and request.method == 'GET':
+        referer = request.META.get('HTTP_REFERER')
+        if referer and request.path not in referer:
+            next_url = referer
+
     default_redirect_url = reverse('planner_activity_planner', kwargs={'project_pk': activity.project.pk})
     
     if request.method == 'POST':
@@ -696,7 +718,7 @@ def edit_activity_view(request, pk):
 def delete_activity_view(request, pk):
     activity = get_object_or_404(Activity, pk=pk)
     project_pk = activity.project.pk
-    next_url = request.POST.get('next')
+    next_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER')
     activity.delete()
     default_redirect_url = reverse('planner_activity_planner', kwargs={'project_pk': project_pk})
     return redirect(next_url or default_redirect_url)
@@ -737,9 +759,9 @@ def capacity_plan_view(request):
     capacity_settings = {c: CapacitySettings.objects.get_or_create(designation=c)[0] for c, _ in Employee.DESIGNATION_CHOICES}
     
     workforce_counts = {
-        'ENGINEER': Employee.objects.filter(designation='ENGINEER', is_active=True).count(),
-        'TEAM_LEAD': Employee.objects.filter(designation='TEAM_LEAD', is_active=True).count(),
-        'MANAGER': Employee.objects.filter(designation='MANAGER', is_active=True).count()
+        'ENGINEER': Employee.objects.filter(designation='ENGINEER', is_active=True).exclude(name__startswith='Unassigned').count(),
+        'TEAM_LEAD': Employee.objects.filter(designation='TEAM_LEAD', is_active=True).exclude(name__startswith='Unassigned').count(),
+        'MANAGER': Employee.objects.filter(designation='MANAGER', is_active=True).exclude(name__startswith='Unassigned').count()
     }
     
     periods = []
