@@ -1054,9 +1054,10 @@ def capacity_plan_view(request):
                 'month': p['label'], 
                 'available_hours': available_hours, 
                 'required_hours': required_hours, 
-                'variance_hours': available_hours - required_hours, 
+                'variance_hours': headcount - required_headcount, 
                 'available_headcount': headcount, 
-                'required_headcount': required_headcount
+                'required_headcount': required_headcount,
+                'variance_headcount': headcount - required_headcount
             })
         report.append(des_data)
     

@@ -182,15 +182,7 @@
                             </td>
                             {% endfor %}
                         </tr>
-                        <tr class="bg-gray-50 font-bold hover:bg-gray-100">
-                            <td class="px-2 py-1.5 text-xs font-medium text-gray-900 whitespace-nowrap border-r">Variance</td>
-                            {% for month_data in des_data.months %}
-                            <td class="px-2 py-1.5 text-center text-xs whitespace-nowrap border-r {% if month_data.variance_hours < 0 %}text-red-600 bg-red-50 shortage-alert{% else %}text-blue-600 bg-blue-50{% endif %}" data-value="{{ month_data.variance_hours }}">
-                                {{ month_data.variance_hours|floatformat:0 }}
-                            </td>
-                            {% endfor %}
-                        </tr>
-                        <tr class="border-b-4 border-gray-200 hover:bg-gray-50">
+                        <tr class="hover:bg-gray-50">
                             <td class="px-2 py-1.5 text-xs font-medium text-gray-700 whitespace-nowrap italic border-r bg-purple-50">Req/Avail HC</td>
                              {% for month_data in des_data.months %}
                              <td class="px-2 py-1.5 text-center text-xs font-semibold whitespace-nowrap border-r bg-purple-50
@@ -201,6 +193,14 @@
                                 </div>
                              </td>
                              {% endfor %}
+                        </tr>
+                        <tr class="bg-gray-50 font-bold border-b-4 border-gray-200 hover:bg-gray-100">
+                            <td class="px-2 py-1.5 text-xs font-medium text-gray-900 whitespace-nowrap border-r">Variance</td>
+                            {% for month_data in des_data.months %}
+                            <td class="px-2 py-1.5 text-center text-xs whitespace-nowrap border-r {% if month_data.variance_hours < 0 %}text-red-600 bg-red-50 shortage-alert{% else %}text-blue-600 bg-blue-50{% endif %}" data-value="{{ month_data.variance_hours }}">
+                                {{ month_data.variance_hours|floatformat:0 }}
+                            </td>
+                            {% endfor %}
                         </tr>
                     {% empty %}
                         <tr>
