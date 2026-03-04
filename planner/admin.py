@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ProjectType, Segment, Category, Holiday, Project, Activity, GeneralSettings, CapacitySettings, EffortBracket, SalesForecast, Leave
+from .models import ProjectType, Segment, Category, Holiday, Project, Activity, GeneralSettings, CapacitySettings, EffortBracket, SalesForecast, Leave, Site, SiteAllocation
 from import_export.admin import ImportExportModelAdmin
 
 class ProjectTypeAdmin(ImportExportModelAdmin, admin.ModelAdmin):
@@ -68,6 +68,20 @@ class LeaveAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     list_filter = ('start_date', 'end_date')
     raw_id_fields = ('employee',)
 
+class SiteAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    list_display = ('name', 'get_project_code', 'location', 'is_office')
+    search_fields = ('name', 'project__project_id', 'location')
+    list_filter = ('is_office',)
+
+    def get_project_code(self, obj):
+        return obj.project.project_id if obj.project else "-"
+    get_project_code.short_description = 'Project Code'
+
+class SiteAllocationAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    list_display = ('employee', 'site', 'start_date', 'end_date', 'duration_days')
+    search_fields = ('employee__name', 'site__name', 'site__project__project_id')
+    list_filter = ('site', 'start_date', 'end_date')
+
 admin.site.register(ProjectType, ProjectTypeAdmin)
 admin.site.register(Segment, SegmentAdmin)
 admin.site.register(Category, CategoryAdmin)
@@ -79,3 +93,5 @@ admin.site.register(CapacitySettings, CapacitySettingsAdmin)
 admin.site.register(EffortBracket, EffortBracketAdmin)
 admin.site.register(SalesForecast, SalesForecastAdmin)
 admin.site.register(Leave, LeaveAdmin)
+admin.site.register(Site, SiteAdmin)
+admin.site.register(SiteAllocation, SiteAllocationAdmin)

@@ -4,11 +4,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from employees.models import Employee
 from .models import (ProjectType, Segment, Category, Holiday,
                      Project, Activity, GeneralSettings, CapacitySettings,
-                     SalesForecast, EffortBracket, Leave)
+                     SalesForecast, EffortBracket, Leave, Site, SiteAllocation)
 from datetime import date, timedelta, datetime
 from collections import OrderedDict, defaultdict
 from django.db.models import Min, Max, Q
-from .forms import ActivityForm, ProjectForm, LeaveForm
+from .forms import ActivityForm, ProjectForm, LeaveForm, SiteForm, SiteAllocationForm
 from django.urls import reverse
 from urllib.parse import urlencode
 from django.http import JsonResponse, HttpResponse
@@ -544,6 +544,8 @@ def _get_workforce_context():
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
         'all_leaves': Leave.objects.filter(end_date__gte=today).select_related('employee').order_by('start_date'),
+        'all_sites': Site.objects.all(),
+        'all_allocations': SiteAllocation.objects.select_related('employee', 'site').order_by('-start_date'),
         'active_nav': 'workforce',
     }
 
@@ -577,12 +579,32 @@ def workforce_view(request):
             else:
                 error_message = "Error adding leave. Please check dates."
                 active_tab = 'leaves'
+        
+        elif 'add_site' in request.POST:
+            site_form = SiteForm(request.POST)
+            if site_form.is_valid():
+                site_form.save()
+                return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+            else:
+                error_message = "Error adding site."
+                active_tab = 'site_team'
+
+        elif 'add_allocation' in request.POST:
+            alloc_form = SiteAllocationForm(request.POST)
+            if alloc_form.is_valid():
+                alloc_form.save()
+                return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+            else:
+                error_message = "Error adding allocation."
+                active_tab = 'site_team'
 
     context = _get_workforce_context()
     context.update({
         'error_message': error_message,
         'entered_data': entered_data,
         'leave_form': LeaveForm(),
+        'site_form': SiteForm(),
+        'allocation_form': SiteAllocationForm(),
         'active_tab': active_tab,
     })
     return render(request, 'planner/workforce.html', context)
@@ -665,6 +687,14 @@ def delete_employee_view(request, pk):
 def delete_leave_view(request, pk):
     get_object_or_404(Leave, pk=pk).delete()
     return redirect(f"{reverse('planner_workforce')}?tab=leaves")
+
+def delete_site_view(request, pk):
+    get_object_or_404(Site, pk=pk).delete()
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+
+def delete_site_allocation_view(request, pk):
+    get_object_or_404(SiteAllocation, pk=pk).delete()
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
 
 def delete_holiday_view(request, pk):
     get_object_or_404(Holiday, pk=pk).delete()

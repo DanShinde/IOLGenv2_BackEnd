@@ -126,6 +126,41 @@ class Leave(models.Model):
     class Meta:
         ordering = ['-start_date']
 
+class Site(models.Model):
+    name = models.CharField(max_length=200, blank=True)
+    project = models.OneToOneField(Project, on_delete=models.CASCADE, null=True, blank=True, related_name='site_record')
+    location = models.CharField(max_length=200)
+    is_office = models.BooleanField(default=False, verbose_name="Is Office Location")
+
+    def __str__(self):
+        code = self.project.project_id if self.project else "Office"
+        return f"{self.name} ({code})"
+    
+    def save(self, *args, **kwargs):
+        if self.project:
+            self.name = self.project.customer_name
+        super().save(*args, **kwargs)
+    
+    class Meta:
+        ordering = ['name']
+
+class SiteAllocation(models.Model):
+    employee = models.ForeignKey('employees.Employee', on_delete=models.CASCADE, related_name='site_allocations')
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name='allocations')
+    start_date = models.DateField(default=timezone.now)
+    end_date = models.DateField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-start_date']
+
+    def __str__(self):
+        return f"{self.employee} at {self.site}"
+
+    @property
+    def duration_days(self):
+        end = self.end_date if self.end_date else timezone.now().date()
+        return (end - self.start_date).days
+
 class Holiday(models.Model):
     date = models.DateField(unique=True)
     description = models.CharField(max_length=200)
