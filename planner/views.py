@@ -20,8 +20,9 @@ from django.views.decorators.http import require_POST
 from itertools import groupby
 from django.utils.dateparse import parse_date
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A3, landscape
+from reportlab.lib.pagesizes import A3, A4, landscape
 from reportlab.lib import colors
+import csv
 
 # Define this constant at the top of the file to avoid "magic numbers"
 CR = 10_000_000
@@ -613,7 +614,18 @@ def workforce_view(request):
         elif 'add_allocation' in request.POST:
             alloc_form = SiteAllocationForm(request.POST)
             if alloc_form.is_valid():
-                alloc_form.save()
+                new_alloc = alloc_form.save(commit=False)
+                
+                # Logic to close previous active allocation (Shift to another site)
+                previous_active = SiteAllocation.objects.filter(
+                    employee=new_alloc.employee,
+                    end_date__isnull=True
+                )
+                for prev in previous_active:
+                    prev.end_date = new_alloc.start_date
+                    prev.save()
+                
+                new_alloc.save()
                 return redirect(f"{reverse('planner_workforce')}?tab=site_team")
             else:
                 error_message = "Error adding allocation."
@@ -641,6 +653,162 @@ def workforce_view(request):
         'active_tab': active_tab,
     })
     return render(request, 'planner/workforce.html', context)
+
+def _get_site_history_data(request):
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    engineer_id = request.GET.get('engineer')
+    site_id = request.GET.get('site')
+    status_filter = request.GET.get('status')
+    
+    today = date.today()
+    start_date = parse_date(start_date_str) if start_date_str else today.replace(day=1)
+    end_date = parse_date(end_date_str) if end_date_str else today
+
+    # Filter allocations that overlap with the selected period
+    allocations = SiteAllocation.objects.select_related('employee', 'site', 'site__project')
+
+    if engineer_id:
+        allocations = allocations.filter(employee_id=engineer_id)
+    if site_id:
+        allocations = allocations.filter(site_id=site_id)
+    
+    if status_filter == 'Active':
+        allocations = allocations.filter(end_date__isnull=True)
+    elif status_filter == 'Relieved':
+        allocations = allocations.filter(end_date__isnull=False)
+
+    allocations = allocations.filter(
+        start_date__lte=end_date
+    ).filter(
+        Q(end_date__gte=start_date) | Q(end_date__isnull=True)
+    ).order_by('employee__name', 'start_date')
+
+    report_data = defaultdict(list)
+    
+    for alloc in allocations:
+        # Calculate effective duration within the window
+        eff_start = max(alloc.start_date, start_date)
+        eff_end = min(alloc.end_date, end_date) if alloc.end_date else end_date
+        
+        duration = (eff_end - eff_start).days + 1
+        if duration < 0: duration = 0
+        
+        report_data[alloc.employee].append({
+            'site': alloc.site,
+            'start_date': alloc.start_date,
+            'end_date': alloc.end_date,
+            'eff_start': eff_start,
+            'eff_end': eff_end,
+            'duration': duration,
+            'status': 'Active' if not alloc.end_date else 'Relieved'
+        })
+    return report_data, start_date, end_date
+
+def employee_site_history_report_view(request):
+    report_data, start_date, end_date = _get_site_history_data(request)
+
+    context = {
+        'report_data': dict(report_data),
+        'start_date': start_date,
+        'end_date': end_date,
+        'active_nav': 'workforce',
+        'all_employees': Employee.objects.all().order_by('name'),
+        'all_sites': Site.objects.all().order_by('name'),
+        'selected_engineer': int(request.GET.get('engineer')) if request.GET.get('engineer') else None,
+        'selected_site': int(request.GET.get('site')) if request.GET.get('site') else None,
+        'selected_status': request.GET.get('status'),
+    }
+    return render(request, 'planner/site_history_report.html', context)
+
+def export_site_history_csv(request):
+    report_data, start_date, end_date = _get_site_history_data(request)
+    
+    response = HttpResponse(content_type='text/csv')
+    filename = f"Site_History_Report_{start_date}_{end_date}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Employee', 'Designation', 'Site/Project', 'Location', 'Start Date', 'End Date', 'Duration (Days)', 'Status'])
+    
+    for employee, history in report_data.items():
+        for item in history:
+            writer.writerow([
+                employee.name,
+                employee.get_designation_display(),
+                item['site'].name,
+                item['site'].location,
+                item['start_date'],
+                item['end_date'] if item['end_date'] else 'Present',
+                item['duration'],
+                item['status']
+            ])
+            
+    return response
+
+def export_site_history_pdf(request):
+    report_data, start_date, end_date = _get_site_history_data(request)
+    
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"Site_History_Report_{start_date}_{end_date}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    c = canvas.Canvas(response, pagesize=A4)
+    width, height = A4
+    margin = 50
+    y = height - margin
+    
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margin, y, "Employee Site History Report")
+    y -= 20
+    c.setFont("Helvetica", 10)
+    c.drawString(margin, y, f"Period: {start_date} to {end_date}")
+    y -= 30
+    
+    c.setFont("Helvetica-Bold", 9)
+    # Columns: Employee, Site, Duration, Status
+    col_emp = margin
+    col_site = margin + 120
+    col_dur = margin + 350
+    col_stat = margin + 430
+    
+    c.drawString(col_emp, y, "Employee")
+    c.drawString(col_site, y, "Site / Project")
+    c.drawString(col_dur, y, "Duration")
+    c.drawString(col_stat, y, "Status")
+    c.line(margin, y-5, width-margin, y-5)
+    y -= 20
+    
+    c.setFont("Helvetica", 9)
+    
+    for employee, history in report_data.items():
+        if y < 50:
+            c.showPage()
+            y = height - margin
+            c.setFont("Helvetica", 9)
+            
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(col_emp, y, employee.name)
+        c.setFont("Helvetica", 9)
+        
+        for item in history:
+            if y < 50:
+                c.showPage()
+                y = height - margin
+                c.setFont("Helvetica", 9)
+            
+            site_str = f"{item['site'].name} ({item['site'].location})"
+            c.drawString(col_site, y, site_str[:45])
+            
+            dur_str = f"{item['duration']} days"
+            c.drawString(col_dur, y, dur_str)
+            
+            c.drawString(col_stat, y, item['status'])
+            y -= 15
+        y -= 5 # Extra space between employees
+        
+    c.save()
+    return response
 
 def update_employee_view(request, pk):
     employee = get_object_or_404(Employee, pk=pk)
@@ -727,6 +895,15 @@ def delete_site_view(request, pk):
 
 def delete_site_allocation_view(request, pk):
     get_object_or_404(SiteAllocation, pk=pk).delete()
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+
+def relieve_site_allocation_view(request, pk):
+    allocation = get_object_or_404(SiteAllocation, pk=pk)
+    if request.method == 'POST':
+        end_date_str = request.POST.get('end_date')
+        if end_date_str:
+            allocation.end_date = parse_date(end_date_str)
+            allocation.save()
     return redirect(f"{reverse('planner_workforce')}?tab=site_team")
 
 def delete_holiday_view(request, pk):
