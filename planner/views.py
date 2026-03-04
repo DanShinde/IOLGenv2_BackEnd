@@ -580,6 +580,7 @@ def workforce_view(request):
     error_message = None
     entered_data = {}
     active_tab = request.GET.get('tab', 'employees')
+    active_subtab = request.GET.get('subtab', 'sites')
     
     leave_form = LeaveForm()
     project_site_form = SiteForm(prefix='project_site')
@@ -616,20 +617,22 @@ def workforce_view(request):
             project_site_form_post = SiteForm(request.POST, prefix='project_site')
             if project_site_form_post.is_valid():
                 project_site_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
             else:
                 error_message = "Error adding project site. Please check the form for details."
                 active_tab = 'site_team'
+                active_subtab = 'sites'
                 project_site_form = project_site_form_post
 
         elif 'add_office_site' in request.POST:
             office_site_form_post = SiteForm(request.POST, prefix='office_site')
             if office_site_form_post.is_valid():
                 office_site_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
             else:
                 error_message = "Error adding office location. Please check the form for details."
                 active_tab = 'site_team'
+                active_subtab = 'sites'
                 office_site_form = office_site_form_post
 
         elif 'add_allocation' in request.POST:
@@ -646,12 +649,14 @@ def workforce_view(request):
                 if active_allocation:
                     error_message = f"Cannot allocate {new_alloc.employee.name}. They are currently active at {active_allocation.site.name}. Please relieve them first."
                     active_tab = 'site_team'
+                    active_subtab = 'allocations'
                 else:
                     new_alloc.save()
-                    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+                    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
             else:
                 error_message = "Error adding allocation."
                 active_tab = 'site_team'
+                active_subtab = 'allocations'
                 allocation_form = alloc_form_post
         
         elif 'refresh_coordinates' in request.POST:
@@ -675,6 +680,7 @@ def workforce_view(request):
         'office_site_form': office_site_form,
         'allocation_form': allocation_form,
         'active_tab': active_tab,
+        'active_subtab': active_subtab,
     })
     return render(request, 'planner/workforce.html', context)
 
@@ -915,11 +921,11 @@ def delete_leave_view(request, pk):
 
 def delete_site_view(request, pk):
     get_object_or_404(Site, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
 
 def delete_site_allocation_view(request, pk):
     get_object_or_404(SiteAllocation, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def relieve_site_allocation_view(request, pk):
     allocation = get_object_or_404(SiteAllocation, pk=pk)
@@ -928,7 +934,7 @@ def relieve_site_allocation_view(request, pk):
         if end_date_str:
             allocation.end_date = parse_date(end_date_str)
             allocation.save()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def delete_holiday_view(request, pk):
     get_object_or_404(Holiday, pk=pk).delete()
