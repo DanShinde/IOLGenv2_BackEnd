@@ -7,7 +7,7 @@ from .models import (ProjectType, Segment, Category, Holiday,
                      SalesForecast, EffortBracket, Leave, Site, SiteAllocation)
 from datetime import date, timedelta, datetime
 from collections import OrderedDict, defaultdict
-from django.db.models import Min, Max, Q
+from django.db.models import Min, Max, Q, Prefetch
 from .forms import ActivityForm, ProjectForm, LeaveForm, SiteForm, SiteAllocationForm
 from django.urls import reverse
 from urllib.parse import urlencode
@@ -539,7 +539,9 @@ def _get_workforce_context():
     today = date.today()
 
     # Prepare sites data for map view
-    all_sites = Site.objects.all()
+    all_sites = Site.objects.prefetch_related(
+        Prefetch('allocations', queryset=SiteAllocation.objects.filter(end_date__isnull=True).select_related('employee'))
+    ).all()
     sites_for_map = []
     sites_missing_coords = []
 
@@ -550,7 +552,8 @@ def _get_workforce_context():
                 'location': site.location,
                 'lat': site.latitude,
                 'lng': site.longitude,
-                'project_code': site.project.project_id if site.project else 'Office'
+                'project_code': site.project.project_id if site.project else 'Office',
+                'employees': [alloc.employee.name for alloc in site.allocations.all()]
             })
         elif site.location: # Only list as missing if they actually have a location text
             sites_missing_coords.append(site)
