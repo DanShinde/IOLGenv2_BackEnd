@@ -449,45 +449,69 @@
                     </div>
                 </div>
                 
-                <!-- Add Site Form -->
-                <div class="p-4">
-                    <form method="post" class="add-form p-4 rounded-xl shadow-inner">
-                        {% if site_form.errors %}
-                        <div class="mb-4 bg-red-50 border-l-4 border-red-500 p-4">
-                            <div class="flex">
-                                <div class="ml-3"><p class="text-sm text-red-700">{{ site_form.errors }}</p></div>
-                            </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+                    <!-- Add Project Site Form -->
+                    <div class="add-form p-4 rounded-xl shadow-inner">
+                        <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                            Add Project Site
+                        </h3>
+                        {% if project_site_form.errors %}
+                        <div class="mb-4 bg-red-50 border-l-4 border-red-500 p-2">
+                            <p class="text-xs text-red-700">{{ project_site_form.errors }}</p>
                         </div>
                         {% endif %}
-                        {% csrf_token %}
-                        <div class="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-12">
-                            <div class="sm:col-span-4" id="div_id_project">
-                                <label for="{{ site_form.project.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Project Code</label>
-                                {{ site_form.project }}
-                            </div>
-                            <div class="sm:col-span-4 hidden" id="div_id_name">
-                                <label for="{{ site_form.name.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Office Name</label>
-                                {{ site_form.name }}
-                            </div>
-                            <div class="sm:col-span-3 relative">
-                                <label for="{{ site_form.location.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Location</label>
-                                {{ site_form.location }}
-                                <ul id="location-suggestions" class="hidden absolute z-50 bg-white border border-gray-300 w-full rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 text-xs"></ul>
-                            </div>
-                            <div class="sm:col-span-1 flex items-end pb-2">
-                                <div class="flex items-center">
-                                    {{ site_form.is_office|attr:"id:id_is_office" }}
-                                    <label for="{{ site_form.is_office.id_for_label }}" class="ml-2 text-xs font-medium text-gray-700">Is Office?</label>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="add_project_site" value="1">
+                            <div class="space-y-3">
+                                <div>
+                                    <label for="{{ project_site_form.project.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Project Code</label>
+                                    {{ project_site_form.project }}
+                                </div>
+                                <div class="relative">
+                                    <label for="{{ project_site_form.location.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Location</label>
+                                    {{ project_site_form.location }}
+                                    <ul id="suggestions-project" class="hidden absolute z-50 bg-white border border-gray-300 w-full rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 text-xs"></ul>
+                                </div>
+                                <div class="text-right pt-2">
+                                    <button type="submit" class="btn-primary text-white py-2 px-4 rounded-lg font-semibold text-xs">Add Site</button>
                                 </div>
                             </div>
-                            <div class="sm:col-span-2 flex items-end">
-                                <button type="submit" name="add_site" class="btn-primary w-full text-white py-2 px-4 rounded-lg font-semibold text-xs flex items-center justify-center">
-                                    <svg class="icon mr-1.5 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                                    Add Site
-                                </button>
-                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Add Office Location Form -->
+                    <div class="add-form p-4 rounded-xl shadow-inner">
+                        <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                            Add Office Location
+                        </h3>
+                        {% if office_site_form.errors %}
+                        <div class="mb-4 bg-red-50 border-l-4 border-red-500 p-2">
+                            <p class="text-xs text-red-700">{{ office_site_form.errors }}</p>
                         </div>
-                    </form>
+                        {% endif %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="add_office_site" value="1">
+                            <input type="hidden" name="{{ office_site_form.prefix }}-is_office" value="on">
+                            <div class="space-y-3">
+                                <div>
+                                    <label for="{{ office_site_form.name.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Office Name</label>
+                                    {{ office_site_form.name }}
+                                </div>
+                                <div class="relative">
+                                    <label for="{{ office_site_form.location.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Location</label>
+                                    {{ office_site_form.location }}
+                                    <ul id="suggestions-office" class="hidden absolute z-50 bg-white border border-gray-300 w-full rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 text-xs"></ul>
+                                </div>
+                                <div class="text-right pt-2">
+                                    <button type="submit" class="btn-secondary text-white py-2 px-4 rounded-lg font-semibold text-xs">Add Office</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
                 </div>
     
                 <!-- Sites Table -->
@@ -510,9 +534,9 @@
                                 <td class="px-4 py-2 text-sm text-gray-500">{{ site.location }}</td>
                                 <td class="px-4 py-2 text-sm">
                                     {% if site.is_office %}
-                                    <span class="designation-badge" style="background-color: #d1fae5; color: #065f46;">Office</span>
+                                    <span class="designation-badge" style="background-color: #ecfccb; color: #166534;">Office</span>
                                     {% else %}
-                                    <span class="designation-badge" style="background-color: #dbeafe; color: #1e40af;">Site</span>
+                                    <span class="designation-badge" style="background-color: #e0e7ff; color: #3730a3;">Site</span>
                                     {% endif %}
                                 </td>
                                 <td class="px-4 py-2 text-xs">
@@ -634,15 +658,23 @@
                             <p class="text-xs text-gray-600">Visual overview of all project sites and offices.</p>
                         </div>
                     </div>
-                    {% if sites_missing_coords %}
-                    <form method="POST">
-                        {% csrf_token %}
-                        <button type="submit" name="refresh_coordinates" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-xs font-medium shadow-sm flex items-center">
-                            <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                            Refresh Coordinates
-                        </button>
-                    </form>
-                    {% endif %}
+                    <div class="flex items-center space-x-3">
+                        <div class="relative">
+                            <input type="text" id="map-search" placeholder="Search site..." class="text-xs border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5 shadow-sm w-48">
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                <svg class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                        </div>
+                        {% if sites_missing_coords %}
+                        <form method="POST">
+                            {% csrf_token %}
+                            <button type="submit" name="refresh_coordinates" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-xs font-medium shadow-sm flex items-center">
+                                <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Refresh Coordinates
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             
@@ -886,11 +918,14 @@
         }).addTo(map);
 
         const markers = [];
+        const searchData = []; // Store data for searching
         sites.forEach(site => {
             const empCount = site.employees ? site.employees.length : 0;
             
             // Use standard Leaflet marker look with a badge for count
-            let iconHtml = `<img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-[25px] h-[41px]">`;
+            // Apply hue-rotate filter for offices to make them green (approx -90deg from blue)
+            const imgStyle = site.is_office ? 'filter: hue-rotate(270deg);' : '';
+            let iconHtml = `<img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-[25px] h-[41px]" style="${imgStyle}">`;
             
             if (empCount > 0) {
                 iconHtml += `
@@ -926,12 +961,67 @@
             
             marker.bindPopup(popupContent);
             markers.push(marker);
+            
+            // Add to search data
+            searchData.push({
+                marker: marker,
+                text: (site.name + ' ' + site.project_code + ' ' + site.location).toLowerCase()
+            });
         });
 
         // Fit map to show all markers
         if (markers.length > 0) {
             const group = new L.featureGroup(markers);
             map.fitBounds(group.getBounds().pad(0.3));
+        }
+
+        // Add Legend
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'bg-white p-3 rounded-lg shadow-md text-xs border border-gray-200');
+            div.innerHTML = `
+                <div class="font-bold mb-2 text-gray-700">Location Type</div>
+                <div class="flex items-center mb-1.5">
+                    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-3 h-5 mr-2">
+                    <span class="text-gray-600">Project Site</span>
+                </div>
+                <div class="flex items-center">
+                    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-3 h-5 mr-2" style="filter: hue-rotate(270deg);">
+                    <span class="text-gray-600">Office Location</span>
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        // Search Functionality
+        const searchInput = document.getElementById('map-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const term = e.target.value.toLowerCase();
+                const visibleMarkers = [];
+
+                searchData.forEach(item => {
+                    if (item.text.includes(term)) {
+                        if (!map.hasLayer(item.marker)) {
+                            map.addLayer(item.marker);
+                        }
+                        visibleMarkers.push(item.marker);
+                    } else {
+                        if (map.hasLayer(item.marker)) {
+                            map.removeLayer(item.marker);
+                        }
+                    }
+                });
+
+                if (visibleMarkers.length > 0) {
+                    const group = new L.featureGroup(visibleMarkers);
+                    map.fitBounds(group.getBounds().pad(0.3));
+                    if (visibleMarkers.length === 1) {
+                        visibleMarkers[0].openPopup();
+                    }
+                }
+            });
         }
 
         // Force map to re-evaluate its size after the container is visible.
@@ -943,72 +1033,61 @@
         window.siteMapInitialized = true;
     }
 
-    // Toggle Site Form Fields based on Is Office
-    const isOfficeCheckbox = document.getElementById('id_is_office');
-    const projectDiv = document.getElementById('div_id_project');
-    const nameDiv = document.getElementById('div_id_name');
-
-    if (isOfficeCheckbox) {
-        isOfficeCheckbox.addEventListener('change', function() {
-            if (this.checked) {
-                projectDiv.classList.add('hidden');
-                nameDiv.classList.remove('hidden');
-            } else {
-                projectDiv.classList.remove('hidden');
-                nameDiv.classList.add('hidden');
-            }
-        });
-    }
-
     // Location Autocomplete Logic
-    const locationInput = document.getElementById('id_location');
-    const suggestionsList = document.getElementById('location-suggestions');
+    function setupAutocomplete(inputId, suggestionsId) {
+        const locationInput = document.getElementById(inputId);
+        const suggestionsList = document.getElementById(suggestionsId);
 
-    if (locationInput && suggestionsList) {
-        let debounceTimer;
+        if (locationInput && suggestionsList) {
+            let debounceTimer;
 
-        locationInput.addEventListener('input', function() {
-            const query = this.value;
-            clearTimeout(debounceTimer);
+            locationInput.addEventListener('input', function() {
+                const query = this.value;
+                clearTimeout(debounceTimer);
 
-            if (query.length < 3) {
-                suggestionsList.classList.add('hidden');
-                return;
-            }
+                if (query.length < 3) {
+                    suggestionsList.classList.add('hidden');
+                    return;
+                }
 
-            debounceTimer = setTimeout(() => {
-                // Fetch data from OpenStreetMap Nominatim API
-                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`)
-                    .then(response => response.json())
-                    .then(data => {
-                        suggestionsList.innerHTML = '';
-                        if (data.length > 0) {
-                            suggestionsList.classList.remove('hidden');
-                            data.forEach(place => {
-                                const li = document.createElement('li');
-                                li.className = 'px-3 py-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-0 text-gray-700';
-                                li.textContent = place.display_name;
-                                li.addEventListener('click', () => {
-                                    locationInput.value = place.display_name;
-                                    suggestionsList.classList.add('hidden');
+                debounceTimer = setTimeout(() => {
+                    // Fetch data from OpenStreetMap Nominatim API
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`)
+                        .then(response => response.json())
+                        .then(data => {
+                            suggestionsList.innerHTML = '';
+                            if (data.length > 0) {
+                                suggestionsList.classList.remove('hidden');
+                                data.forEach(place => {
+                                    const li = document.createElement('li');
+                                    li.className = 'px-3 py-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-0 text-gray-700';
+                                    li.textContent = place.display_name;
+                                    li.addEventListener('click', () => {
+                                        locationInput.value = place.display_name;
+                                        suggestionsList.classList.add('hidden');
+                                    });
+                                    suggestionsList.appendChild(li);
                                 });
-                                suggestionsList.appendChild(li);
-                            });
-                        } else {
-                            suggestionsList.classList.add('hidden');
-                        }
-                    })
-                    .catch(error => console.error('Error fetching location:', error));
-            }, 300); // Wait 300ms after typing stops
-        });
+                            } else {
+                                suggestionsList.classList.add('hidden');
+                            }
+                        })
+                        .catch(error => console.error('Error fetching location:', error));
+                }, 300); // Wait 300ms after typing stops
+            });
 
-        // Hide suggestions when clicking outside
-        document.addEventListener('click', function(e) {
-            if (e.target !== locationInput && e.target !== suggestionsList) {
-                suggestionsList.classList.add('hidden');
-            }
-        });
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target !== locationInput && e.target !== suggestionsList) {
+                    suggestionsList.classList.add('hidden');
+                }
+            });
+        }
     }
+
+    // Initialize for both forms
+    setupAutocomplete('id_project_site-location', 'suggestions-project');
+    setupAutocomplete('id_office_site-location', 'suggestions-office');
 
     // Team Allocation Table Filtering
     const filterEmployee = document.getElementById('filter-employee');

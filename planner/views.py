@@ -553,7 +553,8 @@ def _get_workforce_context():
                 'lat': site.latitude,
                 'lng': site.longitude,
                 'project_code': site.project.project_id if site.project else 'Office',
-                'employees': [alloc.employee.name for alloc in site.allocations.all()]
+                'employees': [alloc.employee.name for alloc in site.allocations.all()],
+                'is_office': site.is_office
             })
         elif site.location: # Only list as missing if they actually have a location text
             sites_missing_coords.append(site)
@@ -581,7 +582,8 @@ def workforce_view(request):
     active_tab = request.GET.get('tab', 'employees')
     
     leave_form = LeaveForm()
-    site_form = SiteForm()
+    project_site_form = SiteForm(prefix='project_site')
+    office_site_form = SiteForm(prefix='office_site')
     allocation_form = SiteAllocationForm()
     
     if request.method == 'POST':
@@ -610,15 +612,25 @@ def workforce_view(request):
                 active_tab = 'leaves'
                 leave_form = leave_form_post
         
-        elif 'add_site' in request.POST:
-            site_form_post = SiteForm(request.POST)
-            if site_form_post.is_valid():
-                site_form_post.save()
+        elif 'add_project_site' in request.POST:
+            project_site_form_post = SiteForm(request.POST, prefix='project_site')
+            if project_site_form_post.is_valid():
+                project_site_form_post.save()
                 return redirect(f"{reverse('planner_workforce')}?tab=site_team")
             else:
-                error_message = "Error adding site. Please check the form for details."
+                error_message = "Error adding project site. Please check the form for details."
                 active_tab = 'site_team'
-                site_form = site_form_post
+                project_site_form = project_site_form_post
+
+        elif 'add_office_site' in request.POST:
+            office_site_form_post = SiteForm(request.POST, prefix='office_site')
+            if office_site_form_post.is_valid():
+                office_site_form_post.save()
+                return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+            else:
+                error_message = "Error adding office location. Please check the form for details."
+                active_tab = 'site_team'
+                office_site_form = office_site_form_post
 
         elif 'add_allocation' in request.POST:
             alloc_form_post = SiteAllocationForm(request.POST)
@@ -659,7 +671,8 @@ def workforce_view(request):
         'error_message': error_message,
         'entered_data': entered_data,
         'leave_form': leave_form,
-        'site_form': site_form,
+        'project_site_form': project_site_form,
+        'office_site_form': office_site_form,
         'allocation_form': allocation_form,
         'active_tab': active_tab,
     })
