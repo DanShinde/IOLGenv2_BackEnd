@@ -91,6 +91,9 @@ class SiteForm(forms.ModelForm):
                 field.widget.attrs.update({
                     'class': 'form-checkbox h-4 w-4 text-indigo-600 transition duration-150 ease-in-out'
                 })
+        
+        # Disable browser autocomplete for location to show our custom suggestions
+        self.fields['location'].widget.attrs.update({'autocomplete': 'off', 'placeholder': 'Start typing to search location...'})
 
     def clean(self):
         cleaned_data = super().clean()
