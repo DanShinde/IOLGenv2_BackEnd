@@ -580,6 +580,10 @@ def workforce_view(request):
     entered_data = {}
     active_tab = request.GET.get('tab', 'employees')
     
+    leave_form = LeaveForm()
+    site_form = SiteForm()
+    allocation_form = SiteAllocationForm()
+    
     if request.method == 'POST':
         if 'add_employee' in request.POST:
             name = request.POST.get('name')
@@ -597,42 +601,46 @@ def workforce_view(request):
                     return redirect('planner_workforce')
         
         elif 'add_leave' in request.POST:
-            leave_form = LeaveForm(request.POST)
-            if leave_form.is_valid():
-                leave_form.save()
+            leave_form_post = LeaveForm(request.POST)
+            if leave_form_post.is_valid():
+                leave_form_post.save()
                 return redirect(f"{reverse('planner_workforce')}?tab=leaves")
             else:
                 error_message = "Error adding leave. Please check dates."
                 active_tab = 'leaves'
+                leave_form = leave_form_post
         
         elif 'add_site' in request.POST:
-            site_form = SiteForm(request.POST)
-            if site_form.is_valid():
-                site_form.save()
+            site_form_post = SiteForm(request.POST)
+            if site_form_post.is_valid():
+                site_form_post.save()
                 return redirect(f"{reverse('planner_workforce')}?tab=site_team")
             else:
-                error_message = "Error adding site."
+                error_message = "Error adding site. Please check the form for details."
                 active_tab = 'site_team'
+                site_form = site_form_post
 
         elif 'add_allocation' in request.POST:
-            alloc_form = SiteAllocationForm(request.POST)
-            if alloc_form.is_valid():
-                new_alloc = alloc_form.save(commit=False)
+            alloc_form_post = SiteAllocationForm(request.POST)
+            if alloc_form_post.is_valid():
+                new_alloc = alloc_form_post.save(commit=False)
                 
-                # Logic to close previous active allocation (Shift to another site)
-                previous_active = SiteAllocation.objects.filter(
+                # Check if employee is already allocated
+                active_allocation = SiteAllocation.objects.filter(
                     employee=new_alloc.employee,
                     end_date__isnull=True
-                )
-                for prev in previous_active:
-                    prev.end_date = new_alloc.start_date
-                    prev.save()
-                
-                new_alloc.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=site_team")
+                ).first()
+
+                if active_allocation:
+                    error_message = f"Cannot allocate {new_alloc.employee.name}. They are currently active at {active_allocation.site.name}. Please relieve them first."
+                    active_tab = 'site_team'
+                else:
+                    new_alloc.save()
+                    return redirect(f"{reverse('planner_workforce')}?tab=site_team")
             else:
                 error_message = "Error adding allocation."
                 active_tab = 'site_team'
+                allocation_form = alloc_form_post
         
         elif 'refresh_coordinates' in request.POST:
             # Attempt to geocode sites that are missing coordinates
@@ -650,9 +658,9 @@ def workforce_view(request):
     context.update({
         'error_message': error_message,
         'entered_data': entered_data,
-        'leave_form': LeaveForm(),
-        'site_form': SiteForm(),
-        'allocation_form': SiteAllocationForm(),
+        'leave_form': leave_form,
+        'site_form': site_form,
+        'allocation_form': allocation_form,
         'active_tab': active_tab,
     })
     return render(request, 'planner/workforce.html', context)
