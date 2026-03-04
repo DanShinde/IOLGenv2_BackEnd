@@ -15,6 +15,7 @@ from django.http import JsonResponse, HttpResponse
 import json
 from .utils import calculate_end_date, count_working_days, calculate_effort_from_value, calculate_overlap_working_days
 import calendar
+import time
 from django.views.decorators.http import require_POST
 from itertools import groupby
 from django.utils.dateparse import parse_date
@@ -535,6 +536,24 @@ def activity_planner_view(request, project_pk):
 # ... (rest of the views remain unchanged) ...
 def _get_workforce_context():
     today = date.today()
+
+    # Prepare sites data for map view
+    all_sites = Site.objects.all()
+    sites_for_map = []
+    sites_missing_coords = []
+
+    for site in all_sites:
+        if site.latitude is not None and site.longitude is not None:
+            sites_for_map.append({
+                'name': site.name,
+                'location': site.location,
+                'lat': site.latitude,
+                'lng': site.longitude,
+                'project_code': site.project.project_id if site.project else 'Office'
+            })
+        elif site.location: # Only list as missing if they actually have a location text
+            sites_missing_coords.append(site)
+
     return {
         'workforce_counts': {
             'engineers': Employee.objects.filter(designation='ENGINEER', is_active=True).exclude(name__startswith='Unassigned').count(),
@@ -544,7 +563,9 @@ def _get_workforce_context():
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
         'all_leaves': Leave.objects.filter(end_date__gte=today).select_related('employee').order_by('start_date'),
-        'all_sites': Site.objects.all(),
+        'all_sites': all_sites,
+        'sites_for_map_json': json.dumps(sites_for_map),
+        'sites_missing_coords': sites_missing_coords,
         'all_allocations': SiteAllocation.objects.select_related('employee', 'site').order_by('-start_date'),
         'active_nav': 'workforce',
     }
@@ -597,6 +618,18 @@ def workforce_view(request):
             else:
                 error_message = "Error adding allocation."
                 active_tab = 'site_team'
+        
+        elif 'refresh_coordinates' in request.POST:
+            # Attempt to geocode sites that are missing coordinates
+            # We limit to 5 at a time to prevent browser timeout and respect API rate limits
+            sites_to_update = Site.objects.filter(Q(latitude__isnull=True) | Q(longitude__isnull=True)).exclude(location='')
+            count = 0
+            for site in sites_to_update:
+                if count >= 5: break
+                site.save() # This triggers the geocoding logic in models.py
+                time.sleep(1.1) # Respect OpenStreetMap Nominatim rate limit (1 req/sec)
+                count += 1
+            return redirect(f"{reverse('planner_workforce')}?tab=map_view")
 
     context = _get_workforce_context()
     context.update({
