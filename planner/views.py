@@ -559,11 +559,18 @@ def _get_workforce_context():
         elif site.location: # Only list as missing if they actually have a location text
             sites_missing_coords.append(site)
 
+    # Calculate active allocations counts
+    active_allocations = SiteAllocation.objects.filter(end_date__isnull=True)
+    on_site_count = active_allocations.filter(site__is_office=False).count()
+    in_office_count = active_allocations.filter(site__is_office=True).count()
+
     return {
         'workforce_counts': {
             'engineers': Employee.objects.filter(designation='ENGINEER', is_active=True).exclude(name__startswith='Unassigned').count(),
             'team_leads': Employee.objects.filter(designation='TEAM_LEAD', is_active=True).exclude(name__startswith='Unassigned').count(),
             'managers': Employee.objects.filter(designation='MANAGER', is_active=True).exclude(name__startswith='Unassigned').count(),
+            'on_site': on_site_count,
+            'in_office': in_office_count,
         },
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
