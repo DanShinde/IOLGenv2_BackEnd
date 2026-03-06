@@ -61,6 +61,7 @@ urlpatterns = [
     # Export URLs
     path('push-pull/export/excel/', views.export_push_pull_excel, name='export_push_pull_excel'),
     path('push-pull/export/pdf/', views.export_push_pull_pdf, name='export_push_pull_pdf'),
+    path('push-pull/send-email/', views.send_push_pull_email, name='send_push_pull_email'),
 
     # AJAX for Contact Person
     path('contact/add/ajax/', views.add_contact_person_ajax, name='add_contact_person_ajax'),
