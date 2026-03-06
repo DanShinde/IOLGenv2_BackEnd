@@ -569,8 +569,10 @@ def _get_workforce_context():
             'engineers': Employee.objects.filter(designation='ENGINEER', is_active=True).exclude(name__startswith='Unassigned').count(),
             'team_leads': Employee.objects.filter(designation='TEAM_LEAD', is_active=True).exclude(name__startswith='Unassigned').count(),
             'managers': Employee.objects.filter(designation='MANAGER', is_active=True).exclude(name__startswith='Unassigned').count(),
+
             'on_site': on_site_count,
             'in_office': in_office_count,
+
         },
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,

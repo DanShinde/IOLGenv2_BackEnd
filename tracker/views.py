@@ -1517,6 +1517,7 @@ def save_mitigation_plan(request, update_id):
 def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
 
+
     updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()
     contact_persons = ContactPerson.objects.all()
 
@@ -1552,6 +1553,7 @@ def all_push_pull_content(request, filter=None):
     # Auto-archive logic: Move 'Closed' items older than 30 days to 'Archived'
     archive_threshold = timezone.now() - timedelta(days=30)
     ProjectUpdate.objects.filter(status='Closed', closed_at__lt=archive_threshold).update(status='Archived')
+
 
 
     updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
@@ -2178,4 +2180,6 @@ def public_push_pull_content(request, access_token):
         'status_filter': status_filter,
         'push_pull_filter': push_pull_filter,
     }
+    return render(request, 'tracker/all_push_pull_content.html', context)
+    
     return render(request, 'tracker/all_push_pull_content.html', context)
