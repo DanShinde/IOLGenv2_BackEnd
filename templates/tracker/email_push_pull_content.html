@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Automation Push/Pull Content Update</title>
+    <style>
+        /* Client-specific styles */
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; }
+
+        /* Reset styles */
+        body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; background-color: #f4f4f4; font-family: Arial, sans-serif; }
+        
+        /* Table styles */
+        .email-container { width: 100%; max-width: 900px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header { background-color: #1b263b; color: #ffffff; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .data-table th { background-color: #e9ecef; color: #333; padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: bold; }
+        .data-table td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: top; color: #333; }
+        .data-table tr:last-child td { border-bottom: none; }
+        
+        /* Badges */
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; color: #fff; text-decoration: none; }
+        .bg-open { background-color: #28a745; } /* Green */
+        .bg-progress { background-color: #ffc107; color: #000; } /* Yellow */
+        .bg-closed { background-color: #6c757d; } /* Grey */
+        .bg-push { background-color: #17a2b8; } /* Info/Blue */
+        .bg-pull { background-color: #6610f2; } /* Purple */
+
+        /* Button */
+        .btn-primary { background-color: #007bff; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-top: 10px; }
+        
+        /* Remarks */
+        .remark-item { font-size: 11px; color: #666; margin-bottom: 4px; border-left: 2px solid #ddd; padding-left: 5px; }
+        .remark-author { font-weight: bold; color: #333; }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td style="padding: 20px 0;">
+                <div class="email-container">
+                    <!-- Header -->
+                    <div class="header">
+                        <h2 style="margin: 0; font-size: 24px;">Automation Push/Pull Content Update</h2>
+                        <p style="margin: 5px 0 0; opacity: 0.8;">{{ date_str }}</p>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="content">
+                        <p style="font-size: 16px; line-height: 1.5; margin-bottom: 20px;">Hello,</p>
+                        <p style="font-size: 14px; line-height: 1.5; margin-bottom: 20px;">
+                            Here is the latest summary of Push/Pull content updates. You can view details and update the status directly by clicking the button below.
+                        </p>
+                        
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <a href="{{ public_url }}" class="btn-primary">Open in Tracker to Update</a>
+                        </div>
+
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 10%;">Project</th>
+                                    <th style="width: 8%;">Type</th>
+                                    <th style="width: 25%;">What</th>
+                                    <th style="width: 15%;">Who</th>
+                                    <th style="width: 10%;">Raised By</th>
+                                    <th style="width: 10%;">ETA</th>
+                                    <th style="width: 10%;">Status</th>
+                                    <th style="width: 12%;">Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for update in updates %}
+                                <tr>
+                                    <td><strong>{{ update.project.code|default:"General" }}</strong></td>
+                                    <td>
+                                        <span class="badge {% if update.push_pull_type == 'Push' %}bg-push{% else %}bg-pull{% endif %}">
+                                            {{ update.get_push_pull_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ update.text|linebreaksbr }}</td>
+                                    <td>{% for person in update.who_contact.all %}{{ person.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+                                    <td>{{ update.raised_by.name|default:"-" }}</td>
+                                    <td>{{ update.eta|date:"d M Y"|default:"-" }}</td>
+                                    <td>
+                                        <span class="badge {% if update.status == 'Open' %}bg-open{% elif update.status == 'In Progress' %}bg-progress{% else %}bg-closed{% endif %}">
+                                            {{ update.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% for remark in update.remarks.all %}
+                                            <div class="remark-item"><span class="remark-author">{{ remark.added_by.get_full_name|default:remark.added_by.username }}:</span> {{ remark.text }}</div>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

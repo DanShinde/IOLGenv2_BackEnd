@@ -5,13 +5,19 @@ from . import views
 
 urlpatterns = [
     path('', views.project_list_view, name='planner_project_list'),
-    path('planner/all/', views.consolidated_planner_view, name='planner_consolidated_planner'),
-    path('planner/<int:project_pk>/', views.activity_planner_view, name='planner_activity_planner'),
+    path('all/', views.consolidated_planner_view, name='planner_consolidated_planner'),
+    path('<int:project_pk>/', views.activity_planner_view, name='planner_activity_planner'),
     path('workforce/', views.workforce_view, name='planner_workforce'),
     path('configuration/', views.configuration_view, name='planner_configuration'),
     path('employee/<int:pk>/delete/', views.delete_employee_view, name='planner_delete_employee'),
     path('leave/<int:pk>/delete/', views.delete_leave_view, name='planner_delete_leave'), # New URL
+    path('site/<int:pk>/delete/', views.delete_site_view, name='planner_delete_site'),
+    path('site-allocation/<int:pk>/delete/', views.delete_site_allocation_view, name='planner_delete_site_allocation'),
+    path('site-allocation/<int:pk>/relieve/', views.relieve_site_allocation_view, name='planner_relieve_site_allocation'),
     path('project/<int:pk>/delete/', views.delete_project_view, name='planner_delete_project'),
+    path('reports/site-history/', views.employee_site_history_report_view, name='planner_site_history_report'),
+    path('reports/site-history/export/csv/', views.export_site_history_csv, name='planner_site_history_export_csv'),
+    path('reports/site-history/export/pdf/', views.export_site_history_pdf, name='planner_site_history_export_pdf'),
     path('activity/<int:pk>/edit/', views.edit_activity_view, name='planner_edit_activity'),
     path('activity/<int:pk>/delete/', views.delete_activity_view, name='planner_delete_activity'),
     path('holiday/<int:pk>/delete/', views.delete_holiday_view, name='planner_delete_holiday'),

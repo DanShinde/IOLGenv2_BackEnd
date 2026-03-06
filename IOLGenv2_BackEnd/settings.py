@@ -472,4 +472,16 @@ CACHES = {
     }
 }
 
-#----
+# Email Configuration
+# Default to console backend for development (prints to terminal instead of sending)
+# This fixes [WinError 10061] if no SMTP server is running locally.
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# To send real emails, uncomment and configure the following (e.g., for Gmail):
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com' # Use 'smtp.office365.com' for Outlook/Corporate
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'mhshvsnt@gmail.com'  # <--- Update this
+EMAIL_HOST_PASSWORD = 'xcga fato fzoj bzox'      # <--- Paste your 16-char App Password here
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

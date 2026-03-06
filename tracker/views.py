@@ -38,6 +38,7 @@ import json
 from django.contrib.auth import get_user_model
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
+from django.core.mail import send_mail
 from planner.models import Project as PlannerProject
 from django.utils.html import escape
 
@@ -1516,7 +1517,7 @@ def save_mitigation_plan(request, update_id):
 def all_project_updates(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
 
-    updates = project.updates.select_related('author').prefetch_related('who_contact', 'remarks').all()
+
     updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()
     contact_persons = ContactPerson.objects.all()
 
@@ -1554,7 +1555,7 @@ def all_push_pull_content(request, filter=None):
     ProjectUpdate.objects.filter(status='Closed', closed_at__lt=archive_threshold).update(status='Archived')
 
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks').order_by('-created_at')
+
     updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
 
     if current_filter == 'project':
@@ -1604,6 +1605,12 @@ def add_contact_person_ajax(request):
         name = request.POST.get('name')
         if not name:
             return JsonResponse({'status': 'error', 'message': 'Name is required'}, status=400)
+        
+        # ✅ NEW: Validate that the name has at least a first and last name
+        parts = name.strip().split(' ', 1)
+        if len(parts) < 2 or not parts[0] or not parts[1]:
+            return JsonResponse({'status': 'error', 'message': 'First and last name are required.'}, status=400)
+
         
         contact, created = ContactPerson.objects.get_or_create(name=name)
         
@@ -1802,6 +1809,89 @@ def export_push_pull_pdf(request):
     response['Content-Disposition'] = f'attachment; filename={filename}'
 
     return response
+
+@login_required
+def send_push_pull_email(request):
+    # 1. Retrieve filters (similar to all_push_pull_content)
+    # Check GET first, then session, default to 'all'
+    current_filter = request.GET.get('filter', request.session.get('push_pull_filter', 'all'))
+    status_filter = request.GET.get('status_filter', 'all')
+    push_pull_filter = request.GET.get('push_pull_filter', 'all')
+
+    # 2. Filter the updates
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
+
+    if current_filter == 'project':
+        updates_qs = updates_qs.filter(content_type='Project')
+    elif current_filter == 'general':
+        updates_qs = updates_qs.filter(content_type='General')
+
+    if push_pull_filter == 'push':
+        updates_qs = updates_qs.filter(push_pull_type='Push')
+    elif push_pull_filter == 'pull':
+        updates_qs = updates_qs.filter(push_pull_type='Pull')
+
+    if status_filter == 'open':
+        updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
+    elif status_filter == 'closed':
+        updates_qs = updates_qs.filter(status='Closed')
+    elif status_filter == 'archived':
+        updates_qs = updates_qs.filter(status='Archived')
+    else:
+        updates_qs = updates_qs.exclude(status='Archived')
+
+    updates = list(updates_qs.all())
+
+    # 3. Collect recipients from the 'who_contact' field
+    recipients = set()
+    for update in updates:
+        for contact in update.who_contact.all():
+            if contact.email:
+                recipients.add(contact.email)
+
+    if not recipients:
+        messages.error(request, "No email addresses found for the contacts in the current list.")
+        return redirect('all_push_pull_content')
+
+    # 4. Generate Public Link (using the hardcoded token from public view)
+    token = "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+    public_url = request.build_absolute_uri(reverse('public_push_pull_content', args=[token]))
+    
+    # Append filters to the public URL so the recipient sees the same view
+    params = request.GET.copy()
+    if 'filter' not in params and current_filter != 'all':
+        params['filter'] = current_filter
+    if params:
+        public_url += f"?{params.urlencode()}"
+
+    # 5. Render the Email Body using the new dedicated template
+    context = {
+        'updates': updates,
+        'public_url': public_url,
+        'date_str': timezone.now().strftime('%d-%b-%Y'),
+    }
+
+    try:
+        # Render the dedicated email template
+        html_content = render_to_string('tracker/email_push_pull_content.html', context, request=request)
+
+        send_mail(
+            subject=f"Push/Pull Content Update - {timezone.now().strftime('%d-%b-%Y')}",
+            message="", # Plain text fallback left empty as we rely on HTML
+            from_email=None, # Use DEFAULT_FROM_EMAIL
+            recipient_list=list(recipients),
+            html_message=html_content,
+            fail_silently=False
+        )
+        messages.success(request, f"Email sent successfully to {len(recipients)} recipients.")
+    except Exception as e:
+        messages.error(request, f"Error sending email: {e}")
+
+    # Redirect back preserving filters
+    redirect_url = reverse('all_push_pull_content')
+    if request.GET:
+        redirect_url += f"?{request.GET.urlencode()}"
+    return HttpResponseRedirect(redirect_url)
 
 
 @login_required

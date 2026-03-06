@@ -4,23 +4,25 @@ from django.shortcuts import render, redirect, get_object_or_404
 from employees.models import Employee
 from .models import (ProjectType, Segment, Category, Holiday,
                      Project, Activity, GeneralSettings, CapacitySettings,
-                     SalesForecast, EffortBracket, Leave)
+                     SalesForecast, EffortBracket, Leave, Site, SiteAllocation)
 from datetime import date, timedelta, datetime
 from collections import OrderedDict, defaultdict
-from django.db.models import Min, Max, Q
-from .forms import ActivityForm, ProjectForm, LeaveForm
+from django.db.models import Min, Max, Q, Prefetch
+from .forms import ActivityForm, ProjectForm, LeaveForm, SiteForm, SiteAllocationForm
 from django.urls import reverse
 from urllib.parse import urlencode
 from django.http import JsonResponse, HttpResponse
 import json
 from .utils import calculate_end_date, count_working_days, calculate_effort_from_value, calculate_overlap_working_days
 import calendar
+import time
 from django.views.decorators.http import require_POST
 from itertools import groupby
 from django.utils.dateparse import parse_date
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A3, landscape
+from reportlab.lib.pagesizes import A3, A4, landscape
 from reportlab.lib import colors
+import csv
 
 # Define this constant at the top of the file to avoid "magic numbers"
 CR = 10_000_000
@@ -535,15 +537,50 @@ def activity_planner_view(request, project_pk):
 # ... (rest of the views remain unchanged) ...
 def _get_workforce_context():
     today = date.today()
+
+    # Prepare sites data for map view
+    all_sites = Site.objects.prefetch_related(
+        Prefetch('allocations', queryset=SiteAllocation.objects.filter(end_date__isnull=True).select_related('employee'))
+    ).all()
+    sites_for_map = []
+    sites_missing_coords = []
+
+    for site in all_sites:
+        if site.latitude is not None and site.longitude is not None:
+            sites_for_map.append({
+                'name': site.name,
+                'location': site.location,
+                'lat': site.latitude,
+                'lng': site.longitude,
+                'project_code': site.project.project_id if site.project else 'Office',
+                'employees': [alloc.employee.name for alloc in site.allocations.all()],
+                'is_office': site.is_office
+            })
+        elif site.location: # Only list as missing if they actually have a location text
+            sites_missing_coords.append(site)
+
+    # Calculate active allocations counts
+    active_allocations = SiteAllocation.objects.filter(end_date__isnull=True)
+    on_site_count = active_allocations.filter(site__is_office=False).count()
+    in_office_count = active_allocations.filter(site__is_office=True).count()
+
     return {
         'workforce_counts': {
             'engineers': Employee.objects.filter(designation='ENGINEER', is_active=True).exclude(name__startswith='Unassigned').count(),
             'team_leads': Employee.objects.filter(designation='TEAM_LEAD', is_active=True).exclude(name__startswith='Unassigned').count(),
             'managers': Employee.objects.filter(designation='MANAGER', is_active=True).exclude(name__startswith='Unassigned').count(),
+
+            'on_site': on_site_count,
+            'in_office': in_office_count,
+
         },
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
         'all_leaves': Leave.objects.filter(end_date__gte=today).select_related('employee').order_by('start_date'),
+        'all_sites': all_sites,
+        'sites_for_map_json': json.dumps(sites_for_map),
+        'sites_missing_coords': sites_missing_coords,
+        'all_allocations': SiteAllocation.objects.select_related('employee', 'site').order_by('-start_date'),
         'active_nav': 'workforce',
     }
 
@@ -552,6 +589,12 @@ def workforce_view(request):
     error_message = None
     entered_data = {}
     active_tab = request.GET.get('tab', 'employees')
+    active_subtab = request.GET.get('subtab', 'sites')
+    
+    leave_form = LeaveForm()
+    project_site_form = SiteForm(prefix='project_site')
+    office_site_form = SiteForm(prefix='office_site')
+    allocation_form = SiteAllocationForm()
     
     if request.method == 'POST':
         if 'add_employee' in request.POST:
@@ -570,22 +613,241 @@ def workforce_view(request):
                     return redirect('planner_workforce')
         
         elif 'add_leave' in request.POST:
-            leave_form = LeaveForm(request.POST)
-            if leave_form.is_valid():
-                leave_form.save()
+            leave_form_post = LeaveForm(request.POST)
+            if leave_form_post.is_valid():
+                leave_form_post.save()
                 return redirect(f"{reverse('planner_workforce')}?tab=leaves")
             else:
                 error_message = "Error adding leave. Please check dates."
                 active_tab = 'leaves'
+                leave_form = leave_form_post
+        
+        elif 'add_project_site' in request.POST:
+            project_site_form_post = SiteForm(request.POST, prefix='project_site')
+            if project_site_form_post.is_valid():
+                project_site_form_post.save()
+                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+            else:
+                error_message = "Error adding project site. Please check the form for details."
+                active_tab = 'site_team'
+                active_subtab = 'sites'
+                project_site_form = project_site_form_post
+
+        elif 'add_office_site' in request.POST:
+            office_site_form_post = SiteForm(request.POST, prefix='office_site')
+            if office_site_form_post.is_valid():
+                office_site_form_post.save()
+                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+            else:
+                error_message = "Error adding office location. Please check the form for details."
+                active_tab = 'site_team'
+                active_subtab = 'sites'
+                office_site_form = office_site_form_post
+
+        elif 'add_allocation' in request.POST:
+            alloc_form_post = SiteAllocationForm(request.POST)
+            if alloc_form_post.is_valid():
+                new_alloc = alloc_form_post.save(commit=False)
+                
+                # Check if employee is already allocated
+                active_allocation = SiteAllocation.objects.filter(
+                    employee=new_alloc.employee,
+                    end_date__isnull=True
+                ).first()
+
+                if active_allocation:
+                    error_message = f"Cannot allocate {new_alloc.employee.name}. They are currently active at {active_allocation.site.name}. Please relieve them first."
+                    active_tab = 'site_team'
+                    active_subtab = 'allocations'
+                else:
+                    new_alloc.save()
+                    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+            else:
+                error_message = "Error adding allocation."
+                active_tab = 'site_team'
+                active_subtab = 'allocations'
+                allocation_form = alloc_form_post
+        
+        elif 'refresh_coordinates' in request.POST:
+            # Attempt to geocode sites that are missing coordinates
+            # We limit to 5 at a time to prevent browser timeout and respect API rate limits
+            sites_to_update = Site.objects.filter(Q(latitude__isnull=True) | Q(longitude__isnull=True)).exclude(location='')
+            count = 0
+            for site in sites_to_update:
+                if count >= 5: break
+                site.save() # This triggers the geocoding logic in models.py
+                time.sleep(1.1) # Respect OpenStreetMap Nominatim rate limit (1 req/sec)
+                count += 1
+            return redirect(f"{reverse('planner_workforce')}?tab=map_view")
 
     context = _get_workforce_context()
     context.update({
         'error_message': error_message,
         'entered_data': entered_data,
-        'leave_form': LeaveForm(),
+        'leave_form': leave_form,
+        'project_site_form': project_site_form,
+        'office_site_form': office_site_form,
+        'allocation_form': allocation_form,
         'active_tab': active_tab,
+        'active_subtab': active_subtab,
     })
     return render(request, 'planner/workforce.html', context)
+
+def _get_site_history_data(request):
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    engineer_id = request.GET.get('engineer')
+    site_id = request.GET.get('site')
+    status_filter = request.GET.get('status')
+    
+    today = date.today()
+    start_date = parse_date(start_date_str) if start_date_str else today.replace(day=1)
+    end_date = parse_date(end_date_str) if end_date_str else today
+
+    # Filter allocations that overlap with the selected period
+    allocations = SiteAllocation.objects.select_related('employee', 'site', 'site__project')
+
+    if engineer_id:
+        allocations = allocations.filter(employee_id=engineer_id)
+    if site_id:
+        allocations = allocations.filter(site_id=site_id)
+    
+    if status_filter == 'Active':
+        allocations = allocations.filter(end_date__isnull=True)
+    elif status_filter == 'Relieved':
+        allocations = allocations.filter(end_date__isnull=False)
+
+    allocations = allocations.filter(
+        start_date__lte=end_date
+    ).filter(
+        Q(end_date__gte=start_date) | Q(end_date__isnull=True)
+    ).order_by('employee__name', 'start_date')
+
+    report_data = defaultdict(list)
+    
+    for alloc in allocations:
+        # Calculate effective duration within the window
+        eff_start = max(alloc.start_date, start_date)
+        eff_end = min(alloc.end_date, end_date) if alloc.end_date else end_date
+        
+        duration = (eff_end - eff_start).days + 1
+        if duration < 0: duration = 0
+        
+        report_data[alloc.employee].append({
+            'site': alloc.site,
+            'start_date': alloc.start_date,
+            'end_date': alloc.end_date,
+            'eff_start': eff_start,
+            'eff_end': eff_end,
+            'duration': duration,
+            'status': 'Active' if not alloc.end_date else 'Relieved'
+        })
+    return report_data, start_date, end_date
+
+def employee_site_history_report_view(request):
+    report_data, start_date, end_date = _get_site_history_data(request)
+
+    context = {
+        'report_data': dict(report_data),
+        'start_date': start_date,
+        'end_date': end_date,
+        'active_nav': 'workforce',
+        'all_employees': Employee.objects.all().order_by('name'),
+        'all_sites': Site.objects.all().order_by('name'),
+        'selected_engineer': int(request.GET.get('engineer')) if request.GET.get('engineer') else None,
+        'selected_site': int(request.GET.get('site')) if request.GET.get('site') else None,
+        'selected_status': request.GET.get('status'),
+    }
+    return render(request, 'planner/site_history_report.html', context)
+
+def export_site_history_csv(request):
+    report_data, start_date, end_date = _get_site_history_data(request)
+    
+    response = HttpResponse(content_type='text/csv')
+    filename = f"Site_History_Report_{start_date}_{end_date}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Employee', 'Designation', 'Site/Project', 'Location', 'Start Date', 'End Date', 'Duration (Days)', 'Status'])
+    
+    for employee, history in report_data.items():
+        for item in history:
+            writer.writerow([
+                employee.name,
+                employee.get_designation_display(),
+                item['site'].name,
+                item['site'].location,
+                item['start_date'],
+                item['end_date'] if item['end_date'] else 'Present',
+                item['duration'],
+                item['status']
+            ])
+            
+    return response
+
+def export_site_history_pdf(request):
+    report_data, start_date, end_date = _get_site_history_data(request)
+    
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"Site_History_Report_{start_date}_{end_date}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    c = canvas.Canvas(response, pagesize=A4)
+    width, height = A4
+    margin = 50
+    y = height - margin
+    
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margin, y, "Employee Site History Report")
+    y -= 20
+    c.setFont("Helvetica", 10)
+    c.drawString(margin, y, f"Period: {start_date} to {end_date}")
+    y -= 30
+    
+    c.setFont("Helvetica-Bold", 9)
+    # Columns: Employee, Site, Duration, Status
+    col_emp = margin
+    col_site = margin + 120
+    col_dur = margin + 350
+    col_stat = margin + 430
+    
+    c.drawString(col_emp, y, "Employee")
+    c.drawString(col_site, y, "Site / Project")
+    c.drawString(col_dur, y, "Duration")
+    c.drawString(col_stat, y, "Status")
+    c.line(margin, y-5, width-margin, y-5)
+    y -= 20
+    
+    c.setFont("Helvetica", 9)
+    
+    for employee, history in report_data.items():
+        if y < 50:
+            c.showPage()
+            y = height - margin
+            c.setFont("Helvetica", 9)
+            
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(col_emp, y, employee.name)
+        c.setFont("Helvetica", 9)
+        
+        for item in history:
+            if y < 50:
+                c.showPage()
+                y = height - margin
+                c.setFont("Helvetica", 9)
+            
+            site_str = f"{item['site'].name} ({item['site'].location})"
+            c.drawString(col_site, y, site_str[:45])
+            
+            dur_str = f"{item['duration']} days"
+            c.drawString(col_dur, y, dur_str)
+            
+            c.drawString(col_stat, y, item['status'])
+            y -= 15
+        y -= 5 # Extra space between employees
+        
+    c.save()
+    return response
 
 def update_employee_view(request, pk):
     employee = get_object_or_404(Employee, pk=pk)
@@ -665,6 +927,23 @@ def delete_employee_view(request, pk):
 def delete_leave_view(request, pk):
     get_object_or_404(Leave, pk=pk).delete()
     return redirect(f"{reverse('planner_workforce')}?tab=leaves")
+
+def delete_site_view(request, pk):
+    get_object_or_404(Site, pk=pk).delete()
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+
+def delete_site_allocation_view(request, pk):
+    get_object_or_404(SiteAllocation, pk=pk).delete()
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+
+def relieve_site_allocation_view(request, pk):
+    allocation = get_object_or_404(SiteAllocation, pk=pk)
+    if request.method == 'POST':
+        end_date_str = request.POST.get('end_date')
+        if end_date_str:
+            allocation.end_date = parse_date(end_date_str)
+            allocation.save()
+    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def delete_holiday_view(request, pk):
     get_object_or_404(Holiday, pk=pk).delete()
@@ -1054,9 +1333,10 @@ def capacity_plan_view(request):
                 'month': p['label'], 
                 'available_hours': available_hours, 
                 'required_hours': required_hours, 
-                'variance_hours': available_hours - required_hours, 
+                'variance_hours': headcount - required_headcount, 
                 'available_headcount': headcount, 
-                'required_headcount': required_headcount
+                'required_headcount': required_headcount,
+                'variance_headcount': headcount - required_headcount
             })
         report.append(des_data)
     

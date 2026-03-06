@@ -29,8 +29,9 @@ class SegmentAdmin(admin.ModelAdmin):
 # ✅ Register the ContactPerson model
 @admin.register(ContactPerson)
 class ContactPersonAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
-    search_fields = ('name',)
+    list_display = ('first_name', 'last_name', 'email')
+    search_fields = ('first_name', 'last_name', 'email', 'name')
+    fields = ('first_name', 'last_name', 'email') # 'name' is hidden and auto-calculated
 
 @admin.register(ProjectComment)
 class ProjectCommentAdmin(admin.ModelAdmin):

@@ -16,6 +16,10 @@ class TrackerGroupRequiredMiddleware:
     def __call__(self, request):
         # Adjust this prefix if your tracker URLs are mounted elsewhere
         if request.path_info.startswith('/tracker/'):
+            # ✅ Allow public access to specific paths (Guest Access for Email Links)
+            if request.path_info.startswith('/tracker/public/'):
+                return self.get_response(request)
+
             # not logged in → send to login
             if not request.user.is_authenticated:
                 return redirect('loginw')  

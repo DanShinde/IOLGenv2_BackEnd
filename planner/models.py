@@ -5,6 +5,8 @@ from django.utils import timezone
 from datetime import timedelta
 from .utils import calculate_end_date, count_working_days
 from employees.models import Employee
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 
 class Segment(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -125,6 +127,63 @@ class Leave(models.Model):
     
     class Meta:
         ordering = ['-start_date']
+
+class Site(models.Model):
+    name = models.CharField(max_length=200, blank=True)
+    project = models.OneToOneField(Project, on_delete=models.CASCADE, null=True, blank=True, related_name='site_record')
+    location = models.CharField(max_length=200)
+    is_office = models.BooleanField(default=False, verbose_name="Is Office Location")
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
+    def __str__(self):
+        code = self.project.project_id if self.project else "Office"
+        return f"{self.name} ({code})"
+    
+    def save(self, *args, **kwargs):
+        # Auto-populate name from project
+        if self.project:
+            self.name = self.project.customer_name
+
+        # Geocode if location has changed or if coordinates are missing
+        try:
+            old_instance = Site.objects.get(pk=self.pk)
+            location_changed = old_instance.location != self.location
+        except Site.DoesNotExist:
+            location_changed = True # It's a new instance
+
+        if self.location and (location_changed or self.latitude is None or self.longitude is None):
+            try:
+                geolocator = Nominatim(user_agent="iolgen_planner_app", timeout=10)
+                location_data = geolocator.geocode(self.location)
+                if location_data:
+                    self.latitude = location_data.latitude
+                    self.longitude = location_data.longitude
+            except (GeocoderTimedOut, GeocoderUnavailable):
+                # Don't block saving if the geocoding service is unavailable
+                pass
+
+        super().save(*args, **kwargs)
+    
+    class Meta:
+        ordering = ['name']
+
+class SiteAllocation(models.Model):
+    employee = models.ForeignKey('employees.Employee', on_delete=models.CASCADE, related_name='site_allocations')
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name='allocations')
+    start_date = models.DateField(default=timezone.now)
+    end_date = models.DateField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-start_date']
+
+    def __str__(self):
+        return f"{self.employee} at {self.site}"
+
+    @property
+    def duration_days(self):
+        end = self.end_date if self.end_date else timezone.now().date()
+        return (end - self.start_date).days
 
 class Holiday(models.Model):
     date = models.DateField(unique=True)

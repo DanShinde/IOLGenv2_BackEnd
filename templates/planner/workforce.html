@@ -1,4 +1,5 @@
 {% extends 'planner/_base.html' %}
+{% load widget_tweaks %}
 
 {% block title %}Workforce{% endblock %}
 
@@ -92,6 +93,14 @@
     }
 </style>
 
+<!-- Load Leaflet here to ensure it works even if head_extra block is missing in base template -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
 <header class="header-gradient shadow-xl">
     <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
         <div class="flex items-center">
@@ -152,6 +161,7 @@
     <div class="mb-6 flex space-x-2 border-b border-gray-200">
         <button class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none" onclick="switchTab('employees')">Employees</button>
         <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchTab('leaves')">Leave Management</button>
+        <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchTab('site_team')">Site Team</button>
     </div>
 
     <div id="employees-tab">
@@ -291,7 +301,7 @@
                                 <td class="px-4 py-2">
                                     <div class="flex items-center space-x-3">
                                         <button class="text-indigo-600 hover:text-indigo-800 font-medium text-xs flex items-center" 
-                                                onclick="openEditModal(this)">
+                                                onclick="openEditModal('{% url 'planner_update_employee' employee.pk %}', this)">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                                             </svg>
@@ -423,6 +433,286 @@
         </div>
     </div>
 
+    <div id="site_team-tab" class="hidden">
+        <!-- Sub-tabs for Site Team -->
+        <div class="mb-6 flex space-x-2 border-b border-gray-200">
+            <button id="btn-subtab-sites" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none" onclick="switchSiteSubTab('sites')">Manage Sites</button>
+            <button id="btn-subtab-allocations" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchSiteSubTab('allocations')">Team Allocations</button>
+            <button id="btn-subtab-map" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchSiteSubTab('map')">Map View</button>
+        </div>
+
+        <div id="subtab-sites">
+            <!-- Section 1: Manage Sites -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                    <div class="flex items-center">
+                        <svg class="large-icon text-gray-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">Manage Sites</h2>
+                            <p class="text-xs text-gray-600">Define project sites and office locations</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+                    <!-- Add Project Site Form -->
+                    <div class="add-form p-4 rounded-xl shadow-inner">
+                        <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                            Add Project Site
+                        </h3>
+                        {% if project_site_form.errors %}
+                        <div class="mb-4 bg-red-50 border-l-4 border-red-500 p-2">
+                            <p class="text-xs text-red-700">{{ project_site_form.errors }}</p>
+                        </div>
+                        {% endif %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="add_project_site" value="1">
+                            <div class="space-y-3">
+                                <div>
+                                    <label for="{{ project_site_form.project.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Project Code</label>
+                                    {{ project_site_form.project }}
+                                </div>
+                                <div class="relative">
+                                    <label for="{{ project_site_form.location.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Location</label>
+                                    {{ project_site_form.location }}
+                                    <ul id="suggestions-project" class="hidden absolute z-50 bg-white border border-gray-300 w-full rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 text-xs"></ul>
+                                </div>
+                                <div class="text-right pt-2">
+                                    <button type="submit" class="btn-primary text-white py-2 px-4 rounded-lg font-semibold text-xs">Add Site</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Add Office Location Form -->
+                    <div class="add-form p-4 rounded-xl shadow-inner">
+                        <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                            Add Office Location
+                        </h3>
+                        {% if office_site_form.errors %}
+                        <div class="mb-4 bg-red-50 border-l-4 border-red-500 p-2">
+                            <p class="text-xs text-red-700">{{ office_site_form.errors }}</p>
+                        </div>
+                        {% endif %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="add_office_site" value="1">
+                            <input type="hidden" name="{{ office_site_form.prefix }}-is_office" value="on">
+                            <div class="space-y-3">
+                                <div>
+                                    <label for="{{ office_site_form.name.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Office Name</label>
+                                    {{ office_site_form.name }}
+                                </div>
+                                <div class="relative">
+                                    <label for="{{ office_site_form.location.id_for_label }}" class="block text-xs font-semibold text-gray-700 mb-1">Location</label>
+                                    {{ office_site_form.location }}
+                                    <ul id="suggestions-office" class="hidden absolute z-50 bg-white border border-gray-300 w-full rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 text-xs"></ul>
+                                </div>
+                                <div class="text-right pt-2">
+                                    <button type="submit" class="btn-secondary text-white py-2 px-4 rounded-lg font-semibold text-xs">Add Office</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+    
+                <!-- Sites Table -->
+                <div class="px-4 pb-4">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Name</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Code</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Location</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for site in all_sites %}
+                            <tr class="employee-row">
+                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ site.name }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">{% if site.project %}{{ site.project.project_id }}{% else %}-{% endif %}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">{{ site.location }}</td>
+                                <td class="px-4 py-2 text-sm">
+                                    {% if site.is_office %}
+                                    <span class="designation-badge" style="background-color: #ecfccb; color: #166534;">Office</span>
+                                    {% else %}
+                                    <span class="designation-badge" style="background-color: #e0e7ff; color: #3730a3;">Site</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-2 text-xs">
+                                    <a href="{% url 'planner_delete_site' site.pk %}" class="text-red-600 hover:text-red-800 font-medium" onclick="return confirm('Are you sure?')">Remove</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="px-4 py-8 text-center text-xs text-gray-500">No sites added yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="subtab-allocations" class="hidden">
+            <!-- Section 2: Site Allocations -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="flex items-center">
+                            <svg class="large-icon text-gray-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                            <div>
+                                <h2 class="text-lg font-bold text-gray-800">Team Allocations</h2>
+                                <p class="text-xs text-gray-600">Track which employee is on which site</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{% url 'planner_site_history_report' %}" class="text-indigo-600 hover:text-indigo-900 text-xs font-medium flex items-center bg-indigo-50 px-3 py-1.5 rounded-md border border-indigo-100">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            View History Report
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Add Allocation Form -->
+                <div class="p-4">
+                    <form method="post" class="add-form p-4 rounded-xl shadow-inner">
+                        {% csrf_token %}
+                        <div class="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-12">
+                            <div class="sm:col-span-3">
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Employee</label>
+                                {{ allocation_form.employee }}
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Site</label>
+                                {{ allocation_form.site }}
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
+                                {{ allocation_form.start_date }}
+                            </div>
+                            <div class="sm:col-span-2 hidden">
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">End Date (Optional)</label>
+                                {{ allocation_form.end_date }}
+                            </div>
+                            <div class="sm:col-span-2 flex items-end">
+                                <button type="submit" name="add_allocation" class="btn-primary w-full text-white py-2 px-4 rounded-lg font-semibold text-xs">
+                                    Allocate
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+    
+                <!-- Allocations Table -->
+                <div class="px-4 pb-4">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Employee</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Site / Project</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Action</th>
+                            </tr>
+                            <!-- Filter Row -->
+                            <tr class="bg-gray-100">
+                                <th class="px-4 py-1"><input type="text" id="filter-employee" placeholder="Filter Employee..." class="w-full text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 px-2 py-1"></th>
+                                <th class="px-4 py-1"><input type="text" id="filter-site" placeholder="Filter Site..." class="w-full text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 px-2 py-1"></th>
+                                <th class="px-4 py-1"></th>
+                                <th class="px-4 py-1"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100" id="allocations-table-body">
+                            {% for alloc in all_allocations %}
+                            <tr class="employee-row allocation-row">
+                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ alloc.employee.name }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">{{ alloc.site.name }} <span class="text-xs text-gray-400">({% if alloc.site.project %}{{ alloc.site.project.project_id }}{% else %}Office{% endif %})</span></td>
+                                <td class="px-4 py-2 text-xs text-gray-600">
+                                    {{ alloc.start_date|date:"d M Y" }} to
+                                    {% if alloc.end_date %}{{ alloc.end_date|date:"d M Y" }}<span class="block text-gray-400">({{ alloc.duration_days }} days)</span>{% else %}Present<span class="block text-gray-400">({{ alloc.duration_days }} days so far)</span>{% endif %}
+                                </td>
+                                <td class="px-4 py-2 text-xs">
+                                    <a href="{% url 'planner_delete_site_allocation' alloc.pk %}" class="text-red-600 hover:text-red-800 font-medium" onclick="return confirm('Are you sure?')">Remove</a>
+                                    {% if not alloc.end_date %}
+                                    <button onclick="openRelieveModal('{% url 'planner_relieve_site_allocation' alloc.pk %}', '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.name|escapejs }}')" class="ml-3 text-amber-600 hover:text-amber-800 font-medium">Relieve</button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="px-4 py-8 text-center text-xs text-gray-500">No allocations found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="subtab-map" class="hidden">
+            <!-- Section 3: Map View -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="large-icon text-gray-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 16.382V5.618a1 1 0 00-1.447-.894L15 7m-6 0l6-3m0 0l-6-3m6 3L9 4"></path></svg>
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">Site Locations Map</h2>
+                            <p class="text-xs text-gray-600">Visual overview of all project sites and offices.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="relative">
+                            <input type="text" id="map-search" placeholder="Search site..." class="text-xs border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5 shadow-sm w-48">
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                <svg class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                        </div>
+                        {% if sites_missing_coords %}
+                        <form method="POST">
+                            {% csrf_token %}
+                            <button type="submit" name="refresh_coordinates" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-xs font-medium shadow-sm flex items-center">
+                                <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Refresh Coordinates
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            {% if sites_missing_coords %}
+            <div class="bg-yellow-50 border-b border-yellow-100 px-6 py-3">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-xs font-medium text-yellow-800">Some sites are missing coordinates</h3>
+                        <div class="mt-1 text-xs text-yellow-700">
+                            <p>The following sites could not be placed on the map: 
+                                {% for site in sites_missing_coords %}
+                                    <span class="font-semibold">{{ site.name }}</span>{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </p>
+                            <p class="mt-1">Click "Refresh Coordinates" to try fetching them again, or edit the site to check the location spelling.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div id="site-map" style="height: 600px; border: 1px solid #e5e7eb;" class="w-full bg-gray-50">
+                <div class="p-8 text-center text-gray-500">Loading map...</div>
+            </div>
+        </div>
+        </div>
+    </div>
+
     {% if all_employees %}
     <div class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
         <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
@@ -431,7 +721,7 @@
             </svg>
             Team Insights
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div class="bg-white rounded-lg p-3 border border-blue-100">
                 <p class="text-xs text-gray-600 mb-0.5">Total Workforce</p>
                 <p class="text-lg font-bold text-indigo-600">{{ all_employees|length }}</p>
@@ -443,6 +733,14 @@
             <div class="bg-white rounded-lg p-3 border border-blue-100">
                 <p class="text-xs text-gray-600 mb-0.5">Leadership Team</p>
                 <p class="text-lg font-bold text-purple-600">{{ workforce_counts.team_leads|add:workforce_counts.managers }}</p>
+            </div>
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <p class="text-xs text-gray-600 mb-0.5">On Site</p>
+                <p class="text-lg font-bold text-amber-600">{{ workforce_counts.on_site }}</p>
+            </div>
+            <div class="bg-white rounded-lg p-3 border border-blue-100">
+                <p class="text-xs text-gray-600 mb-0.5">In Office</p>
+                <p class="text-lg font-bold text-green-600">{{ workforce_counts.in_office }}</p>
             </div>
         </div>
     </div>
@@ -491,6 +789,33 @@
     </div>
 </div>
 
+<!-- Relieve Modal -->
+<div id="relieveModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+    <div class="relative mx-auto p-5 border w-full max-w-sm shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center pb-3 border-b">
+            <h3 class="text-lg font-semibold text-gray-800">Relieve from Site</h3>
+            <button onclick="closeRelieveModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+        </div>
+        <div class="mt-4">
+            <form id="relieveForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="space-y-3">
+                    <p class="text-sm text-gray-600">Select the last working day for <span id="relieve_employee_name" class="font-semibold"></span> at <span id="relieve_site_name" class="font-semibold"></span>.</p>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Relieving Date</label>
+                        <input type="date" name="end_date" class="form-input w-full px-3 py-2 rounded-lg text-sm" required value="{% now 'Y-m-d' %}">
+                    </div>
+                </div>
+                
+                <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
+                    <button type="button" onclick="closeRelieveModal()" class="bg-gray-200 text-gray-700 py-1.5 px-4 rounded-md hover:bg-gray-300 text-xs font-medium">Cancel</button>
+                    <button type="submit" class="bg-red-600 text-white py-1.5 px-4 rounded-md hover:bg-red-700 text-xs font-medium">Relieve</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% if error_message %}
 <script>
     alert("{{ error_message|escapejs }}");
@@ -501,20 +826,50 @@
     function switchTab(tab) {
         document.getElementById('employees-tab').classList.toggle('hidden', tab !== 'employees');
         document.getElementById('leaves-tab').classList.toggle('hidden', tab !== 'leaves');
+        document.getElementById('site_team-tab').classList.toggle('hidden', tab !== 'site_team');
         
         // Update styling for tabs
         const buttons = document.querySelectorAll('div.mb-6.flex.space-x-2 button');
-        buttons[0].className = tab === 'employees' 
-            ? 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none'
-            : 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none';
-        buttons[1].className = tab === 'leaves' 
-            ? 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none'
-            : 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none';
+        const activeClasses = 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none';
+        const inactiveClasses = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none';
+
+        buttons[0].className = tab === 'employees' ? activeClasses : inactiveClasses;
+        buttons[1].className = tab === 'leaves' ? activeClasses : inactiveClasses;
+        if (buttons.length > 2) {
+            buttons[2].className = tab === 'site_team' ? activeClasses : inactiveClasses;
+        }
     }
 
-    function openEditModal(button) {
+    function switchSiteSubTab(subtab) {
+        document.getElementById('subtab-sites').classList.toggle('hidden', subtab !== 'sites');
+        document.getElementById('subtab-allocations').classList.toggle('hidden', subtab !== 'allocations');
+        document.getElementById('subtab-map').classList.toggle('hidden', subtab !== 'map');
+        
+        const btnSites = document.getElementById('btn-subtab-sites');
+        const btnAllocations = document.getElementById('btn-subtab-allocations');
+        const btnMap = document.getElementById('btn-subtab-map');
+        
+        const activeClass = 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none';
+        const inactiveClass = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none';
+        
+        btnSites.className = subtab === 'sites' ? activeClass : inactiveClass;
+        btnAllocations.className = subtab === 'allocations' ? activeClass : inactiveClass;
+        btnMap.className = subtab === 'map' ? activeClass : inactiveClass;
+
+        // Handle map rendering/resizing when subtab is shown
+        if (subtab === 'map') {
+            if (!window.siteMapInitialized) {
+                initializeSiteMap();
+            } else if (window.mapInstance) {
+                setTimeout(function() {
+                    window.mapInstance.invalidateSize();
+                }, 300);
+            }
+        }
+    }
+
+    function openEditModal(url, button) {
         const row = button.closest('tr');
-        const id = row.dataset.id;
         const name = row.dataset.name;
         const designation = row.dataset.designation;
         const active = row.dataset.active === 'True';
@@ -524,7 +879,7 @@
         document.getElementById('edit_status').value = active ? "True" : "False";
 
         const form = document.getElementById('editEmployeeForm');
-        form.action = `/employee/${id}/update/`;
+        form.action = url;
 
         document.getElementById('editEmployeeModal').classList.remove('hidden');
     }
@@ -540,10 +895,257 @@
         }
     }
 
+    function openRelieveModal(url, employeeName, siteName) {
+        document.getElementById('relieve_employee_name').textContent = employeeName;
+        document.getElementById('relieve_site_name').textContent = siteName;
+        const form = document.getElementById('relieveForm');
+        form.action = url;
+        document.getElementById('relieveModal').classList.remove('hidden');
+    }
+
+    function closeRelieveModal() {
+        document.getElementById('relieveModal').classList.add('hidden');
+    }
+
     // NEW: Automatically switch to the active tab on load
     document.addEventListener('DOMContentLoaded', () => {
         const activeTab = "{{ active_tab|default:'employees' }}";
         switchTab(activeTab);
+        
+        if (activeTab === 'site_team') {
+            const activeSubTab = "{{ active_subtab|default:'sites' }}";
+            switchSiteSubTab(activeSubTab);
+        }
     });
+
+    // Map Initialization Logic
+    let siteMapInitialized = false;
+    var mapInstance = null;
+
+    function initializeSiteMap() {
+        if (window.siteMapInitialized) return; // Prevent double initialization
+
+        // Check if Leaflet is loaded
+        if (typeof L === 'undefined') {
+            console.error('Leaflet library not loaded');
+            document.getElementById('site-map').innerHTML = '<div class="p-8 text-center text-red-500">Error: Map library could not be loaded. Please check internet connection.</div>';
+            return;
+        }
+
+        const sites = JSON.parse('{{ sites_for_map_json|escapejs }}');
+        const mapContainer = document.getElementById('site-map');
+        
+        if (sites.length === 0) {
+            mapContainer.innerHTML = '<div class="p-8 text-center text-xs text-gray-500">No sites with valid coordinates to display on the map.</div>';
+            return;
+        }
+
+        // Clear loading text
+        mapContainer.innerHTML = '';
+
+        // Initialize map, centered on India or the first site
+        window.mapInstance = L.map('site-map').setView([20.5937, 78.9629], 5); // Default center on India
+        const map = window.mapInstance;
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const markers = [];
+        const searchData = []; // Store data for searching
+        sites.forEach(site => {
+            const empCount = site.employees ? site.employees.length : 0;
+            
+            // Use standard Leaflet marker look with a badge for count
+            // Apply hue-rotate filter for offices to make them green (approx -90deg from blue)
+            const imgStyle = site.is_office ? 'filter: hue-rotate(270deg);' : '';
+            let iconHtml = `<img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-[25px] h-[41px]" style="${imgStyle}">`;
+            
+            if (empCount > 0) {
+                iconHtml += `
+                    <div class="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 bg-red-600 text-white text-[10px] font-bold rounded-full border-2 border-white shadow-sm z-10">
+                        ${empCount}
+                    </div>
+                `;
+            }
+            
+            const customIcon = L.divIcon({
+                className: '', // Remove default leaflet styles
+                html: `<div class="relative">${iconHtml}</div>`,
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34]
+            });
+
+            const marker = L.marker([site.lat, site.lng], {icon: customIcon}).addTo(map);
+            
+            let popupContent = `<b>${site.name}</b><br><span class="text-xs text-gray-500">${site.project_code}</span><br><small>${site.location}</small>`;
+            
+            if (site.employees && site.employees.length > 0) {
+                popupContent += '<div class="mt-2 pt-2 border-t border-gray-200">';
+                popupContent += '<p class="text-xs font-semibold text-gray-700 mb-1">Team (' + site.employees.length + '):</p>';
+                popupContent += '<div class="max-h-24 overflow-y-auto"><ul class="text-xs text-gray-600 list-disc pl-3">';
+                site.employees.forEach(emp => {
+                    popupContent += `<li>${emp}</li>`;
+                });
+                popupContent += '</ul></div></div>';
+            } else {
+                popupContent += '<div class="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-400 italic">No active team members</div>';
+            }
+            
+            marker.bindPopup(popupContent);
+            markers.push(marker);
+            
+            // Add to search data
+            searchData.push({
+                marker: marker,
+                text: (site.name + ' ' + site.project_code + ' ' + site.location).toLowerCase()
+            });
+        });
+
+        // Fit map to show all markers
+        if (markers.length > 0) {
+            const group = new L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.3));
+        }
+
+        // Add Legend
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'bg-white p-3 rounded-lg shadow-md text-xs border border-gray-200');
+            div.innerHTML = `
+                <div class="font-bold mb-2 text-gray-700">Location Type</div>
+                <div class="flex items-center mb-1.5">
+                    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-3 h-5 mr-2">
+                    <span class="text-gray-600">Project Site</span>
+                </div>
+                <div class="flex items-center">
+                    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-3 h-5 mr-2" style="filter: hue-rotate(270deg);">
+                    <span class="text-gray-600">Office Location</span>
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        // Search Functionality
+        const searchInput = document.getElementById('map-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const term = e.target.value.toLowerCase();
+                const visibleMarkers = [];
+
+                searchData.forEach(item => {
+                    if (item.text.includes(term)) {
+                        if (!map.hasLayer(item.marker)) {
+                            map.addLayer(item.marker);
+                        }
+                        visibleMarkers.push(item.marker);
+                    } else {
+                        if (map.hasLayer(item.marker)) {
+                            map.removeLayer(item.marker);
+                        }
+                    }
+                });
+
+                if (visibleMarkers.length > 0) {
+                    const group = new L.featureGroup(visibleMarkers);
+                    map.fitBounds(group.getBounds().pad(0.3));
+                    if (visibleMarkers.length === 1) {
+                        visibleMarkers[0].openPopup();
+                    }
+                }
+            });
+        }
+
+        // Force map to re-evaluate its size after the container is visible.
+        // This is crucial for maps inside hidden tabs.
+        setTimeout(function() {
+            map.invalidateSize();
+        }, 300);
+
+        window.siteMapInitialized = true;
+    }
+
+    // Location Autocomplete Logic
+    function setupAutocomplete(inputId, suggestionsId) {
+        const locationInput = document.getElementById(inputId);
+        const suggestionsList = document.getElementById(suggestionsId);
+
+        if (locationInput && suggestionsList) {
+            let debounceTimer;
+
+            locationInput.addEventListener('input', function() {
+                const query = this.value;
+                clearTimeout(debounceTimer);
+
+                if (query.length < 3) {
+                    suggestionsList.classList.add('hidden');
+                    return;
+                }
+
+                debounceTimer = setTimeout(() => {
+                    // Fetch data from OpenStreetMap Nominatim API
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`)
+                        .then(response => response.json())
+                        .then(data => {
+                            suggestionsList.innerHTML = '';
+                            if (data.length > 0) {
+                                suggestionsList.classList.remove('hidden');
+                                data.forEach(place => {
+                                    const li = document.createElement('li');
+                                    li.className = 'px-3 py-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-0 text-gray-700';
+                                    li.textContent = place.display_name;
+                                    li.addEventListener('click', () => {
+                                        locationInput.value = place.display_name;
+                                        suggestionsList.classList.add('hidden');
+                                    });
+                                    suggestionsList.appendChild(li);
+                                });
+                            } else {
+                                suggestionsList.classList.add('hidden');
+                            }
+                        })
+                        .catch(error => console.error('Error fetching location:', error));
+                }, 300); // Wait 300ms after typing stops
+            });
+
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target !== locationInput && e.target !== suggestionsList) {
+                    suggestionsList.classList.add('hidden');
+                }
+            });
+        }
+    }
+
+    // Initialize for both forms
+    setupAutocomplete('id_project_site-location', 'suggestions-project');
+    setupAutocomplete('id_office_site-location', 'suggestions-office');
+
+    // Team Allocation Table Filtering
+    const filterEmployee = document.getElementById('filter-employee');
+    const filterSite = document.getElementById('filter-site');
+    const allocationRows = document.querySelectorAll('.allocation-row');
+
+    function filterAllocations() {
+        const empTerm = filterEmployee.value.toLowerCase();
+        const siteTerm = filterSite.value.toLowerCase();
+
+        allocationRows.forEach(row => {
+            const empText = row.children[0].textContent.toLowerCase();
+            const siteText = row.children[1].textContent.toLowerCase();
+            
+            const matchesEmp = empText.includes(empTerm);
+            const matchesSite = siteText.includes(siteTerm);
+
+            row.style.display = (matchesEmp && matchesSite) ? '' : 'none';
+        });
+    }
+
+    if (filterEmployee && filterSite) {
+        filterEmployee.addEventListener('keyup', filterAllocations);
+        filterSite.addEventListener('keyup', filterAllocations);
+    }
 </script>
 {% endblock %}
