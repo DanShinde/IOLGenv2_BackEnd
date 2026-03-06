@@ -1604,6 +1604,12 @@ def add_contact_person_ajax(request):
         if not name:
             return JsonResponse({'status': 'error', 'message': 'Name is required'}, status=400)
         
+        # ✅ NEW: Validate that the name has at least a first and last name
+        parts = name.strip().split(' ', 1)
+        if len(parts) < 2 or not parts[0] or not parts[1]:
+            return JsonResponse({'status': 'error', 'message': 'First and last name are required.'}, status=400)
+
+        
         contact, created = ContactPerson.objects.get_or_create(name=name)
         
         return JsonResponse({'status': 'success', 'id': contact.id, 'name': contact.name, 'created': created})

@@ -19,9 +19,9 @@
             {% endif %}
 
             {% if not is_public_view %}
-            <a href="{% url 'public_push_pull_content' access_token='a1b2c3d4-e5f6-7890-1234-567890abcdef' %}" class="btn btn-primary" target="_blank">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#shareLinkModal">
                 <i class="fas fa-share-alt me-2"></i>Share Link
-            </a>
+            </button>
             {% endif %}
 
         </div>
@@ -380,6 +380,28 @@
     </div>
 </div>
 
+<!-- Share Link Modal -->
+<div class="modal fade" id="shareLinkModal" tabindex="-1" aria-labelledby="shareLinkModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="shareLinkModalLabel">Share Public Link</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Copy this link to share a view with guests. The link includes the current filters.</p>
+        <div class="input-group">
+          <input type="text" id="shareableLinkInput" class="form-control" readonly>
+          <button class="btn btn-outline-secondary" type="button" id="copyLinkBtn">
+            <i class="fas fa-copy me-1"></i> Copy
+          </button>
+        </div>
+        <div id="copy-feedback" class="text-success mt-2 d-none">Link copied to clipboard!</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -591,8 +613,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             $selectElement.val(response.id).trigger('change');
                         }
                     } else {
-                        alert('Error creating new contact.');
+                        alert('Error creating new contact: ' + (response.message || 'Unknown error'));
+                        // Remove the invalid tag
+                        const currentSelection = $selectElement.val() || [];
+                        const cleanSelection = currentSelection.filter(id => id !== data.id);
+                        $selectElement.val(cleanSelection).trigger('change');
                     }
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Error creating new contact.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    alert(errorMessage);
+                    // Remove the invalid tag from select2
+                    const currentSelection = $selectElement.val() || [];
+                    const cleanSelection = currentSelection.filter(id => id !== data.id);
+                    $selectElement.val(cleanSelection).trigger('change');
                 }
             });
         }
@@ -646,6 +683,38 @@ document.addEventListener('DOMContentLoaded', function() {
             $row.toggle(show);
         });
     });
+
+    // --- Share Link Modal Logic ---
+    const shareLinkModal = document.getElementById('shareLinkModal');
+    if (shareLinkModal) { // Only run if the modal exists on the page
+        const shareableLinkInput = document.getElementById('shareableLinkInput');
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
+        const copyFeedback = document.getElementById('copy-feedback');
+
+        shareLinkModal.addEventListener('show.bs.modal', function (event) {
+            const publicPath = "{% url 'public_push_pull_content' access_token='a1b2c3d4-e5f6-7890-1234-567890abcdef' %}";
+            const queryParams = "?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}";
+            const fullUrl = window.location.protocol + "//" + window.location.host + publicPath + queryParams;
+            
+            shareableLinkInput.value = fullUrl;
+            copyFeedback.classList.add('d-none');
+            copyLinkBtn.innerHTML = '<i class="fas fa-copy me-1"></i> Copy';
+        });
+
+        copyLinkBtn.addEventListener('click', function() {
+            shareableLinkInput.select();
+            navigator.clipboard.writeText(shareableLinkInput.value).then(function() {
+                copyFeedback.classList.remove('d-none');
+                copyLinkBtn.innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
+                setTimeout(() => {
+                    copyFeedback.classList.add('d-none');
+                    copyLinkBtn.innerHTML = '<i class="fas fa-copy me-1"></i> Copy';
+                }, 2500);
+            }, function(err) {
+                alert('Could not copy text: ' + err);
+            });
+        });
+    }
 });
 </script>
 {% endblock %}

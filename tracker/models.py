@@ -185,11 +185,36 @@ class ProjectComment(models.Model):
 
 # ✅ NEW MODEL: ContactPerson
 class ContactPerson(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    first_name = models.CharField(max_length=50, null=True) # Required in Admin
+    last_name = models.CharField(max_length=50, null=True)  # Required in Admin
+    name = models.CharField(max_length=100, unique=True, blank=True) # Auto-populated
     email = models.EmailField(max_length=254, blank=True, null=True)
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # 1. If First/Last provided, update Name
+        if self.first_name and self.last_name:
+            self.name = f"{self.first_name} {self.last_name}"
+        
+        # 2. If Name provided but First/Last missing (e.g. from Quick Add), split Name
+        elif self.name:
+            parts = self.name.strip().split(' ', 1)
+            if not self.first_name:
+                self.first_name = parts[0]
+            if not self.last_name:
+                self.last_name = parts[1] if len(parts) > 1 else ""
+            # Ensure name is consistent
+            self.name = f"{self.first_name} {self.last_name}".strip()
+
+        # 3. Auto-generate Email if missing
+        if not self.email and self.first_name and self.last_name:
+            clean_first = self.first_name.strip().replace(' ', '')
+            clean_last = self.last_name.strip().replace(' ', '')
+            self.email = f"{clean_first}.{clean_last}@armstrongdematic.com".lower()
+
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ['name']
