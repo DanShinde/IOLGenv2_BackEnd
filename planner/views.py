@@ -20,6 +20,7 @@ from django.views.decorators.http import require_POST
 from itertools import groupby
 from django.utils.dateparse import parse_date
 from reportlab.pdfgen import canvas
+import math
 from reportlab.lib.pagesizes import A3, A4, landscape
 from reportlab.lib import colors
 import csv
@@ -582,6 +583,7 @@ def _get_workforce_context():
         'sites_missing_coords': sites_missing_coords,
         'all_allocations': SiteAllocation.objects.select_related('employee', 'site').order_by('-start_date'),
         'active_nav': 'workforce',
+        'all_segments': Segment.objects.all().order_by('name'),
     }
 
 def workforce_view(request):
@@ -602,14 +604,16 @@ def workforce_view(request):
             designation = request.POST.get('designation')
             is_active_val = request.POST.get('is_active')
             is_active = True if is_active_val == 'True' else False
+            segment_id = request.POST.get('segment')
+            segment_obj = Segment.objects.get(pk=segment_id) if segment_id else None
             
             if name and designation:
                 if Employee.objects.filter(name__iexact=name).exists():
                     error_message = f"Team member with name '{name}' already exists."
-                    entered_data = {'name': name, 'designation': designation, 'is_active': is_active_val}
+                    entered_data = {'name': name, 'designation': designation, 'is_active': is_active_val, 'segment': segment_id}
                     active_tab = 'employees'
                 else:
-                    Employee.objects.create(name=name, designation=designation, is_active=is_active)
+                    Employee.objects.create(name=name, designation=designation, is_active=is_active, segment=segment_obj)
                     return redirect('planner_workforce')
         
         elif 'add_leave' in request.POST:
@@ -856,6 +860,8 @@ def update_employee_view(request, pk):
         designation = request.POST.get('designation')
         is_active_val = request.POST.get('is_active')
         is_active = True if is_active_val == 'True' else False
+        segment_id = request.POST.get('segment')
+        segment_obj = Segment.objects.get(pk=segment_id) if segment_id else None
 
         if name and designation:
             if Employee.objects.filter(name__iexact=name).exclude(pk=pk).exists():
@@ -866,6 +872,7 @@ def update_employee_view(request, pk):
             employee.name = name
             employee.designation = designation
             employee.is_active = is_active
+            employee.segment = segment_obj
             employee.save()
             return redirect('planner_workforce')
     return redirect('planner_workforce')
@@ -1132,6 +1139,7 @@ def capacity_plan_view(request):
 
     # -- TRACK DAILY DEMAND FOR WEEKLY MAX CALCULATION --
     daily_demand = defaultdict(lambda: defaultdict(float)) # {designation: {date: hours}}
+    daily_segment_demand = defaultdict(lambda: defaultdict(float)) # {(segment_name, designation): {date: hours}}
     
     live_workload_by_segment = defaultdict(lambda: defaultdict(float))
     forecasted_workload_by_segment = defaultdict(lambda: defaultdict(float))
@@ -1146,11 +1154,14 @@ def capacity_plan_view(request):
                 # Track daily demand
                 daily_demand[activity.assignee.designation][current_date] += daily_hours
                 
+                if activity.project.segment:
+                    daily_segment_demand[(activity.project.segment.name, activity.assignee.designation)][current_date] += daily_hours
+
                 # Keep tracking sum for segment charts
                 if current_date in date_to_key:
                     m_key = date_to_key[current_date]
                     if activity.project.segment:
-                        live_workload_by_segment[activity.project.segment.name][m_key] += daily_hours
+                        live_workload_by_segment[(activity.project.segment.name, activity.assignee.designation)][m_key] += daily_hours
             current_date += timedelta(days=1)
 
     project_types_with_brackets = ProjectType.objects.prefetch_related('effort_brackets')
@@ -1186,12 +1197,19 @@ def capacity_plan_view(request):
                 daily_demand['ENGINEER'][current_date] += daily_eng_hours
                 daily_demand['TEAM_LEAD'][current_date] += daily_tl_hours
                 daily_demand['MANAGER'][current_date] += daily_mgr_hours
+                
+                if forecast.segment:
+                    daily_segment_demand[(forecast.segment, 'ENGINEER')][current_date] += daily_eng_hours
+                    daily_segment_demand[(forecast.segment, 'TEAM_LEAD')][current_date] += daily_tl_hours
+                    daily_segment_demand[(forecast.segment, 'MANAGER')][current_date] += daily_mgr_hours
 
                 # Keep tracking sum for segment charts
                 if current_date in date_to_key:
                     month_key = date_to_key[current_date]
                     if forecast.segment:
-                        forecasted_workload_by_segment[forecast.segment][month_key] += total_daily_hours
+                        forecasted_workload_by_segment[(forecast.segment, 'ENGINEER')][month_key] += daily_eng_hours
+                        forecasted_workload_by_segment[(forecast.segment, 'TEAM_LEAD')][month_key] += daily_tl_hours
+                        forecasted_workload_by_segment[(forecast.segment, 'MANAGER')][month_key] += daily_mgr_hours
             current_date += timedelta(days=1)
     
     global_live_workload = defaultdict(float)
@@ -1242,19 +1260,93 @@ def capacity_plan_view(request):
         })
     
     segment_charts = []
+    blended_segment_charts = []
     all_segments = Segment.objects.all().order_by('name')
     for segment in all_segments:
-        seg_data = {'name': segment.name, 'data': []}
+        seg_name = segment.name
+        
+        blended_data = []
         for p in periods:
-            live = live_workload_by_segment[segment.name].get(p['key'], 0)
-            forecast = forecasted_workload_by_segment[segment.name].get(p['key'], 0)
-            seg_data['data'].append({
+            live_b = live_workload_by_segment[(seg_name, 'ENGINEER')].get(p['key'], 0) + live_workload_by_segment[(seg_name, 'TEAM_LEAD')].get(p['key'], 0)
+            forecast_b = forecasted_workload_by_segment[(seg_name, 'ENGINEER')].get(p['key'], 0) + forecasted_workload_by_segment[(seg_name, 'TEAM_LEAD')].get(p['key'], 0)
+            blended_data.append({
                 'month': p['label'],
-                'live_workload': round(live, 1),
-                'forecasted_workload': round(forecast, 1),
-                'total': round(live + forecast, 1)
+                'live_workload': round(live_b, 1),
+                'forecasted_workload': round(forecast_b, 1)
             })
-        segment_charts.append(seg_data)
+            
+        blended_segment_charts.append({
+            'name': seg_name,
+            'data': blended_data
+        })
+        
+        for des_val, des_label in [('ENGINEER', 'Engineer'), ('TEAM_LEAD', 'Team Lead')]:
+            seg_data = {'name': f"{seg_name} - {des_label}", 'segment_name': seg_name, 'designation': des_label, 'data': []}
+            
+            segment_employees = Employee.objects.filter(segment=segment, designation=des_val, is_active=True).exclude(name__startswith='Unassigned')
+            seg_hc = segment_employees.count()
+
+            for p in periods:
+                live = live_workload_by_segment[(seg_name, des_val)].get(p['key'], 0)
+                forecast = forecasted_workload_by_segment[(seg_name, des_val)].get(p['key'], 0)
+                total_demand_hrs = live + forecast
+                
+                working_days = count_working_days(p['start'], p['end'], holidays)
+                period_days = (p['end'] - p['start']).days + 1
+                month_factor = period_days / 30.44
+                
+                available_hrs = 0
+                settings = capacity_settings.get(des_val, capacity_settings['ENGINEER'])
+                for emp in segment_employees:
+                    emp_leave_days = 0
+                    for leave in all_leaves:
+                        if leave.employee_id == emp.id:
+                            emp_leave_days += calculate_overlap_working_days(
+                                leave.start_date, leave.end_date, p['start'], p['end'], holidays
+                            )
+                    gross_hrs = (working_days - emp_leave_days) * general_settings.working_hours_per_day
+                    non_proj_hrs = (settings.monthly_meeting_hours + settings.monthly_leave_hours) * month_factor
+                    eff_loss = (gross_hrs - non_proj_hrs) * (settings.efficiency_loss_factor / 100)
+                    net_hrs = gross_hrs - non_proj_hrs - eff_loss
+                    if net_hrs > 0:
+                        available_hrs += net_hrs
+                
+                dates_in_period = []
+                curr = p['start']
+                while curr <= p['end']:
+                    dates_in_period.append(curr)
+                    curr += timedelta(days=1)
+                    
+                week_groups = groupby(dates_in_period, key=lambda d: d.isocalendar()[:2])
+                weekly_headcount_reqs = []
+                avg_eff_loss = settings.efficiency_loss_factor
+                for week_key, days_iter in week_groups:
+                    days_in_week_chunk = list(days_iter)
+                    working_days_in_chunk = [d for d in days_in_week_chunk if d.weekday() < 5 and d not in holidays]
+                    count_working_days_week = len(working_days_in_chunk)
+                    if count_working_days_week == 0:
+                        continue
+                    weekly_demand = sum(daily_segment_demand[(seg_name, des_val)].get(d, 0.0) for d in days_in_week_chunk)
+                    effective_weekly_capacity_per_person = (count_working_days_week * general_settings.working_hours_per_day * (1 - avg_eff_loss / 100))
+                    if effective_weekly_capacity_per_person > 0:
+                        weekly_headcount_reqs.append(weekly_demand / effective_weekly_capacity_per_person)
+                    else:
+                        weekly_headcount_reqs.append(0)
+                required_headcount = max(weekly_headcount_reqs) if weekly_headcount_reqs else 0.0
+                variance_hours = available_hrs - total_demand_hrs
+
+                seg_data['data'].append({
+                    'month': p['label'],
+                    'total': round(total_demand_hrs, 1),
+                    'available_hours': available_hrs,
+                    'variance_hours': variance_hours,
+                    'available_headcount': seg_hc,
+                    'required_headcount': required_headcount,
+                    'variance_headcount': math.ceil(seg_hc - required_headcount),
+                    'live_workload': round(live, 1),
+                    'forecasted_workload': round(forecast, 1),
+                })
+            segment_charts.append(seg_data)
 
     report = []
     for des_value, des_display in Employee.DESIGNATION_CHOICES:
@@ -1333,10 +1425,10 @@ def capacity_plan_view(request):
                 'month': p['label'], 
                 'available_hours': available_hours, 
                 'required_hours': required_hours, 
-                'variance_hours': headcount - required_headcount, 
+                'variance_hours': available_hours - required_hours, 
                 'available_headcount': headcount, 
                 'required_headcount': required_headcount,
-                'variance_headcount': headcount - required_headcount
+                'variance_headcount': math.ceil(headcount - required_headcount)
             })
         report.append(des_data)
     
@@ -1345,6 +1437,7 @@ def capacity_plan_view(request):
         'report_data': report,
         'chart_data': chart_data,
         'segment_charts': segment_charts,
+        'blended_segment_charts': blended_segment_charts,
         'view_type': view_type
     }
     return render(request, 'planner/capacity_plan.html', context)
