@@ -178,7 +178,7 @@
             
             <form method="POST" action="{% url 'planner_workforce' %}" class="space-y-4">
                 {% csrf_token %}
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
                     <div class="lg:col-span-1">
                         <label class="block text-xs font-semibold text-gray-700 mb-1">
                             <svg class="icon inline mr-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -215,6 +215,21 @@
                         <select name="is_active" class="form-input w-full px-3 py-2 text-xs rounded-lg" required>
                             <option value="True" {% if entered_data.is_active == 'True' %}selected{% endif %}>Active</option>
                             <option value="False" {% if entered_data.is_active == 'False' %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
+
+                    <div class="lg:col-span-1" id="segmentFieldContainer">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">
+                            <svg class="icon inline mr-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                            Segment
+                        </label>
+                        <select name="segment" id="add_segment" class="form-input w-full px-3 py-2 text-xs rounded-lg">
+                            <option value="">Select segment...</option>
+                            {% for segment in all_segments %}
+                            <option value="{{ segment.id }}" {% if entered_data.segment == segment.id|stringformat:"s" %}selected{% endif %}>{{ segment.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -256,6 +271,7 @@
                             <tr>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Employee</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Designation</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Segment</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Status</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Actions</th>
                             </tr>
@@ -266,6 +282,7 @@
                                 data-id="{{ employee.pk }}"
                                 data-name="{{ employee.name }}"
                                 data-designation="{{ employee.designation }}"
+                                data-segment="{{ employee.segment_id|default:'' }}"
                                 data-active="{{ employee.is_active }}">
                                 <td class="px-4 py-2">
                                     <div class="flex items-center">
@@ -287,6 +304,7 @@
                                         <span class="designation-badge manager-badge">{{ employee.get_designation_display }}</span>
                                     {% endif %}
                                 </td>
+                                <td class="px-4 py-2 text-sm text-gray-600">{{ employee.segment.name|default:"-" }}</td>
                                 <td class="px-4 py-2">
                                     <div class="flex items-center">
                                         {% if employee.is_active %}
@@ -778,6 +796,16 @@
                             <option value="False">Inactive</option>
                         </select>
                     </div>
+
+                    <div id="editSegmentFieldContainer">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Segment</label>
+                        <select id="edit_segment" name="segment" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                            <option value="">Select segment...</option>
+                            {% for segment in all_segments %}
+                            <option value="{{ segment.id }}">{{ segment.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
@@ -873,15 +901,29 @@
         const name = row.dataset.name;
         const designation = row.dataset.designation;
         const active = row.dataset.active === 'True';
+        const segment = row.dataset.segment;
 
         document.getElementById('edit_name').value = name;
         document.getElementById('edit_designation').value = designation;
         document.getElementById('edit_status').value = active ? "True" : "False";
+        document.getElementById('edit_segment').value = segment;
+        
+        toggleEditSegmentVisibility();
 
         const form = document.getElementById('editEmployeeForm');
         form.action = url;
 
         document.getElementById('editEmployeeModal').classList.remove('hidden');
+    }
+    
+    function toggleEditSegmentVisibility() {
+        const designation = document.getElementById('edit_designation').value;
+        const segmentContainer = document.getElementById('editSegmentFieldContainer');
+        if (designation === 'MANAGER') {
+            segmentContainer.style.display = 'none';
+        } else {
+            segmentContainer.style.display = 'block';
+        }
     }
 
     function closeEditModal() {
@@ -915,6 +957,31 @@
         if (activeTab === 'site_team') {
             const activeSubTab = "{{ active_subtab|default:'sites' }}";
             switchSiteSubTab(activeSubTab);
+        }
+        
+        const addDesignation = document.querySelector('select[name="designation"]');
+        if (addDesignation) {
+            const toggleAddSegment = () => {
+                const segmentContainer = document.getElementById('segmentFieldContainer');
+                if (addDesignation.value === 'MANAGER') {
+                    segmentContainer.style.display = 'none';
+                    document.getElementById('add_segment').value = '';
+                } else {
+                    segmentContainer.style.display = 'block';
+                }
+            };
+            addDesignation.addEventListener('change', toggleAddSegment);
+            toggleAddSegment(); // initial check
+        }
+        
+        const editDesignation = document.getElementById('edit_designation');
+        if (editDesignation) {
+            editDesignation.addEventListener('change', () => {
+                toggleEditSegmentVisibility();
+                if (editDesignation.value === 'MANAGER') {
+                    document.getElementById('edit_segment').value = '';
+                }
+            });
         }
     });
 

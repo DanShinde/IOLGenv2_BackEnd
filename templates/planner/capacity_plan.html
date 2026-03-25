@@ -195,10 +195,10 @@
                              {% endfor %}
                         </tr>
                         <tr class="bg-gray-50 font-bold border-b-4 border-gray-200 hover:bg-gray-100">
-                            <td class="px-2 py-1.5 text-xs font-medium text-gray-900 whitespace-nowrap border-r">Variance</td>
+                            <td class="px-2 py-1.5 text-xs font-medium text-gray-900 whitespace-nowrap border-r">Variance (HC)</td>
                             {% for month_data in des_data.months %}
-                            <td class="px-2 py-1.5 text-center text-xs whitespace-nowrap border-r {% if month_data.variance_hours < 0 %}text-red-600 bg-red-50 shortage-alert{% else %}text-blue-600 bg-blue-50{% endif %}" data-value="{{ month_data.variance_hours }}">
-                                {{ month_data.variance_hours|floatformat:0 }}
+                            <td class="px-2 py-1.5 text-center text-xs whitespace-nowrap border-r {% if month_data.variance_headcount < 0 %}text-red-600 bg-red-50 shortage-alert{% else %}text-blue-600 bg-blue-50{% endif %}" data-value="{{ month_data.variance_headcount }}">
+                                {% if month_data.variance_headcount > 0 %}+{% endif %}{{ month_data.variance_headcount|floatformat:0 }}
                             </td>
                             {% endfor %}
                         </tr>
@@ -253,13 +253,123 @@
     </div>
 
     {% if segment_charts %}
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-r-lg shadow-sm">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-blue-800">Why might the Segment totals differ from the overall Department totals?</h3>
+                <div class="mt-2 text-xs text-blue-700 space-y-1.5">
+                    <p><strong class="font-semibold text-blue-900">Supply (Avail HC):</strong> The top report counts <em>all</em> active team members, while this table only counts those explicitly assigned to a Segment in Workforce settings.</p>
+                    <p><strong class="font-semibold text-blue-900">Demand (Hrs):</strong> The top report includes <em>all</em> work. This table only includes projects and forecasts that have a Segment defined.</p>
+                    <p><strong class="font-semibold text-blue-900">Req HC (Peak Math):</strong> Required Headcount is calculated based on <em>peak weekly demand</em>. Because different segments hit their busiest peaks in different weeks, adding their individual peaks together will be higher than the department's true overall peak. This actually shows efficient resource sharing across your segments!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900">Segment-wise Demand Analysis</h3>
+                    <p class="text-xs text-gray-600">Live vs forecasted demand split by segment</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-1">
+                        <div class="w-2.5 h-2.5 bg-green-500 rounded"></div>
+                        <span class="text-[10px] text-gray-600">Supply</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <div class="w-2.5 h-2.5 bg-yellow-500 rounded"></div>
+                        <span class="text-[10px] text-gray-600">Demand</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <div class="w-2.5 h-2.5 bg-red-500 rounded"></div>
+                        <span class="text-[10px] text-gray-600">Shortage</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto" style="max-height: 600px;">
+            <table class="min-w-full" id="segmentCapacityTable">
+                <thead class="bg-gray-50 table-header-sticky">
+                    <tr>
+                        <th class="px-2 py-1.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider sticky left-0 bg-gray-50 z-20 w-32 border-r">Segment</th>
+                        <th class="px-2 py-1.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-32 border-r">Metric</th>
+                        {% for month_data in segment_charts.0.data %}
+                        <th class="px-2 py-1.5 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider min-w-[80px] border-r">{{ month_data.month }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="bg-white" id="segmentCapacityTableBody">
+                    {% for segment in segment_charts %}
+                        <tr class="border-t hover:bg-gray-50">
+                            <td rowspan="4" class="px-2 py-2 align-top font-bold text-sm text-indigo-700 whitespace-nowrap sticky left-0 bg-white z-10 border-r">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-8 w-8 mr-2">
+                                        <div class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                            <span class="text-xs font-medium text-indigo-600">{{ segment.segment_name|slice:":2"|upper }}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-medium text-gray-900 max-w-[120px] truncate" title="{{ segment.segment_name }}">{{ segment.segment_name }}</div>
+                                        <div class="text-[10px] text-gray-500">{{ segment.designation }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-2 py-1.5 text-xs font-medium text-gray-700 whitespace-nowrap border-r bg-green-50">Supply (Hrs)</td>
+                            {% for month_data in segment.data %}
+                            <td class="px-2 py-1.5 text-center text-xs text-green-600 font-semibold whitespace-nowrap border-r bg-green-50">
+                                {{ month_data.available_hours|floatformat:0 }}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-2 py-1.5 text-xs font-medium text-gray-700 whitespace-nowrap border-r bg-yellow-50">Demand (Hrs)</td>
+                            {% for month_data in segment.data %}
+                            <td class="px-2 py-1.5 text-center text-xs text-yellow-600 font-semibold whitespace-nowrap border-r bg-yellow-50">
+                                {{ month_data.total|floatformat:0 }}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-2 py-1.5 text-xs font-medium text-gray-700 whitespace-nowrap italic border-r bg-purple-50">Req/Avail HC</td>
+                             {% for month_data in segment.data %}
+                             <td class="px-2 py-1.5 text-center text-xs font-semibold whitespace-nowrap border-r bg-purple-50
+                                {% if month_data.required_headcount > month_data.available_headcount %}text-red-600{% else %}text-gray-800{% endif %}">
+                                <div class="flex flex-col items-center">
+                                    <span class="text-xs">{{ month_data.required_headcount|floatformat:1 }}</span>
+                                    <div class="text-[10px] text-gray-500 border-t border-purple-200 pt-0.5 w-full">{{ month_data.available_headcount }}</div>
+                                </div>
+                             </td>
+                             {% endfor %}
+                        </tr>
+                        <tr class="bg-gray-50 font-bold border-b-4 border-gray-200 hover:bg-gray-100">
+                            <td class="px-2 py-1.5 text-xs font-medium text-gray-900 whitespace-nowrap border-r">Variance (HC)</td>
+                            {% for month_data in segment.data %}
+                            <td class="px-2 py-1.5 text-center text-xs whitespace-nowrap border-r {% if month_data.variance_headcount < 0 %}text-red-600 bg-red-50 shortage-alert{% else %}text-blue-600 bg-blue-50{% endif %}">
+                                {% if month_data.variance_headcount > 0 %}+{% endif %}{{ month_data.variance_headcount|floatformat:0 }}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="mt-6 mb-6">
         <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center">
             <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
             Segment Capacity Breakdown
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {% for segment in segment_charts %}
+            {% for segment in blended_segment_charts %}
             <div class="bg-white rounded-lg shadow-lg p-3 relative group hover:shadow-xl transition-all">
                 <div class="flex justify-between items-center mb-2">
                     <h4 class="font-semibold text-gray-700 truncate text-xs" title="{{ segment.name }}">{{ segment.name }}</h4>
@@ -289,7 +399,7 @@
     </div>
 </div>
 
-{{ segment_charts|json_script:"segment-data" }}
+{{ blended_segment_charts|json_script:"segment-data" }}
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>

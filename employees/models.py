@@ -27,6 +27,7 @@ class Employee(models.Model):
     email = models.EmailField(blank=True, null=True, help_text="Employee email address")
     phone = models.CharField(max_length=20, blank=True, null=True, help_text="Contact phone number")
     join_date = models.DateField(null=True, blank=True, help_text="Date of joining")
+    segment = models.ForeignKey('planner.Segment', on_delete=models.SET_NULL, null=True, blank=True, help_text="Segment for Engineer/Team Lead. Managers leave this blank.")
 
     class Meta:
         ordering = ['name']
