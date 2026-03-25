@@ -1063,20 +1063,36 @@ def capacity_plan_view(request):
                 'label': p_start.strftime('W%W %d %b')
             })
     elif view_type == 'quarter':
-        q_month = (today.month - 1) // 3 * 3 + 1
-        start_date = date(today.year, q_month, 1)
-        for i in range(8):
-            year_offset = (start_date.month + (i*3) - 1) // 12
-            month = (start_date.month + (i*3) - 1) % 12 + 1
+        # Determine the start date of the current Indian Financial Year quarter
+        current_month = today.month
+        current_year = today.year
+        if 4 <= current_month <= 6:
+            start_date = date(current_year, 4, 1)  # Q1
+        elif 7 <= current_month <= 9:
+            start_date = date(current_year, 7, 1)  # Q2
+        elif 10 <= current_month <= 12:
+            start_date = date(current_year, 10, 1) # Q3
+        else:  # Jan, Feb, Mar
+            start_date = date(current_year, 1, 1)  # Q4
+
+        for i in range(8): # Generate 8 quarters
+            # Calculate the start of the period
+            year_offset = (start_date.month + (i * 3) - 1) // 12
+            month = (start_date.month + (i * 3) - 1) % 12 + 1
             year = start_date.year + year_offset
             p_start = date(year, month, 1)
+
+            # Calculate the end of the period (last day of the 3rd month)
+            p_end = (p_start + timedelta(days=92)).replace(day=1) - timedelta(days=1)
+
+            # Determine the financial quarter number and year for the label
+            if 4 <= p_start.month <= 6: q_num, fy_year = 1, p_start.year
+            elif 7 <= p_start.month <= 9: q_num, fy_year = 2, p_start.year
+            elif 10 <= p_start.month <= 12: q_num, fy_year = 3, p_start.year
+            else: q_num, fy_year = 4, p_start.year - 1
             
-            if month >= 10:
-                p_end = date(year + 1, 1, 1) - timedelta(days=1)
-            else:
-                p_end = date(year, month + 3, 1) - timedelta(days=1)
+            q_label = f"Q{q_num} FY{str(fy_year)[-2:]}-{str(fy_year + 1)[-2:]}"
             
-            q_label = f"Q{(month-1)//3 + 1} {year}"
             periods.append({'start': p_start, 'end': p_end, 'key': q_label, 'label': q_label})
     else: 
         start_date = today.replace(day=1)
