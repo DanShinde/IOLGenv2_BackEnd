@@ -2039,8 +2039,8 @@ def add_update_remark(request, update_id):
             
     # ✅ Corrected redirect logic to handle both project and non-project updates
     if redirect_to == 'project_detail' and update.project:
-        # Redirect back to the specific project detail page
-        return redirect('tracker_project_detail', project_id=update.project.id)
+        # Redirect back to the specific project detail page on the push-pull tab
+        return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[update.project.id])}?bottom_tab=push_pull#project-notes")
     else:
         # Default to the general content page or the filtered page
         return redirect('all_push_pull_content')
@@ -2066,8 +2066,8 @@ def edit_update_remark(request, remark_id):
     
     # ✅ Corrected redirect logic
     if redirect_to == 'project_detail' and remark.update.project:
-        # Redirect back to the project page
-        return redirect('tracker_project_detail', project_id=remark.update.project.id)
+        # Redirect back to the project page on the push-pull tab
+        return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[remark.update.project.id])}?bottom_tab=push_pull#project-notes")
     else:
         # Default to the all push-pull content page
         return redirect('all_push_pull_content')
@@ -2089,8 +2089,8 @@ def delete_update_remark(request, remark_id):
 
     # ✅ Corrected redirect logic
     if redirect_to == 'project_detail' and remark.update.project:
-        # Redirect back to the project page if the update has a project
-        return redirect('tracker_project_detail', project_id=remark.update.project.id)
+        # Redirect back to the project page on the push-pull tab if the update has a project
+        return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[remark.update.project.id])}?bottom_tab=push_pull#project-notes")
     else:
         # Redirect back to the general content page
         return redirect('all_push_pull_content')
