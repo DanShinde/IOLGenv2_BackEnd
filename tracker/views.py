@@ -1447,22 +1447,18 @@ def edit_project_update(request, update_id):
         
         referer = request.META.get('HTTP_REFERER')
         if referer and 'all-push-pull-content' in referer:
-            filter_type = 'all'
-            if 'filter=project' in referer:
-                filter_type = 'project'
-            elif 'filter=general' in referer:
-                filter_type = 'general'
-            return redirect('all_push_pull_content_filtered', filter=filter_type)
+            return redirect('all_push_pull_content')
+            
         if update.project:
             return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[update.project.id])}?bottom_tab=push_pull#project-notes")
         else:
-            return redirect('all_push_pull_content_filtered', filter='general')
+            return redirect('all_push_pull_content')
     else:
         messages.error(request, "You do not have permission to edit this update.")
         if update.project:
             return redirect('tracker_project_detail', project_id=update.project.id)
         else:
-            return redirect('all_push_pull_content_filtered', filter='general')
+            return redirect('all_push_pull_content')
 
 
 @login_required
@@ -1474,12 +1470,7 @@ def delete_project_update(request, update_id):
         messages.success(request, "Push-Pull content deleted.")
         referer = request.META.get('HTTP_REFERER')
         if referer and 'all-push-pull-content' in referer:
-            filter_type = 'all'
-            if 'filter=project' in referer:
-                filter_type = 'project'
-            elif 'filter=general' in referer:
-                filter_type = 'general'
-            return redirect('all_push_pull_content_filtered', filter=filter_type)
+            return redirect('all_push_pull_content')
         
         if project_id:
             return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project_id])}?bottom_tab=push_pull#project-notes")
@@ -1533,22 +1524,29 @@ def all_project_updates(request, project_id):
 
 @login_required
 def all_push_pull_content(request, filter=None):
-    # Check for an explicit filter in the URL query parameters
-    if 'filter' in request.GET and request.GET['filter'] in ['all', 'project', 'general']:
-        if request.GET['filter'] == 'all':
-
-            if 'push_pull_filter' in request.session:
-                del request.session['push_pull_filter']
-        else:
-            request.session['push_pull_filter'] = request.GET['filter']
-
-        # This redirect is crucial for a clean URL and consistent filtering
+    # Handle explicit clear filters request
+    if request.GET.get('clear_filters') == '1':
+        for key in ['pp_category_filter', 'pp_status_filter', 'pp_type_filter']:
+            if key in request.session:
+                del request.session[key]
         return redirect('all_push_pull_content')
 
-    # Get the current filters from the session and request
-    current_filter = request.session.get('push_pull_filter', 'all')
-    status_filter = request.GET.get('status_filter', 'all')
-    push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
+    # If filter is passed as part of the URL path (e.g., from a redirect kwarg)
+    if filter:
+        request.session['pp_category_filter'] = filter
+
+    # Session-based filter persistence from query parameters
+    if 'filter' in request.GET:
+        request.session['pp_category_filter'] = request.GET['filter']
+    if 'status_filter' in request.GET:
+        request.session['pp_status_filter'] = request.GET['status_filter']
+    if 'push_pull_filter' in request.GET:
+        request.session['pp_type_filter'] = request.GET['push_pull_filter']
+
+    # Get the current filters from the session (default to 'all')
+    current_filter = request.session.get('pp_category_filter', 'all')
+    status_filter = request.session.get('pp_status_filter', 'all')
+    push_pull_filter = request.session.get('pp_type_filter', 'all')
 
     # Auto-archive logic: Move 'Closed' items older than 30 days to 'Archived'
     archive_threshold = timezone.now() - timedelta(days=30)
@@ -1622,7 +1620,7 @@ def add_contact_person_ajax(request):
 @login_required
 def export_push_pull_excel(request):
     updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
-    filter = request.GET.get('filter')
+    filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
 
     if filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1630,14 +1628,14 @@ def export_push_pull_excel(request):
         updates_qs = updates_qs.filter(content_type='General')
 
     # Apply push/pull filtering
-    push_pull_filter = request.GET.get('push_pull_filter')
+    push_pull_filter = request.GET.get('push_pull_filter', request.session.get('pp_type_filter', 'all'))
     if push_pull_filter == 'push':
         updates_qs = updates_qs.filter(push_pull_type='Push')
     elif push_pull_filter == 'pull':
         updates_qs = updates_qs.filter(push_pull_type='Pull')
 
     # Apply status filtering
-    status_filter = request.GET.get('status_filter')
+    status_filter = request.GET.get('status_filter', request.session.get('pp_status_filter', 'all'))
     if status_filter == 'open':
         updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
@@ -1706,7 +1704,7 @@ def export_push_pull_excel(request):
 @login_required
 def export_push_pull_pdf(request):
     updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
-    filter = request.GET.get('filter')
+    filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
 
     if filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1714,14 +1712,14 @@ def export_push_pull_pdf(request):
         updates_qs = updates_qs.filter(content_type='General')
 
     # Apply push/pull filtering
-    push_pull_filter = request.GET.get('push_pull_filter')
+    push_pull_filter = request.GET.get('push_pull_filter', request.session.get('pp_type_filter', 'all'))
     if push_pull_filter == 'push':
         updates_qs = updates_qs.filter(push_pull_type='Push')
     elif push_pull_filter == 'pull':
         updates_qs = updates_qs.filter(push_pull_type='Pull')
 
     # Apply status filtering
-    status_filter = request.GET.get('status_filter')
+    status_filter = request.GET.get('status_filter', request.session.get('pp_status_filter', 'all'))
     if status_filter == 'open':
         updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
@@ -1814,9 +1812,9 @@ def export_push_pull_pdf(request):
 def send_push_pull_email(request):
     # 1. Retrieve filters (similar to all_push_pull_content)
     # Check GET first, then session, default to 'all'
-    current_filter = request.GET.get('filter', request.session.get('push_pull_filter', 'all'))
-    status_filter = request.GET.get('status_filter', 'all')
-    push_pull_filter = request.GET.get('push_pull_filter', 'all')
+    current_filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
+    status_filter = request.GET.get('status_filter', request.session.get('pp_status_filter', 'all'))
+    push_pull_filter = request.GET.get('push_pull_filter', request.session.get('pp_type_filter', 'all'))
 
     # 2. Filter the updates
     updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
@@ -2045,7 +2043,7 @@ def add_update_remark(request, update_id):
         return redirect('tracker_project_detail', project_id=update.project.id)
     else:
         # Default to the general content page or the filtered page
-        return redirect('all_push_pull_content_filtered', filter='general')
+        return redirect('all_push_pull_content')
 
 @login_required
 def edit_update_remark(request, remark_id):
@@ -2072,7 +2070,7 @@ def edit_update_remark(request, remark_id):
         return redirect('tracker_project_detail', project_id=remark.update.project.id)
     else:
         # Default to the all push-pull content page
-        return redirect('all_push_pull_content_filtered', filter='general')
+        return redirect('all_push_pull_content')
 
 
 @login_required
@@ -2095,7 +2093,7 @@ def delete_update_remark(request, remark_id):
         return redirect('tracker_project_detail', project_id=remark.update.project.id)
     else:
         # Redirect back to the general content page
-        return redirect('all_push_pull_content_filtered', filter='general')
+        return redirect('all_push_pull_content')
     
 
 from uuid import UUID
@@ -2149,11 +2147,18 @@ def public_push_pull_content(request, access_token):
         update_id = request.POST.get('update_id')
         update = get_object_or_404(ProjectUpdate, id=update_id)
 
+        # Build query string to retain filters for the public view
+        from urllib.parse import urlencode
+        q_string = request.GET.urlencode()
+        redirect_url = reverse('public_push_pull_content', args=[str(access_token)])
+        if q_string:
+            redirect_url += f"?{q_string}"
+
         if 'update_status' in request.POST:
             update.status = request.POST['update_status']
             update.save()
             messages.success(request, f"Update status for item {update.id} changed to {update.status}.")
-            return redirect('public_push_pull_content', access_token=str(access_token))
+            return redirect(redirect_url)
         
         if 'remark_text' in request.POST:
             text = request.POST.get('remark_text')
@@ -2169,7 +2174,7 @@ def public_push_pull_content(request, access_token):
                     added_by=public_user
                 )
                 messages.success(request, "Remark added successfully.")
-            return redirect('public_push_pull_content', access_token=str(access_token))
+            return redirect(redirect_url)
     
     context = {
         'updates': updates,

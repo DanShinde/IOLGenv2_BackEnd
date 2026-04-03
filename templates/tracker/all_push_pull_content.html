@@ -145,6 +145,11 @@
                     </li>
                 </ul>
             </div>
+            <div class="ms-auto">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="clearFiltersBtn" title="Clear all filters">
+                    <i class="fas fa-times me-1"></i>Clear Filters
+                </button>
+            </div>
         </div>
 
         <div class="table-responsive">
@@ -639,17 +644,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Table Column Filtering
-    $('.filter-input').on('keyup change', function() {
+    // --- Clear Filters Button Logic ---
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', function() {
+            sessionStorage.removeItem('pushPullTableFilters');
+            window.location.href = "{% url 'all_push_pull_content' %}?clear_filters=1";
+        });
+    }
+
+    // Table Column Filtering (with sessionStorage retention)
+    var savedFilters = JSON.parse(sessionStorage.getItem('pushPullTableFilters')) || {};
+    $('.filter-input').each(function() {
+        var colIndex = $(this).data('col');
+        if (savedFilters[colIndex]) {
+            $(this).val(savedFilters[colIndex]);
+        }
+    });
+
+    function applyTableFilters() {
         var filters = [];
+        var filtersToSave = {};
         $('.filter-input').each(function() {
             var $input = $(this);
             var colIndex = $input.data('col');
             var val = $input.val().toLowerCase();
             if (val) {
                 filters.push({ col: colIndex, val: val });
+                filtersToSave[colIndex] = $input.val();
             }
         });
+
+        // Save applied filters to browser's session storage
+        sessionStorage.setItem('pushPullTableFilters', JSON.stringify(filtersToSave));
 
         var $rows = $('#pushPullTable tbody tr');
         
@@ -686,6 +713,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             $row.toggle(show);
         });
+    }
+
+    // Trigger table filtering initially if there are saved filters
+    if (Object.keys(savedFilters).length > 0) {
+        applyTableFilters();
+    }
+
+    $('.filter-input').on('keyup change', function() {
+        applyTableFilters();
     });
 
     // --- Share Link Modal Logic ---
