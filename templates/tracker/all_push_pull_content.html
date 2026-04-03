@@ -53,7 +53,7 @@
                 </div>
                 <div class="col-md-2">
                     <label for="push_pull_type" class="form-label small mb-0">Type</label>
-                    <select name="push_pull_type" id="push_pull_type" class="form-select form-select-sm">
+                    <select name="push_pull_type" id="push_pull_type" class="form-select form-select-sm" onchange="toggleTopETA(this.value)">
                         <option value="Pull">Pull Content</option>
                         <option value="Push">Push Content</option>
                     </select>
@@ -273,6 +273,9 @@
                         </td>
 
                         <td>
+                            {% if update.push_pull_type == 'Push' %}
+                                <div class="text-muted small">N/A</div>
+                            {% else %}
                             {% if not is_public_view %}
                                 <input type="date" class="form-control form-control-sm border-0 bg-transparent shadow-none px-0" 
                                        value="{{ update.eta|date:'Y-m-d' }}" 
@@ -284,9 +287,28 @@
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             {% endif %}
+                            {% endif %}
                         </td>
 
                         <td>
+                            {% if update.push_pull_type == 'Push' %}
+                                {% if update.status == 'Open' or update.status == 'In Progress' %}
+                                    {% if not is_public_view %}
+                                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill py-0 px-2 mt-1" onclick="updateField({{ update.id }}, 'status', 'Closed', true)">
+                                            <i class="fas fa-check me-1"></i>Acknowledge
+                                        </button>
+                                    {% else %}
+                                        <form method="post" action="" class="d-inline">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="update_id" value="{{ update.id }}">
+                                            <input type="hidden" name="update_status" value="Closed">
+                                            <button type="submit" class="btn btn-sm btn-outline-success rounded-pill py-0 px-2 mt-1"><i class="fas fa-check me-1"></i>Acknowledge</button>
+                                        </form>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-success mt-1"><i class="fas fa-check-double me-1"></i>Acknowledged</span>
+                                {% endif %}
+                            {% else %}
                             {% if not is_public_view %}
                                 <select class="form-select form-select-sm border-0 bg-transparent shadow-none ps-0 fw-bold 
                                     {% if update.status == 'Open' %}text-success{% elif update.status == 'In Progress' %}text-warning{% elif update.status == 'Archived' %}text-muted{% else %}text-secondary{% endif %}" 
@@ -333,6 +355,7 @@
                                     </ul>
                                 </div>
 
+                            {% endif %}
                             {% endif %}
                         </td>
 
@@ -469,7 +492,7 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     // General AJAX Update Function
-    function updateField(id, field, value) {
+    function updateField(id, field, value, reload=false) {
         fetch("{% url 'update_project_update_ajax' %}", {
             method: 'POST',
             headers: {
@@ -486,9 +509,23 @@
         .then(data => {
             if(data.status !== 'success') {
                 alert('Error updating: ' + (data.message || 'Unknown error'));
+            } else if (reload || field === 'push_pull_type') {
+                location.reload();
             }
         })
         .catch(err => console.error(err));
+    }
+
+    function toggleTopETA(val) {
+        var eta = document.getElementById('eta_date');
+        if (eta) {
+            if (val === 'Push') {
+                eta.value = '';
+                eta.disabled = true;
+            } else {
+                eta.disabled = false;
+            }
+        }
     }
 
 document.addEventListener('DOMContentLoaded', function() {
