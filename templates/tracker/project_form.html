@@ -99,6 +99,14 @@
                         </div>
                     </div>
 
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label for="description" class="form-label"><i class="fas fa-align-left me-2 text-muted"></i>Project Description</label>
+                            <textarea name="description" id="description" class="form-control shadow-sm" rows="5" placeholder="Add a project description (up to 1000 words), including details such as module types, module count, customer-specific requirements, and references to similar previously executed projects.">{% if project and project.description %}{{ project.description }}{% endif %}</textarea>
+                            <div class="form-text text-muted small">You can add detailed project information here.</div>
+                        </div>
+                    </div>
+
                     <hr>
 
                     <div class="d-flex justify-content-end">

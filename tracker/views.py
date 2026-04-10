@@ -105,7 +105,8 @@ def new_project(request):
             code=code, customer_name=request.POST['customer_name'],
             value=request.POST['value'], so_punch_date=parse_date(request.POST['so_punch_date']),
             segment_con=segment_con,
-            team_lead=team_lead
+            team_lead=team_lead,
+            description=request.POST.get('description', '')
         )
 
         # ... stage creation logic is unchanged ...
@@ -133,6 +134,7 @@ def edit_project(request, project_id):
         project.customer_name = request.POST['customer_name']
         project.value = request.POST['value']
         project.so_punch_date = parse_date(request.POST['so_punch_date'])
+        project.description = request.POST.get('description', '')
 
         segment_id = request.POST.get('segment')
         project.segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None

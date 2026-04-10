@@ -448,6 +448,15 @@
                 </div>
             </div>
             <hr>
+            <div class="mb-3 mt-3">
+                <h6 class="text-muted">Project Description</h6>
+                {% if project.description %}
+                    <p class="mb-0 text-dark" style="white-space: pre-line; line-height: 1.6;">{{ project.description }}</p>
+                {% else %}
+                    <p class="mb-0 text-muted fst-italic" style="font-size: 0.9rem;">No description provided.</p>
+                {% endif %}
+            </div>
+            <hr>
             <div class="progress-wrapper mt-3">
                 <div class="d-flex justify-content-between mb-1">
                     <span class="text-muted">Overall Completion</span>

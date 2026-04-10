@@ -19,6 +19,7 @@ class Project(models.Model):
     value = models.DecimalField(max_digits=12, decimal_places=2)
     so_punch_date = models.DateField()
     is_archived = models.BooleanField(default=False)
+    description = models.TextField(blank=True, null=True)
     # The redundant 'segment' CharField and the custom 'save' method have been removed.
     # 'segment_con' is now the single source of truth.
     segment_con = models.ForeignKey(
