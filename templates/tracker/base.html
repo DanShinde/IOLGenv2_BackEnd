@@ -9,101 +9,524 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-    /* IMPROVEMENT: Refined color palette and added new variables for consistency */
+    /* ============================================================
+       CSS VARIABLES — Single source of truth for the design system
+       ============================================================ */
     :root {
-        --primary: #4361ee;
-        --primary-dark: #3a56d4;
-        --secondary: #3f37c9;
-        --accent: #4895ef;
-        --success: #28a745;
-        --warning: #ffc107;
-        --danger: #dc3545;
-        --dark: #1b263b;
-        --light: #f8f9fa;
-        --gray: #8d99ae;
-        --border-color: #e9ecef;
-        --border-radius: 14px; /* Softer radius */
-        --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
-        --card-shadow-hover: 0 10px 15px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.08);
-        --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        --primary:        #4361ee;
+        --primary-dark:   #3a56d4;
+        --primary-light:  rgba(67, 97, 238, 0.12);
+        --secondary:      #3f37c9;
+        --accent:         #4895ef;
+        --success:        #28a745;
+        --warning:        #ffc107;
+        --danger:         #dc3545;
+        --dark:           #1b263b;
+        --light:          #f8f9fa;
+        --gray:           #8d99ae;
+        --border-color:   #e9ecef;
+        --border-radius:  14px;
+        --card-shadow:    0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+        --card-shadow-hover: 0 10px 15px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.08);
+        --transition:     all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+        /* Navbar-specific tokens */
+        --nav-height:        64px;
+        --nav-height-shrunk: 54px;
+        --nav-bg:            rgba(15, 23, 42, 0.92);
+        --nav-bg-solid:      #0f172a;
+        --nav-border:        rgba(255,255,255,0.07);
+        --nav-text:          rgba(255,255,255,0.78);
+        --nav-text-hover:    #ffffff;
+        --nav-active-bg:     rgba(67, 97, 238, 0.22);
+        --nav-active-color:  #7b9fff;
+        --nav-hover-bg:      rgba(255,255,255,0.07);
+        --nav-pill-radius:   10px;
     }
 
-    /* IMPROVEMENT: Custom scrollbar for a more integrated look */
-    ::-webkit-scrollbar { width: 8px; }
+    /* ============================================================
+       GLOBAL RESETS & BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    ::-webkit-scrollbar { width: 7px; }
     ::-webkit-scrollbar-track { background: #f1f1f1; }
-    ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #c5cad3; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--gray); }
 
-    /* IMPROVEMENT: Added a fade-in animation for a smoother page load */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(10px); }
+        to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes pulse-ring {
+        0%   { box-shadow: 0 0 0 0 rgba(67,97,238,0.55); }
+        70%  { box-shadow: 0 0 0 8px rgba(67,97,238,0); }
+        100% { box-shadow: 0 0 0 0 rgba(67,97,238,0); }
     }
 
     body {
-        background: #f7f9fc; /* A simpler, clean background */
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: #f0f4f8;
+        font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #333;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
-        padding-top: 80px;
-        animation: fadeIn 0.5s ease-out; /* Apply fade-in animation */
+        padding-top: var(--nav-height);
+        animation: fadeInDown 0.45s ease-out;
     }
 
-    /* IMPROVEMENT: Modern "glassmorphism" navbar effect */
+    /* ============================================================
+       NAVBAR — CORE STRUCTURE
+       ============================================================ */
     .navbar-custom {
-        background: rgba(27, 38, 59, 0.85); /* Dark background with transparency */
-        backdrop-filter: blur(10px); /* The blur effect */
-        -webkit-backdrop-filter: blur(10px);
-        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
-        padding: 0.8rem 1rem;
+        background: var(--nav-bg);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--nav-border);
+        box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+        height: var(--nav-height);
+        padding: 0 1.25rem;
         position: fixed;
         top: 0;
         width: 100%;
         z-index: 1030;
+        transition: height 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Scrolled / shrunk state — applied via JS */
+    .navbar-custom.scrolled {
+        height: var(--nav-height-shrunk);
+        background: var(--nav-bg-solid);
+        box-shadow: 0 2px 20px rgba(0,0,0,0.28);
+    }
+
+    .navbar-custom > .container-fluid {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 0;
+    }
+
+    /* ============================================================
+       BRAND / LOGO
+       ============================================================ */
+    .navbar-brand {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: white !important;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        letter-spacing: -0.3px;
+        flex-shrink: 0;
+        margin-right: 1.5rem;
+    }
+
+    .navbar-brand-logo-wrap {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
         transition: var(--transition);
     }
-    .navbar-brand {
-        font-weight: 700; font-size: 1.5rem; color: white !important; display: flex; align-items: center;
+    .navbar-brand:hover .navbar-brand-logo-wrap {
+        animation: pulse-ring 1.2s ease-out;
+        transform: rotate(-5deg) scale(1.08);
     }
     .navbar-logo {
-        height: 32px; width: auto; margin-right: 10px;
+        height: 20px;
+        width: auto;
+        filter: brightness(0) invert(1);
     }
-    .navbar-custom .nav-link {
-        color: rgba(255, 255, 255, 0.85) !important;
+
+    .navbar-brand-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+    }
+    .navbar-brand-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.2px;
+    }
+    .navbar-brand-subtitle {
+        font-size: 0.65rem;
         font-weight: 500;
-        padding: 0.5rem 1rem !important;
-        border-radius: 8px;
-        margin: 0 3px;
+        color: rgba(255,255,255,0.45);
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+    }
+
+    /* ============================================================
+       NAV DIVIDER
+       ============================================================ */
+    .nav-divider {
+        width: 1px;
+        height: 22px;
+        background: var(--nav-border);
+        margin: 0 0.5rem;
+        flex-shrink: 0;
+    }
+
+    /* ============================================================
+       NAV LINKS
+       ============================================================ */
+    .navbar-custom .navbar-nav {
+        align-items: center;
+    }
+
+    .navbar-custom .nav-link {
+        color: var(--nav-text) !important;
+        font-weight: 500;
+        font-size: 0.875rem;
+        padding: 0.45rem 0.85rem !important;
+        border-radius: var(--nav-pill-radius);
+        margin: 0 2px;
         transition: var(--transition);
         display: flex;
         align-items: center;
-        gap: 8px;
-    }
-    .navbar-custom .nav-link:hover, .navbar-custom .nav-link.active {
-        color: white !important; background: rgba(255, 255, 255, 0.15);
-    }
-    .navbar-custom .nav-link i { font-size: 1.1rem; }
-    .user-dropdown .dropdown-toggle::after { display: none; }
-    .user-avatar {
-        width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;
+        gap: 7px;
+        position: relative;
+        white-space: nowrap;
+        letter-spacing: 0.1px;
     }
 
+    .navbar-custom .nav-link .nav-icon {
+        font-size: 0.95rem;
+        opacity: 0.8;
+        transition: var(--transition);
+        flex-shrink: 0;
+    }
+
+    .navbar-custom .nav-link:hover {
+        color: var(--nav-text-hover) !important;
+        background: var(--nav-hover-bg);
+    }
+    .navbar-custom .nav-link:hover .nav-icon {
+        opacity: 1;
+        transform: translateY(-1px);
+    }
+
+    /* Active state — glowing pill */
+    .navbar-custom .nav-link.active {
+        color: var(--nav-active-color) !important;
+        background: var(--nav-active-bg);
+        font-weight: 600;
+    }
+    .navbar-custom .nav-link.active .nav-icon {
+        opacity: 1;
+        color: var(--nav-active-color);
+    }
+
+    /* Active bottom indicator bar */
+    .navbar-custom .nav-link.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 2px;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        border-radius: 2px;
+        opacity: 0.8;
+    }
+
+    /* ============================================================
+       NOTIFICATION BELL
+       ============================================================ */
+    .nav-icon-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--nav-hover-bg);
+        border: 1px solid var(--nav-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--nav-text);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: var(--transition);
+        position: relative;
+        text-decoration: none;
+        flex-shrink: 0;
+    }
+    .nav-icon-btn:hover {
+        background: rgba(255,255,255,0.12);
+        color: white;
+        border-color: rgba(255,255,255,0.15);
+        transform: translateY(-1px);
+    }
+    .nav-icon-btn .badge-dot {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 8px;
+        height: 8px;
+        background: var(--danger);
+        border-radius: 50%;
+        border: 2px solid var(--nav-bg-solid);
+    }
+
+    /* ============================================================
+       USER DROPDOWN
+       ============================================================ */
+    .user-dropdown .dropdown-toggle::after { display: none; }
+
+    .user-dropdown-btn {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 5px 10px 5px 5px !important;
+        border-radius: 40px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--nav-border);
+        transition: var(--transition);
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .user-dropdown-btn:hover {
+        background: rgba(255,255,255,0.11);
+        border-color: rgba(255,255,255,0.15);
+    }
+
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+        border: 2px solid rgba(255,255,255,0.2);
+        transition: var(--transition);
+    }
+    .user-dropdown-btn:hover .user-avatar {
+        border-color: rgba(255,255,255,0.4);
+        transform: scale(1.05);
+    }
+
+    .user-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+    }
+    .user-name {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: rgba(255,255,255,0.9);
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .user-role {
+        font-size: 0.68rem;
+        color: rgba(255,255,255,0.42);
+        font-weight: 400;
+    }
+
+    .user-chevron {
+        color: rgba(255,255,255,0.4);
+        font-size: 0.7rem;
+        transition: transform 0.25s ease;
+        margin-left: 2px;
+    }
+    .user-dropdown.show .user-chevron {
+        transform: rotate(180deg);
+    }
+
+    /* Dropdown menu */
+    .navbar-custom .dropdown-menu {
+        background: #1a2236;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 14px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.2);
+        padding: 6px;
+        min-width: 210px;
+        margin-top: 8px !important;
+        animation: slideInRight 0.2s ease-out;
+    }
+
+    /* Dropdown header — user info panel */
+    .dropdown-user-header {
+        padding: 12px 14px 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.07);
+        margin-bottom: 4px;
+    }
+    .dropdown-user-header .duh-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: rgba(255,255,255,0.9);
+        margin-bottom: 2px;
+    }
+    .dropdown-user-header .duh-email {
+        font-size: 0.72rem;
+        color: rgba(255,255,255,0.38);
+    }
+
+    .navbar-custom .dropdown-item {
+        color: rgba(255,255,255,0.72);
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 9px 12px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background 0.2s ease, color 0.2s ease;
+    }
+    .navbar-custom .dropdown-item i {
+        width: 16px;
+        text-align: center;
+        font-size: 0.9rem;
+        opacity: 0.7;
+    }
+    .navbar-custom .dropdown-item:hover {
+        background: rgba(255,255,255,0.08);
+        color: white;
+    }
+    .navbar-custom .dropdown-item:hover i { opacity: 1; }
+
+    .navbar-custom .dropdown-item.text-danger {
+        color: #ff6b6b !important;
+    }
+    .navbar-custom .dropdown-item.text-danger:hover {
+        background: rgba(220,53,69,0.15);
+        color: #ff8080 !important;
+    }
+
+    .navbar-custom .dropdown-divider {
+        border-color: rgba(255,255,255,0.07);
+        margin: 4px 0;
+    }
+
+    /* Logout button styled as dropdown item */
+    .navbar-custom .dropdown-item-logout {
+        background: none;
+        border: none;
+        width: 100%;
+        text-align: left;
+        color: #ff6b6b !important;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 9px 12px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background 0.2s ease, color 0.2s ease;
+        cursor: pointer;
+    }
+    .navbar-custom .dropdown-item-logout i {
+        width: 16px;
+        text-align: center;
+        font-size: 0.9rem;
+        opacity: 0.7;
+    }
+    .navbar-custom .dropdown-item-logout:hover {
+        background: rgba(220,53,69,0.15);
+        color: #ff8080 !important;
+    }
+
+    /* ============================================================
+       MOBILE TOGGLER
+       ============================================================ */
+    .navbar-toggler {
+        border: 1px solid var(--nav-border);
+        border-radius: 8px;
+        padding: 6px 9px;
+        background: var(--nav-hover-bg);
+        transition: var(--transition);
+    }
+    .navbar-toggler:hover { background: rgba(255,255,255,0.12); }
+    .navbar-toggler:focus { box-shadow: none; }
+
+    .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255%2C255%2C255%2C0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    }
+
+    /* ============================================================
+       LOGIN / REGISTER BUTTONS (unauthenticated)
+       ============================================================ */
+    .btn-nav-login {
+        color: rgba(255,255,255,0.8) !important;
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 8px;
+        padding: 0.4rem 1rem !important;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+    .btn-nav-login:hover {
+        color: white !important;
+        background: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.35);
+    }
+    .btn-nav-register {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+        color: white !important;
+        border: none;
+        border-radius: 8px;
+        padding: 0.4rem 1rem !important;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        box-shadow: 0 4px 12px rgba(67,97,238,0.35);
+    }
+    .btn-nav-register:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(67,97,238,0.45);
+        color: white !important;
+    }
+
+    /* ============================================================
+       MAIN CONTENT AREA
+       ============================================================ */
     .main-container {
-        margin-top: 20px; margin-bottom: 40px; flex: 1;
+        margin-top: 20px;
+        margin-bottom: 40px;
+        flex: 1;
     }
     .page-header {
-        background: white; border-radius: var(--border-radius); padding: 30px; box-shadow: var(--card-shadow); margin-bottom: 30px;
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 30px;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 30px;
     }
-    .page-title {
-        color: var(--dark); font-weight: 700; margin-bottom: 5px;
-    }
+    .page-title   { color: var(--dark); font-weight: 700; margin-bottom: 5px; }
     .page-subtitle { color: var(--gray); font-size: 1.1rem; }
 
-    /* IMPROVEMENT: Softer shadows, radius, and hover effects */
+    /* ============================================================
+       CARDS
+       ============================================================ */
     .card {
         border: 1px solid var(--border-color);
         border-radius: var(--border-radius);
@@ -115,65 +538,90 @@
     .card:hover {
         transform: translateY(-5px);
         box-shadow: var(--card-shadow-hover);
-        border-top-color: var(--primary); /* Smoother border appearance */
+        border-top-color: var(--primary);
     }
     .card-header {
-        background: white; border-bottom: 1px solid var(--border-color); padding: 18px 25px; font-weight: 600; color: var(--dark); display: flex; align-items: center; justify-content: space-between;
-        border-radius: var(--border-radius) var(--border-radius) 0 0; /* Match card radius */
+        background: white;
+        border-bottom: 1px solid var(--border-color);
+        padding: 18px 25px;
+        font-weight: 600;
+        color: var(--dark);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
     }
     .card-header-actions { display: flex; gap: 0.5rem; }
     .card-body { padding: 25px; }
     .card-header-title { display: flex; align-items: center; font-size: 1.1rem; font-weight: 600; margin: 0; }
     .card-header-title i { font-size: 1.1rem; width: 28px; text-align: center; margin-right: 8px; color: var(--primary); }
 
+    /* ============================================================
+       METRIC CARDS
+       ============================================================ */
     .metric-card {
-        background: white; border-radius: var(--border-radius); padding: 20px; box-shadow: var(--card-shadow); height: 100%; transition: var(--transition);
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 20px;
+        box-shadow: var(--card-shadow);
+        height: 100%;
+        transition: var(--transition);
         border-top: 4px solid var(--primary);
     }
     .metric-card:hover { transform: translateY(-3px); box-shadow: var(--card-shadow-hover); }
     .metric-icon {
-        width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 15px; background: rgba(67, 97, 238, 0.1); color: var(--primary);
+        width: 50px; height: 50px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem; margin-bottom: 15px;
+        background: rgba(67,97,238,0.1); color: var(--primary);
     }
     .metric-value { font-size: 1.8rem; font-weight: 700; color: var(--dark); margin-bottom: 5px; }
     .metric-label { color: var(--gray); font-size: 0.95rem; margin-bottom: 8px; }
 
-    /* IMPROVEMENT: Cleaner table header and row hover */
+    /* ============================================================
+       TABLE
+       ============================================================ */
     .table-custom { border-collapse: separate; border-spacing: 0; width: 100%; }
     .table-custom tbody tr:hover { background-color: #f5f7fb; }
     .table-custom thead th {
-        background-color: #f8fafd; color: var(--dark); font-weight: 600; border-top: 1px solid var(--border-color); border-bottom: 2px solid var(--border-color); padding: 12px 15px; text-align: left;
+        background-color: #f8fafd; color: var(--dark); font-weight: 600;
+        border-top: 1px solid var(--border-color); border-bottom: 2px solid var(--border-color);
+        padding: 12px 15px; text-align: left;
     }
     .table-custom tbody td { padding: 15px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
     .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
-    .bg-completed { background-color: var(--success); color: white; }
-    .bg-in-progress { background-color: var(--accent); color: white; }
-    .bg-not-started { background-color: var(--gray); color: white; }
-    .bg-hold { background-color: var(--danger); color: white; }
+    .bg-completed   { background-color: var(--success); color: white; }
+    .bg-in-progress { background-color: var(--accent);  color: white; }
+    .bg-not-started { background-color: var(--gray);    color: white; }
+    .bg-hold        { background-color: var(--danger);  color: white; }
 
-    /* IMPROVEMENT: Enhanced footer design */
+    /* ============================================================
+       FOOTER
+       ============================================================ */
     .footer {
         background-color: #ffffff;
         border-top: 1px solid var(--border-color);
         padding: 1.5rem 0;
     }
-    
-    /* IMPROVEMENT: Themed modal for consistency */
+
+    /* ============================================================
+       MESSAGE MODAL
+       ============================================================ */
     #messageModal .modal-content {
         border-radius: var(--border-radius);
         border: none;
         box-shadow: var(--card-shadow-hover);
     }
-    #messageModal .modal-header {
-        border-bottom: 1px solid var(--border-color);
-        padding: 1rem 1.5rem;
-    }
-     #messageModal .modal-footer {
+    #messageModal .modal-header { border-bottom: 1px solid var(--border-color); padding: 1rem 1.5rem; }
+    #messageModal .modal-footer {
         border-top: 1px solid var(--border-color);
         background-color: #f7f9fc;
         padding: 0.75rem 1.5rem;
     }
-    
-    /* IMPROVEMENT: Custom select2 styles to match Bootstrap 5 */
+
+    /* ============================================================
+       SELECT2 OVERRIDES
+       ============================================================ */
     .select2-container .select2-selection--multiple {
         min-height: calc(1.5em + .75rem + 2px);
         padding: .375rem .75rem;
@@ -181,90 +629,250 @@
         line-height: 1.5;
         color: #495057;
         background-color: #fff;
-        background-clip: padding-box;
         border: 1px solid #ced4da;
         border-radius: .25rem;
-        transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
     }
-
-    /* IMPROVEMENT: Custom tag styles */
     .select2-container .select2-selection--multiple .select2-selection__choice {
-        background-color: var(--primary); /* Use your primary color for tags */
+        background-color: var(--primary);
         color: white;
         border: 1px solid var(--primary-dark);
         border-radius: .2rem;
         padding: 2px 5px;
-        font-size: 0.875rem; /* A slightly smaller font size for tags */
+        font-size: 0.875rem;
     }
-
-    /* Make the 'x' for removing a tag bigger and easier to click */
     .select2-container .select2-selection--multiple .select2-selection__choice__remove {
-        color: white;
-        font-size: 1.1em;
-        margin-right: 5px;
-        font-weight: bold;
+        color: white; font-size: 1.1em; margin-right: 5px; font-weight: bold;
     }
-    
-    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
-        color: #f8d7da;
-    }
-    
-    .select2-container--open .select2-dropdown {
-        border-color: #80bdff;
-    }
-    
-    .select2-container--default .select2-search--inline .select2-search__field {
-        color: #212529; /* Ensure the text color is readable */
-    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover { color: #f8d7da; }
+    .select2-container--open .select2-dropdown { border-color: #80bdff; }
+    .select2-container--default .select2-search--inline .select2-search__field { color: #212529; }
 
-</style>
-{% block extra_css %}{% endblock %}
+    /* ============================================================
+       RESPONSIVE — collapse nav adjustments
+       ============================================================ */
+    @media (max-width: 991.98px) {
+        .navbar-custom {
+            height: auto;
+            min-height: var(--nav-height);
+            padding: 0.6rem 1rem;
+        }
+        .navbar-custom.scrolled { height: auto; }
+
+        .navbar-collapse {
+            background: #111827;
+            border-radius: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.07);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+        }
+
+        .navbar-custom .nav-link {
+            padding: 0.6rem 1rem !important;
+            border-radius: 8px;
+            margin: 2px 0;
+        }
+        .navbar-custom .nav-link.active::after { display: none; }
+
+        .nav-divider { display: none; }
+
+        .user-dropdown-btn .user-info { display: none; }
+        .user-dropdown-btn .user-chevron { display: none; }
+
+        .navbar-nav.ms-auto {
+            flex-direction: row;
+            gap: 6px;
+            padding: 8px 4px 4px;
+            border-top: 1px solid rgba(255,255,255,0.07);
+            margin-top: 4px;
+        }
+    }
+    </style>
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-custom">
+
+    <!-- ============================================================
+         NAVBAR
+         ============================================================ -->
+    <nav class="navbar navbar-expand-lg navbar-custom" id="mainNavbar">
         <div class="container-fluid">
+
+            <!-- Brand -->
             <a class="navbar-brand" href="{% url 'tracker_index' %}">
-                <img src="{% static 'favicon.ico' %}" alt="Logo" class="navbar-logo">
-                Project Tracker
+                <div class="navbar-brand-logo-wrap">
+                    <img src="{% static 'favicon.ico' %}" alt="Logo" class="navbar-logo">
+                </div>
+                <div class="navbar-brand-text">
+                    <span class="navbar-brand-title">Project Tracker</span>
+                    <span class="navbar-brand-subtitle">Armstrong Dematic</span>
+                </div>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"><span class="navbar-toggler-icon"></span></button>
+
+            <!-- Mobile toggler -->
+            <button class="navbar-toggler ms-auto me-2 d-lg-none" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#navbarContent"
+                    aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Collapsible content -->
             <div class="collapse navbar-collapse" id="navbarContent">
-                <ul class="navbar-nav me-auto">
+
+                <!-- Primary nav links -->
+                <ul class="navbar-nav me-auto align-items-lg-center">
                     {% if user.is_authenticated %}
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_dashboard' %}active{% endif %}" href="{% url 'tracker_dashboard' %}"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_index' or request.resolver_match.url_name == 'tracker_project_detail' %}active{% endif %}" href="{% url 'tracker_index' %}"><i class="fas fa-list-ul"></i>Projects</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'project_reports' %}active{% endif %}" href="{% url 'project_reports' %}"><i class="fas fa-chart-bar"></i>Reports</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'tracker_upcoming_milestones' %}active{% endif %}" href="{% url 'tracker_upcoming_milestones' %}"><i class="fas fa-calendar-alt"></i>Upcoming Milestones</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'all_push_pull_content' %}active{% endif %}" href="{% url 'all_push_pull_content' %}"><i class="fas fa-arrows-alt-h"></i>Push-Pull Content</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'help_page' %}active{% endif %}" href="{% url 'help_page' %}"><i class="fas fa-question-circle"></i>Help</a></li>
-                        <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}"><i class="fas fa-home"></i>Home</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'tracker_dashboard' %}active{% endif %}"
+                               href="{% url 'tracker_dashboard' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Dashboard">
+                                <i class="fas fa-gauge-high nav-icon"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'tracker_index' or request.resolver_match.url_name == 'tracker_project_detail' %}active{% endif %}"
+                               href="{% url 'tracker_index' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="All Projects">
+                                <i class="fas fa-folder-open nav-icon"></i>
+                                <span>Projects</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'project_reports' %}active{% endif %}"
+                               href="{% url 'project_reports' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Reports & Analytics">
+                                <i class="fas fa-chart-bar nav-icon"></i>
+                                <span>Reports</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'tracker_upcoming_milestones' %}active{% endif %}"
+                               href="{% url 'tracker_upcoming_milestones' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Upcoming Milestones">
+                                <i class="fas fa-calendar-check nav-icon"></i>
+                                <span>Milestones</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'all_push_pull_content' %}active{% endif %}"
+                               href="{% url 'all_push_pull_content' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Push-Pull Content">
+                                <i class="fas fa-right-left nav-icon"></i>
+                                <span>Push-Pull</span>
+                            </a>
+                        </li>
+
+                        <!-- Divider -->
+                        <li class="nav-item d-none d-lg-flex align-items-center">
+                            <div class="nav-divider"></div>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'help_page' %}active{% endif %}"
+                               href="{% url 'help_page' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Help & Documentation">
+                                <i class="fas fa-circle-question nav-icon"></i>
+                                <span>Help</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+                               href="{% url 'home' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Home Portal">
+                                <i class="fas fa-house nav-icon"></i>
+                                <span>Home</span>
+                            </a>
+                        </li>
                     {% endif %}
                 </ul>
 
-                <ul class="navbar-nav">
+                <!-- Right-side controls -->
+                <ul class="navbar-nav ms-auto align-items-lg-center" style="gap: 6px;">
                     {% if user.is_authenticated %}
+
+                        <!-- User dropdown -->
                         <li class="nav-item dropdown user-dropdown">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown"><div class="user-avatar me-2">{{ user.username|slice:":1"|upper }}</div><span>{{ user.get_full_name|default:user.username }}</span></a>
+                            <a class="nav-link user-dropdown-btn dropdown-toggle"
+                               href="#" role="button" data-bs-toggle="dropdown"
+                               aria-expanded="false">
+                                <div class="user-avatar">{{ user.username|slice:":1"|upper }}</div>
+                                <div class="user-info d-none d-lg-flex">
+                                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                                    <span class="user-role">{% if user.is_staff %}Administrator{% else %}Member{% endif %}</span>
+                                </div>
+                                <i class="fas fa-chevron-down user-chevron d-none d-lg-block"></i>
+                            </a>
+
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
-                                {% if user.is_staff %}<li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="fas fa-user-shield me-2"></i>Admin</a></li>{% endif %}
-                                <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                                <!-- User info header -->
+                                <li>
+                                    <div class="dropdown-user-header">
+                                        <div class="duh-name">{{ user.get_full_name|default:user.username }}</div>
+                                        <div class="duh-email">{{ user.email|default:"No email set" }}</div>
+                                    </div>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#">
+                                        <i class="fas fa-user"></i> My Profile
+                                    </a>
+                                </li>
+                                {% if user.is_staff %}
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'admin:index' %}">
+                                        <i class="fas fa-shield-halved"></i> Admin Panel
+                                    </a>
+                                </li>
+                                {% endif %}
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'tracker_dashboard' %}">
+                                        <i class="fas fa-gauge-high"></i> My Dashboard
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'tracker_index' %}?my=1">
+                                        <i class="fas fa-folder-open"></i> My Projects
+                                    </a>
+                                </li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><form action="{% url 'tracker_logout' %}" method="post" style="display: inline;">{% csrf_token %}<button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt me-2"></i>Logout</button></form></li>
+                                <li>
+                                    <form action="{% url 'tracker_logout' %}" method="post" style="display:contents;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item-logout">
+                                            <i class="fas fa-arrow-right-from-bracket"></i> Sign Out
+                                        </button>
+                                    </form>
+                                </li>
                             </ul>
                         </li>
+
                     {% else %}
-                        <li class="nav-item"><a class="nav-link" href="{% url 'tracker_login' %}"><i class="fas fa-sign-in-alt"></i>Login</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'tracker_signup' %}"><i class="fas fa-user-plus"></i>Register</a></li>
+                        <!-- Unauthenticated -->
+                        <li class="nav-item">
+                            <a class="nav-link btn-nav-login" href="{% url 'tracker_login' %}">
+                                <i class="fas fa-right-to-bracket"></i> Sign In
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link btn-nav-register" href="{% url 'tracker_signup' %}">
+                                <i class="fas fa-user-plus"></i> Register
+                            </a>
+                        </li>
                     {% endif %}
                 </ul>
-            </div>
-        </div>
+
+            </div><!-- /.navbar-collapse -->
+        </div><!-- /.container-fluid -->
     </nav>
-    
+
+    <!-- ============================================================
+         MAIN CONTENT
+         ============================================================ -->
     <div class="container-fluid main-container">
         {% if messages %}
-            <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+            <div class="modal fade" id="messageModal" tabindex="-1"
+                 aria-labelledby="messageModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         {% for message in messages %}
@@ -272,11 +880,11 @@
                             <div class="modal-header">
                                 <h5 class="modal-title" id="messageModalLabel">
                                     {% if 'success' in message.tags %}
-                                        <i class="fas fa-check-circle text-success me-2"></i>Success
+                                        <i class="fas fa-circle-check text-success me-2"></i>Success
                                     {% elif 'error' in message.tags %}
-                                        <i class="fas fa-times-circle text-danger me-2"></i>Error
+                                        <i class="fas fa-circle-xmark text-danger me-2"></i>Error
                                     {% else %}
-                                        <i class="fas fa-info-circle text-info me-2"></i>Notification
+                                        <i class="fas fa-circle-info text-info me-2"></i>Notification
                                     {% endif %}
                                 </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -297,15 +905,24 @@
                 </div>
             </div>
         {% endif %}
+
         {% block content %}{% endblock %}
     </div>
 
+    <!-- ============================================================
+         FOOTER
+         ============================================================ -->
     <footer class="footer mt-auto py-3">
         <div class="container-fluid text-center">
-            <span class="text-muted">Project Tracker &copy; {% now "Y" %} | A comprehensive project management solution</span>
+            <span class="text-muted small">
+                Project Tracker &copy; {% now "Y" %} &nbsp;|&nbsp; Armstrong Dematic &nbsp;|&nbsp; A comprehensive project management solution
+            </span>
         </div>
     </footer>
 
+    <!-- ============================================================
+         SCRIPTS
+         ============================================================ -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -313,29 +930,52 @@
     {% block scripts %}{% endblock %}
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script>
-        // Scroll restoration script
-        if (history.scrollRestoration) { history.scrollRestoration = 'manual'; }
-        document.addEventListener("DOMContentLoaded", function(event) { 
-            var scrollpos = sessionStorage.getItem('scrollpos');
-            var scrollpath = sessionStorage.getItem('scrollpath');
-            if (scrollpos && scrollpath === window.location.pathname) {
-                window.scrollTo(0, parseInt(scrollpos));
-            }
-            sessionStorage.removeItem('scrollpos');
-            sessionStorage.removeItem('scrollpath');
-        });
-        window.addEventListener("beforeunload", function(e) {
-            sessionStorage.setItem('scrollpos', window.scrollY);
-            sessionStorage.setItem('scrollpath', window.location.pathname);
-        });
 
-        // Script to automatically trigger the message modal
-        var messageModalElement = document.getElementById('messageModal');
-        if (messageModalElement) {
-            var messageModal = new bootstrap.Modal(messageModalElement);
-            messageModal.show();
+    <script>
+    // ── Scroll restoration ──────────────────────────────────────────
+    if (history.scrollRestoration) { history.scrollRestoration = 'manual'; }
+    document.addEventListener("DOMContentLoaded", function () {
+        var scrollpos  = sessionStorage.getItem('scrollpos');
+        var scrollpath = sessionStorage.getItem('scrollpath');
+        if (scrollpos && scrollpath === window.location.pathname) {
+            window.scrollTo(0, parseInt(scrollpos));
         }
+        sessionStorage.removeItem('scrollpos');
+        sessionStorage.removeItem('scrollpath');
+    });
+    window.addEventListener("beforeunload", function () {
+        sessionStorage.setItem('scrollpos',  window.scrollY);
+        sessionStorage.setItem('scrollpath', window.location.pathname);
+    });
+
+    // ── Auto-show message modal ─────────────────────────────────────
+    var messageModalEl = document.getElementById('messageModal');
+    if (messageModalEl) {
+        new bootstrap.Modal(messageModalEl).show();
+    }
+
+    // ── Navbar shrink on scroll ─────────────────────────────────────
+    (function () {
+        var navbar = document.getElementById('mainNavbar');
+        if (!navbar) return;
+        var onScroll = function () {
+            if (window.scrollY > 20) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll(); // run once on load
+    })();
+
+    // ── Bootstrap tooltips ─────────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", function () {
+        var tooltipEls = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipEls.forEach(function (el) {
+            new bootstrap.Tooltip(el, { trigger: 'hover' });
+        });
+    });
     </script>
 </body>
 </html>
