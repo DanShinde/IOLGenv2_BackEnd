@@ -73,11 +73,13 @@ def signup_view(request):
 
 @login_required
 def index(request):
-    projects = Project.objects.select_related('segment_con').all()
+    show_archived = request.GET.get('archived') == '1'
+    projects = Project.objects.filter(is_archived=show_archived).select_related('segment_con').all()
     context = {
         'projects': projects,
         'all_segments': trackerSegment.objects.all(),
-        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD')
+        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD'),
+        'show_archived': show_archived
     }
     return render(request, 'tracker/index.html', context)
 
@@ -362,6 +364,16 @@ def delete_project(request, project_id):
     return redirect('tracker_index')
 
 @login_required
+def toggle_archive_project(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if request.method == 'POST':
+        project.is_archived = not project.is_archived
+        project.save()
+        status_str = "archived" if project.is_archived else "unarchived"
+        messages.success(request, f"Project '{project.code}' has been {status_str}.")
+    return redirect('tracker_project_detail', project_id=project.id)
+
+@login_required
 def edit_remark(request, remark_id):
     remark = get_object_or_404(StageRemark, pk=remark_id)
     project_id = remark.stage.project.id
@@ -435,8 +447,10 @@ def dashboard(request):
         label, start_date, end_date = period_map[period]
         display_period = label
 
-    completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
-    live_projects = Project.objects.filter(
+    completed_early_ids = Project.objects.filter(
+        is_archived=False, stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date
+    ).values_list('id', flat=True)
+    live_projects = Project.objects.filter(is_archived=False).filter(
         Q(so_punch_date__lte=end_date) | Q(so_punch_date__isnull=True)
     ).exclude(id__in=completed_early_ids).select_related('segment_con', 'team_lead').prefetch_related('stages').distinct()
 
@@ -450,12 +464,13 @@ def dashboard(request):
     # NEW, ROBUST QUERY
     # 1. First, get the IDs of all projects that are genuinely completed.
     completed_project_ids = Project.objects.filter(
+        is_archived=False,
         stages__name='Handover',
         stages__status='Completed'
     ).values_list('id', flat=True)
 
     # 2. Then, find projects that are older than the cutoff AND are NOT in the completed list.
-    chronic_projects = Project.objects.exclude(
+    chronic_projects = Project.objects.filter(is_archived=False).exclude(
         id__in=completed_project_ids
     ).filter(
         so_punch_date__lt=chronic_cutoff_date
@@ -613,7 +628,7 @@ def project_reports(request):
     query_params = request.GET or request.session.get('report_filters', {})
     
     # --- The FIX is in this line: We add select_related and prefetch_related ---
-    projects_qs = Project.objects.select_related('segment_con', 'team_lead').prefetch_related('stages').all()
+    projects_qs = Project.objects.filter(is_archived=False).select_related('segment_con', 'team_lead').prefetch_related('stages').all()
 
     # --- Dynamic Financial Year Logic (Same as Dashboard) ---
     today = timezone.now().date()
@@ -663,6 +678,7 @@ def project_reports(request):
         # Match Dashboard Logic: Live Projects in Period (Carry-over + New)
         # 1. Exclude projects completed before the start of the FY
         completed_early_ids = Project.objects.filter(
+            is_archived=False,
             stages__name='Handover', 
             stages__status='Completed', 
             stages__actual_date__lt=fy_start
@@ -737,6 +753,7 @@ def project_reports(request):
     hide_completed = query_params.get('hide_completed') == '1'
     if hide_completed:
         completed_project_ids = Project.objects.filter(
+            is_archived=False,
             stages__name='Handover',
             stages__status='Completed'
         ).values_list('id', flat=True)
@@ -1096,19 +1113,22 @@ def get_filtered_stages(filter_type):
 
     if filter_type == 'overdue':
         return Stage.objects.filter(
+            project__is_archived=False,
             status__in=["Not started", "In Progress"],
             planned_date__lt=today
         ).order_by('planned_date')
     elif filter_type in date_ranges:
         start, end = date_ranges[filter_type]
         return Stage.objects.filter(
+            project__is_archived=False,
             status__in=["Not started", "In Progress"],
             planned_date__range=(start, end)
         ).order_by('planned_date')
     elif filter_type == 'all':
-        return Stage.objects.exclude(status__in=["Completed", "Not Applicable"]).order_by('planned_date')
+        return Stage.objects.filter(project__is_archived=False).exclude(status__in=["Completed", "Not Applicable"]).order_by('planned_date')
     else:
         return Stage.objects.filter(
+            project__is_archived=False,
             status__in=["Not started", "In Progress"],
             planned_date__gte=today
         ).order_by('planned_date')
@@ -1182,7 +1202,7 @@ def export_milestones_pdf(request):
 
 @login_required
 def export_report_pdf(request):
-    projects = Project.objects.select_related('segment_con').prefetch_related('stages').all()
+    projects = Project.objects.filter(is_archived=False).select_related('segment_con').prefetch_related('stages').all()
     selected_segment_ids = request.GET.getlist('segments')
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
@@ -1226,6 +1246,7 @@ def export_report_pdf(request):
     # --- NEW: Hide Completed Logic for PDF ---
     if request.GET.get('hide_completed') == '1':
         completed_project_ids = Project.objects.filter(
+            is_archived=False,
             stages__name='Handover',
             stages__status='Completed'
         ).values_list('id', flat=True)
@@ -1554,7 +1575,7 @@ def all_push_pull_content(request, filter=None):
 
 
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1619,7 +1640,7 @@ def add_contact_person_ajax(request):
 
 @login_required
 def export_push_pull_excel(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
     filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
 
     if filter == 'project':
@@ -1703,7 +1724,7 @@ def export_push_pull_excel(request):
 
 @login_required
 def export_push_pull_pdf(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
     filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
 
     if filter == 'project':
@@ -1817,7 +1838,7 @@ def send_push_pull_email(request):
     push_pull_filter = request.GET.get('push_pull_filter', request.session.get('pp_type_filter', 'all'))
 
     # 2. Filter the updates
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -2114,7 +2135,7 @@ def public_push_pull_content(request, access_token):
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all')
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')

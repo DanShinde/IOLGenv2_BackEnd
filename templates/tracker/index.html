@@ -9,12 +9,17 @@
 <div class="page-header">
     <div class="d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="page-title"><i class="fas fa-list-ul me-2"></i>All Projects</h1>
+            <h1 class="page-title"><i class="fas fa-list-ul me-2"></i>{% if show_archived %}Archived Projects{% else %}All Projects{% endif %}</h1>
             <p class="page-subtitle">Manage your entire project portfolio</p>
         </div>
-        <a href="{% url 'tracker_new_project' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i>Add New Project
-        </a>
+        <div class="d-flex gap-2">
+            <a href="?archived={% if show_archived %}0{% else %}1{% endif %}" class="btn btn-outline-secondary">
+                <i class="fas fa-archive me-2"></i>{% if show_archived %}View Active{% else %}View Archived{% endif %}
+            </a>
+            <a href="{% url 'tracker_new_project' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Add New Project
+            </a>
+        </div>
     </div>
 </div>
 

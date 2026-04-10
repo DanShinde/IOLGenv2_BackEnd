@@ -388,7 +388,11 @@
 <div class="page-header">
     <div class="d-flex justify-content-between align-items-center mb-2">
         <div>
-            <h1 class="page-title">{{ project.code }} - {{ project.customer_name }}</h1>
+            <h1 class="page-title">{{ project.code }} - {{ project.customer_name }}
+                {% if project.is_archived %}
+                    <span class="badge bg-secondary ms-2 align-middle fs-6">ARCHIVED</span>
+                {% endif %}
+            </h1>
             <p class="page-subtitle">{{project.segment_con.name|default:'No Segment'}}</p>
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -401,6 +405,23 @@
                 <i class="fas fa-chart-bar me-2"></i>Activity Planner
             </button>
             {% endif %}
+            
+            {% if project.is_archived %}
+                <form method="POST" action="{% url 'toggle_archive_project' project.id %}" class="d-inline d-print-none">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-success" onclick="return confirm('Are you sure you want to unarchive this project?');">
+                        <i class="fas fa-box-open me-2"></i>Unarchive
+                    </button>
+                </form>
+            {% elif overall_status == 'Completed' %}
+                <form method="POST" action="{% url 'toggle_archive_project' project.id %}" class="d-inline d-print-none">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-warning" onclick="return confirm('Are you sure you want to archive this project? It will be hidden from active reports.');">
+                        <i class="fas fa-archive me-2"></i>Archive
+                    </button>
+                </form>
+            {% endif %}
+
             <button type="button" class="btn btn-outline-secondary d-none d-md-inline-block" onclick="window.print()">
                 <i class="fas fa-print me-2"></i>Print
             </button>
