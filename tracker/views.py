@@ -1732,8 +1732,8 @@ def export_push_pull_pdf(request):
     updates = updates_qs.all()
 
     buffer = BytesIO()
-    # Use portrait A4 for a list-style report
-    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    # Use landscape A4 for higher width capacity in a list-style report
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
     elements = []
     styles = getSampleStyleSheet()
 

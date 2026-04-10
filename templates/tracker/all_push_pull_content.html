@@ -15,6 +15,7 @@
             {% if not is_public_view %}
                 <a href="{% url 'export_push_pull_excel' %}?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-outline-success"><i class="fas fa-file-excel me-2"></i>Export to Excel</a>
                 <a href="{% url 'export_push_pull_pdf' %}?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Export to PDF</a>
+                <button type="button" class="btn btn-outline-secondary d-none d-md-inline-block" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
 
                 <a href="{% url 'send_push_pull_email' %}?filter={{ filter|default:'all' }}&status_filter={{ status_filter|default:'all' }}&push_pull_filter={{ push_pull_filter|default:'all' }}" class="btn btn-outline-primary" onclick="return confirm('Are you sure you want to send email to all recipients in the list?');"><i class="fas fa-envelope me-2"></i>Send Email</a>
 
@@ -32,7 +33,7 @@
 
 
 {% if not is_public_view %}
-<div class="card mb-4">
+<div class="card mb-4 d-print-none">
     <div class="card-header"><h5 class="card-header-title"><i class="fas fa-plus-circle me-2"></i>Add Push-Pull Content</h5></div>
     <div class="card-body">
         <form action="{% url 'add_general_update' %}" method="post" class="p-3 bg-light rounded">
@@ -102,7 +103,7 @@
     </div>
 
     <div class="card-body">
-        <div class="d-flex flex-wrap gap-3 mb-4">
+        <div class="d-flex flex-wrap gap-3 mb-4 d-print-none">
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small fw-bold">Category:</span>
                 <ul class="nav nav-pills nav-sm">
@@ -165,11 +166,11 @@
                         <th style="width: 10%;">Status</th>
                         <th style="width: 15%;">Remarks</th>
                         {% if not is_public_view %}
-                        <th style="width: 5%;">Actions</th>
+                        <th style="width: 5%;" class="d-print-none">Actions</th>
                         {% endif %}
                     </tr>
                     <!-- Filter Row -->
-                    <tr class="filter-row bg-light">
+                    <tr class="filter-row bg-light d-print-none">
                         <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="0" placeholder="Filter..." style="font-size: 0.75rem;"></th>
                         <th class="p-2">
                             <select class="form-select form-select-sm filter-input shadow-none border" data-col="1" style="font-size: 0.75rem;">
@@ -190,9 +191,9 @@
                                 <option value="closed">Closed</option>
                             </select>
                         </th>
-                        <th class="p-2"></th>
+                        <th class="p-2 d-print-none"></th>
                         {% if not is_public_view %}
-                        <th class="p-2"></th>
+                        <th class="p-2 d-print-none"></th>
                         {% endif %}
                     </tr>
                 </thead>
@@ -371,7 +372,7 @@
                                 </ul>
                             {% endif %}
                             
-                            <form action="{% if is_public_view %}{% else %}{% url 'add_update_remark' update.id %}{% endif %}" method="post" class="d-flex gap-1">
+                            <form action="{% if is_public_view %}{% else %}{% url 'add_update_remark' update.id %}{% endif %}" method="post" class="d-flex gap-1 d-print-none">
                                 {% csrf_token %}
                                 {% if is_public_view %}
                                     <input type="hidden" name="update_id" value="{{ update.id }}">
@@ -386,7 +387,7 @@
                         </td>
 
                         {% if not is_public_view %}
-                        <td class="text-center">
+                        <td class="text-center d-print-none">
                             {% if user == update.author or user.is_staff %}
                                 <form action="{% url 'delete_project_update' update.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this item?');">
                                     {% csrf_token %}
@@ -487,6 +488,20 @@
         background-color: rgba(67, 56, 202, 0.1) !important;
         border-radius: 50%;
         color: #312e81 !important;
+    }
+
+    /* Print Styles to maximize page capacity (Landscape) */
+    @media print {
+        @page { size: landscape; margin: 1cm; }
+        body { background: white !important; margin: 0; padding: 0; }
+        .navbar, .sidebar, .page-header .btn, .d-print-none { display: none !important; }
+        .card { border: none !important; box-shadow: none !important; margin: 0 !important; }
+        .card-header { padding: 0 0 10px 0 !important; border-bottom: 2px solid #000 !important; }
+        .table { width: 100% !important; margin: 0 !important; }
+        .table-responsive { overflow: visible !important; }
+        /* Clean up inline inputs to display as flat text for print */
+        select, input, textarea { border: none !important; background: transparent !important; appearance: none; -moz-appearance: none; -webkit-appearance: none; }
+        .select2-container--bootstrap-5 .select2-selection__choice__remove { display: none !important; }
     }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>

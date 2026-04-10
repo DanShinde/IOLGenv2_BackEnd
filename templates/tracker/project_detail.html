@@ -361,6 +361,24 @@
         font-weight: 600;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+
+    /* Print Styles */
+    @media print {
+        @page { size: landscape; margin: 1cm; }
+        body { background: white !important; margin: 0; padding: 0; }
+        .navbar, .sidebar, .btn, .d-print-none { display: none !important; }
+        .nav-tabs { display: none !important; }
+        /* Make all tabs visible so everything prints */
+        .tab-content > .tab-pane { display: block !important; opacity: 1 !important; visibility: visible !important; margin-bottom: 20px; }
+        .card { border: none !important; box-shadow: none !important; margin-bottom: 15px !important; page-break-inside: avoid; }
+        .card-header { padding: 0 0 10px 0 !important; border-bottom: 2px solid #000 !important; background: transparent !important; }
+        .table-responsive { overflow: visible !important; }
+        /* Clean up inline inputs */
+        select, input, textarea { border: none !important; background: transparent !important; appearance: none; -moz-appearance: none; -webkit-appearance: none; padding: 0; margin: 0; }
+        .select2-container--bootstrap-5 .select2-selection__choice__remove { display: none !important; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .project-notes-feed { max-height: none !important; overflow: visible !important; border: none !important; padding: 0 !important; }
+    }
 </style>
 {% endblock %}
 
@@ -383,6 +401,9 @@
                 <i class="fas fa-chart-bar me-2"></i>Activity Planner
             </button>
             {% endif %}
+            <button type="button" class="btn btn-outline-secondary d-none d-md-inline-block" onclick="window.print()">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
             <a href="{% url 'tracker_edit_project' project.id %}" class="btn btn-outline-secondary">
                 <i class="fas fa-edit me-2"></i>Edit Project
             </a>
@@ -568,9 +589,10 @@
         </ul>
         <div class="tab-content" id="stageTabsContent">
             <div class="tab-pane fade {% if request.GET.active_tab != 'emulation' %}show active{% endif %}" id="automation-content" role="tabpanel">
+                <h4 class="d-none d-print-block mb-3">Automation Stages</h4>
                 <form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="automationStagesForm">
                     {% csrf_token %}<input type="hidden" name="active_tab" value="automation">
-                    <div class="d-flex justify-content-end align-items-center mb-3">
+                    <div class="d-flex justify-content-end align-items-center mb-3 d-print-none">
 
                             <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#allRemarksModalAutomation">
                                 <i class="fas fa-comments me-1"></i> View All Remarks
@@ -579,7 +601,7 @@
                         <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
                     </div>
 
-                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%" class="d-print-none">Actions</th></tr></thead><tbody>
 
                         {% for stage in automation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
@@ -611,7 +633,7 @@
                             <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
 
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
-                            <td>
+                            <td class="d-print-none">
                                 <div class="d-flex align-items-center">
                                     <span class="autosave-indicator" id="autosave-indicator-{{ stage.id }}"></span>
                                     <div class="dropdown">
@@ -632,9 +654,10 @@
                 </form>
             </div>
             <div class="tab-pane fade {% if request.GET.active_tab == 'emulation' %}show active{% endif %}" id="emulation-content" role="tabpanel">
+                <h4 class="d-none d-print-block mb-3">Emulation Stages</h4>
                 <form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="emulationStagesForm">
                     {% csrf_token %}<input type="hidden" name="active_tab" value="emulation">
-                    <div class="d-flex justify-content-end align-items-center mb-3">
+                    <div class="d-flex justify-content-end align-items-center mb-3 d-print-none">
 
                             <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#allRemarksModalEmulation">
                                 <i class="fas fa-comments me-1"></i> View All Remarks
@@ -643,7 +666,7 @@
                         <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
                     </div>
 
-                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%">Actions</th></tr></thead><tbody>
+                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%" class="d-print-none">Actions</th></tr></thead><tbody>
 
                         {% for stage in emulation_stages %}
                         <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
@@ -675,7 +698,7 @@
                             <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
 
                             <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
-                            <td>
+                            <td class="d-print-none">
                                 <div class="d-flex align-items-center">
                                     <span class="autosave-indicator" id="autosave-indicator-{{ stage.id }}"></span>
                                     <div class="dropdown">
@@ -721,10 +744,11 @@
         <div class="tab-content" id="notesPushPullTabsContent">
             <!-- Project Notes Tab -->
             <div class="tab-pane fade {% if request.GET.bottom_tab != 'push_pull' %}show active{% endif %}" id="notes-content" role="tabpanel" aria-labelledby="notes-tab">
+                <h4 class="d-none d-print-block mb-3">Project Notes</h4>
                 <div class="p-3 bg-light">
                     <div class="project-notes-feed">
                         {% if total_comments_count > initial_comments_limit %}
-                        <div class="text-center mb-3" id="load-more-container">
+                        <div class="text-center mb-3 d-print-none" id="load-more-container">
                             <button class="btn btn-sm btn-outline-primary rounded-pill px-3" id="load-more-comments">
                                 <i class="fas fa-history me-1"></i> Load Older Notes
                             </button>
@@ -742,7 +766,7 @@
                             </div>
                         {% endif %}
                     </div>
-                    <form method="POST" action="{% url 'tracker_project_detail' project.id %}">
+                    <form method="POST" action="{% url 'tracker_project_detail' project.id %}" class="d-print-none">
                         {% csrf_token %}
                         <input type="hidden" name="active_tab" value="{{ request.GET.active_tab|default:'automation' }}">
                         <div class="d-flex gap-2">
@@ -755,6 +779,7 @@
 
             <!-- Push-Pull Contents Tab -->
             <div class="tab-pane fade {% if request.GET.bottom_tab == 'push_pull' %}show active{% endif %}" id="push-pull-content" role="tabpanel" aria-labelledby="push-pull-tab">
+                <h4 class="d-none d-print-block mb-3">Push-Pull Contents</h4>
                 <div class="table-responsive">
                     <table class="table loop-table mb-0">
                         <thead class="bg-light">
@@ -765,10 +790,10 @@
                                 <th style="width: 15%;">Raised By</th>
                                 <th style="width: 10%;">WHEN</th>
                                 <th style="width: 10%;">Status</th>
-                                <th style="width: 10%;"></th>
+                                <th style="width: 10%;" class="d-print-none"></th>
                             </tr>
                             <!-- Filter Row -->
-                            <tr class="filter-row bg-light">
+                            <tr class="filter-row bg-light d-print-none">
                                 <th class="p-2">
                                     <select class="form-select form-select-sm filter-input shadow-none border" data-col="0" style="font-size: 0.75rem;">
                                         <option value="">All</option>
@@ -826,7 +851,7 @@
                                         <span class="badge {% if update.status == 'Closed' %}bg-success{% else %}bg-secondary{% endif %}">{{ update.status }}</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-end">
+                                <td class="text-end d-print-none">
                                     <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-bs-toggle="modal" data-bs-target="#editUpdateModal{{ update.id }}" title="Edit"><i class="fas fa-edit"></i></button>
                                     <button type="button" class="btn btn-sm btn-link text-primary p-0 me-3" data-bs-toggle="modal" data-bs-target="#localUpdateRemarksModal{{ update.id }}" title="View Details"><i class="fas fa-eye"></i></button>
                                     <a href="{% url 'delete_project_update' update.id %}" class="btn btn-sm btn-link text-danger p-0" title="Delete" onclick="return confirm('Are you sure you want to delete this item?');"><i class="far fa-trash-alt"></i></a>
@@ -877,7 +902,7 @@
                 <form id="new-update-form" action="{% url 'add_project_update' project.id %}" method="post" style="display:none;">
                     {% csrf_token %}
                 </form>
-                <div class="p-2 border-top">
+                <div class="p-2 border-top d-print-none">
                     <button class="btn btn-sm btn-light text-primary fw-bold" onclick="document.getElementById('new-update-row').style.display = 'table-row'; this.style.display='none';">
                         <i class="fas fa-plus me-1"></i> Add Row
                     </button>
