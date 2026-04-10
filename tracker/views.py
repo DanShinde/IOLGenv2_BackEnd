@@ -74,7 +74,7 @@ def signup_view(request):
 @login_required
 def index(request):
     show_archived = request.GET.get('archived') == '1'
-    projects = Project.objects.filter(is_archived=show_archived).select_related('segment_con').all()
+    projects = Project.objects.filter(is_archived=show_archived).select_related('segment_con').prefetch_related('stages').all()
     context = {
         'projects': projects,
         'all_segments': trackerSegment.objects.all(),

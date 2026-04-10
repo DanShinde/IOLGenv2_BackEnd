@@ -40,6 +40,8 @@
                         <th>Segment</th>
                         <th>Value in Cr.</th>
                         <th>SO Punch Date</th>
+                        <th>Automation Stage</th>
+                        <th>Emulation Stage</th>
                         <th>Status</th>
                         <th>Progress</th>
                         <th>Actions</th>
@@ -50,6 +52,8 @@
                         <th><input type="text" class="form-control form-control-sm" placeholder="Filter Segment..." onkeyup="filterTable(this)"></th>
                         <th></th> {# No filter for Value #}
                         <th></th> {# No filter for Date #}
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Auto..." onkeyup="filterTable(this)"></th>
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Emu..." onkeyup="filterTable(this)"></th>
                         <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterTable(this)"></th>
                         <th></th> {# No filter for Progress #}
                         <th></th> {# No filter for Actions #}
@@ -63,6 +67,8 @@
                         <td>{{ project.segment_con.name|default:'N/A' }}</td>
                         <td>₹{{ project.value|floatformat:2|intcomma }}</td>
                         <td>{{ project.so_punch_date|date:"M d, Y" }}</td>
+                        <td><small class="fw-semibold text-secondary">{{ project.get_current_automation_stage }}</small></td>
+                        <td><small class="fw-semibold text-secondary">{{ project.get_current_emulation_stage }}</small></td>
                         <td>
                             <span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span>
                         </td>
@@ -92,7 +98,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-5">
+                        <td colspan="10" class="text-center py-5">
                              <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
                              <p class="text-muted">No projects found. <a href="{% url 'tracker_new_project' %}">Add your first project!</a></p>
                         </td>

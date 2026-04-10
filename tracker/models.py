@@ -75,6 +75,22 @@ class Project(models.Model):
         else:
             return 'Not started'  # fallback
 
+    def get_current_automation_stage(self):
+        stages = [s for s in self.stages.all() if s.stage_type == 'Automation']
+        stages.sort(key=lambda x: x.id)
+        for stage in stages:
+            if stage.status not in ['Completed', 'Not Applicable']:
+                return stage.name
+        return "Completed" if stages else "N/A"
+
+    def get_current_emulation_stage(self):
+        stages = [s for s in self.stages.all() if s.stage_type == 'Emulation']
+        stages.sort(key=lambda x: x.id)
+        for stage in stages:
+            if stage.status not in ['Completed', 'Not Applicable']:
+                return stage.name
+        return "Completed" if stages else "N/A"
+
 
     @property
     def get_schedule_status(self):
