@@ -724,6 +724,14 @@
                 <ul class="navbar-nav me-auto align-items-lg-center">
                     {% if user.is_authenticated %}
                         <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+                               href="{% url 'home' %}"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Home Portal">
+                                <i class="fas fa-house nav-icon"></i>
+                                <span>Home</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'tracker_dashboard' %}active{% endif %}"
                                href="{% url 'tracker_dashboard' %}"
                                data-bs-toggle="tooltip" data-bs-placement="bottom" title="Dashboard">
@@ -775,14 +783,6 @@
                                data-bs-toggle="tooltip" data-bs-placement="bottom" title="Help & Documentation">
                                 <i class="fas fa-circle-question nav-icon"></i>
                                 <span>Help</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
-                               href="{% url 'home' %}"
-                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Home Portal">
-                                <i class="fas fa-house nav-icon"></i>
-                                <span>Home</span>
                             </a>
                         </li>
                     {% endif %}
