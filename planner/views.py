@@ -866,12 +866,29 @@ def resource_availability_report_view(request):
     """
     today = date.today()
 
-    try:
-        days = int(request.GET.get('days', 30))
-    except (TypeError, ValueError):
-        days = 30
-    days = max(1, min(days, 365))
-    period_end = today + timedelta(days=days - 1)
+    # A custom date range (both ends provided and valid) takes precedence over the quick
+    # look-ahead window, and unlike that window it isn't anchored to today — it can be a
+    # past or future range, so availability can be checked for any period.
+    custom_start = parse_date(request.GET.get('start_date', '') or '')
+    custom_end = parse_date(request.GET.get('end_date', '') or '')
+    use_custom_range = bool(custom_start and custom_end and custom_start <= custom_end)
+
+    if use_custom_range:
+        period_start = custom_start
+        period_end = custom_end
+        if (period_end - period_start).days + 1 > 366:
+            period_end = period_start + timedelta(days=365)
+        days = (period_end - period_start).days + 1
+    else:
+        custom_start = None
+        custom_end = None
+        try:
+            days = int(request.GET.get('days', 30))
+        except (TypeError, ValueError):
+            days = 30
+        days = max(1, min(days, 365))
+        period_start = today
+        period_end = period_start + timedelta(days=days - 1)
 
     try:
         top_n = int(request.GET.get('top_n', 10))
@@ -880,22 +897,26 @@ def resource_availability_report_view(request):
     top_n = max(1, min(top_n, 100))
 
     selected_designation = request.GET.get('designation', '')
+    selected_assignee_ids = [v for v in request.GET.getlist('assignee') if v]
 
     holidays = list(Holiday.objects.values_list('date', flat=True))
     holidays_set = set(holidays)
-    total_working_days = count_working_days(today, period_end, holidays) or 0
+    total_working_days = count_working_days(period_start, period_end, holidays) or 0
 
-    employees_qs = Employee.objects.filter(is_active=True).exclude(name__startswith='Unassigned')
+    all_assignable_employees = Employee.objects.filter(is_active=True).exclude(name__startswith='Unassigned').order_by('name')
+
+    employees_qs = all_assignable_employees
     if selected_designation:
         employees_qs = employees_qs.filter(designation=selected_designation)
-    employees_qs = employees_qs.order_by('name')
+    if selected_assignee_ids:
+        employees_qs = employees_qs.filter(pk__in=selected_assignee_ids)
 
     # Non-completed activities for these employees whose date range overlaps the window.
     activities = Activity.objects.filter(
         assignee__in=employees_qs,
         is_completed=False,
         start_date__lte=period_end,
-        end_date__gte=today,
+        end_date__gte=period_start,
     ).select_related('project', 'assignee').order_by('start_date')
 
     activities_by_employee = defaultdict(list)
@@ -906,7 +927,7 @@ def resource_availability_report_view(request):
 
         # Only count the portion of the activity that actually falls inside the window,
         # and de-duplicate days covered by more than one overlapping activity.
-        seg_start = max(act.start_date, today)
+        seg_start = max(act.start_date, period_start)
         seg_end = min(act.end_date, period_end)
         current_date = seg_start
         while current_date <= seg_end:
@@ -918,12 +939,21 @@ def resource_availability_report_view(request):
     for emp in employees_qs:
         occupied_days = len(occupied_days_by_employee.get(emp.id, ()))
         occupancy_pct = round((occupied_days / total_working_days) * 100, 1) if total_working_days else 0
+
+        # Group this resource's tasks by project (each project links back to its planner page).
+        emp_activities = sorted(activities_by_employee.get(emp.id, []), key=lambda a: a.start_date)
+        project_groups = OrderedDict()
+        for act in emp_activities:
+            group = project_groups.setdefault(act.project_id, {'project': act.project, 'tasks': []})
+            group['tasks'].append(act)
+
         resources.append({
             'employee': emp,
             'occupied_days': occupied_days,
             'available_days': max(0, total_working_days - occupied_days),
             'occupancy_pct': occupancy_pct,
-            'activities': sorted(activities_by_employee.get(emp.id, []), key=lambda a: a.start_date),
+            'project_groups': list(project_groups.values()),
+            'task_count': len(emp_activities),
         })
 
     most_occupied = sorted(resources, key=lambda r: (-r['occupancy_pct'], r['employee'].name))[:top_n]
@@ -932,13 +962,19 @@ def resource_availability_report_view(request):
     context = {
         'active_nav': 'resource_report',
         'today': today,
+        'period_start': period_start,
         'period_end': period_end,
         'days': days,
+        'use_custom_range': use_custom_range,
+        'custom_start': custom_start,
+        'custom_end': custom_end,
         'top_n': top_n,
         'total_working_days': total_working_days,
         'total_resources': employees_qs.count(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
         'selected_designation': selected_designation,
+        'all_assignable_employees': all_assignable_employees,
+        'selected_assignee_ids': selected_assignee_ids,
         'most_available': most_available,
         'most_occupied': most_occupied,
     }
