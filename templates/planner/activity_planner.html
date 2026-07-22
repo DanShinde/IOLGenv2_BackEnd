@@ -84,18 +84,70 @@
         border-bottom: 1px solid #818cf8;
     }
 
-    .col-project    { width: 100px; min-width: 100px; max-width: 100px; left: 0px; }
-    .col-activity   { width: 180px; min-width: 180px; max-width: 180px; left: 100px; }
-    .col-assignee   { width: 100px; min-width: 100px; max-width: 100px; left: 280px; text-align: center; }
-    .col-start      { width: 60px;  min-width: 60px;  max-width: 60px;  left: 380px; }
-    .col-end        { width: 60px;  min-width: 60px;  max-width: 60px;  left: 440px; }
-    .col-actions    { width: 60px;  min-width: 60px;  max-width: 60px;  left: 500px; box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
+    :root {
+        --w-project: 100px;
+        --w-activity: 180px;
+        --w-activity-noproj: 200px;
+        --w-assignee: 100px;
+        --w-start: 60px;
+        --w-duration: 55px;
+        --w-end: 60px;
+        --w-actions: 60px;
+    }
 
-    .no-project-col .col-activity { width: 200px; min-width: 200px; max-width: 200px; left: 0px; } 
-    .no-project-col .col-assignee { left: 200px; }
-    .no-project-col .col-start    { left: 300px; }
-    .no-project-col .col-end      { left: 360px; }
-    .no-project-col .col-actions  { left: 420px; }
+    .col-project    { width: var(--w-project); min-width: var(--w-project); max-width: var(--w-project); left: 0px; }
+    .col-activity   { width: var(--w-activity); min-width: var(--w-activity); max-width: var(--w-activity); left: var(--w-project); }
+    .col-assignee   { width: var(--w-assignee); min-width: var(--w-assignee); max-width: var(--w-assignee); left: calc(var(--w-project) + var(--w-activity)); text-align: center; }
+    .col-start      { width: var(--w-start);  min-width: var(--w-start);  max-width: var(--w-start);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee)); }
+    .col-duration   { width: var(--w-duration);  min-width: var(--w-duration);  max-width: var(--w-duration);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start)); }
+    .col-end        { width: var(--w-end);  min-width: var(--w-end);  max-width: var(--w-end);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
+    .col-actions    { width: var(--w-actions);  min-width: var(--w-actions);  max-width: var(--w-actions);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
+
+    .no-project-col .col-activity { width: var(--w-activity-noproj); min-width: var(--w-activity-noproj); max-width: var(--w-activity-noproj); left: 0px; }
+    .no-project-col .col-assignee { left: var(--w-activity-noproj); }
+    .no-project-col .col-start    { left: calc(var(--w-activity-noproj) + var(--w-assignee)); }
+    .no-project-col .col-duration { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start)); }
+    .no-project-col .col-end      { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
+    .no-project-col .col-actions  { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+
+    .remark-btn.has-remark { color: #b45309; }
+    .remark-btn.has-remark svg { fill: currentColor; }
+
+    /* --- Resizable Splitter between Activities Breakdown & Gantt Timeline --- */
+    .breakdown-resize-handle {
+        position: sticky;
+        left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-actions));
+        height: 0;
+        z-index: 80;
+        pointer-events: none;
+    }
+    .no-project-col .breakdown-resize-handle {
+        left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-actions));
+    }
+    .breakdown-resize-handle .grip {
+        position: absolute;
+        top: 0;
+        left: -4px;
+        width: 8px;
+        cursor: col-resize;
+        pointer-events: auto;
+        background: transparent;
+    }
+    .breakdown-resize-handle .grip::after {
+        content: '';
+        position: absolute;
+        top: 0; bottom: 0; left: 3px;
+        width: 2px;
+        background: #cbd5e1;
+    }
+    .breakdown-resize-handle .grip:hover,
+    .breakdown-resize-handle .grip.dragging {
+        background: rgba(79, 70, 229, 0.08);
+    }
+    .breakdown-resize-handle .grip:hover::after,
+    .breakdown-resize-handle .grip.dragging::after {
+        background: #4f46e5;
+    }
 
     .group-header .sticky-cell { 
         background-color: #f8fafc; 
@@ -276,7 +328,7 @@
             </div>
         </div>
 
-        <div class="table-container relative min-h-[400px]">
+        <div class="table-container relative min-h-[400px] {% if project %}no-project-col{% endif %}">
             <div id="gantt-loader" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px] transition-all duration-300">
                 <div class="flex flex-col items-center p-6 bg-white rounded-xl shadow-2xl border border-indigo-100">
                     <svg class="w-12 h-12 text-indigo-600 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
@@ -287,10 +339,14 @@
                 </div>
             </div>
 
+            <div class="breakdown-resize-handle" title="Drag to resize the Activities Breakdown pane">
+                <div class="grip"></div>
+            </div>
+
             <table class="w-full table-auto {% if project %}no-project-col{% endif %}" style="min-width: 4000px;">
                 <thead class="bg-gray-50 sticky top-0 z-50">
                     <tr class="h-6">
-                        <th colspan="{% if not project %}6{% else %}5{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
+                        <th colspan="{% if not project %}7{% else %}6{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
                             <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
                         </th>
                         {% for month, day_count in gantt_data.months.items %}<th colspan="{{ day_count }}" class="px-2 py-1 text-center text-xs font-semibold border-l bg-gradient-to-r from-indigo-500 to-purple-600 text-white">{{ month }}</th>{% endfor %}
@@ -300,6 +356,7 @@
                         <th class="sticky-cell col-activity px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
                         <th class="sticky-cell col-assignee px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Assignee</th>
                         <th class="sticky-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
+                        <th class="sticky-cell col-duration px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Dur.</th>
                         <th class="sticky-cell col-end px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">End</th>
                         <th class="sticky-cell col-actions px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                         {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" data-date="{{ d|date:'Y-m-d' }}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
@@ -309,6 +366,7 @@
                         <th class="sticky-cell col-activity p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="activity" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-assignee p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="assignee" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-start p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="start" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
+                        <th class="sticky-cell col-duration p-0.5 bg-gray-100 border-r"></th>
                         <th class="sticky-cell col-end p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="end" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-actions p-0.5 bg-gray-100 border-r"></th>
                         <th colspan="{{ gantt_data.header_dates|length }}" class="bg-gray-100"></th>
@@ -322,7 +380,7 @@
                             {% if grouping_method != 'none' %}
                             {% with group_data=group_gantt_data|get_item:group_name %}
                             <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}">
-                                <td colspan="6" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
+                                <td colspan="7" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
                                     <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                 </td>
                                 <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
@@ -436,6 +494,15 @@
     </div>
 </div>
 
+<div id="remarkPopover" class="hidden fixed z-[100000] bg-white border border-gray-200 rounded-lg shadow-2xl p-3 w-72">
+    <label class="block text-xs font-semibold text-gray-600 mb-1">Remark</label>
+    <textarea id="remarkPopoverText" rows="4" class="w-full text-xs border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"></textarea>
+    <div class="flex justify-end space-x-2 mt-2">
+        <button type="button" id="remarkPopoverCancel" class="px-2 py-1 text-xs rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50">Cancel</button>
+        <button type="button" id="remarkPopoverSave" class="px-2 py-1 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Save</button>
+    </div>
+</div>
+
 <script>
 function toggleFilterMenu(menuId) {
     const menu = document.getElementById(menuId);
@@ -463,6 +530,27 @@ function exportGantt() {
     if (assignees.length) params.set('assignees', assignees.join(','));
     
     window.location.href = '?' + params.toString();
+}
+
+// Single-field inline edit save used by the Activities Breakdown table (schedule fields + remark).
+function quickSaveActivityField(updateUrl, field, value, onSuccess, onError) {
+    const csrfInput = document.querySelector('#addActivityForm [name=csrfmiddlewaretoken]');
+    const csrfToken = csrfInput ? csrfInput.value : '';
+    const body = new URLSearchParams();
+    body.set('field', field);
+    body.set('value', value);
+
+    fetch(updateUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+    })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })).catch(() => ({ ok: false, data: null })))
+    .then(({ ok, data }) => {
+        if (ok && data && data.success) onSuccess(data);
+        else onError((data && data.error) || 'Failed to save changes.');
+    })
+    .catch(() => onError('Network error while saving.'));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -577,17 +665,187 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Fix Assignee Column Display ---
-    // Replace avatar/initials with shortened name text (First L.)
-    document.querySelectorAll('.gantt-activity-row').forEach(row => {
-        const assigneeName = row.dataset.assignee;
-        const assigneeFullName = row.dataset.assigneeFull || assigneeName;
-        const cell = row.querySelector('.col-assignee');
-        if (cell && assigneeName) {
-            // Replace content with text
-            cell.innerHTML = `<div class="text-xs font-medium text-gray-700 truncate px-1" title="${assigneeFullName}">${assigneeName}</div>`;
-        }
+    // --- Inline Editing: Activities Breakdown table ---
+    // Reuses the same date-calc rules as the Add Activity modal above (parseDateLocal,
+    // toISODate, isWorkingDay, addWorkingDays, countWorkingDays), applied per-row.
+    const tableContainerEl = document.querySelector('.table-container');
+
+    document.querySelectorAll('.inline-edit-input').forEach(el => {
+        el.dataset.originalValue = el.value;
     });
+
+    if (tableContainerEl) {
+        // Live preview: typing a Start Date or Duration recalculates the End Date field,
+        // exactly like the Add Activity modal does, before anything is saved.
+        tableContainerEl.addEventListener('input', (e) => {
+            const el = e.target;
+            if (!el.classList.contains('inline-edit-input')) return;
+            const field = el.dataset.field;
+            if (field !== 'start_date' && field !== 'duration') return;
+
+            const row = el.closest('tr');
+            if (!row) return;
+            const rowStart = row.querySelector('[data-field="start_date"]');
+            const rowDuration = row.querySelector('[data-field="duration"]');
+            const rowEnd = row.querySelector('[data-field="end_date"]');
+            if (rowStart && rowDuration && rowEnd && rowStart.value && rowDuration.value) {
+                const dur = parseInt(rowDuration.value, 10);
+                if (dur > 0) {
+                    rowEnd.value = toISODate(addWorkingDays(rowStart.value, dur));
+                }
+            }
+        });
+
+        function commitInlineEdit(input) {
+            const row = input.closest('tr');
+            if (!row) return;
+            const updateUrl = row.dataset.quickUpdateUrl;
+            const field = input.dataset.field;
+            if (!updateUrl || !field) return;
+
+            const original = input.dataset.originalValue ?? '';
+            let value = input.value;
+            if (field === 'activity_name') value = value.trim();
+            if (value === original) return;
+
+            if (field === 'activity_name' && !value) {
+                alert('Activity name cannot be empty.');
+                input.value = original;
+                return;
+            }
+
+            if (field === 'duration') {
+                const dur = parseInt(value, 10);
+                if (!dur || dur < 1) {
+                    alert('Duration must be at least 1 day.');
+                    input.value = original;
+                    return;
+                }
+            }
+
+            if (field === 'end_date') {
+                const rowStart = row.querySelector('[data-field="start_date"]');
+                if (rowStart && rowStart.value) {
+                    if (value < rowStart.value) {
+                        alert('End Date cannot be before Start Date.');
+                        input.value = original;
+                        return;
+                    }
+                    if (!isWorkingDay(parseDateLocal(value))) {
+                        alert('Error: The selected End Date falls on a weekend or holiday.\nPlease select a working day.');
+                        input.value = original;
+                        return;
+                    }
+                }
+            }
+
+            input.disabled = true;
+            quickSaveActivityField(updateUrl, field, value, () => {
+                // Reload so the Gantt bars, overlap/leave detection, and search index
+                // (all computed from the full dataset) stay accurate. Scroll position
+                // and active filters are restored automatically via saveState/restoreState.
+                location.reload();
+            }, (err) => {
+                alert(err);
+                input.value = original;
+                input.disabled = false;
+            });
+        }
+
+        // Select/date/number fields commit on 'change' (i.e. once the user finalizes the value).
+        tableContainerEl.addEventListener('change', (e) => {
+            const el = e.target;
+            if (!el.classList.contains('inline-edit-input')) return;
+            if (el.tagName === 'SELECT' || el.type === 'date' || el.type === 'number') {
+                commitInlineEdit(el);
+            }
+        });
+
+        // Text fields (activity name) commit on blur. 'focusout' bubbles, unlike 'blur'.
+        tableContainerEl.addEventListener('focusout', (e) => {
+            const el = e.target;
+            if (!el.classList.contains('inline-edit-input')) return;
+            if (el.tagName === 'INPUT' && el.type === 'text') {
+                commitInlineEdit(el);
+            }
+        });
+
+        tableContainerEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.classList.contains('inline-edit-input') && e.target.type === 'text') {
+                e.preventDefault();
+                e.target.blur();
+            }
+        });
+    }
+
+    // --- Remark: separate small popover editor (does not affect scheduling, no reload needed) ---
+    (function setupRemarkPopover() {
+        const popover = document.getElementById('remarkPopover');
+        const textarea = document.getElementById('remarkPopoverText');
+        const saveBtn = document.getElementById('remarkPopoverSave');
+        const cancelBtn = document.getElementById('remarkPopoverCancel');
+        if (!popover || !textarea || !saveBtn || !cancelBtn) return;
+
+        let activeBtn = null;
+
+        function closePopover() {
+            popover.classList.add('hidden');
+            activeBtn = null;
+            document.removeEventListener('mousedown', outsideClickHandler, true);
+        }
+
+        function outsideClickHandler(e) {
+            if (!popover.contains(e.target) && !(activeBtn && activeBtn.contains(e.target)) && e.target !== activeBtn) {
+                closePopover();
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.remark-btn');
+            if (!btn) return;
+            e.stopPropagation();
+
+            activeBtn = btn;
+            textarea.value = btn.dataset.remark || '';
+
+            popover.classList.remove('hidden');
+            const rect = btn.getBoundingClientRect();
+            const popRect = popover.getBoundingClientRect();
+            let left = rect.right - popRect.width;
+            if (left < 8) left = 8;
+            popover.style.left = `${left}px`;
+            popover.style.top = `${rect.bottom + 4}px`;
+
+            textarea.focus();
+            document.addEventListener('mousedown', outsideClickHandler, true);
+        });
+
+        cancelBtn.addEventListener('click', closePopover);
+
+        saveBtn.addEventListener('click', () => {
+            if (!activeBtn) return;
+            const row = activeBtn.closest('tr');
+            const updateUrl = row ? row.dataset.quickUpdateUrl : null;
+            if (!updateUrl) return;
+
+            const value = textarea.value;
+            saveBtn.disabled = true;
+            quickSaveActivityField(updateUrl, 'remark', value, () => {
+                activeBtn.dataset.remark = value;
+                activeBtn.classList.toggle('has-remark', !!value.trim());
+                activeBtn.title = value.trim() ? 'Edit Remark' : 'Add Remark';
+                saveBtn.disabled = false;
+                closePopover();
+            }, (err) => {
+                alert(err);
+                saveBtn.disabled = false;
+            });
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !popover.classList.contains('hidden')) closePopover();
+        });
+    })();
 
     // --- Modal Management ---
     const modal = document.getElementById('addActivityModal');
@@ -608,6 +866,75 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === "Escape" && !modal.classList.contains('hidden')) closeModal();
         });
     }
+
+    // --- Resizable Splitter: Activities Breakdown <-> Gantt Timeline ---
+    (function setupBreakdownResize() {
+        const grip = document.querySelector('.breakdown-resize-handle .grip');
+        const tableEl = document.querySelector('.table-container table');
+        if (!grip || !tableEl) return;
+
+        const isNoProjectMode = tableEl.classList.contains('no-project-col');
+        const varName = isNoProjectMode ? '--w-activity-noproj' : '--w-activity';
+        const MIN_WIDTH = 100;
+        const MAX_WIDTH = 600;
+        const storageKey = 'planner_breakdown_width_' + (isNoProjectMode ? 'noproj' : 'proj');
+
+        const savedWidth = sessionStorage.getItem(storageKey);
+        if (savedWidth) {
+            document.documentElement.style.setProperty(varName, `${savedWidth}px`);
+        }
+
+        function getCurrentWidth() {
+            return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(varName)) || 180;
+        }
+
+        let dragging = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        function onMouseMove(e) {
+            if (!dragging) return;
+            const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (e.clientX - startX)));
+            document.documentElement.style.setProperty(varName, `${newWidth}px`);
+        }
+
+        function onMouseUp() {
+            if (!dragging) return;
+            dragging = false;
+            grip.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            sessionStorage.setItem(storageKey, getCurrentWidth());
+            requestAnimationFrame(drawTodayMarker);
+        }
+
+        grip.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            dragging = true;
+            startX = e.clientX;
+            startWidth = getCurrentWidth();
+            grip.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        // Keep the grip's clickable height in sync with the table's actual rendered
+        // height at all times (initial load, filtering, expand/collapse, virtual scroll
+        // updates) without depending on any specific render call happening first.
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => {
+                grip.style.height = `${tableEl.offsetHeight}px`;
+            });
+            ro.observe(tableEl);
+        } else {
+            grip.style.height = `${tableEl.offsetHeight}px`;
+            setTimeout(() => { grip.style.height = `${tableEl.offsetHeight}px`; }, 500);
+        }
+    })();
 
     // --- Scroll to Today Logic ---
     const goToTodayBtn = document.getElementById('goToTodayBtn');
@@ -647,20 +974,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Action Dropdown Logic (PORTAL METHOD) & Row Auto-Scroll ---
-    let currentlyOpenMenu = null;
-    let originalParent = null; // Store original parent to return element on close
+    // --- Row Auto-Scroll to Gantt bar ---
     let currentlyActiveRow = null;
-    const tableContainer = document.querySelector('.table-container');
 
-    // NEW: Auto-scroll to Gantt bar on row click
     document.querySelector('tbody').addEventListener('click', (e) => {
         const row = e.target.closest('.gantt-activity-row');
         if (!row) return;
 
-        // Do not trigger if clicking an action button, link, or dropdown
-        if (e.target.closest('.action-btn') || e.target.closest('a') || e.target.closest('.action-menu')) return;
-        
+        // Do not trigger if clicking an action button, link, or an inline-edit field
+        if (e.target.closest('.action-btn') || e.target.closest('a') ||
+            e.target.closest('input') || e.target.closest('select')) return;
+
         if (currentlyActiveRow) currentlyActiveRow.classList.remove('row-is-active');
         row.classList.add('row-is-active');
         currentlyActiveRow = row;
@@ -670,91 +994,6 @@ document.addEventListener('DOMContentLoaded', () => {
             bar.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
     });
-
-    // 1. Handle Click on Action Button
-    tableContainer.addEventListener('click', (e) => {
-        const actionBtn = e.target.closest('.action-btn');
-        if (actionBtn) {
-            e.stopPropagation();
-            
-            // This is the menu inside the sticky cell
-            const menu = actionBtn.parentElement.querySelector('.action-menu');
-
-            // If we are clicking the same button that opened the current menu, toggle it
-            if (currentlyOpenMenu && currentlyOpenMenu === menu) {
-                closeCurrentMenu();
-            } 
-            // If we clicked a different button, close existing and open new
-            else {
-                if (currentlyOpenMenu) closeCurrentMenu();
-                
-                // If menu is still in original location (it should be if closed), open it
-                if (menu) {
-                    openMenuPortal(actionBtn, menu);
-                }
-            }
-        }
-    });
-
-    // 2. Open Menu via Portal (Move to Body)
-    function openMenuPortal(btn, menu) {
-        // Store reference to put it back later
-        originalParent = menu.parentElement;
-        currentlyOpenMenu = menu;
-
-        // Move to body to break all stacking contexts
-        document.body.appendChild(menu);
-        menu.classList.remove('hidden');
-        
-        // Calculate Position
-        const btnRect = btn.getBoundingClientRect();
-        const menuWidth = 160; // Approx width for w-40/min-w-10rem
-        
-        // Position: Fixed
-        menu.style.position = 'fixed';
-        menu.style.top = `${btnRect.bottom + 2}px`;
-        // Align right edge of menu with right edge of button
-        menu.style.left = `${btnRect.right - menuWidth}px`;
-        
-        // Add listeners to close
-        document.addEventListener('scroll', closeCurrentMenu, true);
-        window.addEventListener('resize', closeCurrentMenu);
-        document.addEventListener('click', closeCurrentMenuOutside);
-    }
-
-    // 3. Close Menu Helper
-    function closeCurrentMenu() {
-        if (!currentlyOpenMenu) return;
-        
-        const menu = currentlyOpenMenu;
-        menu.classList.add('hidden');
-        
-        // Clean up inline styles
-        menu.style.position = ''; 
-        menu.style.top = '';
-        menu.style.left = '';
-        
-        // Move back to original parent
-        if (originalParent) {
-            originalParent.appendChild(menu);
-        }
-        
-        currentlyOpenMenu = null;
-        originalParent = null;
-        
-        document.removeEventListener('scroll', closeCurrentMenu, true);
-        window.removeEventListener('resize', closeCurrentMenu);
-        document.removeEventListener('click', closeCurrentMenuOutside);
-    }
-
-    function closeCurrentMenuOutside(e) {
-        // If clicking inside the menu, do nothing (let links work)
-        if (currentlyOpenMenu && currentlyOpenMenu.contains(e.target)) return;
-        // If clicking the button that opened it, handle in main listener
-        if (e.target.closest('.action-btn')) return;
-        
-        closeCurrentMenu();
-    }
 
     // --- Filter Logic --- (Existing Logic Preserved)
     
@@ -1286,6 +1525,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
 
 // --- VIRTUAL SCROLL IMPLEMENTATION ---
+function updateResizeHandleHeight() {
+    const grip = document.querySelector('.breakdown-resize-handle .grip');
+    const tableEl = document.querySelector('.table-container table');
+    if (grip && tableEl) {
+        grip.style.height = `${tableEl.offsetHeight}px`;
+    }
+}
+
 function initVirtualScroll() {
     const tbody = document.querySelector('tbody');
     const tableContainer = document.querySelector('.table-container');
@@ -1412,6 +1659,8 @@ function renderVirtualWindow(forceUpdate = false) {
     if (nodesToRender.length > 0) {
         topSpacer.after(...nodesToRender);
     }
+
+    updateResizeHandleHeight();
 }
 });
 </script>

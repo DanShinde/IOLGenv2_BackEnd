@@ -20,6 +20,7 @@ urlpatterns = [
     path('reports/site-history/export/pdf/', views.export_site_history_pdf, name='planner_site_history_export_pdf'),
     path('activity/<int:pk>/edit/', views.edit_activity_view, name='planner_edit_activity'),
     path('activity/<int:pk>/delete/', views.delete_activity_view, name='planner_delete_activity'),
+    path('activity/<int:pk>/quick-update/', views.activity_quick_update_view, name='planner_activity_quick_update'),
     path('holiday/<int:pk>/delete/', views.delete_holiday_view, name='planner_delete_holiday'),
     path('project-type/<int:pk>/edit/', views.edit_project_type_view, name='planner_edit_project_type'),
     path('project-type/<int:pk>/delete/', views.delete_project_type_view, name='planner_delete_project_type'),

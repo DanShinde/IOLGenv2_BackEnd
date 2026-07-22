@@ -531,7 +531,8 @@ def activity_planner_view(request, project_pk):
         'project': project,
         'form': form,
         'active_nav': 'projects',
-        'gantt_init_data': gantt_init_data
+        'gantt_init_data': gantt_init_data,
+        'assignees': Employee.objects.filter(is_active=True).order_by('name')
     })
     return render(request, 'planner/activity_planner.html', context)
 
@@ -1008,6 +1009,76 @@ def delete_activity_view(request, pk):
     activity.delete()
     default_redirect_url = reverse('planner_activity_planner', kwargs={'project_pk': project_pk})
     return redirect(next_url or default_redirect_url)
+
+@require_POST
+def activity_quick_update_view(request, pk):
+    """Single-field inline edit endpoint used by the Activities Breakdown table.
+    Mirrors the calculation rules from ActivityForm / Activity.save(): providing
+    start_date or duration re-derives end_date, providing end_date re-derives duration.
+    """
+    activity = get_object_or_404(Activity, pk=pk)
+    field = request.POST.get('field', '')
+    value = request.POST.get('value', '')
+
+    if field == 'activity_name':
+        value = value.strip()
+        if not value:
+            return JsonResponse({'success': False, 'error': 'Activity name cannot be empty.'}, status=400)
+        activity.activity_name = value
+
+    elif field == 'assignee':
+        if value:
+            employee = Employee.objects.filter(pk=value).first()
+            if not employee:
+                return JsonResponse({'success': False, 'error': 'Selected assignee not found.'}, status=400)
+            activity.assignee = employee
+        else:
+            activity.assignee = None
+
+    elif field == 'start_date':
+        dt = parse_date(value)
+        if not dt:
+            return JsonResponse({'success': False, 'error': 'Invalid start date.'}, status=400)
+        activity.start_date = dt
+        activity.end_date = None  # re-derive from the existing duration
+
+    elif field == 'duration':
+        try:
+            duration = int(value)
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'Duration must be a whole number.'}, status=400)
+        if duration < 1:
+            return JsonResponse({'success': False, 'error': 'Duration must be at least 1 day.'}, status=400)
+        activity.duration = duration
+        activity.end_date = None  # re-derive from the new duration
+
+    elif field == 'end_date':
+        dt = parse_date(value)
+        if not dt:
+            return JsonResponse({'success': False, 'error': 'Invalid end date.'}, status=400)
+        if dt < activity.start_date:
+            return JsonResponse({'success': False, 'error': 'End date cannot be before start date.'}, status=400)
+        activity.end_date = dt  # Activity.save() re-derives duration
+
+    elif field == 'remark':
+        activity.remark = value
+
+    else:
+        return JsonResponse({'success': False, 'error': 'Unknown field.'}, status=400)
+
+    activity.save()
+
+    return JsonResponse({
+        'success': True,
+        'activity_name': activity.activity_name,
+        'assignee_id': activity.assignee_id,
+        'assignee_name': activity.assignee.name if activity.assignee else '',
+        'assignee_full_name': getattr(activity.assignee, 'full_name', activity.assignee.name) if activity.assignee else '',
+        'start_date': activity.start_date.isoformat(),
+        'end_date': activity.end_date.isoformat() if activity.end_date else '',
+        'duration': activity.duration,
+        'remark': activity.remark,
+    })
 
 def edit_project_type_view(request, pk):
     project_type = get_object_or_404(ProjectType, pk=pk)
