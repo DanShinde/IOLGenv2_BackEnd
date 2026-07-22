@@ -149,7 +149,43 @@
         background: #4f46e5;
     }
 
-    .group-header .sticky-cell { 
+    /* --- Per-column resize handles (one per Activities Breakdown column boundary) ---
+       Standalone sticky elements (same technique as .breakdown-resize-handle) instead of
+       grips embedded inside <th> cells: adjacent header <th>s share the same z-index, so
+       DOM order lets the *next* column silently cover half of an embedded grip's hit area. */
+    .col-resize-handle {
+        position: sticky;
+        height: 0;
+        z-index: 80;
+        pointer-events: none;
+    }
+    .col-resize-handle .grip {
+        position: absolute;
+        top: 0;
+        left: -4px;
+        width: 8px;
+        cursor: col-resize;
+        pointer-events: auto;
+        background: transparent;
+    }
+    .col-resize-handle .grip:hover,
+    .col-resize-handle .grip.dragging {
+        background: rgba(79, 70, 229, 0.25);
+    }
+
+    .col-resize-handle.after-project  { left: var(--w-project); }
+    .col-resize-handle.after-activity { left: calc(var(--w-project) + var(--w-activity)); }
+    .no-project-col .col-resize-handle.after-activity { left: var(--w-activity-noproj); }
+    .col-resize-handle.after-assignee { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee)); }
+    .no-project-col .col-resize-handle.after-assignee { left: calc(var(--w-activity-noproj) + var(--w-assignee)); }
+    .col-resize-handle.after-start { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start)); }
+    .no-project-col .col-resize-handle.after-start { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start)); }
+    .col-resize-handle.after-duration { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
+    .no-project-col .col-resize-handle.after-duration { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
+    .col-resize-handle.after-end { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+    .no-project-col .col-resize-handle.after-end { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+
+    .group-header .sticky-cell {
         background-color: #f8fafc; 
         left: 0px !important; 
         width: auto !important; 
@@ -338,6 +374,13 @@
                     <span class="text-indigo-800 font-semibold text-sm tracking-wide">Loading Timeline...</span>
                 </div>
             </div>
+
+            {% if not project %}<div class="col-resize-handle after-project" data-var="--w-project" title="Drag to resize the Project column"><div class="grip"></div></div>{% endif %}
+            <div class="col-resize-handle after-activity" data-var="{% if project %}--w-activity-noproj{% else %}--w-activity{% endif %}" title="Drag to resize the Activity column"><div class="grip"></div></div>
+            <div class="col-resize-handle after-assignee" data-var="--w-assignee" title="Drag to resize the Assignee column"><div class="grip"></div></div>
+            <div class="col-resize-handle after-start" data-var="--w-start" title="Drag to resize the Start column"><div class="grip"></div></div>
+            <div class="col-resize-handle after-duration" data-var="--w-duration" title="Drag to resize the Duration column"><div class="grip"></div></div>
+            <div class="col-resize-handle after-end" data-var="--w-end" title="Drag to resize the End column"><div class="grip"></div></div>
 
             <div class="breakdown-resize-handle" title="Drag to resize the Activities Breakdown pane">
                 <div class="grip"></div>
@@ -868,34 +911,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Resizable Splitter: Activities Breakdown <-> Gantt Timeline ---
+    // Unlike the per-column handles below (which resize one column each), this handle sits
+    // at the boundary between the whole breakdown pane and the timeline, so dragging it
+    // scales every breakdown column together, proportionally, to grow/shrink the whole pane.
     (function setupBreakdownResize() {
         const grip = document.querySelector('.breakdown-resize-handle .grip');
         const tableEl = document.querySelector('.table-container table');
         if (!grip || !tableEl) return;
 
         const isNoProjectMode = tableEl.classList.contains('no-project-col');
-        const varName = isNoProjectMode ? '--w-activity-noproj' : '--w-activity';
-        const MIN_WIDTH = 100;
-        const MAX_WIDTH = 600;
-        const storageKey = 'planner_breakdown_width_' + (isNoProjectMode ? 'noproj' : 'proj');
+        const activityVar = isNoProjectMode ? '--w-activity-noproj' : '--w-activity';
+        const columnVars = isNoProjectMode
+            ? [activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions']
+            : ['--w-project', activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions'];
 
-        const savedWidth = sessionStorage.getItem(storageKey);
-        if (savedWidth) {
-            document.documentElement.style.setProperty(varName, `${savedWidth}px`);
+        const MIN_COL_WIDTH = 40;
+        const MIN_TOTAL = columnVars.length * MIN_COL_WIDTH;
+        const MAX_TOTAL = 1600;
+
+        function getWidth(varName) {
+            return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(varName)) || 0;
         }
 
-        function getCurrentWidth() {
-            return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(varName)) || 180;
-        }
+        // Column widths may already be individually customized (per-column handles write to
+        // the same sessionStorage keys), so pick those up before computing the starting total.
+        columnVars.forEach(v => {
+            const saved = sessionStorage.getItem('planner_col_width_' + v);
+            if (saved) document.documentElement.style.setProperty(v, `${saved}px`);
+        });
 
         let dragging = false;
         let startX = 0;
-        let startWidth = 0;
+        let startWidths = {};
 
         function onMouseMove(e) {
             if (!dragging) return;
-            const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (e.clientX - startX)));
-            document.documentElement.style.setProperty(varName, `${newWidth}px`);
+            const startTotal = columnVars.reduce((sum, v) => sum + startWidths[v], 0);
+            const newTotal = Math.min(MAX_TOTAL, Math.max(MIN_TOTAL, startTotal + (e.clientX - startX)));
+            const scale = newTotal / startTotal;
+            columnVars.forEach(v => {
+                const newWidth = Math.max(MIN_COL_WIDTH, Math.round(startWidths[v] * scale));
+                document.documentElement.style.setProperty(v, `${newWidth}px`);
+            });
         }
 
         function onMouseUp() {
@@ -906,7 +963,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.userSelect = '';
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
-            sessionStorage.setItem(storageKey, getCurrentWidth());
+            columnVars.forEach(v => {
+                sessionStorage.setItem('planner_col_width_' + v, getWidth(v));
+            });
             requestAnimationFrame(drawTodayMarker);
         }
 
@@ -914,7 +973,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             dragging = true;
             startX = e.clientX;
-            startWidth = getCurrentWidth();
+            startWidths = {};
+            columnVars.forEach(v => { startWidths[v] = getWidth(v); });
             grip.classList.add('dragging');
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
@@ -933,6 +993,79 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             grip.style.height = `${tableEl.offsetHeight}px`;
             setTimeout(() => { grip.style.height = `${tableEl.offsetHeight}px`; }, 500);
+        }
+    })();
+
+    // --- Per-column resize handles (drag a boundary to resize the column to its left) ---
+    (function setupColumnResizeHandles() {
+        const handles = document.querySelectorAll('.col-resize-handle');
+        const tableEl = document.querySelector('.table-container table');
+        if (!handles.length || !tableEl) return;
+
+        const MIN_WIDTH = 40;
+        const MAX_WIDTH = 500;
+        let dragging = null; // the .col-resize-handle being dragged
+        let startX = 0;
+        let startWidth = 0;
+
+        function getWidth(varName) {
+            return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(varName)) || MIN_WIDTH;
+        }
+
+        function onMouseMove(e) {
+            if (!dragging) return;
+            const varName = dragging.dataset.var;
+            const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (e.clientX - startX)));
+            document.documentElement.style.setProperty(varName, `${newWidth}px`);
+        }
+
+        function onMouseUp() {
+            if (!dragging) return;
+            const varName = dragging.dataset.var;
+            dragging.querySelector('.grip').classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            sessionStorage.setItem('planner_col_width_' + varName, getWidth(varName));
+            dragging = null;
+            requestAnimationFrame(drawTodayMarker);
+        }
+
+        handles.forEach(handle => {
+            const varName = handle.dataset.var;
+            const grip = handle.querySelector('.grip');
+            if (!varName || !grip) return;
+
+            const saved = sessionStorage.getItem('planner_col_width_' + varName);
+            if (saved) document.documentElement.style.setProperty(varName, `${saved}px`);
+
+            grip.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                dragging = handle;
+                startX = e.clientX;
+                startWidth = getWidth(varName);
+                grip.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        });
+
+        // Keep every grip's clickable height in sync with the table's actual rendered height.
+        function syncGripHeights() {
+            const h = `${tableEl.offsetHeight}px`;
+            handles.forEach(handle => {
+                const grip = handle.querySelector('.grip');
+                if (grip) grip.style.height = h;
+            });
+        }
+        if (window.ResizeObserver) {
+            new ResizeObserver(syncGripHeights).observe(tableEl);
+        } else {
+            syncGripHeights();
+            setTimeout(syncGripHeights, 500);
         }
     })();
 
@@ -1190,7 +1323,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isVisible) {
             for (const column in colFilters) {
-                if (!row.searchData.fullText.includes(colFilters[column])) {
+                const columnText = (row.searchData.columnTexts && row.searchData.columnTexts[column]) || '';
+                if (!columnText.includes(colFilters[column])) {
                     isVisible = false;
                     break;
                 }
@@ -1554,6 +1688,25 @@ function initVirtualScroll() {
         // FIX: Remove 'hidden' class from server-side rendering so VS can control visibility
         row.classList.remove('hidden');
 
+        // Per-column text for the "Filter..." boxes, read from each field's actual current
+        // value (not textContent) — the Assignee cell is a <select> whose textContent would
+        // otherwise include every option in the dropdown, not just the selected one.
+        const columnTexts = {};
+        row.querySelectorAll('[data-filter-column]').forEach(cell => {
+            const col = cell.dataset.filterColumn;
+            const select = cell.querySelector('select');
+            const input = cell.querySelector('input');
+            let text;
+            if (select) {
+                text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+            } else if (input) {
+                text = input.value;
+            } else {
+                text = cell.textContent;
+            }
+            columnTexts[col] = (text || '').trim().toLowerCase();
+        });
+
         // Cache search data to avoid DOM access during filter
         const searchData = {
             project: (row.dataset.projectCode || '').toLowerCase(),
@@ -1562,7 +1715,7 @@ function initVirtualScroll() {
             teamLead: (row.dataset.teamLead || '').toLowerCase(),
             assignee: (row.dataset.assignee || '').toLowerCase(),
             activityName: (row.dataset.activityName || '').toLowerCase(),
-            fullText: row.textContent.toLowerCase()
+            columnTexts: columnTexts
         };
 
         // Initialize collapsed state for groups (default collapsed except first?)
