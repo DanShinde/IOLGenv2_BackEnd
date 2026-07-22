@@ -1,0 +1,52 @@
+{% load planner_extras %}
+{% comment %}
+    Inline "add new activity" row. Included once at the bottom of the single-project
+    table, and once per project group in the consolidated (grouped-by-project) view.
+    Expects: target_project, assignees, gantt_data, today, and optionally group_name.
+{% endcomment %}
+<tr class="h-10 add-activity-row hover:bg-emerald-50/60 transition-colors"
+    {% if group_name %}data-group-id="{{ group_name }}"{% endif %}
+    data-project-pk="{{ target_project.pk }}"
+    data-create-url="{% url 'planner_activity_quick_create' %}">
+
+    {% if not project and grouping_method != 'engineer' %}
+    <td class="sticky-cell col-project px-2 py-1 text-xs font-medium text-gray-400 italic border-r">
+        <div class="truncate w-full" title="{{ target_project.project_id }}">{{ target_project.project_id }}</div>
+    </td>
+    {% endif %}
+
+    <td class="sticky-cell col-activity px-1 py-1 border-r">
+        <input type="text" class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-dashed border-gray-300 rounded px-1 py-0.5 hover:border-emerald-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
+               placeholder="+ New activity name" data-field="activity_name">
+    </td>
+
+    <td class="sticky-cell col-assignee px-1 py-1 border-r">
+        {% comment %} Options populated client-side from #assigneeOptionsTemplate — see _activity_rows.html. {% endcomment %}
+        <select class="inline-edit-input w-full text-xs text-gray-500 bg-transparent border border-dashed border-gray-300 rounded px-0.5 py-0.5 hover:border-emerald-400 focus:border-emerald-500 focus:bg-white focus:outline-none" data-field="assignee">
+            <option value="">Unassigned</option>
+        </select>
+    </td>
+
+    <td class="sticky-cell col-start px-1 py-1 border-r whitespace-nowrap">
+        <input type="date" class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-dashed border-gray-300 rounded px-0.5 py-0.5 hover:border-emerald-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
+               value="{{ today|date:'Y-m-d' }}" data-field="start_date">
+    </td>
+    <td class="sticky-cell col-duration px-1 py-1 border-r text-center">
+        <input type="number" min="1" class="inline-edit-input w-full text-xs text-gray-700 text-center bg-transparent border border-dashed border-gray-300 rounded px-0.5 py-0.5 hover:border-emerald-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
+               value="1" data-field="duration">
+    </td>
+    <td class="sticky-cell col-end px-1 py-1 border-r whitespace-nowrap">
+        <input type="date" class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-dashed border-gray-300 rounded px-0.5 py-0.5 hover:border-emerald-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
+               data-field="end_date">
+    </td>
+
+    <td class="sticky-cell col-actions px-1 py-1 border-r">
+        <div class="flex items-center justify-center">
+            <button type="button" class="add-row-save-btn action-btn p-1 rounded hover:bg-emerald-100 text-emerald-600" title="Add Activity">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+            </button>
+        </div>
+    </td>
+
+    <td colspan="{{ gantt_data.header_dates|length }}" class="p-0"></td>
+</tr>

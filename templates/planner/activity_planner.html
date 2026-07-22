@@ -252,6 +252,17 @@
 
 {{ gantt_init_data|json_script:"gantt-init-data" }}
 
+{% comment %}
+    Assignee <option> list rendered ONCE and cloned into every row's <select> via JS
+    (see populateAssigneeDropdowns below). With hundreds of activity rows, looping the
+    full employee list inside each row was by far the dominant cost of rendering this page.
+{% endcomment %}
+<template id="assigneeOptionsTemplate">
+    {% for emp in assignees %}
+    <option value="{{ emp.pk }}">{{ emp.name }}</option>
+    {% endfor %}
+</template>
+
 <div class="max-w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
     {% if not project %}
     <div class="mb-4 bg-white p-3 rounded-xl shadow-lg border border-gray-100">
@@ -440,6 +451,7 @@
                 <tbody>
                     {% if project %}
                         {% include 'planner/_activity_rows.html' with activities=activities %}
+                        {% include 'planner/_add_activity_row.html' with target_project=project %}
                     {% else %}
                         {% for group_name, activities_in_group in display_data.items %}
                             {% if grouping_method != 'none' %}
@@ -455,6 +467,9 @@
                             {% endwith %}
                             {% endif %}
                             {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' %}
+                            {% if grouping_method == 'project' %}
+                                {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify %}
+                            {% endif %}
                         {% empty %}
                             <tr><td colspan="99" class="text-center text-gray-500 py-8"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg><h3 class="mt-2 text-sm font-medium text-gray-900">No activities found</h3><p class="mt-1 text-sm text-gray-500">Create your first activity to start planning.</p></td></tr>
                         {% endfor %}
@@ -601,12 +616,16 @@ function exportGantt() {
 }
 
 // Single-field inline edit save used by the Activities Breakdown table (schedule fields + remark).
-function quickSaveActivityField(updateUrl, field, value, onSuccess, onError) {
+// presetBody (URLSearchParams), when given, is sent as-is instead of the field/value pair —
+// used by the inline "add new activity" row, which submits several fields at once.
+function quickSaveActivityField(updateUrl, field, value, onSuccess, onError, presetBody) {
     const csrfInput = document.querySelector('#addActivityForm [name=csrfmiddlewaretoken]');
     const csrfToken = csrfInput ? csrfInput.value : '';
-    const body = new URLSearchParams();
-    body.set('field', field);
-    body.set('value', value);
+    const body = presetBody || new URLSearchParams();
+    if (!presetBody) {
+        body.set('field', field);
+        body.set('value', value);
+    }
 
     fetch(updateUrl, {
         method: 'POST',
@@ -622,6 +641,19 @@ function quickSaveActivityField(updateUrl, field, value, onSuccess, onError) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Populate every row's Assignee <select> from the single shared options template
+    // (must run before anything reads/captures select values, e.g. the virtual-scroll
+    // row indexing and the inline-edit "original value" snapshot below).
+    (function populateAssigneeDropdowns() {
+        const optionsTemplate = document.getElementById('assigneeOptionsTemplate');
+        if (!optionsTemplate) return;
+        document.querySelectorAll('select.inline-edit-input[data-field="assignee"]').forEach(select => {
+            select.appendChild(optionsTemplate.content.cloneNode(true));
+            const currentId = select.dataset.assigneeId;
+            if (currentId) select.value = currentId;
+        });
+    })();
+
     // Apply styles to Django form fields in Modal
     const modalForm = document.getElementById('addActivityForm');
     if (modalForm) {
@@ -749,17 +781,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const el = e.target;
             if (!el.classList.contains('inline-edit-input')) return;
             const field = el.dataset.field;
-            if (field !== 'start_date' && field !== 'duration') return;
-
             const row = el.closest('tr');
             if (!row) return;
-            const rowStart = row.querySelector('[data-field="start_date"]');
-            const rowDuration = row.querySelector('[data-field="duration"]');
-            const rowEnd = row.querySelector('[data-field="end_date"]');
-            if (rowStart && rowDuration && rowEnd && rowStart.value && rowDuration.value) {
-                const dur = parseInt(rowDuration.value, 10);
-                if (dur > 0) {
-                    rowEnd.value = toISODate(addWorkingDays(rowStart.value, dur));
+
+            if (field === 'start_date' || field === 'duration') {
+                const rowStart = row.querySelector('[data-field="start_date"]');
+                const rowDuration = row.querySelector('[data-field="duration"]');
+                const rowEnd = row.querySelector('[data-field="end_date"]');
+                if (rowStart && rowDuration && rowEnd && rowStart.value && rowDuration.value) {
+                    const dur = parseInt(rowDuration.value, 10);
+                    if (dur > 0) {
+                        rowEnd.value = toISODate(addWorkingDays(rowStart.value, dur));
+                    }
+                }
+            } else if (field === 'end_date' && row.classList.contains('add-activity-row')) {
+                // The add-row has no server round-trip until it's actually submitted, so
+                // (unlike existing rows, which get the authoritative duration on reload)
+                // it needs the reverse calculation done locally too.
+                const rowStart = row.querySelector('[data-field="start_date"]');
+                const rowDuration = row.querySelector('[data-field="duration"]');
+                if (rowStart && rowDuration && rowStart.value && el.value && el.value >= rowStart.value && isWorkingDay(parseDateLocal(el.value))) {
+                    rowDuration.value = countWorkingDays(rowStart.value, el.value);
                 }
             }
         });
@@ -843,6 +885,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 e.target.blur();
             }
+        });
+
+        // --- Inline "add new activity" row: creates via AJAX, then reloads (same reasoning
+        // as commitInlineEdit — bars/overlaps/leaves/counts all need a fresh server render). ---
+        tableContainerEl.addEventListener('click', (e) => {
+            const btn = e.target.closest('.add-row-save-btn');
+            if (!btn) return;
+            const row = btn.closest('tr.add-activity-row');
+            if (!row) return;
+
+            const nameInput = row.querySelector('[data-field="activity_name"]');
+            const assigneeSelect = row.querySelector('[data-field="assignee"]');
+            const startInput = row.querySelector('[data-field="start_date"]');
+            const durationInput = row.querySelector('[data-field="duration"]');
+            const endInput = row.querySelector('[data-field="end_date"]');
+
+            const name = (nameInput.value || '').trim();
+            if (!name) {
+                alert('Activity name is required.');
+                nameInput.focus();
+                return;
+            }
+            if (!startInput.value) {
+                alert('Start date is required.');
+                startInput.focus();
+                return;
+            }
+
+            const body = new URLSearchParams();
+            body.set('project', row.dataset.projectPk);
+            body.set('activity_name', name);
+            body.set('assignee', assigneeSelect.value);
+            body.set('start_date', startInput.value);
+            body.set('duration', durationInput.value || '1');
+            if (endInput.value) body.set('end_date', endInput.value);
+
+            btn.disabled = true;
+            quickSaveActivityField(row.dataset.createUrl, null, null, () => {
+                location.reload();
+            }, (err) => {
+                alert(err);
+                btn.disabled = false;
+            }, body);
         });
     }
 
@@ -1398,12 +1483,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const assigneeBtnText = document.getElementById('assigneeBtnText');
         if (assigneeBtnText) assigneeBtnText.textContent = selectedAssignees.length > 0 ? `Assignees (${selectedAssignees.length})` : 'Assignees (All)';
 
+        const hasActiveFilters = !!globalSearch || Object.keys(colFilters).length > 0 ||
+            selectedSegments.length > 0 || selectedLeaders.length > 0 || selectedAssignees.length > 0;
+
         // 2-Pass Filtering Logic to handle Group Visibility correctly
         const matchingGroupIds = new Set();
 
-        // Pass 1: Check content filters for all activity rows
+        // Pass 1: Check content filters for all activity rows (the add-row is a control,
+        // not data, so it never participates in filter matching itself).
         vsRowsData.forEach(row => {
-            if (!row.isGroup) {
+            if (!row.isGroup && !row.isAddRow) {
                 const matches = checkRowFilters(row, globalSearch, colFilters, selectedSegments, selectedLeaders, selectedAssignees);
                 row.matchesFilters = matches;
                 if (matches && row.groupId) {
@@ -1411,6 +1500,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
+        if (!hasActiveFilters) {
+            // Nothing is being filtered: also surface empty groups (e.g. a brand-new
+            // project with zero activities yet) so their "add new activity" row stays
+            // reachable, since they'd otherwise have no matching child row to trigger this.
+            vsRowsData.forEach(row => {
+                if (row.groupId) matchingGroupIds.add(row.groupId);
+            });
+        }
 
         // Pass 2: Build visible list
         vsVisibleRows = vsRowsData.filter(row => {
@@ -1425,7 +1523,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (row.groupId && vsCollapsedGroups.has(row.groupId)) {
                 return false;
             }
-            
+
+            // 3. Add-row: follows its group's visibility, ignores filter matching.
+            if (row.isAddRow) {
+                return row.groupId ? matchingGroupIds.has(row.groupId) : true;
+            }
+
             return row.matchesFilters;
         });
 
@@ -1816,14 +1919,18 @@ function initVirtualScroll() {
     if (!tbody || !tableContainer) return;
 
     // 1. Capture all rows
-    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    // #no-results-row is static "nothing matched" messaging, not a data/group/add row —
+    // it must stay out of the virtualized set, or it gets its 'hidden' class stripped and
+    // (trivially matching when no filters are active) renders as if it were a real row.
+    const allRows = Array.from(tbody.querySelectorAll('tr')).filter(row => row.id !== 'no-results-row');
     if (allRows.length === 0) return;
 
     // 2. Build Data Structure
     vsRowsData = allRows.map(row => {
         const isGroup = row.classList.contains('group-header');
+        const isAddRow = row.classList.contains('add-activity-row');
         const groupId = row.dataset.groupId;
-        
+
         // Capture height before modifying DOM (avoid layout thrashing)
         // If row is hidden (grouped), height is 0, so we use fallback.
         const height = row.offsetHeight || (isGroup ? 32 : 40);
@@ -1831,35 +1938,40 @@ function initVirtualScroll() {
         // FIX: Remove 'hidden' class from server-side rendering so VS can control visibility
         row.classList.remove('hidden');
 
-        // Per-column text for the "Filter..." boxes, read from each field's actual current
-        // value (not textContent) — the Assignee cell is a <select> whose textContent would
-        // otherwise include every option in the dropdown, not just the selected one.
-        const columnTexts = {};
-        row.querySelectorAll('[data-filter-column]').forEach(cell => {
-            const col = cell.dataset.filterColumn;
-            const select = cell.querySelector('select');
-            const input = cell.querySelector('input');
-            let text;
-            if (select) {
-                text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
-            } else if (input) {
-                text = input.value;
-            } else {
-                text = cell.textContent;
-            }
-            columnTexts[col] = (text || '').trim().toLowerCase();
-        });
+        // The "add new activity" row is a control, not data — it's never subject to the
+        // column/search filters, so it doesn't need searchData built for it.
+        let searchData = null;
+        if (!isAddRow) {
+            // Per-column text for the "Filter..." boxes, read from each field's actual current
+            // value (not textContent) — the Assignee cell is a <select> whose textContent would
+            // otherwise include every option in the dropdown, not just the selected one.
+            const columnTexts = {};
+            row.querySelectorAll('[data-filter-column]').forEach(cell => {
+                const col = cell.dataset.filterColumn;
+                const select = cell.querySelector('select');
+                const input = cell.querySelector('input');
+                let text;
+                if (select) {
+                    text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+                } else if (input) {
+                    text = input.value;
+                } else {
+                    text = cell.textContent;
+                }
+                columnTexts[col] = (text || '').trim().toLowerCase();
+            });
 
-        // Cache search data to avoid DOM access during filter
-        const searchData = {
-            project: (row.dataset.projectCode || '').toLowerCase(),
-            customer: (row.dataset.customer || '').toLowerCase(),
-            segment: (row.dataset.segment || '').toLowerCase(),
-            teamLead: (row.dataset.teamLead || '').toLowerCase(),
-            assignee: (row.dataset.assignee || '').toLowerCase(),
-            activityName: (row.dataset.activityName || '').toLowerCase(),
-            columnTexts: columnTexts
-        };
+            // Cache search data to avoid DOM access during filter
+            searchData = {
+                project: (row.dataset.projectCode || '').toLowerCase(),
+                customer: (row.dataset.customer || '').toLowerCase(),
+                segment: (row.dataset.segment || '').toLowerCase(),
+                teamLead: (row.dataset.teamLead || '').toLowerCase(),
+                assignee: (row.dataset.assignee || '').toLowerCase(),
+                activityName: (row.dataset.activityName || '').toLowerCase(),
+                columnTexts: columnTexts
+            };
+        }
 
         // Initialize collapsed state for groups (default collapsed except first?)
         // Existing logic was: index > 0 collapsed.
@@ -1871,6 +1983,7 @@ function initVirtualScroll() {
             element: row,
             height: height,
             isGroup: isGroup,
+            isAddRow: isAddRow,
             groupId: groupId,
             searchData: searchData
         };

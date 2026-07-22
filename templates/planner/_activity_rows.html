@@ -29,14 +29,16 @@
     </td>
 
     <td class="sticky-cell col-assignee px-1 py-1 text-xs text-gray-600 border-r" data-filter-column="assignee">
-        <select class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-transparent rounded px-0.5 py-0.5 hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none" data-field="assignee">
+        {% comment %}
+            Options are populated client-side from #assigneeOptionsTemplate (see
+            activity_planner.html) instead of looping the full employee list per row —
+            with hundreds of rows this loop was the dominant cost of rendering the page.
+        {% endcomment %}
+        <select class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-transparent rounded px-0.5 py-0.5 hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none" data-field="assignee" data-assignee-id="{{ activity.assignee_id|default_if_none:'' }}">
             <option value="">Unassigned</option>
             {% if activity.assignee and not activity.assignee.is_active %}
             <option value="{{ activity.assignee.pk }}" selected>{{ activity.assignee.name }} (Inactive)</option>
             {% endif %}
-            {% for emp in assignees %}
-            <option value="{{ emp.pk }}" {% if activity.assignee_id == emp.pk %}selected{% endif %}>{{ emp.name }}</option>
-            {% endfor %}
         </select>
     </td>
 

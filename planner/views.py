@@ -427,6 +427,7 @@ def consolidated_planner_view(request):
     assignees = Employee.objects.filter(is_active=True).order_by('name')
 
     display_data = defaultdict(list)
+    project_lookup = {}  # project_id (code) -> Project instance; only populated for grouping_method == 'project'
     if grouping_method == 'engineer':
         sorted_activities = sorted(context['activities'], key=lambda a: (a.assignee.name if a.assignee else "Unassigned", a.start_date))
         for act in sorted_activities:
@@ -443,7 +444,7 @@ def consolidated_planner_view(request):
         )
         display_data['All Activities'] = sorted_activities
         
-    else: 
+    else:
         # Default fallback to 'project'
         grouping_method = 'project'
         activities_by_project = defaultdict(list)
@@ -451,6 +452,7 @@ def consolidated_planner_view(request):
             activities_by_project[act.project_id].append(act)
         for project in Project.objects.order_by('project_id'):
             display_data[project.project_id] = sorted(activities_by_project.get(project.id, []), key=lambda a: a.start_date)
+            project_lookup[project.project_id] = project
 
     gantt_init_data = {
         'activities': [
@@ -477,7 +479,8 @@ def consolidated_planner_view(request):
         'gantt_init_data': gantt_init_data,
         'segments': segments,
         'team_leads': team_leads,
-        'assignees': assignees
+        'assignees': assignees,
+        'project_lookup': project_lookup
     })
     return render(request, 'planner/activity_planner.html', context)
 
@@ -1079,6 +1082,54 @@ def activity_quick_update_view(request, pk):
         'duration': activity.duration,
         'remark': activity.remark,
     })
+
+@require_POST
+def activity_quick_create_view(request):
+    """Inline "add row" endpoint used at the bottom of the Activities Breakdown table
+    (and per project group in the consolidated view). Mirrors the essential fields of
+    ActivityForm; end_date/duration derivation is handled by Activity.save() as usual.
+    """
+    project = get_object_or_404(Project, pk=request.POST.get('project'))
+
+    activity_name = request.POST.get('activity_name', '').strip()
+    if not activity_name:
+        return JsonResponse({'success': False, 'error': 'Activity name is required.'}, status=400)
+
+    start_date = parse_date(request.POST.get('start_date', ''))
+    if not start_date:
+        return JsonResponse({'success': False, 'error': 'A valid start date is required.'}, status=400)
+
+    try:
+        duration = int(request.POST.get('duration') or 1)
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Duration must be a whole number.'}, status=400)
+    if duration < 1:
+        return JsonResponse({'success': False, 'error': 'Duration must be at least 1 day.'}, status=400)
+
+    assignee = None
+    assignee_id = request.POST.get('assignee')
+    if assignee_id:
+        assignee = Employee.objects.filter(pk=assignee_id).first()
+        if not assignee:
+            return JsonResponse({'success': False, 'error': 'Selected assignee not found.'}, status=400)
+
+    activity = Activity(
+        project=project,
+        activity_name=activity_name,
+        assignee=assignee,
+        start_date=start_date,
+        duration=duration,
+    )
+
+    end_date_str = request.POST.get('end_date')
+    if end_date_str:
+        dt = parse_date(end_date_str)
+        if dt:
+            activity.end_date = dt
+
+    activity.save()
+
+    return JsonResponse({'success': True, 'pk': activity.pk})
 
 def edit_project_type_view(request, pk):
     project_type = get_object_or_404(ProjectType, pk=pk)

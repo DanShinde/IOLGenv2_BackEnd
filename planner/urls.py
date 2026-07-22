@@ -21,6 +21,7 @@ urlpatterns = [
     path('activity/<int:pk>/edit/', views.edit_activity_view, name='planner_edit_activity'),
     path('activity/<int:pk>/delete/', views.delete_activity_view, name='planner_delete_activity'),
     path('activity/<int:pk>/quick-update/', views.activity_quick_update_view, name='planner_activity_quick_update'),
+    path('activity/quick-create/', views.activity_quick_create_view, name='planner_activity_quick_create'),
     path('holiday/<int:pk>/delete/', views.delete_holiday_view, name='planner_delete_holiday'),
     path('project-type/<int:pk>/edit/', views.edit_project_type_view, name='planner_edit_project_type'),
     path('project-type/<int:pk>/delete/', views.delete_project_type_view, name='planner_delete_project_type'),
