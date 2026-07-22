@@ -857,6 +857,93 @@ def export_site_history_pdf(request):
     c.save()
     return response
 
+def resource_availability_report_view(request):
+    """
+    Ranks active employees by how much of an upcoming window they're booked for,
+    based on non-completed Activity assignments overlapping that window. Lets users
+    quickly spot the most free (available) and most booked (occupied) resources,
+    with each resource's current/upcoming tasks listed underneath their name.
+    """
+    today = date.today()
+
+    try:
+        days = int(request.GET.get('days', 30))
+    except (TypeError, ValueError):
+        days = 30
+    days = max(1, min(days, 365))
+    period_end = today + timedelta(days=days - 1)
+
+    try:
+        top_n = int(request.GET.get('top_n', 10))
+    except (TypeError, ValueError):
+        top_n = 10
+    top_n = max(1, min(top_n, 100))
+
+    selected_designation = request.GET.get('designation', '')
+
+    holidays = list(Holiday.objects.values_list('date', flat=True))
+    holidays_set = set(holidays)
+    total_working_days = count_working_days(today, period_end, holidays) or 0
+
+    employees_qs = Employee.objects.filter(is_active=True).exclude(name__startswith='Unassigned')
+    if selected_designation:
+        employees_qs = employees_qs.filter(designation=selected_designation)
+    employees_qs = employees_qs.order_by('name')
+
+    # Non-completed activities for these employees whose date range overlaps the window.
+    activities = Activity.objects.filter(
+        assignee__in=employees_qs,
+        is_completed=False,
+        start_date__lte=period_end,
+        end_date__gte=today,
+    ).select_related('project', 'assignee').order_by('start_date')
+
+    activities_by_employee = defaultdict(list)
+    occupied_days_by_employee = defaultdict(set)
+
+    for act in activities:
+        activities_by_employee[act.assignee_id].append(act)
+
+        # Only count the portion of the activity that actually falls inside the window,
+        # and de-duplicate days covered by more than one overlapping activity.
+        seg_start = max(act.start_date, today)
+        seg_end = min(act.end_date, period_end)
+        current_date = seg_start
+        while current_date <= seg_end:
+            if current_date.weekday() < 5 and current_date not in holidays_set:
+                occupied_days_by_employee[act.assignee_id].add(current_date)
+            current_date += timedelta(days=1)
+
+    resources = []
+    for emp in employees_qs:
+        occupied_days = len(occupied_days_by_employee.get(emp.id, ()))
+        occupancy_pct = round((occupied_days / total_working_days) * 100, 1) if total_working_days else 0
+        resources.append({
+            'employee': emp,
+            'occupied_days': occupied_days,
+            'available_days': max(0, total_working_days - occupied_days),
+            'occupancy_pct': occupancy_pct,
+            'activities': sorted(activities_by_employee.get(emp.id, []), key=lambda a: a.start_date),
+        })
+
+    most_occupied = sorted(resources, key=lambda r: (-r['occupancy_pct'], r['employee'].name))[:top_n]
+    most_available = sorted(resources, key=lambda r: (r['occupancy_pct'], r['employee'].name))[:top_n]
+
+    context = {
+        'active_nav': 'resource_report',
+        'today': today,
+        'period_end': period_end,
+        'days': days,
+        'top_n': top_n,
+        'total_working_days': total_working_days,
+        'total_resources': employees_qs.count(),
+        'designation_choices': Employee.DESIGNATION_CHOICES,
+        'selected_designation': selected_designation,
+        'most_available': most_available,
+        'most_occupied': most_occupied,
+    }
+    return render(request, 'planner/resource_availability_report.html', context)
+
 def update_employee_view(request, pk):
     employee = get_object_or_404(Employee, pk=pk)
     if request.method == 'POST':
