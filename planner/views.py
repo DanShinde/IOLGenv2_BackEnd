@@ -1302,7 +1302,7 @@ def capacity_plan_view(request):
     forecasted_workload_by_segment = defaultdict(lambda: defaultdict(float))
     
     for activity in Activity.objects.select_related('assignee', 'project__segment').filter(
-        assignee__isnull=False, start_date__isnull=False, end_date__isnull=False
+        assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False
     ):
         daily_hours = general_settings.working_hours_per_day
         current_date = activity.start_date
@@ -1373,7 +1373,7 @@ def capacity_plan_view(request):
     global_forecast_workload = defaultdict(float)
     
     # Calculate global sums for Charts (Workload Volume)
-    for activity in Activity.objects.filter(assignee__isnull=False, start_date__isnull=False, end_date__isnull=False):
+    for activity in Activity.objects.filter(assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False):
         current_date = activity.start_date
         while current_date <= activity.end_date:
             if current_date.weekday() < 5 and current_date not in holidays:

@@ -395,6 +395,10 @@
                     <h2 class="text-sm font-bold text-gray-800">Activity Timeline</h2>
                 </div>
                 <div class="flex items-center space-x-3">
+                    <button id="toggleCompletedBtn" class="bg-white text-gray-700 border border-gray-300 py-1 px-3 rounded-md font-semibold text-xs flex items-center hover:bg-gray-50 transition-colors shadow-sm" title="Completed activities are hidden by default">
+                        <svg class="w-3 h-3 mr-1.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span id="toggleCompletedBtnText">Show Completed</span>
+                    </button>
                     <button id="goToTodayBtn" class="bg-white text-gray-700 border border-gray-300 py-1 px-3 rounded-md font-semibold text-xs flex items-center hover:bg-gray-50 transition-colors shadow-sm" title="Scroll to Today">
                         <svg class="w-3 h-3 mr-1.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         Today
@@ -1426,11 +1430,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearFiltersBtn = document.getElementById('clearFilters');
     
     // Virtual Scroll State
-    let vsRowsData = []; // { element, height, isGroup, groupId, searchData: {} }
+    let vsRowsData = []; // { element, height, isGroup, groupId, isAddRow, isCompleted, searchData: {} }
     let vsVisibleRows = [];
     let vsCollapsedGroups = new Set();
     let isVirtualScrollActive = false;
     let isRenderPending = false;
+
+    // Completed activities are hidden by default; the toggle below persists for the
+    // browser tab's session (sessionStorage), not tied to a specific project's URL.
+    let showCompletedActivities = sessionStorage.getItem('planner_show_completed') === 'true';
 
     // --- STATE PERSISTENCE START ---
     function saveState() {
@@ -1589,8 +1597,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function checkRowFilters(row, globalSearch, colFilters, selectedSegments, selectedLeaders, selectedAssignees) {
+        // Completed activities are hidden by default, independent of any other filter.
+        if (!showCompletedActivities && row.isCompleted) return false;
+
         let isVisible = true;
-        
+
         // 1. Global Search
         if (globalSearch) {
             const s = row.searchData;
@@ -1641,6 +1652,26 @@ document.addEventListener('DOMContentLoaded', () => {
             segmentCheckboxes.forEach(cb => cb.checked = false);
             leaderCheckboxes.forEach(cb => cb.checked = false);
             assigneeCheckboxes.forEach(cb => cb.checked = false);
+            applyFilters();
+        });
+    }
+
+    // --- Show/Hide Completed Activities (hidden by default, persists for this tab's session) ---
+    const toggleCompletedBtn = document.getElementById('toggleCompletedBtn');
+    const toggleCompletedBtnText = document.getElementById('toggleCompletedBtnText');
+    function updateToggleCompletedBtn() {
+        if (!toggleCompletedBtn || !toggleCompletedBtnText) return;
+        toggleCompletedBtnText.textContent = showCompletedActivities ? 'Hide Completed' : 'Show Completed';
+        toggleCompletedBtn.classList.toggle('bg-emerald-50', showCompletedActivities);
+        toggleCompletedBtn.classList.toggle('border-emerald-300', showCompletedActivities);
+        toggleCompletedBtn.classList.toggle('text-emerald-700', showCompletedActivities);
+    }
+    if (toggleCompletedBtn) {
+        updateToggleCompletedBtn();
+        toggleCompletedBtn.addEventListener('click', () => {
+            showCompletedActivities = !showCompletedActivities;
+            sessionStorage.setItem('planner_show_completed', String(showCompletedActivities));
+            updateToggleCompletedBtn();
             applyFilters();
         });
     }
@@ -1978,6 +2009,7 @@ function initVirtualScroll() {
     vsRowsData = allRows.map(row => {
         const isGroup = row.classList.contains('group-header');
         const isAddRow = row.classList.contains('add-activity-row');
+        const isCompleted = row.classList.contains('row-completed');
         const groupId = row.dataset.groupId;
 
         // Capture height before modifying DOM (avoid layout thrashing)
@@ -2033,6 +2065,7 @@ function initVirtualScroll() {
             height: height,
             isGroup: isGroup,
             isAddRow: isAddRow,
+            isCompleted: isCompleted,
             groupId: groupId,
             searchData: searchData
         };
