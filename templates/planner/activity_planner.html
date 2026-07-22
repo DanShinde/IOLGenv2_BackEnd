@@ -114,6 +114,8 @@
         --w-start: 60px;
         --w-duration: 55px;
         --w-end: 60px;
+        --w-completion: 70px;
+        --w-completed: 50px;
         --w-actions: 60px;
     }
 
@@ -123,28 +125,36 @@
     .col-start      { width: var(--w-start);  min-width: var(--w-start);  max-width: var(--w-start);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee)); }
     .col-duration   { width: var(--w-duration);  min-width: var(--w-duration);  max-width: var(--w-duration);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start)); }
     .col-end        { width: var(--w-end);  min-width: var(--w-end);  max-width: var(--w-end);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
-    .col-actions    { width: var(--w-actions);  min-width: var(--w-actions);  max-width: var(--w-actions);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
+    .col-completion { width: var(--w-completion);  min-width: var(--w-completion);  max-width: var(--w-completion);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); text-align: center; }
+    .col-completed  { width: var(--w-completed);  min-width: var(--w-completed);  max-width: var(--w-completed);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); text-align: center; }
+    .col-actions    { width: var(--w-actions);  min-width: var(--w-actions);  max-width: var(--w-actions);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
 
     .no-project-col .col-activity { width: var(--w-activity-noproj); min-width: var(--w-activity-noproj); max-width: var(--w-activity-noproj); left: 0px; }
     .no-project-col .col-assignee { left: var(--w-activity-noproj); }
     .no-project-col .col-start    { left: calc(var(--w-activity-noproj) + var(--w-assignee)); }
     .no-project-col .col-duration { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start)); }
     .no-project-col .col-end      { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
-    .no-project-col .col-actions  { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+    .no-project-col .col-completion { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+    .no-project-col .col-completed  { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
+    .no-project-col .col-actions  { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
 
     .remark-btn.has-remark { color: #b45309; }
     .remark-btn.has-remark svg { fill: currentColor; }
 
+    tr.row-completed .sticky-cell { background-color: #f0fdf4; }
+    tr.row-completed:hover .sticky-cell { background-color: #dcfce7; }
+    tr.row-completed .col-activity input { color: #16a34a; text-decoration: line-through; text-decoration-color: #86efac; }
+
     /* --- Resizable Splitter between Activities Breakdown & Gantt Timeline --- */
     .breakdown-resize-handle {
         position: sticky;
-        left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-actions));
+        left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
         height: 0;
         z-index: 80;
         pointer-events: none;
     }
     .no-project-col .breakdown-resize-handle {
-        left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-actions));
+        left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
     }
     .breakdown-resize-handle .grip {
         position: absolute;
@@ -206,6 +216,10 @@
     .no-project-col .col-resize-handle.after-duration { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
     .col-resize-handle.after-end { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
     .no-project-col .col-resize-handle.after-end { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+    .col-resize-handle.after-completion { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
+    .no-project-col .col-resize-handle.after-completion { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
+    .col-resize-handle.after-completed { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
+    .no-project-col .col-resize-handle.after-completed { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
 
     .group-header .sticky-cell {
         background-color: #f8fafc; 
@@ -414,6 +428,8 @@
             <div class="col-resize-handle after-start" data-var="--w-start" title="Drag to resize the Start column"><div class="grip"></div></div>
             <div class="col-resize-handle after-duration" data-var="--w-duration" title="Drag to resize the Duration column"><div class="grip"></div></div>
             <div class="col-resize-handle after-end" data-var="--w-end" title="Drag to resize the End column"><div class="grip"></div></div>
+            <div class="col-resize-handle after-completion" data-var="--w-completion" title="Drag to resize the % Complete column"><div class="grip"></div></div>
+            <div class="col-resize-handle after-completed" data-var="--w-completed" title="Drag to resize the Completed column"><div class="grip"></div></div>
 
             <div class="breakdown-resize-handle" title="Drag to resize the Activities Breakdown pane">
                 <div class="grip"></div>
@@ -422,7 +438,7 @@
             <table class="w-full table-auto {% if project %}no-project-col{% endif %}" style="min-width: 4000px;">
                 <thead class="bg-gray-50 sticky top-0 z-50">
                     <tr class="h-6">
-                        <th colspan="{% if not project %}7{% else %}6{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
+                        <th colspan="{% if not project %}9{% else %}8{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
                             <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
                         </th>
                         {% for month, day_count in gantt_data.months.items %}<th colspan="{{ day_count }}" class="px-2 py-1 text-center text-xs font-semibold border-l bg-gradient-to-r from-indigo-500 to-purple-600 text-white">{{ month }}</th>{% endfor %}
@@ -434,6 +450,8 @@
                         <th class="sticky-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
                         <th class="sticky-cell col-duration px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Dur.</th>
                         <th class="sticky-cell col-end px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">End</th>
+                        <th class="sticky-cell col-completion px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">% Comp.</th>
+                        <th class="sticky-cell col-completed px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Done</th>
                         <th class="sticky-cell col-actions px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                         {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" data-date="{{ d|date:'Y-m-d' }}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
                     </tr>
@@ -444,6 +462,8 @@
                         <th class="sticky-cell col-start p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="start" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                         <th class="sticky-cell col-duration p-0.5 bg-gray-100 border-r"></th>
                         <th class="sticky-cell col-end p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="end" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
+                        <th class="sticky-cell col-completion p-0.5 bg-gray-100 border-r"></th>
+                        <th class="sticky-cell col-completed p-0.5 bg-gray-100 border-r"></th>
                         <th class="sticky-cell col-actions p-0.5 bg-gray-100 border-r"></th>
                         <th colspan="{{ gantt_data.header_dates|length }}" class="bg-gray-100"></th>
                     </tr>
@@ -457,7 +477,7 @@
                             {% if grouping_method != 'none' %}
                             {% with group_data=group_gantt_data|get_item:group_name %}
                             <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}">
-                                <td colspan="7" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
+                                <td colspan="9" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
                                     <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                 </td>
                                 <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
@@ -771,7 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tableContainerEl = document.querySelector('.table-container');
 
     document.querySelectorAll('.inline-edit-input').forEach(el => {
-        el.dataset.originalValue = el.value;
+        el.dataset.originalValue = el.type === 'checkbox' ? String(el.checked) : el.value;
     });
 
     if (tableContainerEl) {
@@ -803,8 +823,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (rowStart && rowDuration && rowStart.value && el.value && el.value >= rowStart.value && isWorkingDay(parseDateLocal(el.value))) {
                     rowDuration.value = countWorkingDays(rowStart.value, el.value);
                 }
+            } else if (field === 'completion_percentage') {
+                // Optimistic preview of the 100% -> completed rule; the server re-confirms
+                // (and is the actual source of truth) once the field is committed.
+                const rowCompleted = row.querySelector('[data-field="is_completed"]');
+                if (rowCompleted) rowCompleted.checked = parseInt(el.value, 10) >= 100;
             }
         });
+
+        // Checking "Completed" optimistically fills % Complete to 100 (server confirms on commit).
+        tableContainerEl.addEventListener('change', (e) => {
+            const el = e.target;
+            if (!el.classList.contains('inline-edit-input') || el.dataset.field !== 'is_completed') return;
+            if (!el.checked) return;
+            const row = el.closest('tr');
+            const rowCompletion = row ? row.querySelector('[data-field="completion_percentage"]') : null;
+            if (rowCompletion) rowCompletion.value = 100;
+        });
+
+        function revertInlineEdit(input, original) {
+            if (input.type === 'checkbox') input.checked = original === 'true';
+            else input.value = original;
+        }
 
         function commitInlineEdit(input) {
             const row = input.closest('tr');
@@ -814,13 +854,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!updateUrl || !field) return;
 
             const original = input.dataset.originalValue ?? '';
-            let value = input.value;
+            let value = input.type === 'checkbox' ? String(input.checked) : input.value;
             if (field === 'activity_name') value = value.trim();
             if (value === original) return;
 
             if (field === 'activity_name' && !value) {
                 alert('Activity name cannot be empty.');
-                input.value = original;
+                revertInlineEdit(input, original);
                 return;
             }
 
@@ -828,7 +868,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dur = parseInt(value, 10);
                 if (!dur || dur < 1) {
                     alert('Duration must be at least 1 day.');
-                    input.value = original;
+                    revertInlineEdit(input, original);
+                    return;
+                }
+            }
+
+            if (field === 'completion_percentage') {
+                const pct = parseInt(value, 10);
+                if (isNaN(pct) || pct < 0 || pct > 100) {
+                    alert('Completion % must be between 0 and 100.');
+                    revertInlineEdit(input, original);
                     return;
                 }
             }
@@ -838,12 +887,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (rowStart && rowStart.value) {
                     if (value < rowStart.value) {
                         alert('End Date cannot be before Start Date.');
-                        input.value = original;
+                        revertInlineEdit(input, original);
                         return;
                     }
                     if (!isWorkingDay(parseDateLocal(value))) {
                         alert('Error: The selected End Date falls on a weekend or holiday.\nPlease select a working day.');
-                        input.value = original;
+                        revertInlineEdit(input, original);
                         return;
                     }
                 }
@@ -857,16 +906,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 location.reload();
             }, (err) => {
                 alert(err);
-                input.value = original;
+                revertInlineEdit(input, original);
                 input.disabled = false;
             });
         }
 
-        // Select/date/number fields commit on 'change' (i.e. once the user finalizes the value).
+        // Select/date/number/checkbox fields commit on 'change' (i.e. once the user finalizes the value).
         tableContainerEl.addEventListener('change', (e) => {
             const el = e.target;
             if (!el.classList.contains('inline-edit-input')) return;
-            if (el.tagName === 'SELECT' || el.type === 'date' || el.type === 'number') {
+            if (el.tagName === 'SELECT' || el.type === 'date' || el.type === 'number' || el.type === 'checkbox') {
                 commitInlineEdit(el);
             }
         });
@@ -1032,8 +1081,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const isNoProjectMode = tableEl.classList.contains('no-project-col');
         const activityVar = isNoProjectMode ? '--w-activity-noproj' : '--w-activity';
         const columnVars = isNoProjectMode
-            ? [activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions']
-            : ['--w-project', activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions'];
+            ? [activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-completion', '--w-completed', '--w-actions']
+            : ['--w-project', activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-completion', '--w-completed', '--w-actions'];
 
         const MIN_COL_WIDTH = 40;
         const MIN_TOTAL = columnVars.length * MIN_COL_WIDTH;

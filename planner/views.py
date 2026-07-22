@@ -1066,6 +1066,23 @@ def activity_quick_update_view(request, pk):
     elif field == 'remark':
         activity.remark = value
 
+    elif field == 'completion_percentage':
+        try:
+            pct = int(value)
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'Completion % must be a whole number.'}, status=400)
+        if pct < 0 or pct > 100:
+            return JsonResponse({'success': False, 'error': 'Completion % must be between 0 and 100.'}, status=400)
+        activity.completion_percentage = pct
+        if pct == 100:
+            activity.is_completed = True
+
+    elif field == 'is_completed':
+        is_completed = value in ('true', 'True', '1', 'on', 'yes')
+        activity.is_completed = is_completed
+        if is_completed:
+            activity.completion_percentage = 100
+
     else:
         return JsonResponse({'success': False, 'error': 'Unknown field.'}, status=400)
 
@@ -1081,6 +1098,8 @@ def activity_quick_update_view(request, pk):
         'end_date': activity.end_date.isoformat() if activity.end_date else '',
         'duration': activity.duration,
         'remark': activity.remark,
+        'completion_percentage': activity.completion_percentage,
+        'is_completed': activity.is_completed,
     })
 
 @require_POST

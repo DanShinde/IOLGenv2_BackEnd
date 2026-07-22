@@ -40,6 +40,10 @@
                data-field="end_date">
     </td>
 
+    {% comment %} New activities start at 0% / not completed — nothing to set until it exists. {% endcomment %}
+    <td class="sticky-cell col-completion px-1 py-1 border-r"></td>
+    <td class="sticky-cell col-completed px-1 py-1 border-r"></td>
+
     <td class="sticky-cell col-actions px-1 py-1 border-r">
         <div class="flex items-center justify-center">
             <button type="button" class="add-row-save-btn action-btn p-1 rounded hover:bg-emerald-100 text-emerald-600" title="Add Activity">
