@@ -67,11 +67,33 @@
     /* --- Key Structural and Sticky Column Styles --- */
     .table-container { max-height: 75vh; overflow: auto; border-top: 1px solid #e5e7eb; scroll-behavior: smooth; overflow-anchor: none; }
     .table-container::-webkit-scrollbar { width: 10px; height: 10px; }
+    .table-container::-webkit-scrollbar:horizontal { height: 0; } /* native horizontal bar spans the whole table incl. the frozen pane; replaced by .gantt-hscroll-track below, which only spans the timeline */
     .table-container::-webkit-scrollbar-track { background: #f1f5f9; }
     .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px;}
     .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     .sticky-cell { position: -webkit-sticky; position: sticky; background-color: white; z-index: 40; }
     thead .sticky-cell { z-index: 60; }
+
+    /* --- Custom horizontal scrollbar, scoped to just the Gantt timeline (right of the split line) --- */
+    .gantt-hscroll-track {
+        position: relative;
+        height: 10px;
+        background: #f1f5f9;
+        border-top: 1px solid #e5e7eb;
+        border-radius: 0 0 0.75rem 0.75rem;
+    }
+    .gantt-hscroll-thumb {
+        position: absolute;
+        top: 0;
+        height: 10px;
+        background: #cbd5e1;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .gantt-hscroll-thumb:hover,
+    .gantt-hscroll-thumb.dragging {
+        background: #94a3b8;
+    }
 
     /* Fix for horizontal scroll visibility behind sticky columns */
     table { border-collapse: separate !important; border-spacing: 0; }
@@ -446,6 +468,9 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+        <div id="ganttHScrollTrack" class="gantt-hscroll-track">
+            <div id="ganttHScrollThumb" class="gantt-hscroll-thumb"></div>
         </div>
         <div class="bg-gray-50 px-4 py-2 border-t border-gray-200 flex flex-wrap items-center justify-end gap-4 text-xs text-gray-600">
             <span class="font-semibold text-gray-700">Legend:</span>
@@ -1067,6 +1092,124 @@ document.addEventListener('DOMContentLoaded', () => {
             syncGripHeights();
             setTimeout(syncGripHeights, 500);
         }
+    })();
+
+    // --- Custom horizontal scrollbar, scoped to just the Gantt timeline ---
+    // The native scrollbar on .table-container always spans the FULL table width, including
+    // the frozen breakdown columns (which don't visually move), so its thumb range doesn't
+    // line up with the split line. This overlay tracks the same scroll position but is sized
+    // and positioned to represent only the timeline's visible/scrollable width.
+    (function setupGanttScrollbar() {
+        const container = document.querySelector('.table-container');
+        const tableEl = document.querySelector('.table-container table');
+        const track = document.getElementById('ganttHScrollTrack');
+        const thumb = document.getElementById('ganttHScrollThumb');
+        if (!container || !tableEl || !track || !thumb) return;
+
+        const isNoProjectMode = tableEl.classList.contains('no-project-col');
+        const activityVar = isNoProjectMode ? '--w-activity-noproj' : '--w-activity';
+        const breakdownVars = isNoProjectMode
+            ? [activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions']
+            : ['--w-project', activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions'];
+
+        function getBreakdownWidth() {
+            const rootStyle = getComputedStyle(document.documentElement);
+            return breakdownVars.reduce((sum, v) => sum + (parseFloat(rootStyle.getPropertyValue(v)) || 0), 0);
+        }
+
+        let dragging = false;
+        let dragStartX = 0;
+        let dragStartScrollLeft = 0;
+
+        function updateScrollbar() {
+            const breakdownWidth = getBreakdownWidth();
+            const viewportWidth = Math.max(0, container.clientWidth - breakdownWidth);
+
+            track.style.marginLeft = `${breakdownWidth}px`;
+            track.style.width = `${viewportWidth}px`;
+
+            const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+            const timelineContentWidth = Math.max(1, tableEl.scrollWidth - breakdownWidth);
+
+            if (viewportWidth <= 0 || maxScrollLeft <= 0) {
+                thumb.style.width = `${viewportWidth}px`;
+                thumb.style.left = '0px';
+                return;
+            }
+
+            const thumbWidth = Math.max(30, Math.min(viewportWidth, viewportWidth * (viewportWidth / timelineContentWidth)));
+            const thumbLeft = (container.scrollLeft / maxScrollLeft) * (viewportWidth - thumbWidth);
+
+            thumb.style.width = `${thumbWidth}px`;
+            thumb.style.left = `${thumbLeft}px`;
+        }
+
+        function onThumbMouseMove(e) {
+            if (!dragging) return;
+            const breakdownWidth = getBreakdownWidth();
+            const viewportWidth = Math.max(1, container.clientWidth - breakdownWidth);
+            const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+            const thumbWidth = parseFloat(thumb.style.width) || 30;
+            const trackRange = Math.max(1, viewportWidth - thumbWidth);
+
+            const deltaScroll = ((e.clientX - dragStartX) / trackRange) * maxScrollLeft;
+            container.style.scrollBehavior = 'auto';
+            container.scrollLeft = Math.min(maxScrollLeft, Math.max(0, dragStartScrollLeft + deltaScroll));
+            updateScrollbar();
+        }
+
+        function onThumbMouseUp() {
+            if (!dragging) return;
+            dragging = false;
+            thumb.classList.remove('dragging');
+            container.style.scrollBehavior = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onThumbMouseMove);
+            document.removeEventListener('mouseup', onThumbMouseUp);
+        }
+
+        thumb.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            dragging = true;
+            dragStartX = e.clientX;
+            dragStartScrollLeft = container.scrollLeft;
+            thumb.classList.add('dragging');
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', onThumbMouseMove);
+            document.addEventListener('mouseup', onThumbMouseUp);
+        });
+
+        // Clicking the track (not the thumb) jumps the scroll position to that point.
+        track.addEventListener('mousedown', (e) => {
+            if (e.target === thumb) return;
+            const breakdownWidth = getBreakdownWidth();
+            const viewportWidth = Math.max(1, container.clientWidth - breakdownWidth);
+            const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+            const thumbWidth = parseFloat(thumb.style.width) || 30;
+            const trackRange = Math.max(1, viewportWidth - thumbWidth);
+
+            const trackRect = track.getBoundingClientRect();
+            const clickX = (e.clientX - trackRect.left) - (thumbWidth / 2);
+            const ratio = Math.min(1, Math.max(0, clickX / trackRange));
+
+            container.style.scrollBehavior = 'auto';
+            container.scrollLeft = ratio * maxScrollLeft;
+            container.style.scrollBehavior = '';
+            updateScrollbar();
+        });
+
+        container.addEventListener('scroll', updateScrollbar);
+        window.addEventListener('resize', updateScrollbar);
+
+        // Fires whenever the table's rendered width changes, which also covers all of the
+        // column/pane resize handles above (they mutate the width live during drag).
+        if (window.ResizeObserver) {
+            new ResizeObserver(updateScrollbar).observe(tableEl);
+        } else {
+            setTimeout(updateScrollbar, 500);
+        }
+
+        updateScrollbar();
     })();
 
     // --- Scroll to Today Logic ---
