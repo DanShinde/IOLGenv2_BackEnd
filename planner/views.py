@@ -1,6 +1,7 @@
 # planner/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.template.loader import render_to_string
 from employees.models import Employee
 from .models import (ProjectType, Segment, Category, Holiday,
                      Project, Activity, GeneralSettings, CapacitySettings,
@@ -467,7 +468,9 @@ def consolidated_planner_view(request):
         ],
         'holidays': [h.isoformat() for h in context['holidays_map'].keys()],
         'leaves': _get_leaves_map(),  # NEW: Inject leaves
-        'today': context['today'].isoformat()
+        'today': context['today'].isoformat(),
+        'grouping_method': grouping_method,
+        'is_single_project': False,
     }
 
     context.update({
@@ -527,7 +530,9 @@ def activity_planner_view(request, project_pk):
         ],
         'holidays': [h.isoformat() for h in context['holidays_map'].keys()],
         'leaves': _get_leaves_map(),  # NEW: Inject leaves
-        'today': context['today'].isoformat()
+        'today': context['today'].isoformat(),
+        'grouping_method': 'none',
+        'is_single_project': True,
     }
 
     context.update({
@@ -1271,7 +1276,42 @@ def activity_quick_create_view(request):
 
     activity.save()
 
-    return JsonResponse({'success': True, 'pk': activity.pk})
+    # Employee.full_name isn't a real model field -- it's normally monkey-patched on by
+    # _prepare_gantt_context() (used when rendering the full page) before the row template
+    # reads it for data-assignee. This endpoint never calls that, so without this the new
+    # row's data-assignee would silently render "Unassigned" even when one is set.
+    if activity.assignee:
+        activity.assignee.full_name = activity.assignee.name
+
+    # Rendered client-side without a reload (see activity_planner.html), so the new row's
+    # frozen-pane HTML is rendered here and sent back for direct insertion. The timeline-pane
+    # half is trivial (an empty bar container) and gets built client-side instead -- only the
+    # frozen half needs real template logic (inline-edit inputs, filter attributes, etc).
+    render_context = {
+        'activities': [activity],
+        'pane': 'frozen',
+        'group_name': request.POST.get('group_name') or None,
+        'grouping_method': 'none',
+    }
+    if request.POST.get('is_single_project'):
+        render_context['project'] = activity.project  # any truthy value suppresses the Project column
+    frozen_row_html = render_to_string('planner/_activity_rows.html', render_context, request=request)
+
+    return JsonResponse({
+        'success': True,
+        'pk': activity.pk,
+        'activity_name': activity.activity_name,
+        'assignee_id': activity.assignee_id,
+        'assignee_name': activity.assignee.name if activity.assignee else '',
+        'assignee_full_name': getattr(activity.assignee, 'full_name', activity.assignee.name) if activity.assignee else '',
+        'start_date': activity.start_date.isoformat(),
+        'end_date': activity.end_date.isoformat() if activity.end_date else '',
+        'duration': activity.duration,
+        'completion_percentage': activity.completion_percentage,
+        'is_completed': activity.is_completed,
+        'project_code': activity.project.project_id,
+        'frozen_row_html': frozen_row_html,
+    })
 
 def edit_project_type_view(request, pk):
     project_type = get_object_or_404(ProjectType, pk=pk)

@@ -733,18 +733,22 @@ function quickSaveActivityField(updateUrl, field, value, onSuccess, onError, pre
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Populates one row's Assignee <select> from the single shared options template. Reused
+    // both for the page-load pass below and for a single newly-added row (see the add-row
+    // success handler further down), which is why it's a standalone function rather than an
+    // inline loop.
+    function populateAssigneeDropdown(select) {
+        const optionsTemplate = document.getElementById('assigneeOptionsTemplate');
+        if (!optionsTemplate || !select) return;
+        select.appendChild(optionsTemplate.content.cloneNode(true));
+        const currentId = select.dataset.assigneeId;
+        if (currentId) select.value = currentId;
+    }
+
     // Populate every row's Assignee <select> from the single shared options template
     // (must run before anything reads/captures select values, e.g. the virtual-scroll
     // row indexing and the inline-edit "original value" snapshot below).
-    (function populateAssigneeDropdowns() {
-        const optionsTemplate = document.getElementById('assigneeOptionsTemplate');
-        if (!optionsTemplate) return;
-        document.querySelectorAll('select.inline-edit-input[data-field="assignee"]').forEach(select => {
-            select.appendChild(optionsTemplate.content.cloneNode(true));
-            const currentId = select.dataset.assigneeId;
-            if (currentId) select.value = currentId;
-        });
-    })();
+    document.querySelectorAll('select.inline-edit-input[data-field="assignee"]').forEach(populateAssigneeDropdown);
 
     // Apply styles to Django form fields in Modal
     const modalForm = document.getElementById('addActivityForm');
@@ -762,10 +766,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const durationInput = document.getElementById('id_duration');
     const endInput = document.getElementById('id_end_date');
 
-    // Get holidays from the gantt data script
+    // Get holidays from the gantt data script. `ganttData` is the SINGLE mutable source of
+    // truth for the whole page's Gantt dataset -- inline edits and the add-activity row patch
+    // ganttData.activities directly (see commitInlineEdit / the add-row handler below) so that
+    // repaintGanttBars() can recompute bars/overlaps from it without a page reload. `const`
+    // here only prevents reassigning the variable itself; mutating its contents is fine.
     const ganttDataEl = document.getElementById('gantt-init-data');
-    const ganttData = ganttDataEl ? JSON.parse(ganttDataEl.textContent) : { holidays: [] };
+    const ganttData = ganttDataEl ? JSON.parse(ganttDataEl.textContent) : { holidays: [], activities: [] };
     const holidaysSet = new Set(ganttData.holidays);
+    const PLANNER_GROUPING_METHOD = ganttData.grouping_method || 'none';
+    const PLANNER_IS_SINGLE_PROJECT = !!ganttData.is_single_project;
 
     function parseDateLocal(dateStr) {
         if (!dateStr) return new Date();
@@ -865,9 +875,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // to be scoped to .frozen-pane.
     const tableContainerEl = document.querySelector('.frozen-pane');
 
-    document.querySelectorAll('.inline-edit-input').forEach(el => {
+    // Baseline an input's committed value -- what commitInlineEdit() diffs the current value
+    // against to decide "did this actually change", and what revertInlineEdit() restores on
+    // error. Reused both for the page-load pass below and for a single newly-added row's
+    // inputs (see the add-row success handler further down).
+    function setOriginalValueBaseline(el) {
         el.dataset.originalValue = el.type === 'checkbox' ? String(el.checked) : el.value;
-    });
+    }
+    document.querySelectorAll('.inline-edit-input').forEach(setOriginalValueBaseline);
 
     if (tableContainerEl) {
         // Live preview: typing a Start Date or Duration recalculates the End Date field,
@@ -974,11 +989,77 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             input.disabled = true;
-            quickSaveActivityField(updateUrl, field, value, () => {
-                // Reload so the Gantt bars, overlap/leave detection, and search index
-                // (all computed from the full dataset) stay accurate. Scroll position
-                // and active filters are restored automatically via saveState/restoreState.
-                location.reload();
+            quickSaveActivityField(updateUrl, field, value, (data) => {
+                // Editing an activity's assignee while the page is grouped by assignee would
+                // need to move this row into a different group's section -- moving a row
+                // between virtual-scroll groups is a bigger, riskier change than everything
+                // else here, so that one case alone still falls back to a full reload (the
+                // save has already succeeded server-side either way).
+                if (field === 'assignee' && PLANNER_GROUPING_METHOD === 'engineer') {
+                    location.reload();
+                    return;
+                }
+
+                try {
+                    // Patch EVERY field's displayed value from the server's response, not just
+                    // the one the user directly edited -- e.g. editing start_date/duration
+                    // re-derives end_date server-side, and that authoritative value must win
+                    // over whatever the client-side live-preview listeners wrote.
+                    const fieldInputs = {
+                        activity_name: row.querySelector('[data-field="activity_name"]'),
+                        assignee: row.querySelector('[data-field="assignee"]'),
+                        start_date: row.querySelector('[data-field="start_date"]'),
+                        duration: row.querySelector('[data-field="duration"]'),
+                        end_date: row.querySelector('[data-field="end_date"]'),
+                        completion_percentage: row.querySelector('[data-field="completion_percentage"]'),
+                        is_completed: row.querySelector('[data-field="is_completed"]'),
+                    };
+                    if (fieldInputs.activity_name) fieldInputs.activity_name.value = data.activity_name;
+                    if (fieldInputs.assignee) fieldInputs.assignee.value = data.assignee_id || '';
+                    if (fieldInputs.start_date) fieldInputs.start_date.value = data.start_date;
+                    if (fieldInputs.duration) fieldInputs.duration.value = data.duration;
+                    if (fieldInputs.end_date) fieldInputs.end_date.value = data.end_date;
+                    if (fieldInputs.completion_percentage) fieldInputs.completion_percentage.value = data.completion_percentage;
+                    if (fieldInputs.is_completed) fieldInputs.is_completed.checked = data.is_completed;
+
+                    // Re-baseline every input just patched, so the next edit's dirty-check
+                    // compares against the newly committed values, not the pre-edit originals.
+                    Object.values(fieldInputs).forEach(el => { if (el) setOriginalValueBaseline(el); });
+
+                    // Feed buildSearchDataForRow() below the same way a fresh server render
+                    // would (search/filter matching is case-insensitive, so exact title-casing
+                    // doesn't matter here -- only the lowercased comparison does).
+                    row.dataset.assignee = data.assignee_full_name || 'Unassigned';
+                    row.dataset.activityName = (data.activity_name || '').toLowerCase();
+
+                    // Row styling + vsRowsData bookkeeping for "completed" state / filtering.
+                    row.classList.toggle('row-completed', !!data.is_completed);
+                    const pk = row.dataset.activityPk;
+                    const entry = vsRowsData.find(r => r.frozenEl === row);
+                    if (entry) {
+                        entry.isCompleted = !!data.is_completed;
+                        entry.searchData = buildSearchDataForRow(row);
+                    }
+
+                    // Patch the in-memory Gantt dataset and repaint bars/overlaps from it --
+                    // this is the whole reason a reload isn't needed: the client already has
+                    // everything it needs to recompute the same result the server would have.
+                    const ganttAct = ganttData.activities.find(a => String(a.pk) === String(pk));
+                    if (ganttAct) {
+                        ganttAct.name = data.activity_name;
+                        ganttAct.assignee = data.assignee_full_name || null;
+                        ganttAct.start_date = data.start_date;
+                        ganttAct.end_date = data.end_date || null;
+                    }
+                    repaintGanttBars();
+                    applyFilters();
+                } catch (e) {
+                    console.error('Inline edit: falling back to reload after an unexpected error applying the update.', e);
+                    location.reload();
+                    return;
+                }
+
+                input.disabled = false;
             }, (err) => {
                 alert(err);
                 revertInlineEdit(input, original);
@@ -1011,8 +1092,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // --- Inline "add new activity" row: creates via AJAX, then reloads (same reasoning
-        // as commitInlineEdit — bars/overlaps/leaves/counts all need a fresh server render). ---
+        // --- Inline "add new activity" row: creates via AJAX, then inserts the new row
+        // directly (no reload) -- see the success handler below for how. ---
         tableContainerEl.addEventListener('click', (e) => {
             const btn = e.target.closest('.add-row-save-btn');
             if (!btn) return;
@@ -1044,10 +1125,98 @@ document.addEventListener('DOMContentLoaded', () => {
             body.set('start_date', startInput.value);
             body.set('duration', durationInput.value || '1');
             if (endInput.value) body.set('end_date', endInput.value);
+            // Add-rows only ever exist in 'project'-grouped or single-project (ungrouped)
+            // views -- never 'engineer'-grouped (see the grouping_method == 'project' guard
+            // around this row further up this template) -- so there's no "which group does
+            // this land in" ambiguity for the server to resolve here, unlike the assignee-edit
+            // case in commitInlineEdit.
+            body.set('group_name', row.dataset.groupId || '');
+            body.set('grouping_method', PLANNER_GROUPING_METHOD);
+            if (PLANNER_IS_SINGLE_PROJECT) body.set('is_single_project', '1');
 
             btn.disabled = true;
-            quickSaveActivityField(row.dataset.createUrl, null, null, () => {
-                location.reload();
+            quickSaveActivityField(row.dataset.createUrl, null, null, (data) => {
+                try {
+                    const addRowIndex = vsRowsData.findIndex(r => r.isAddRow && r.frozenEl === row);
+                    if (addRowIndex === -1) throw new Error('Could not locate the add-row in vsRowsData.');
+                    const addRowEntry = vsRowsData[addRowIndex];
+
+                    // Build the new frozen <tr> from the server-rendered HTML -- guarantees
+                    // identical markup/behavior to a normal reload-rendered row (inline-edit
+                    // inputs, filter attributes, delete/remark buttons, everything) with none
+                    // of that logic duplicated here. <template> is required (not a plain div)
+                    // because a bare <tr> string only parses correctly inside template content.
+                    const tpl = document.createElement('template');
+                    tpl.innerHTML = data.frozen_row_html.trim();
+                    const newFrozenEl = tpl.content.firstElementChild;
+                    if (!newFrozenEl) throw new Error('Server did not return a row to insert.');
+
+                    // The timeline copy only ever needs an empty bar container -- shallow-
+                    // cloning the frozen <tr> guarantees identical data-* identity attributes
+                    // (activity pk, group id, etc.) with zero risk of the two copies drifting.
+                    const timelineColspan = addRowEntry.timelineEl.querySelector('td').colSpan;
+                    const newTimelineEl = newFrozenEl.cloneNode(false);
+                    newTimelineEl.innerHTML = `<td colspan="${timelineColspan}" class="p-0 relative timeline-cell"><div class="timeline-row-container h-full w-full relative"></div></td>`;
+
+                    populateAssigneeDropdown(newFrozenEl.querySelector('select.inline-edit-input[data-field="assignee"]'));
+                    newFrozenEl.querySelectorAll('.inline-edit-input').forEach(setOriginalValueBaseline);
+
+                    // Insert into vsRowsData immediately before the add-row's own entry, so DOM
+                    // order and virtual-scroll's positional rendering stay consistent. Do NOT
+                    // also insert newFrozenEl/newTimelineEl into the live tbody directly --
+                    // renderVirtualWindow() (via applyFilters() below) owns all DOM placement
+                    // once virtual scroll is active; inserting manually here would create
+                    // duplicate/orphaned nodes once it next recomputes.
+                    const newEntry = {
+                        frozenEl: newFrozenEl,
+                        timelineEl: newTimelineEl,
+                        height: addRowEntry.height,
+                        isGroup: false,
+                        isAddRow: false,
+                        isCompleted: false,
+                        groupId: row.dataset.groupId,
+                        searchData: buildSearchDataForRow(newFrozenEl),
+                    };
+                    vsRowsData.splice(addRowIndex, 0, newEntry);
+
+                    // "N Activities" badge -- go through the vsRowsData reference rather than a
+                    // live DOM query, since the group header may currently be virtualized out
+                    // of the DOM (not attached, so querySelector would silently find nothing).
+                    if (row.dataset.groupId) {
+                        const groupEntry = vsRowsData.find(r => r.isGroup && r.groupId === row.dataset.groupId);
+                        const badge = groupEntry ? groupEntry.frozenEl.querySelector('.rounded-full') : null;
+                        if (badge) {
+                            const n = parseInt(badge.textContent, 10);
+                            if (!isNaN(n)) badge.textContent = `${n + 1} Activities`;
+                        }
+                    }
+
+                    // Patch the in-memory Gantt dataset and repaint bars/overlaps from it --
+                    // same reasoning as commitInlineEdit: the client already has everything it
+                    // needs to compute the same result a full reload would have re-rendered.
+                    ganttData.activities.push({
+                        pk: data.pk,
+                        name: data.activity_name,
+                        project: data.project_code,
+                        assignee: data.assignee_full_name || null,
+                        start_date: data.start_date,
+                        end_date: data.end_date || null,
+                    });
+                    repaintGanttBars();
+                    applyFilters();
+
+                    // Reset the add-row's own inputs for the next add (start date deliberately
+                    // left as-is -- today's date is a sensible default to keep, not blank it).
+                    nameInput.value = '';
+                    assigneeSelect.value = '';
+                    durationInput.value = '1';
+                    endInput.value = '';
+                } catch (err2) {
+                    console.error('Add activity: falling back to reload after an unexpected error inserting the new row.', err2);
+                    location.reload();
+                    return;
+                }
+                btn.disabled = false;
             }, (err) => {
                 alert(err);
                 btn.disabled = false;
@@ -1791,22 +1960,41 @@ document.addEventListener('DOMContentLoaded', () => {
         return canvas.toDataURL();
     }
 
-    function renderGantt() {
-        const dataEl = document.getElementById('gantt-init-data');
-        if (!dataEl) return;
-        
-        const data = JSON.parse(dataEl.textContent);
-        const activitiesMap = new Map(data.activities.map(act => [act.pk, act]));
-        const holidaysSet = new Set(data.holidays);
+    // Cached by the one-time renderGantt() call below; reused by every repaintGanttBars() call
+    // triggered by an edit/add so per-edit refreshes don't redo this static, page-lifetime-fixed
+    // work (date-index lookup, today marker, background grid stylesheet).
+    let ganttDateIndexMap = null;
+    let ganttHeaderDates = null;
 
-        // Hide the timeline pane's body during rendering to prevent layout thrashing while
-        // potentially hundreds of bar divs get appended (only that tbody is mutated below).
-        const tableBody = document.querySelector('.timeline-pane tbody');
-        if (tableBody) tableBody.style.display = 'none';
-        
-        // NEW: Leave Logic
-        const leavesMap = new Map(Object.entries(data.leaves || {}));
-        
+    // Returns the rows / group-headers to paint bars into. Once virtual scroll is active, most
+    // rows are DETACHED from the DOM (initVirtualScroll removes every real row, re-inserting
+    // only whichever window is currently scrolled into view -- see renderVirtualWindow), so
+    // vsRowsData (which holds live element references regardless of attachment) is the only
+    // reliable way to reach every row after that point. Only the very first call, before
+    // vsRowsData is populated, falls back to querying the live DOM directly.
+    function getGanttActivityRows() {
+        if (vsRowsData.length) {
+            return vsRowsData.filter(r => !r.isGroup && !r.isAddRow).map(r => r.timelineEl).filter(Boolean);
+        }
+        return Array.from(document.querySelectorAll('.timeline-pane .gantt-activity-row'));
+    }
+    function getGanttGroupHeaders() {
+        if (vsRowsData.length) {
+            return vsRowsData.filter(r => r.isGroup).map(r => r.timelineEl).filter(Boolean);
+        }
+        return Array.from(document.querySelectorAll('.timeline-pane .group-header'));
+    }
+
+    // Recomputes and repaints every Gantt bar (activity bars + group-summary bars) from the
+    // CURRENT contents of ganttData.activities. Safe to call repeatedly -- e.g. after an inline
+    // edit or a newly-added activity -- since it always clears each row's existing bars first
+    // (the very first call, from renderGantt() below, has nothing to clear). Must NOT call
+    // initVirtualScroll(): that would reset scroll position, active filters, and collapsed-group
+    // state, which an in-place refresh needs to preserve.
+    function repaintGanttBars() {
+        const activitiesMap = new Map(ganttData.activities.map(act => [act.pk, act]));
+        const leavesMap = new Map(Object.entries(ganttData.leaves || {}));
+
         const dailyOccupancy = new Map(); // Map<dateStr, Map<assignee, Array<activity>>>
         const allWorkDays = new Map();
 
@@ -1815,14 +2003,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const endDate = parseDate(act.end_date);
             const workDays = getWorkDays(startDate, endDate, holidaysSet);
             allWorkDays.set(act.pk, workDays);
-            
+
             if (act.assignee) {
                 workDays.forEach(dateStr => {
                     if (!dailyOccupancy.has(dateStr)) {
                         dailyOccupancy.set(dateStr, new Map());
                     }
                     const dayMap = dailyOccupancy.get(dateStr);
-                    
+
                     if (!dayMap.has(act.assignee)) {
                         dayMap.set(act.assignee, []);
                     }
@@ -1835,9 +2023,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const activityRowMap = new Map();
         const groupActivitiesMap = new Map();
 
-        // Scoped to .timeline-pane: that's the copy of each row that actually has a
-        // .timeline-row-container to append bars into (the frozen copy doesn't have one).
-        document.querySelectorAll('.timeline-pane .gantt-activity-row').forEach(row => {
+        const activityRows = getGanttActivityRows();
+        activityRows.forEach(row => {
             const pk = parseInt(row.dataset.activityPk, 10);
             activityRowMap.set(pk, row);
             const groupId = row.dataset.groupId;
@@ -1847,45 +2034,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Build Date -> Index Map from Header. Scoped to .timeline-pane: its 2nd header row now
-        // holds only date cells (the frozen pane has its own separate 2nd header row with the
-        // Project/Activity/... column labels), so this no longer risks matching the wrong thead.
-        const dateIndexMap = new Map();
-        const headerDates = [];
-        const headerRow = document.querySelector('.timeline-pane thead tr:nth-child(2)');
-        if (headerRow) {
-            for (let i = 0; i < headerRow.cells.length; i++) {
-                const cell = headerRow.cells[i];
-                if (cell.classList.contains('gantt-cell') && cell.dataset.date) {
-                    dateIndexMap.set(cell.dataset.date, headerDates.length);
-                    headerDates.push(cell.dataset.date);
-                }
-            }
-        }
+        const groupHeaders = getGanttGroupHeaders();
 
-        // Get Today String
-        const todayCell = document.querySelector('th.today-cell');
-        const todayStr = todayCell ? todayCell.dataset.date : null;
-
-        // Generate Background Grid
-        const bgImage = createGridBackground(headerDates, holidaysSet, todayStr);
-        const styleSheet = document.createElement("style");
-        styleSheet.innerText = `.timeline-row-container { background-image: url(${bgImage}); background-repeat: repeat-y; }`;
-        document.head.appendChild(styleSheet);
+        // Clear every target container's existing bars before repainting -- required for
+        // repeated calls (an edit/add can change which days are occupied, overlapping, etc.),
+        // a no-op on the very first call since containers start empty.
+        activityRows.forEach(row => {
+            const container = row.querySelector('.timeline-row-container');
+            if (container) container.replaceChildren();
+        });
+        groupHeaders.forEach(headerRow => {
+            const container = headerRow.querySelector('.timeline-row-container');
+            if (container) container.replaceChildren();
+        });
 
         const COL_WIDTH = 32;
 
         allWorkDays.forEach((workDays, pk) => {
             const act = activitiesMap.get(pk);
             const row = activityRowMap.get(pk);
-            
+
             if (!act || !row) return;
-            
+
             const container = row.querySelector('.timeline-row-container');
             if (!container) return;
 
             workDays.forEach(dateStr => {
-                const index = dateIndexMap.get(dateStr);
+                const index = ganttDateIndexMap.get(dateStr);
                 if (index !== undefined) {
                         let barClass = 'activity-bar';
                         let title = `📋 ${act.name}\n👤 ${act.assignee || 'Unassigned'}\n📅 ${dateStr}`;
@@ -1912,7 +2087,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                             title = overlapText + title;
                         }
-                        
+
                         const barDiv = document.createElement('div');
                         barDiv.className = `gantt-bar ${barClass} mx-1`;
                         barDiv.style.position = 'absolute';
@@ -1932,11 +2107,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
-        
-        // Scoped to .timeline-pane: that's the copy with a .timeline-row-container to append
-        // summary bars into. Group name comes from data-group-name (set on both copies in the
-        // template) rather than a cross-pane lookup of the frozen copy's <span> title text.
-        document.querySelectorAll('.timeline-pane .group-header').forEach(headerRow => {
+
+        // Group name comes from data-group-name (set on both copies in the template) rather
+        // than a cross-pane lookup of the frozen copy's <span> title text.
+        groupHeaders.forEach(headerRow => {
             const groupId = headerRow.dataset.groupId;
             const groupName = headerRow.dataset.groupName || groupId;
             if (!groupId) return;
@@ -1961,15 +2135,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const maxDate = sortedGroupDays[sortedGroupDays.length - 1];
 
             sortedGroupDays.forEach(dateStr => {
-                const index = dateIndexMap.get(dateStr);
+                const index = ganttDateIndexMap.get(dateStr);
                 if (index !== undefined) {
                         const barDiv = document.createElement('div');
                         let barClasses = 'gantt-bar project-timeline-bar';
-                        
+
                         if (dateStr === minDate) barClasses += ' summary-bar-start';
                         if (dateStr === maxDate) barClasses += ' summary-bar-end';
-                        
-                        barDiv.className = barClasses; 
+
+                        barDiv.className = barClasses;
                         barDiv.style.position = 'absolute';
                         barDiv.style.left = `${index * COL_WIDTH}px`;
                         barDiv.style.width = `${COL_WIDTH}px`;
@@ -1978,6 +2152,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+    }
+
+    function renderGantt() {
+        // Hide the timeline pane's body during the initial render to prevent layout thrashing
+        // while potentially hundreds of bar divs get appended (only that tbody is mutated).
+        const tableBody = document.querySelector('.timeline-pane tbody');
+        if (tableBody) tableBody.style.display = 'none';
+
+        // Build Date -> Index Map from Header (fixed for the page's lifetime, computed once).
+        // Scoped to .timeline-pane: its 2nd header row now holds only date cells (the frozen
+        // pane has its own separate 2nd header row with the Project/Activity/... column labels).
+        ganttDateIndexMap = new Map();
+        ganttHeaderDates = [];
+        const headerRow = document.querySelector('.timeline-pane thead tr:nth-child(2)');
+        if (headerRow) {
+            for (let i = 0; i < headerRow.cells.length; i++) {
+                const cell = headerRow.cells[i];
+                if (cell.classList.contains('gantt-cell') && cell.dataset.date) {
+                    ganttDateIndexMap.set(cell.dataset.date, ganttHeaderDates.length);
+                    ganttHeaderDates.push(cell.dataset.date);
+                }
+            }
+        }
+
+        // Get Today String
+        const todayCell = document.querySelector('th.today-cell');
+        const todayStr = todayCell ? todayCell.dataset.date : null;
+
+        // Generate Background Grid (also fixed for the page's lifetime -- computed once).
+        const bgImage = createGridBackground(ganttHeaderDates, holidaysSet, todayStr);
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `.timeline-row-container { background-image: url(${bgImage}); background-repeat: repeat-y; }`;
+        document.head.appendChild(styleSheet);
+
+        repaintGanttBars();
 
         // Restore table body display
         if (tableBody) tableBody.style.display = '';
@@ -2002,6 +2211,41 @@ document.addEventListener('DOMContentLoaded', () => {
 // .timeline-pane's tbody -- instead of a single shared row. Both tbodies are rendered from
 // the exact same Django loop in the exact same order, so frozenRows[i] / timelineRows[i] are
 // always the same logical row; pairing is done positionally rather than by re-matching a key.
+
+// Builds the cached {project, customer, segment, teamLead, assignee, activityName,
+// columnTexts} object a row's vsRowsData entry uses for filtering, read directly off the
+// frozen <tr>'s DOM (data-* attributes + each filter column's current input/select value).
+// Reused by initVirtualScroll()'s initial pass AND by the inline-edit/add-row success
+// handlers, which call this again after patching a row's DOM so its cached search data
+// reflects the new values without needing to hand-duplicate this field mapping.
+function buildSearchDataForRow(frozenEl) {
+    const columnTexts = {};
+    frozenEl.querySelectorAll('[data-filter-column]').forEach(cell => {
+        const col = cell.dataset.filterColumn;
+        const select = cell.querySelector('select');
+        const input = cell.querySelector('input');
+        let text;
+        if (select) {
+            text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+        } else if (input) {
+            text = input.value;
+        } else {
+            text = cell.textContent;
+        }
+        columnTexts[col] = (text || '').trim().toLowerCase();
+    });
+
+    return {
+        project: (frozenEl.dataset.projectCode || '').toLowerCase(),
+        customer: (frozenEl.dataset.customer || '').toLowerCase(),
+        segment: (frozenEl.dataset.segment || '').toLowerCase(),
+        teamLead: (frozenEl.dataset.teamLead || '').toLowerCase(),
+        assignee: (frozenEl.dataset.assignee || '').toLowerCase(),
+        activityName: (frozenEl.dataset.activityName || '').toLowerCase(),
+        columnTexts: columnTexts
+    };
+}
+
 function updateResizeHandleHeight() {
     const grip = document.querySelector('.breakdown-resize-handle .grip');
     const tableEl = document.querySelector('.frozen-pane table');
@@ -2060,38 +2304,7 @@ function initVirtualScroll() {
 
         // The "add new activity" row is a control, not data — it's never subject to the
         // column/search filters, so it doesn't need searchData built for it.
-        let searchData = null;
-        if (!isAddRow) {
-            // Per-column text for the "Filter..." boxes, read from each field's actual current
-            // value (not textContent) — the Assignee cell is a <select> whose textContent would
-            // otherwise include every option in the dropdown, not just the selected one.
-            const columnTexts = {};
-            frozenEl.querySelectorAll('[data-filter-column]').forEach(cell => {
-                const col = cell.dataset.filterColumn;
-                const select = cell.querySelector('select');
-                const input = cell.querySelector('input');
-                let text;
-                if (select) {
-                    text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
-                } else if (input) {
-                    text = input.value;
-                } else {
-                    text = cell.textContent;
-                }
-                columnTexts[col] = (text || '').trim().toLowerCase();
-            });
-
-            // Cache search data to avoid DOM access during filter
-            searchData = {
-                project: (frozenEl.dataset.projectCode || '').toLowerCase(),
-                customer: (frozenEl.dataset.customer || '').toLowerCase(),
-                segment: (frozenEl.dataset.segment || '').toLowerCase(),
-                teamLead: (frozenEl.dataset.teamLead || '').toLowerCase(),
-                assignee: (frozenEl.dataset.assignee || '').toLowerCase(),
-                activityName: (frozenEl.dataset.activityName || '').toLowerCase(),
-                columnTexts: columnTexts
-            };
-        }
+        const searchData = isAddRow ? null : buildSearchDataForRow(frozenEl);
 
         // Initialize collapsed state for groups (default collapsed except first?)
         // Existing logic was: index > 0 collapsed.
