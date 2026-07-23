@@ -8,10 +8,10 @@
     /* --- General & Theming Styles --- */
     .header-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     .group-header { transition: all 0.2s ease; cursor: pointer; }
-    .group-header:hover .sticky-cell { background-color: #f8fafc; }
+    .group-header:hover .frozen-cell { background-color: #f8fafc; }
     .group-icon { transition: transform 0.2s ease; }
     .group-header.collapsed .group-icon { transform: rotate(-90deg); }
-    .project-row:hover .sticky-cell { background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%); }
+    .project-row:hover .frozen-cell { background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%); }
     
     /* COMPACT: Reduced height for activity bars */
     .gantt-bar { border-radius: 4px; transition: all 0.2s ease; position: relative; height: 1.25rem; top: 50%; transform: translateY(-50%); }
@@ -22,6 +22,10 @@
     .leave-bar { background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%); /* Yellow */ }
     .overlap-bar { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); animation: pulse 2s infinite; }
     
+    /* Hard-clip each row's Gantt bars to their own cell -- cheap insurance against a bar ever
+       visually overflowing its row, independent of the frozen/timeline pane split below. */
+    .timeline-cell { overflow: hidden; }
+
     /* Summary Bar Styling */
     .project-timeline-bar { 
         background: #bfdbfe;
@@ -64,44 +68,52 @@
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
     }
 
-    /* --- Key Structural and Sticky Column Styles --- */
-    .table-container { max-height: 75vh; overflow: auto; border-top: 1px solid #e5e7eb; scroll-behavior: smooth; overflow-anchor: none; }
-    .table-container::-webkit-scrollbar { width: 10px; height: 10px; }
-    .table-container::-webkit-scrollbar:horizontal { height: 0; } /* native horizontal bar spans the whole table incl. the frozen pane; replaced by .gantt-hscroll-track below, which only spans the timeline */
-    .table-container::-webkit-scrollbar-track { background: #f1f5f9; }
-    .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px;}
-    .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    .sticky-cell { position: -webkit-sticky; position: sticky; background-color: white; z-index: 40; }
-    thead .sticky-cell { z-index: 60; }
-
-    /* --- Custom horizontal scrollbar, scoped to just the Gantt timeline (right of the split line) --- */
-    .gantt-hscroll-track {
+    /* --- Frozen pane / Timeline pane: two independently-scrolling siblings ---
+       Previously the frozen "Activities Breakdown" columns and the Gantt timeline shared one
+       table with position:sticky freezing the left columns. That's a known Chromium GPU
+       tile-compositor trap: sticky elements sharing a horizontally-scrolling container can
+       have the compositor paint a stale/misplaced tile for a frame or two (confirmed via
+       frame-by-frame video capture -- the gantt bars visibly bled across the frozen columns,
+       fading in over several frames, which is a compositor artifact, not a DOM/CSS bug, so no
+       amount of z-index/overflow/will-change tuning could fully prevent it). The frozen pane
+       here never scrolls horizontally at all, so it structurally can never need to "stick". */
+    .planner-panes { display: flex; align-items: flex-start; border-top: 1px solid #e5e7eb; position: relative; }
+    .frozen-pane {
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 0 0 auto;
         position: relative;
-        height: 10px;
-        background: #f1f5f9;
-        border-top: 1px solid #e5e7eb;
-        border-radius: 0 0 0.75rem 0.75rem;
+        max-height: 75vh;
+        border-right: 1px solid #e5e7eb;
+        scrollbar-width: none; /* one visible vertical scrollbar (on the timeline pane) is enough */
+        width: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
     }
-    .gantt-hscroll-thumb {
-        position: absolute;
-        top: 0;
-        height: 10px;
-        background: #cbd5e1;
-        border-radius: 5px;
-        cursor: pointer;
+    .frozen-pane::-webkit-scrollbar { display: none; }
+    .no-project-col .frozen-pane {
+        width: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
     }
-    .gantt-hscroll-thumb:hover,
-    .gantt-hscroll-thumb.dragging {
-        background: #94a3b8;
+    .timeline-pane {
+        overflow: auto;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-height: 75vh;
+        scroll-behavior: smooth;
+        overflow-anchor: none;
+        position: relative;
     }
+    .timeline-pane::-webkit-scrollbar { width: 10px; height: 10px; }
+    .timeline-pane::-webkit-scrollbar-track { background: #f1f5f9; }
+    .timeline-pane::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; }
+    .timeline-pane::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    /* Fix for horizontal scroll visibility behind sticky columns */
+    .frozen-cell { background-color: white; overflow: hidden; }
+
     table { border-collapse: separate !important; border-spacing: 0; }
     tbody tr td { border-bottom: 1px solid #f1f5f9; }
     thead tr th { border-bottom: 1px solid #e5e7eb; }
 
     /* Active Row Highlighting */
-    tr.row-is-active .sticky-cell {
+    tr.row-is-active .frozen-cell {
         background-color: #e0e7ff !important;
         border-bottom: 1px solid #818cf8;
     }
@@ -119,36 +131,27 @@
         --w-actions: 60px;
     }
 
-    .col-project    { width: var(--w-project); min-width: var(--w-project); max-width: var(--w-project); left: 0px; }
-    .col-activity   { width: var(--w-activity); min-width: var(--w-activity); max-width: var(--w-activity); left: var(--w-project); }
-    .col-assignee   { width: var(--w-assignee); min-width: var(--w-assignee); max-width: var(--w-assignee); left: calc(var(--w-project) + var(--w-activity)); text-align: center; }
-    .col-start      { width: var(--w-start);  min-width: var(--w-start);  max-width: var(--w-start);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee)); }
-    .col-duration   { width: var(--w-duration);  min-width: var(--w-duration);  max-width: var(--w-duration);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start)); }
-    .col-end        { width: var(--w-end);  min-width: var(--w-end);  max-width: var(--w-end);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
-    .col-completion { width: var(--w-completion);  min-width: var(--w-completion);  max-width: var(--w-completion);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); text-align: center; }
-    .col-completed  { width: var(--w-completed);  min-width: var(--w-completed);  max-width: var(--w-completed);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); text-align: center; }
-    .col-actions    { width: var(--w-actions);  min-width: var(--w-actions);  max-width: var(--w-actions);  left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
-
-    .no-project-col .col-activity { width: var(--w-activity-noproj); min-width: var(--w-activity-noproj); max-width: var(--w-activity-noproj); left: 0px; }
-    .no-project-col .col-assignee { left: var(--w-activity-noproj); }
-    .no-project-col .col-start    { left: calc(var(--w-activity-noproj) + var(--w-assignee)); }
-    .no-project-col .col-duration { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start)); }
-    .no-project-col .col-end      { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
-    .no-project-col .col-completion { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
-    .no-project-col .col-completed  { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
-    .no-project-col .col-actions  { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
+    /* Column widths are set authoritatively by the frozen table's <colgroup> (table-fixed),
+       so these classes now only carry alignment/visual concerns -- no positioning math. */
+    .col-assignee, .col-completion, .col-completed { text-align: center; }
+    .col-actions { box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); }
 
     .remark-btn.has-remark { color: #b45309; }
     .remark-btn.has-remark svg { fill: currentColor; }
 
-    tr.row-completed .sticky-cell { background-color: #f0fdf4; }
-    tr.row-completed:hover .sticky-cell { background-color: #dcfce7; }
+    tr.row-completed .frozen-cell { background-color: #f0fdf4; }
+    tr.row-completed:hover .frozen-cell { background-color: #dcfce7; }
     tr.row-completed .col-activity input { color: #16a34a; text-decoration: line-through; text-decoration-color: #86efac; }
 
-    /* --- Resizable Splitter between Activities Breakdown & Gantt Timeline --- */
+    /* --- Resizable Splitter between Activities Breakdown & Gantt Timeline ---
+       Lives inside .frozen-pane (not .planner-panes) so it scrolls vertically together with
+       the rows via the pane's own native scroll -- and since .frozen-pane clips overflow-x,
+       its hit-box sits just inside the pane's trailing edge (-8px to 0) rather than straddling
+       the seam symmetrically, so it's never clipped away. */
     .breakdown-resize-handle {
-        position: sticky;
+        position: absolute;
         left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
+        top: 0;
         height: 0;
         z-index: 80;
         pointer-events: none;
@@ -159,7 +162,7 @@
     .breakdown-resize-handle .grip {
         position: absolute;
         top: 0;
-        left: -4px;
+        left: -8px;
         width: 8px;
         cursor: col-resize;
         pointer-events: auto;
@@ -168,7 +171,7 @@
     .breakdown-resize-handle .grip::after {
         content: '';
         position: absolute;
-        top: 0; bottom: 0; left: 3px;
+        top: 0; bottom: 0; left: 6px;
         width: 2px;
         background: #cbd5e1;
     }
@@ -182,11 +185,14 @@
     }
 
     /* --- Per-column resize handles (one per Activities Breakdown column boundary) ---
-       Standalone sticky elements (same technique as .breakdown-resize-handle) instead of
-       grips embedded inside <th> cells: adjacent header <th>s share the same z-index, so
-       DOM order lets the *next* column silently cover half of an embedded grip's hit area. */
+       Standalone absolutely-positioned elements (same technique as .breakdown-resize-handle)
+       instead of grips embedded inside <th> cells: adjacent header <th>s share the same
+       z-index, so DOM order lets the *next* column silently cover half of an embedded grip's
+       hit area. All of these sit strictly inside .frozen-pane's bounds (never at its trailing
+       edge), so the hit-box can stay symmetric. */
     .col-resize-handle {
-        position: sticky;
+        position: absolute;
+        top: 0;
         height: 0;
         z-index: 80;
         pointer-events: none;
@@ -221,11 +227,8 @@
     .col-resize-handle.after-completed { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
     .no-project-col .col-resize-handle.after-completed { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
 
-    .group-header .sticky-cell {
-        background-color: #f8fafc; 
-        left: 0px !important; 
-        width: auto !important; 
-        min-width: auto !important;
+    .group-header .frozen-cell {
+        background-color: #f8fafc;
         box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.1); /* Match col-actions shadow */
     }
 
@@ -415,7 +418,7 @@
             </div>
         </div>
 
-        <div class="table-container relative min-h-[400px] {% if project %}no-project-col{% endif %}">
+        <div class="planner-shell relative min-h-[400px] {% if project %}no-project-col{% endif %}">
             <div id="gantt-loader" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px] transition-all duration-300">
                 <div class="flex flex-col items-center p-6 bg-white rounded-xl shadow-2xl border border-indigo-100">
                     <svg class="w-12 h-12 text-indigo-600 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
@@ -426,90 +429,155 @@
                 </div>
             </div>
 
-            {% if not project %}<div class="col-resize-handle after-project" data-var="--w-project" title="Drag to resize the Project column"><div class="grip"></div></div>{% endif %}
-            <div class="col-resize-handle after-activity" data-var="{% if project %}--w-activity-noproj{% else %}--w-activity{% endif %}" title="Drag to resize the Activity column"><div class="grip"></div></div>
-            <div class="col-resize-handle after-assignee" data-var="--w-assignee" title="Drag to resize the Assignee column"><div class="grip"></div></div>
-            <div class="col-resize-handle after-start" data-var="--w-start" title="Drag to resize the Start column"><div class="grip"></div></div>
-            <div class="col-resize-handle after-duration" data-var="--w-duration" title="Drag to resize the Duration column"><div class="grip"></div></div>
-            <div class="col-resize-handle after-end" data-var="--w-end" title="Drag to resize the End column"><div class="grip"></div></div>
-            <div class="col-resize-handle after-completion" data-var="--w-completion" title="Drag to resize the % Complete column"><div class="grip"></div></div>
-            <div class="col-resize-handle after-completed" data-var="--w-completed" title="Drag to resize the Completed column"><div class="grip"></div></div>
+            {% comment %}
+                Two independently-scrolling panes instead of one sticky-columns table -- see the
+                comment above .planner-panes in <style> for why. The frozen pane never scrolls
+                horizontally, so it structurally can't suffer the sticky-vs-scroll compositor bug;
+                vertical scroll position is mirrored between the two panes via JS.
+            {% endcomment %}
+            <div class="planner-panes">
+                <div class="frozen-pane {% if project %}no-project-col{% endif %}">
+                    {% if not project %}<div class="col-resize-handle after-project" data-var="--w-project" title="Drag to resize the Project column"><div class="grip"></div></div>{% endif %}
+                    <div class="col-resize-handle after-activity" data-var="{% if project %}--w-activity-noproj{% else %}--w-activity{% endif %}" title="Drag to resize the Activity column"><div class="grip"></div></div>
+                    <div class="col-resize-handle after-assignee" data-var="--w-assignee" title="Drag to resize the Assignee column"><div class="grip"></div></div>
+                    <div class="col-resize-handle after-start" data-var="--w-start" title="Drag to resize the Start column"><div class="grip"></div></div>
+                    <div class="col-resize-handle after-duration" data-var="--w-duration" title="Drag to resize the Duration column"><div class="grip"></div></div>
+                    <div class="col-resize-handle after-end" data-var="--w-end" title="Drag to resize the End column"><div class="grip"></div></div>
+                    <div class="col-resize-handle after-completion" data-var="--w-completion" title="Drag to resize the % Complete column"><div class="grip"></div></div>
+                    <div class="col-resize-handle after-completed" data-var="--w-completed" title="Drag to resize the Completed column"><div class="grip"></div></div>
 
-            <div class="breakdown-resize-handle" title="Drag to resize the Activities Breakdown pane">
-                <div class="grip"></div>
-            </div>
+                    <div class="breakdown-resize-handle" title="Drag to resize the Activities Breakdown pane">
+                        <div class="grip"></div>
+                    </div>
 
-            <table class="w-full table-auto {% if project %}no-project-col{% endif %}" style="min-width: 4000px;">
-                <thead class="bg-gray-50 sticky top-0 z-50">
-                    <tr class="h-6">
-                        <th colspan="{% if not project %}9{% else %}8{% endif %}" class="sticky-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white" style="left: 0; z-index: 70;">
-                            <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
-                        </th>
-                        {% for month, day_count in gantt_data.months.items %}<th colspan="{{ day_count }}" class="px-2 py-1 text-center text-xs font-semibold border-l bg-gradient-to-r from-indigo-500 to-purple-600 text-white">{{ month }}</th>{% endfor %}
-                    </tr>
-                    <tr class="h-8">
-                        {% if not project %}<th class="sticky-cell col-project px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Project</th>{% endif %}
-                        <th class="sticky-cell col-activity px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
-                        <th class="sticky-cell col-assignee px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Assignee</th>
-                        <th class="sticky-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
-                        <th class="sticky-cell col-duration px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Dur.</th>
-                        <th class="sticky-cell col-end px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">End</th>
-                        <th class="sticky-cell col-completion px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">% Comp.</th>
-                        <th class="sticky-cell col-completed px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Done</th>
-                        <th class="sticky-cell col-actions px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" data-date="{{ d|date:'Y-m-d' }}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
-                    </tr>
-                    <tr class="h-8">
-                        {% if not project %}<th class="sticky-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
-                        <th class="sticky-cell col-activity p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="activity" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
-                        <th class="sticky-cell col-assignee p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="assignee" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
-                        <th class="sticky-cell col-start p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="start" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
-                        <th class="sticky-cell col-duration p-0.5 bg-gray-100 border-r"></th>
-                        <th class="sticky-cell col-end p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="end" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
-                        <th class="sticky-cell col-completion p-0.5 bg-gray-100 border-r"></th>
-                        <th class="sticky-cell col-completed p-0.5 bg-gray-100 border-r"></th>
-                        <th class="sticky-cell col-actions p-0.5 bg-gray-100 border-r"></th>
-                        <th colspan="{{ gantt_data.header_dates|length }}" class="bg-gray-100"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if project %}
-                        {% include 'planner/_activity_rows.html' with activities=activities %}
-                        {% include 'planner/_add_activity_row.html' with target_project=project %}
-                    {% else %}
-                        {% for group_name, activities_in_group in display_data.items %}
-                            {% if grouping_method != 'none' %}
-                            {% with group_data=group_gantt_data|get_item:group_name %}
-                            <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}">
-                                <td colspan="9" class="sticky-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
-                                    <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
-                                </td>
-                                <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
-                                    <div class="timeline-row-container h-full w-full relative"></div>
+                    <table class="w-full table-fixed {% if project %}no-project-col{% endif %}">
+                        {% comment %}
+                            table-fixed + an explicit colgroup bound to the SAME --w-* custom
+                            properties used by .breakdown-resize-handle / .col-resize-handle keeps
+                            the real rendered column widths mathematically identical to the resize
+                            math at all times. Without this (table-auto), a cell whose content
+                            needs more room than its declared width (e.g. a long assignee name in
+                            a <select>) could silently widen that column past what the resize
+                            grips assume.
+                        {% endcomment %}
+                        <colgroup>
+                            {% if not project %}<col style="width: var(--w-project);">{% endif %}
+                            <col style="width: {% if project %}var(--w-activity-noproj){% else %}var(--w-activity){% endif %};">
+                            <col style="width: var(--w-assignee);">
+                            <col style="width: var(--w-start);">
+                            <col style="width: var(--w-duration);">
+                            <col style="width: var(--w-end);">
+                            <col style="width: var(--w-completion);">
+                            <col style="width: var(--w-completed);">
+                            <col style="width: var(--w-actions);">
+                        </colgroup>
+                        <thead class="bg-gray-50 sticky top-0 z-50">
+                            <tr class="h-6">
+                                <th colspan="{% if not project %}9{% else %}8{% endif %}" class="frozen-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+                                    <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
+                                </th>
+                            </tr>
+                            <tr class="h-8">
+                                {% if not project %}<th class="frozen-cell col-project px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Project</th>{% endif %}
+                                <th class="frozen-cell col-activity px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
+                                <th class="frozen-cell col-assignee px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Assignee</th>
+                                <th class="frozen-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
+                                <th class="frozen-cell col-duration px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Dur.</th>
+                                <th class="frozen-cell col-end px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">End</th>
+                                <th class="frozen-cell col-completion px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">% Comp.</th>
+                                <th class="frozen-cell col-completed px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Done</th>
+                                <th class="frozen-cell col-actions px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                            <tr class="h-8">
+                                {% if not project %}<th class="frozen-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
+                                <th class="frozen-cell col-activity p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="activity" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
+                                <th class="frozen-cell col-assignee p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="assignee" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
+                                <th class="frozen-cell col-start p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="start" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
+                                <th class="frozen-cell col-duration p-0.5 bg-gray-100 border-r"></th>
+                                <th class="frozen-cell col-end p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="end" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
+                                <th class="frozen-cell col-completion p-0.5 bg-gray-100 border-r"></th>
+                                <th class="frozen-cell col-completed p-0.5 bg-gray-100 border-r"></th>
+                                <th class="frozen-cell col-actions p-0.5 bg-gray-100 border-r"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if project %}
+                                {% include 'planner/_activity_rows.html' with activities=activities pane='frozen' %}
+                                {% include 'planner/_add_activity_row.html' with target_project=project pane='frozen' %}
+                            {% else %}
+                                {% for group_name, activities_in_group in display_data.items %}
+                                    {% if grouping_method != 'none' %}
+                                    {% with group_data=group_gantt_data|get_item:group_name %}
+                                    <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}" data-group-name="{{ group_name }}">
+                                        <td colspan="9" class="frozen-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
+                                            <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% endif %}
+                                    {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' pane='frozen' %}
+                                    {% if grouping_method == 'project' %}
+                                        {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify pane='frozen' %}
+                                    {% endif %}
+                                {% empty %}
+                                    {% comment %}
+                                        No counterpart in the timeline pane's tbody by design (that
+                                        loop's own {% empty %} block below is intentionally left
+                                        blank) -- this row is excluded from virtual scroll's
+                                        positional row-pairing by id, same as #no-results-row.
+                                    {% endcomment %}
+                                    <tr id="no-activities-row"><td colspan="99" class="text-center text-gray-500 py-8"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg><h3 class="mt-2 text-sm font-medium text-gray-900">No activities found</h3><p class="mt-1 text-sm text-gray-500">Create your first activity to start planning.</p></td></tr>
+                                {% endfor %}
+                            {% endif %}
+                            <tr id="no-results-row" class="hidden">
+                                <td colspan="99" class="text-center text-gray-500 py-12">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900">No activities found</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Your filter criteria did not match any activities.</p>
                                 </td>
                             </tr>
-                            {% endwith %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="timeline-pane">
+                    <table class="w-full" style="min-width: 4000px;">
+                        <thead class="bg-gray-50 sticky top-0 z-50">
+                            <tr class="h-6">
+                                {% for month, day_count in gantt_data.months.items %}<th colspan="{{ day_count }}" class="px-2 py-1 text-center text-xs font-semibold border-l bg-gradient-to-r from-indigo-500 to-purple-600 text-white">{{ month }}</th>{% endfor %}
+                            </tr>
+                            <tr class="h-8">
+                                {% for d in gantt_data.header_dates %}<th class="gantt-cell text-center text-xs font-medium text-gray-500 w-8 min-w-[32px] {% if d.weekday > 4 %}weekend-cell{% elif d in holidays_map %}holiday-cell{% endif %} {% if d == today %}today-cell{% endif %}" data-date="{{ d|date:'Y-m-d' }}" title="{% if d in holidays_map %}{{ holidays_map|get_item:d }}{% else %}{{ d|date:"l, F j, Y" }}{% endif %}"><div class="p-0.5">{{ d.day }}</div></th>{% endfor %}
+                            </tr>
+                            <tr class="h-8">
+                                <th colspan="{{ gantt_data.header_dates|length }}" class="bg-gray-100"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if project %}
+                                {% include 'planner/_activity_rows.html' with activities=activities pane='timeline' %}
+                                {% include 'planner/_add_activity_row.html' with target_project=project pane='timeline' %}
+                            {% else %}
+                                {% for group_name, activities_in_group in display_data.items %}
+                                    {% if grouping_method != 'none' %}
+                                    {% with group_data=group_gantt_data|get_item:group_name %}
+                                    <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}" data-group-name="{{ group_name }}">
+                                        <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
+                                            <div class="timeline-row-container h-full w-full relative"></div>
+                                        </td>
+                                    </tr>
+                                    {% endwith %}
+                                    {% endif %}
+                                    {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' pane='timeline' %}
+                                    {% if grouping_method == 'project' %}
+                                        {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify pane='timeline' %}
+                                    {% endif %}
+                                {% empty %}
+                                {% endfor %}
                             {% endif %}
-                            {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' %}
-                            {% if grouping_method == 'project' %}
-                                {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify %}
-                            {% endif %}
-                        {% empty %}
-                            <tr><td colspan="99" class="text-center text-gray-500 py-8"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg><h3 class="mt-2 text-sm font-medium text-gray-900">No activities found</h3><p class="mt-1 text-sm text-gray-500">Create your first activity to start planning.</p></td></tr>
-                        {% endfor %}
-                    {% endif %}
-                    <tr id="no-results-row" class="hidden">
-                        <td colspan="99" class="text-center text-gray-500 py-12">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No activities found</h3>
-                            <p class="mt-1 text-sm text-gray-500">Your filter criteria did not match any activities.</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="ganttHScrollTrack" class="gantt-hscroll-track">
-            <div id="ganttHScrollThumb" class="gantt-hscroll-thumb"></div>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         <div class="bg-gray-50 px-4 py-2 border-t border-gray-200 flex flex-wrap items-center justify-end gap-4 text-xs text-gray-600">
             <span class="font-semibold text-gray-700">Legend:</span>
@@ -792,7 +860,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Inline Editing: Activities Breakdown table ---
     // Reuses the same date-calc rules as the Add Activity modal above (parseDateLocal,
     // toISODate, isWorkingDay, addWorkingDays, countWorkingDays), applied per-row.
-    const tableContainerEl = document.querySelector('.table-container');
+    // All editable inputs/selects/buttons/forms live exclusively in the frozen pane's cells
+    // (the timeline pane only ever holds Gantt bars), so this delegated listener only needs
+    // to be scoped to .frozen-pane.
+    const tableContainerEl = document.querySelector('.frozen-pane');
 
     document.querySelectorAll('.inline-edit-input').forEach(el => {
         el.dataset.originalValue = el.type === 'checkbox' ? String(el.checked) : el.value;
@@ -1079,7 +1150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // scales every breakdown column together, proportionally, to grow/shrink the whole pane.
     (function setupBreakdownResize() {
         const grip = document.querySelector('.breakdown-resize-handle .grip');
-        const tableEl = document.querySelector('.table-container table');
+        const tableEl = document.querySelector('.frozen-pane table');
         if (!grip || !tableEl) return;
 
         const isNoProjectMode = tableEl.classList.contains('no-project-col');
@@ -1162,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Per-column resize handles (drag a boundary to resize the column to its left) ---
     (function setupColumnResizeHandles() {
         const handles = document.querySelectorAll('.col-resize-handle');
-        const tableEl = document.querySelector('.table-container table');
+        const tableEl = document.querySelector('.frozen-pane table');
         if (!handles.length || !tableEl) return;
 
         const MIN_WIDTH = 40;
@@ -1232,166 +1303,82 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     })();
 
-    // --- Custom horizontal scrollbar, scoped to just the Gantt timeline ---
-    // The native scrollbar on .table-container always spans the FULL table width, including
-    // the frozen breakdown columns (which don't visually move), so its thumb range doesn't
-    // line up with the split line. This overlay tracks the same scroll position but is sized
-    // and positioned to represent only the timeline's visible/scrollable width.
-    (function setupGanttScrollbar() {
-        const container = document.querySelector('.table-container');
-        const tableEl = document.querySelector('.table-container table');
-        const track = document.getElementById('ganttHScrollTrack');
-        const thumb = document.getElementById('ganttHScrollThumb');
-        if (!container || !tableEl || !track || !thumb) return;
+    // --- Vertical scroll sync between the frozen pane and the timeline pane ---
+    // The two panes are now independent scrolling elements (see the .planner-panes comment
+    // in <style>), so their vertical scroll position has to be mirrored explicitly. The
+    // syncing flag guards against the mirrored set() re-triggering the other side's listener.
+    (function setupPaneScrollSync() {
+        const frozenPane = document.querySelector('.frozen-pane');
+        const timelinePane = document.querySelector('.timeline-pane');
+        if (!frozenPane || !timelinePane) return;
 
-        const isNoProjectMode = tableEl.classList.contains('no-project-col');
-        const activityVar = isNoProjectMode ? '--w-activity-noproj' : '--w-activity';
-        const breakdownVars = isNoProjectMode
-            ? [activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions']
-            : ['--w-project', activityVar, '--w-assignee', '--w-start', '--w-duration', '--w-end', '--w-actions'];
-
-        function getBreakdownWidth() {
-            const rootStyle = getComputedStyle(document.documentElement);
-            return breakdownVars.reduce((sum, v) => sum + (parseFloat(rootStyle.getPropertyValue(v)) || 0), 0);
+        let syncing = false;
+        function mirrorScrollTop(source, target) {
+            return () => {
+                if (syncing) return;
+                syncing = true;
+                target.scrollTop = source.scrollTop;
+                syncing = false;
+            };
         }
+        frozenPane.addEventListener('scroll', mirrorScrollTop(frozenPane, timelinePane));
+        timelinePane.addEventListener('scroll', mirrorScrollTop(timelinePane, frozenPane));
 
-        let dragging = false;
-        let dragStartX = 0;
-        let dragStartScrollLeft = 0;
-
-        function updateScrollbar() {
-            const breakdownWidth = getBreakdownWidth();
-            const viewportWidth = Math.max(0, container.clientWidth - breakdownWidth);
-
-            track.style.marginLeft = `${breakdownWidth}px`;
-            track.style.width = `${viewportWidth}px`;
-
-            const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-            const timelineContentWidth = Math.max(1, tableEl.scrollWidth - breakdownWidth);
-
-            if (viewportWidth <= 0 || maxScrollLeft <= 0) {
-                thumb.style.width = `${viewportWidth}px`;
-                thumb.style.left = '0px';
-                return;
+        // .frozen-pane has overflow-x: hidden (it never needs to scroll horizontally itself),
+        // so a horizontal wheel/trackpad gesture while hovering the left columns would
+        // otherwise do nothing, unlike before the pane split. Forward it to the timeline pane.
+        frozenPane.addEventListener('wheel', (e) => {
+            if (e.deltaX !== 0) {
+                timelinePane.scrollLeft += e.deltaX;
+                e.preventDefault();
             }
+        }, { passive: false });
+    })();
 
-            const thumbWidth = Math.max(30, Math.min(viewportWidth, viewportWidth * (viewportWidth / timelineContentWidth)));
-            const thumbLeft = (container.scrollLeft / maxScrollLeft) * (viewportWidth - thumbWidth);
-
-            thumb.style.width = `${thumbWidth}px`;
-            thumb.style.left = `${thumbLeft}px`;
+    // --- Header row height sync between the frozen pane and the timeline pane ---
+    // Each pane's <thead> is now a fully separate table, so its row heights are resolved
+    // independently from its own content -- CSS height (even via a Tailwind h-* class) on a
+    // <tr> is only ever a MINIMUM, a row still grows to fit whatever it contains. In the old
+    // single-table layout this couldn't happen (frozen + timeline cells shared one <tr>, so
+    // one shared height applied to both). Measure each header row pair's natural height and
+    // force both sides to the larger of the two, so the two tables can't drift apart.
+    (function syncHeaderRowHeights() {
+        const frozenRows = document.querySelectorAll('.frozen-pane thead tr');
+        const timelineRows = document.querySelectorAll('.timeline-pane thead tr');
+        const count = Math.min(frozenRows.length, timelineRows.length);
+        for (let i = 0; i < count; i++) {
+            const a = frozenRows[i];
+            const b = timelineRows[i];
+            const h = Math.max(a.offsetHeight, b.offsetHeight);
+            a.style.height = `${h}px`;
+            b.style.height = `${h}px`;
         }
-
-        function onThumbMouseMove(e) {
-            if (!dragging) return;
-            const breakdownWidth = getBreakdownWidth();
-            const viewportWidth = Math.max(1, container.clientWidth - breakdownWidth);
-            const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-            const thumbWidth = parseFloat(thumb.style.width) || 30;
-            const trackRange = Math.max(1, viewportWidth - thumbWidth);
-
-            const deltaScroll = ((e.clientX - dragStartX) / trackRange) * maxScrollLeft;
-            container.style.scrollBehavior = 'auto';
-            container.scrollLeft = Math.min(maxScrollLeft, Math.max(0, dragStartScrollLeft + deltaScroll));
-            updateScrollbar();
-        }
-
-        function onThumbMouseUp() {
-            if (!dragging) return;
-            dragging = false;
-            thumb.classList.remove('dragging');
-            container.style.scrollBehavior = '';
-            document.body.style.userSelect = '';
-            document.removeEventListener('mousemove', onThumbMouseMove);
-            document.removeEventListener('mouseup', onThumbMouseUp);
-        }
-
-        thumb.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            dragging = true;
-            dragStartX = e.clientX;
-            dragStartScrollLeft = container.scrollLeft;
-            thumb.classList.add('dragging');
-            document.body.style.userSelect = 'none';
-            document.addEventListener('mousemove', onThumbMouseMove);
-            document.addEventListener('mouseup', onThumbMouseUp);
-        });
-
-        // Clicking the track (not the thumb) jumps the scroll position to that point.
-        track.addEventListener('mousedown', (e) => {
-            if (e.target === thumb) return;
-            const breakdownWidth = getBreakdownWidth();
-            const viewportWidth = Math.max(1, container.clientWidth - breakdownWidth);
-            const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-            const thumbWidth = parseFloat(thumb.style.width) || 30;
-            const trackRange = Math.max(1, viewportWidth - thumbWidth);
-
-            const trackRect = track.getBoundingClientRect();
-            const clickX = (e.clientX - trackRect.left) - (thumbWidth / 2);
-            const ratio = Math.min(1, Math.max(0, clickX / trackRange));
-
-            container.style.scrollBehavior = 'auto';
-            container.scrollLeft = ratio * maxScrollLeft;
-            container.style.scrollBehavior = '';
-            updateScrollbar();
-        });
-
-        container.addEventListener('scroll', updateScrollbar);
-        window.addEventListener('resize', updateScrollbar);
-
-        // Fires whenever the table's rendered width changes, which also covers all of the
-        // column/pane resize handles above (they mutate the width live during drag).
-        if (window.ResizeObserver) {
-            new ResizeObserver(updateScrollbar).observe(tableEl);
-        } else {
-            setTimeout(updateScrollbar, 500);
-        }
-
-        updateScrollbar();
     })();
 
     // --- Scroll to Today Logic ---
+    // Simpler than before the pane split: the timeline pane is now the only thing that
+    // scrolls horizontally, so there's no more "sticky column boundary" to account for --
+    // just center the today-cell within the timeline pane's own viewport.
     const goToTodayBtn = document.getElementById('goToTodayBtn');
     if (goToTodayBtn) {
         goToTodayBtn.addEventListener('click', () => {
             const todayCell = document.querySelector('th.today-cell');
-            const container = document.querySelector('.table-container');
-            
-            if (todayCell && container) {
-                const containerRect = container.getBoundingClientRect();
-                const todayRect = todayCell.getBoundingClientRect();
-                
-                // Find the sticky column boundary (right edge of the last sticky column)
-                const stickyActionCol = document.querySelector('thead .col-actions');
-                let stickyRightEdge = containerRect.left;
-                
-                if (stickyActionCol) {
-                    const stickyRect = stickyActionCol.getBoundingClientRect();
-                    stickyRightEdge = stickyRect.right;
-                }
-                
-                // Calculate the center of the visible scrollable area (between sticky cols and right edge)
-                const visibleWidth = containerRect.right - stickyRightEdge;
-                const visibleCenter = stickyRightEdge + (visibleWidth / 2);
-                
-                // Calculate the center of the today cell
-                const todayCenter = todayRect.left + (todayRect.width / 2);
-                
-                // Calculate delta and scroll
-                const delta = todayCenter - visibleCenter;
-                
-                container.scrollBy({
-                    left: delta,
-                    behavior: 'smooth'
-                });
+            const timelinePane = document.querySelector('.timeline-pane');
+            if (todayCell && timelinePane) {
+                const target = todayCell.offsetLeft + (todayCell.offsetWidth / 2) - (timelinePane.clientWidth / 2);
+                timelinePane.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
             }
         });
     }
 
     // --- Row Auto-Scroll to Gantt bar ---
+    // A click can land in either pane now, so this delegated listener is attached to both
+    // tbodies. Whichever half was clicked, look up its pair by data-activity-pk: 'row-is-active'
+    // only visually applies to the frozen cells (that's the only side CSS targets it on), and
+    // the .gantt-bar to scroll to only exists in the timeline copy.
     let currentlyActiveRow = null;
 
-    document.querySelector('tbody').addEventListener('click', (e) => {
+    function handleRowActivateClick(e) {
         const row = e.target.closest('.gantt-activity-row');
         if (!row) return;
 
@@ -1399,14 +1386,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.closest('.action-btn') || e.target.closest('a') ||
             e.target.closest('input') || e.target.closest('select')) return;
 
-        if (currentlyActiveRow) currentlyActiveRow.classList.remove('row-is-active');
-        row.classList.add('row-is-active');
-        currentlyActiveRow = row;
+        const pk = row.dataset.activityPk;
+        const frozenEl = document.querySelector(`.frozen-pane tr[data-activity-pk="${pk}"]`);
+        const timelineEl = document.querySelector(`.timeline-pane tr[data-activity-pk="${pk}"]`);
 
-        const bar = row.querySelector('.gantt-bar');
+        if (currentlyActiveRow) currentlyActiveRow.classList.remove('row-is-active');
+        if (frozenEl) frozenEl.classList.add('row-is-active');
+        currentlyActiveRow = frozenEl;
+
+        const bar = timelineEl ? timelineEl.querySelector('.gantt-bar') : null;
         if (bar) {
             bar.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
+    }
+    document.querySelectorAll('.frozen-pane tbody, .timeline-pane tbody').forEach(tbody => {
+        tbody.addEventListener('click', handleRowActivateClick);
     });
 
     // --- Filter Logic --- (Existing Logic Preserved)
@@ -1442,7 +1436,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- STATE PERSISTENCE START ---
     function saveState() {
-        const container = document.querySelector('.table-container');
+        // Both panes' scrollTop are always mirrored (see setupPaneScrollSync), so reading
+        // either is equivalent -- frozenPane is used consistently here and in restoreState.
+        const container = document.querySelector('.frozen-pane');
         const currentScroll = container ? container.scrollTop : 0;
         
         const state = {
@@ -1483,7 +1479,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.collapsedGroups) {
                 state.collapsedGroups.forEach(id => {
                     vsCollapsedGroups.add(id);
-                    const header = document.querySelector(`.group-header[data-group-id="${id}"]`);
+                    // .collapsed only needs to live on the frozen copy -- it just drives the
+                    // chevron icon's rotation, which only exists in that copy's title cell.
+                    // Row visibility itself is fully driven by vsCollapsedGroups in applyFilters().
+                    const header = document.querySelector(`.frozen-pane .group-header[data-group-id="${id}"]`);
                     if (header) header.classList.add('collapsed');
                 });
             }
@@ -1496,7 +1495,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- STATE PERSISTENCE END ---
 
     function drawTodayMarker() {
-        const container = document.querySelector('.table-container');
+        const container = document.querySelector('.timeline-pane');
         const todayCell = document.querySelector('th.today-cell');
         const table = container ? container.querySelector('table') : null;
         
@@ -1684,7 +1683,7 @@ document.addEventListener('DOMContentLoaded', () => {
         expandAllBtn.addEventListener('click', () => {
             vsCollapsedGroups.clear();
             vsRowsData.forEach(row => {
-                if (row.isGroup) row.element.classList.remove('collapsed');
+                if (row.isGroup) row.frozenEl.classList.remove('collapsed');
             });
             applyFilters();
         });
@@ -1695,20 +1694,23 @@ document.addEventListener('DOMContentLoaded', () => {
             vsRowsData.forEach(row => {
                 if (row.isGroup) {
                     vsCollapsedGroups.add(row.groupId);
-                    row.element.classList.add('collapsed');
+                    row.frozenEl.classList.add('collapsed');
                 }
             });
             applyFilters();
         });
     }
-    
-    // Group Header Click Logic (Delegated)
-    document.querySelector('tbody').addEventListener('click', (e) => {
+
+    // Group Header Click Logic (Delegated) -- a click can land in either pane now, so this is
+    // attached to both tbodies. .collapsed only needs toggling on the frozen copy (that's the
+    // only side with a chevron icon); row visibility itself is driven by vsCollapsedGroups.
+    function handleGroupHeaderClick(e) {
         const header = e.target.closest('.group-header');
         if (header) {
             const groupId = header.dataset.groupId;
-            header.classList.toggle('collapsed');
-            
+            const frozenHeader = document.querySelector(`.frozen-pane .group-header[data-group-id="${groupId}"]`);
+            if (frozenHeader) frozenHeader.classList.toggle('collapsed');
+
             if (vsCollapsedGroups.has(groupId)) {
                 vsCollapsedGroups.delete(groupId);
             } else {
@@ -1716,6 +1718,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             applyFilters();
         }
+    }
+    document.querySelectorAll('.frozen-pane tbody, .timeline-pane tbody').forEach(tbody => {
+        tbody.addEventListener('click', handleGroupHeaderClick);
     });
     
     // --- Frontend Gantt Rendering Logic ---
@@ -1794,8 +1799,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const activitiesMap = new Map(data.activities.map(act => [act.pk, act]));
         const holidaysSet = new Set(data.holidays);
 
-        // Hide table body during rendering to prevent layout thrashing
-        const tableBody = document.querySelector('tbody');
+        // Hide the timeline pane's body during rendering to prevent layout thrashing while
+        // potentially hundreds of bar divs get appended (only that tbody is mutated below).
+        const tableBody = document.querySelector('.timeline-pane tbody');
         if (tableBody) tableBody.style.display = 'none';
         
         // NEW: Leave Logic
@@ -1829,7 +1835,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const activityRowMap = new Map();
         const groupActivitiesMap = new Map();
 
-        document.querySelectorAll('.gantt-activity-row').forEach(row => {
+        // Scoped to .timeline-pane: that's the copy of each row that actually has a
+        // .timeline-row-container to append bars into (the frozen copy doesn't have one).
+        document.querySelectorAll('.timeline-pane .gantt-activity-row').forEach(row => {
             const pk = parseInt(row.dataset.activityPk, 10);
             activityRowMap.set(pk, row);
             const groupId = row.dataset.groupId;
@@ -1839,10 +1847,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Build Date -> Index Map from Header
+        // Build Date -> Index Map from Header. Scoped to .timeline-pane: its 2nd header row now
+        // holds only date cells (the frozen pane has its own separate 2nd header row with the
+        // Project/Activity/... column labels), so this no longer risks matching the wrong thead.
         const dateIndexMap = new Map();
         const headerDates = [];
-        const headerRow = document.querySelector('thead tr:nth-child(2)');
+        const headerRow = document.querySelector('.timeline-pane thead tr:nth-child(2)');
         if (headerRow) {
             for (let i = 0; i < headerRow.cells.length; i++) {
                 const cell = headerRow.cells[i];
@@ -1923,11 +1933,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         
-        document.querySelectorAll('.group-header').forEach(headerRow => {
+        // Scoped to .timeline-pane: that's the copy with a .timeline-row-container to append
+        // summary bars into. Group name comes from data-group-name (set on both copies in the
+        // template) rather than a cross-pane lookup of the frozen copy's <span> title text.
+        document.querySelectorAll('.timeline-pane .group-header').forEach(headerRow => {
             const groupId = headerRow.dataset.groupId;
-            const groupName = headerRow.querySelector('span').textContent || groupId;
+            const groupName = headerRow.dataset.groupName || groupId;
             if (!groupId) return;
-            
+
             const container = headerRow.querySelector('.timeline-row-container');
             if (!container) return;
 
@@ -1985,39 +1998,65 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
 
 // --- VIRTUAL SCROLL IMPLEMENTATION ---
+// Rows now exist as a PAIR of <tr> elements -- one in .frozen-pane's tbody, one in
+// .timeline-pane's tbody -- instead of a single shared row. Both tbodies are rendered from
+// the exact same Django loop in the exact same order, so frozenRows[i] / timelineRows[i] are
+// always the same logical row; pairing is done positionally rather than by re-matching a key.
 function updateResizeHandleHeight() {
     const grip = document.querySelector('.breakdown-resize-handle .grip');
-    const tableEl = document.querySelector('.table-container table');
+    const tableEl = document.querySelector('.frozen-pane table');
     if (grip && tableEl) {
         grip.style.height = `${tableEl.offsetHeight}px`;
     }
 }
 
 function initVirtualScroll() {
-    const tbody = document.querySelector('tbody');
-    const tableContainer = document.querySelector('.table-container');
-    if (!tbody || !tableContainer) return;
+    const frozenTbody = document.querySelector('.frozen-pane tbody');
+    const timelineTbody = document.querySelector('.timeline-pane tbody');
+    const frozenPane = document.querySelector('.frozen-pane');
+    const timelinePane = document.querySelector('.timeline-pane');
+    if (!frozenTbody || !timelineTbody || !frozenPane || !timelinePane) return;
 
     // 1. Capture all rows
-    // #no-results-row is static "nothing matched" messaging, not a data/group/add row —
-    // it must stay out of the virtualized set, or it gets its 'hidden' class stripped and
-    // (trivially matching when no filters are active) renders as if it were a real row.
-    const allRows = Array.from(tbody.querySelectorAll('tr')).filter(row => row.id !== 'no-results-row');
-    if (allRows.length === 0) return;
+    // #no-results-row and #no-activities-row are static messaging rows, not data/group/add
+    // rows -- they must stay out of the virtualized (paired) set, and #no-results-row must
+    // also stay out or it gets its 'hidden' class stripped and (trivially matching when no
+    // filters are active) renders as if it were a real row. Neither has a counterpart in the
+    // timeline tbody by design.
+    const frozenRows = Array.from(frozenTbody.querySelectorAll('tr'))
+        .filter(row => row.id !== 'no-results-row' && row.id !== 'no-activities-row');
+    const timelineRows = Array.from(timelineTbody.querySelectorAll('tr'));
+    if (frozenRows.length === 0) return;
 
     // 2. Build Data Structure
-    vsRowsData = allRows.map(row => {
-        const isGroup = row.classList.contains('group-header');
-        const isAddRow = row.classList.contains('add-activity-row');
-        const isCompleted = row.classList.contains('row-completed');
-        const groupId = row.dataset.groupId;
+    vsRowsData = frozenRows.map((frozenEl, i) => {
+        const timelineEl = timelineRows[i];
+        if (timelineEl && frozenEl.dataset.activityPk !== timelineEl.dataset.activityPk) {
+            // Should never happen -- both tbodies are built from the same server-side loop in
+            // the same order. Surfaced loudly rather than silently misaligning bars/filtering.
+            console.error('Planner row pairing mismatch at index', i, frozenEl, timelineEl);
+        }
 
-        // Capture height before modifying DOM (avoid layout thrashing)
-        // If row is hidden (grouped), height is 0, so we use fallback.
-        const height = row.offsetHeight || (isGroup ? 32 : 40);
+        const isGroup = frozenEl.classList.contains('group-header');
+        const isAddRow = frozenEl.classList.contains('add-activity-row');
+        const isCompleted = frozenEl.classList.contains('row-completed');
+        const groupId = frozenEl.dataset.groupId;
+
+        // Capture height before modifying DOM (avoid layout thrashing). Measure BOTH sides
+        // and force them to match: each pane is now a fully separate table, so its rows
+        // resolve height independently from their own content -- a frozen row containing
+        // inputs/selects can render a pixel or two taller than its (empty) timeline
+        // counterpart, and that drift compounds row after row into a growing visual
+        // misalignment between the two panes the further down you scroll.
+        // If row is hidden (grouped), offsetHeight is 0 for both sides, so we fall back.
+        const height = Math.max(frozenEl.offsetHeight, timelineEl ? timelineEl.offsetHeight : 0)
+            || (isGroup ? 32 : 40);
+        frozenEl.style.height = `${height}px`;
+        if (timelineEl) timelineEl.style.height = `${height}px`;
 
         // FIX: Remove 'hidden' class from server-side rendering so VS can control visibility
-        row.classList.remove('hidden');
+        frozenEl.classList.remove('hidden');
+        if (timelineEl) timelineEl.classList.remove('hidden');
 
         // The "add new activity" row is a control, not data — it's never subject to the
         // column/search filters, so it doesn't need searchData built for it.
@@ -2027,7 +2066,7 @@ function initVirtualScroll() {
             // value (not textContent) — the Assignee cell is a <select> whose textContent would
             // otherwise include every option in the dropdown, not just the selected one.
             const columnTexts = {};
-            row.querySelectorAll('[data-filter-column]').forEach(cell => {
+            frozenEl.querySelectorAll('[data-filter-column]').forEach(cell => {
                 const col = cell.dataset.filterColumn;
                 const select = cell.querySelector('select');
                 const input = cell.querySelector('input');
@@ -2044,24 +2083,25 @@ function initVirtualScroll() {
 
             // Cache search data to avoid DOM access during filter
             searchData = {
-                project: (row.dataset.projectCode || '').toLowerCase(),
-                customer: (row.dataset.customer || '').toLowerCase(),
-                segment: (row.dataset.segment || '').toLowerCase(),
-                teamLead: (row.dataset.teamLead || '').toLowerCase(),
-                assignee: (row.dataset.assignee || '').toLowerCase(),
-                activityName: (row.dataset.activityName || '').toLowerCase(),
+                project: (frozenEl.dataset.projectCode || '').toLowerCase(),
+                customer: (frozenEl.dataset.customer || '').toLowerCase(),
+                segment: (frozenEl.dataset.segment || '').toLowerCase(),
+                teamLead: (frozenEl.dataset.teamLead || '').toLowerCase(),
+                assignee: (frozenEl.dataset.assignee || '').toLowerCase(),
+                activityName: (frozenEl.dataset.activityName || '').toLowerCase(),
                 columnTexts: columnTexts
             };
         }
 
         // Initialize collapsed state for groups (default collapsed except first?)
         // Existing logic was: index > 0 collapsed.
-        if (isGroup && row.classList.contains('collapsed')) {
+        if (isGroup && frozenEl.classList.contains('collapsed')) {
             vsCollapsedGroups.add(groupId);
         }
 
         return {
-            element: row,
+            frozenEl: frozenEl,
+            timelineEl: timelineEl,
             height: height,
             isGroup: isGroup,
             isAddRow: isAddRow,
@@ -2071,32 +2111,43 @@ function initVirtualScroll() {
         };
     });
 
-    // 3. Detach Rows & Setup Spacers
-    allRows.forEach(row => row.remove());
+    // 3. Detach Rows & Setup Spacer pairs (one pair per tbody, same heights applied to both)
+    frozenRows.forEach(row => row.remove());
+    timelineRows.forEach(row => row.remove());
 
-    const topSpacer = document.createElement('tr');
-    topSpacer.id = 'vs-spacer-top';
-    topSpacer.innerHTML = '<td colspan="100" style="padding:0; border:none;"></td>';
-    
-    const bottomSpacer = document.createElement('tr');
-    bottomSpacer.id = 'vs-spacer-bottom';
-    bottomSpacer.innerHTML = '<td colspan="100" style="padding:0; border:none;"></td>';
-    
-    tbody.appendChild(topSpacer);
-    tbody.appendChild(bottomSpacer);
+    function makeSpacer(id) {
+        const tr = document.createElement('tr');
+        tr.id = id;
+        tr.innerHTML = '<td colspan="100" style="padding:0; border:none;"></td>';
+        return tr;
+    }
+    const frozenTopSpacer = makeSpacer('vs-spacer-top-frozen');
+    const frozenBottomSpacer = makeSpacer('vs-spacer-bottom-frozen');
+    frozenTbody.appendChild(frozenTopSpacer);
+    frozenTbody.appendChild(frozenBottomSpacer);
+
+    const timelineTopSpacer = makeSpacer('vs-spacer-top-timeline');
+    const timelineBottomSpacer = makeSpacer('vs-spacer-bottom-timeline');
+    timelineTbody.appendChild(timelineTopSpacer);
+    timelineTbody.appendChild(timelineBottomSpacer);
 
     // 4. Initial Filter & Render
     isVirtualScrollActive = true;
     applyFilters(); // This will populate vsVisibleRows and call renderVirtualWindow
-    
-    // Restore scroll position if saved
+
+    // Restore scroll position if saved (both panes -- the mirror listeners set up in
+    // setupPaneScrollSync aren't a substitute here since this is a direct programmatic set,
+    // not a user scroll gesture on one specific pane).
     if (window.pendingScrollTop) {
-        tableContainer.scrollTop = window.pendingScrollTop;
+        frozenPane.scrollTop = window.pendingScrollTop;
+        timelinePane.scrollTop = window.pendingScrollTop;
         delete window.pendingScrollTop;
     }
 
-    // 5. Scroll Listener
-    tableContainer.addEventListener('scroll', () => {
+    // 5. Scroll Listener (both panes -- their scrollTop is always mirrored by
+    // setupPaneScrollSync, so either can initiate a recompute; the isRenderPending debounce
+    // coalesces the resulting double-fire into a single call per frame)
+    function onScroll() {
         if (!isRenderPending) {
             requestAnimationFrame(() => {
                 renderVirtualWindow(false);
@@ -2104,51 +2155,68 @@ function initVirtualScroll() {
             });
             isRenderPending = true;
         }
-    });
+    }
+    frozenPane.addEventListener('scroll', onScroll);
+    timelinePane.addEventListener('scroll', onScroll);
 }
 
 function renderVirtualWindow(forceUpdate = false) {
     if (!isVirtualScrollActive) return;
 
-    const tableContainer = document.querySelector('.table-container');
-    const topSpacer = document.getElementById('vs-spacer-top');
-    const bottomSpacer = document.getElementById('vs-spacer-bottom');
-    
-    const scrollTop = tableContainer.scrollTop;
-    const viewportHeight = tableContainer.clientHeight;
+    const frozenPane = document.querySelector('.frozen-pane');
+    const frozenTopSpacer = document.getElementById('vs-spacer-top-frozen');
+    const frozenBottomSpacer = document.getElementById('vs-spacer-bottom-frozen');
+    const timelineTopSpacer = document.getElementById('vs-spacer-top-timeline');
+    const timelineBottomSpacer = document.getElementById('vs-spacer-bottom-timeline');
+
+    // Both panes' scrollTop are always mirrored, so reading frozenPane is equivalent to
+    // reading whichever pane the user actually scrolled.
+    const scrollTop = frozenPane.scrollTop;
+    const viewportHeight = frozenPane.clientHeight;
     const buffer = 15; // Number of rows to render outside viewport
 
     let accumulatedHeight = 0;
     let topHeight = 0;
     let bottomHeight = 0;
-    const nodesToRender = [];
+    const frozenNodes = [];
+    const timelineNodes = [];
 
     // Calculate which rows to show
     for (let i = 0; i < vsVisibleRows.length; i++) {
         const row = vsVisibleRows[i];
         const h = row.height;
-        
+
         // Check if row is within viewport + buffer
         if (accumulatedHeight + h < scrollTop - (h * buffer)) {
             topHeight += h;
         } else if (accumulatedHeight > scrollTop + viewportHeight + (h * buffer)) {
             bottomHeight += h;
         } else {
-            nodesToRender.push(row.element);
+            frozenNodes.push(row.frozenEl);
+            if (row.timelineEl) timelineNodes.push(row.timelineEl);
         }
         accumulatedHeight += h;
     }
 
-    // Update Spacers
-    topSpacer.firstElementChild.style.height = `${topHeight}px`;
-    bottomSpacer.firstElementChild.style.height = `${bottomHeight}px`;
+    // Update Spacers (same heights on both tbodies, so rows stay aligned between panes)
+    frozenTopSpacer.firstElementChild.style.height = `${topHeight}px`;
+    frozenBottomSpacer.firstElementChild.style.height = `${bottomHeight}px`;
+    timelineTopSpacer.firstElementChild.style.height = `${topHeight}px`;
+    timelineBottomSpacer.firstElementChild.style.height = `${bottomHeight}px`;
 
-    // Update DOM: Remove old rows between spacers and insert new ones
-    while (topSpacer.nextSibling && topSpacer.nextSibling !== bottomSpacer) {
-        topSpacer.nextSibling.remove();
+    // Update DOM: Remove old rows between spacers and insert new ones, in each tbody
+    while (frozenTopSpacer.nextSibling && frozenTopSpacer.nextSibling !== frozenBottomSpacer) {
+        frozenTopSpacer.nextSibling.remove();
     }
-    if (nodesToRender.length > 0) {
-        topSpacer.after(...nodesToRender);
+    if (frozenNodes.length > 0) {
+        frozenTopSpacer.after(...frozenNodes);
+    }
+
+    while (timelineTopSpacer.nextSibling && timelineTopSpacer.nextSibling !== timelineBottomSpacer) {
+        timelineTopSpacer.nextSibling.remove();
+    }
+    if (timelineNodes.length > 0) {
+        timelineTopSpacer.after(...timelineNodes);
     }
 
     updateResizeHandleHeight();
