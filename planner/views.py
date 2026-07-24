@@ -902,17 +902,22 @@ def resource_availability_report_view(request):
     top_n = max(1, min(top_n, 100))
 
     selected_designation = request.GET.get('designation', '')
+    selected_segment_id = request.GET.get('segment', '')
     selected_assignee_ids = [v for v in request.GET.getlist('assignee') if v]
+    selected_free_bucket = request.GET.get('free_bucket', '')
 
     holidays = list(Holiday.objects.values_list('date', flat=True))
     holidays_set = set(holidays)
     total_working_days = count_working_days(period_start, period_end, holidays) or 0
 
     all_assignable_employees = Employee.objects.filter(is_active=True).exclude(name__startswith='Unassigned').order_by('name')
+    segment_choices = Segment.objects.filter(employee__in=all_assignable_employees).distinct().order_by('name')
 
     employees_qs = all_assignable_employees
     if selected_designation:
         employees_qs = employees_qs.filter(designation=selected_designation)
+    if selected_segment_id:
+        employees_qs = employees_qs.filter(segment_id=selected_segment_id)
     if selected_assignee_ids:
         employees_qs = employees_qs.filter(pk__in=selected_assignee_ids)
 
@@ -927,18 +932,30 @@ def resource_availability_report_view(request):
     activities_by_employee = defaultdict(list)
     occupied_days_by_employee = defaultdict(set)
 
-    for act in activities:
-        activities_by_employee[act.assignee_id].append(act)
-
-        # Only count the portion of the activity that actually falls inside the window,
-        # and de-duplicate days covered by more than one overlapping activity.
-        seg_start = max(act.start_date, period_start)
-        seg_end = min(act.end_date, period_end)
+    def _add_occupied_range(employee_id, range_start, range_end):
+        # Only count the portion that actually falls inside the window, and de-duplicate
+        # days covered by more than one overlapping activity/leave for the same employee.
+        seg_start = max(range_start, period_start)
+        seg_end = min(range_end, period_end)
         current_date = seg_start
         while current_date <= seg_end:
             if current_date.weekday() < 5 and current_date not in holidays_set:
-                occupied_days_by_employee[act.assignee_id].add(current_date)
+                occupied_days_by_employee[employee_id].add(current_date)
             current_date += timedelta(days=1)
+
+    for act in activities:
+        activities_by_employee[act.assignee_id].append(act)
+        _add_occupied_range(act.assignee_id, act.start_date, act.end_date)
+
+    # Approved leave counts as occupied too -- otherwise someone on leave with no assigned
+    # task would misleadingly show up as fully available.
+    leaves = Leave.objects.filter(
+        employee__in=employees_qs,
+        start_date__lte=period_end,
+        end_date__gte=period_start,
+    )
+    for leave in leaves:
+        _add_occupied_range(leave.employee_id, leave.start_date, leave.end_date)
 
     resources = []
     for emp in employees_qs:
@@ -961,8 +978,52 @@ def resource_availability_report_view(request):
             'task_count': len(emp_activities),
         })
 
-    most_occupied = sorted(resources, key=lambda r: (-r['occupancy_pct'], r['employee'].name))[:top_n]
-    most_available = sorted(resources, key=lambda r: (r['occupancy_pct'], r['employee'].name))[:top_n]
+    # Free-% distribution: how many resources fall into each availability tier, each resource
+    # counted in exactly one tier (100% free = zero occupied days at all). Counts always reflect
+    # every resource matching the designation/segment/assignee filters, regardless of which
+    # bucket (if any) is currently selected, so the cards stay usable as toggles.
+    free_buckets = OrderedDict([
+        ('100', {'label': '100% free', 'min': 100, 'max': 100, 'count': 0, 'color': 'emerald'}),
+        ('80', {'label': '80–99% free', 'min': 80, 'max': 99.9, 'count': 0, 'color': 'teal'}),
+        ('50', {'label': '50–79% free', 'min': 50, 'max': 79.9, 'count': 0, 'color': 'sky'}),
+        ('30', {'label': '30–49% free', 'min': 30, 'max': 49.9, 'count': 0, 'color': 'amber'}),
+        ('10', {'label': '10–29% free', 'min': 10, 'max': 29.9, 'count': 0, 'color': 'orange'}),
+        ('0', {'label': '<10% free', 'min': 0, 'max': 9.9, 'count': 0, 'color': 'rose'}),
+    ])
+    for r in resources:
+        free_pct = 100 - r['occupancy_pct']
+        for bucket in free_buckets.values():
+            if bucket['min'] <= free_pct <= bucket['max']:
+                bucket['count'] += 1
+                break
+
+    # Each card links to itself with free_bucket=<key> so clicking it filters the resource
+    # lists below to just that tier; clicking the already-active card clears the filter again.
+    for key, bucket in free_buckets.items():
+        bucket['active'] = (selected_free_bucket == key)
+        params = request.GET.copy()
+        if bucket['active']:
+            params.pop('free_bucket', None)
+        else:
+            params['free_bucket'] = key
+        encoded = params.urlencode()
+        bucket['url'] = f"{request.path}?{encoded}" if encoded else request.path
+
+    display_resources = resources
+    selected_bucket = free_buckets.get(selected_free_bucket)
+    if selected_bucket:
+        display_resources = [
+            r for r in resources
+            if selected_bucket['min'] <= (100 - r['occupancy_pct']) <= selected_bucket['max']
+        ]
+
+    most_occupied = sorted(display_resources, key=lambda r: (-r['occupancy_pct'], r['employee'].name))[:top_n]
+    most_available = sorted(display_resources, key=lambda r: (r['occupancy_pct'], r['employee'].name))[:top_n]
+
+    has_active_filters = bool(
+        selected_designation or selected_segment_id or selected_assignee_ids
+        or selected_free_bucket or use_custom_range or days != 30 or top_n != 10
+    )
 
     context = {
         'active_nav': 'resource_report',
@@ -978,10 +1039,16 @@ def resource_availability_report_view(request):
         'total_resources': employees_qs.count(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
         'selected_designation': selected_designation,
+        'segment_choices': segment_choices,
+        'selected_segment_id': selected_segment_id,
         'all_assignable_employees': all_assignable_employees,
         'selected_assignee_ids': selected_assignee_ids,
         'most_available': most_available,
         'most_occupied': most_occupied,
+        'free_buckets': list(free_buckets.values()),
+        'selected_bucket': selected_bucket,
+        'has_active_filters': has_active_filters,
+        'clear_url': reverse('planner_resource_availability_report'),
     }
     return render(request, 'planner/resource_availability_report.html', context)
 
