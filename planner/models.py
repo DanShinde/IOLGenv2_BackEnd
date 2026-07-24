@@ -66,11 +66,19 @@ class Activity(models.Model):
     start_date = models.DateField(default=timezone.now)
     duration = models.PositiveIntegerField(default=1, help_text="Duration in working days")
     end_date = models.DateField(blank=True, null=True)
-    
+    completion_percentage = models.PositiveSmallIntegerField(default=0, help_text="Percent complete (0-100)")
+    is_completed = models.BooleanField(default=False)
+
     def __str__(self):
         return f"{self.project.project_id} - {self.activity_name}"
         
     def save(self, *args, **kwargs):
+        # Defensive clamp only — the 100% <-> completed sync itself is handled where the
+        # user actually changes one of the two fields (activity_quick_update_view), not
+        # here, so that e.g. unchecking "completed" while % is still 100 isn't immediately
+        # flipped back by an unrelated save().
+        self.completion_percentage = max(0, min(100, self.completion_percentage or 0))
+
         # 1. Get Global Holidays
         holidays = list(Holiday.objects.values_list('date', flat=True))
         

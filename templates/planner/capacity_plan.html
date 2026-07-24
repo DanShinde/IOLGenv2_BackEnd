@@ -16,16 +16,28 @@
         color: white;
         border-color: #4f46e5;
     }
+    @media print {
+        @page { size: landscape; margin: 1cm; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white; }
+        .no-print { display: none !important; }
+        .shadow-lg, .shadow-md, .shadow-sm { box-shadow: none !important; border: 1px solid #e5e7eb; }
+        tr { page-break-inside: avoid; }
+        .overflow-x-auto { overflow: visible !important; max-height: none !important; }
+        .table-header-sticky { position: static !important; }
+        .sticky { position: static !important; }
+        nav, .sidebar, aside { display: none !important; }
+        main, .max-w-screen-2xl { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; }
+    }
 </style>
 
-<header class="bg-white shadow-md">
+<header class="bg-white shadow-md print-header">
     <div class="max-w-screen-2xl mx-auto py-3 px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-xl font-bold tracking-tight text-gray-900">Capacity Planning Dashboard</h1>
                 <p class="mt-0.5 text-xs text-gray-600">Strategic workforce analysis and demand forecasting</p>
             </div>
-            <div class="flex space-x-3">
+            <div class="flex space-x-3 no-print">
                 <div class="flex rounded-md shadow-sm" role="group">
                     <a href="?view_type=week" class="view-btn px-3 py-1.5 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 {% if view_type == 'week' %}active{% endif %}">
                         Week
@@ -43,6 +55,13 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
                     Refresh
+                </button>
+                
+                <button onclick="window.print()" class="bg-white text-gray-700 py-1.5 px-3 rounded-md shadow-sm border border-gray-300 hover:bg-gray-50 flex items-center text-xs transition-colors">
+                    <svg class="w-3.5 h-3.5 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                    </svg>
+                    Print
                 </button>
             </div>
         </div>

@@ -1,6 +1,7 @@
 # planner/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.template.loader import render_to_string
 from employees.models import Employee
 from .models import (ProjectType, Segment, Category, Holiday,
                      Project, Activity, GeneralSettings, CapacitySettings,
@@ -427,6 +428,7 @@ def consolidated_planner_view(request):
     assignees = Employee.objects.filter(is_active=True).order_by('name')
 
     display_data = defaultdict(list)
+    project_lookup = {}  # project_id (code) -> Project instance; only populated for grouping_method == 'project'
     if grouping_method == 'engineer':
         sorted_activities = sorted(context['activities'], key=lambda a: (a.assignee.name if a.assignee else "Unassigned", a.start_date))
         for act in sorted_activities:
@@ -443,7 +445,7 @@ def consolidated_planner_view(request):
         )
         display_data['All Activities'] = sorted_activities
         
-    else: 
+    else:
         # Default fallback to 'project'
         grouping_method = 'project'
         activities_by_project = defaultdict(list)
@@ -451,6 +453,7 @@ def consolidated_planner_view(request):
             activities_by_project[act.project_id].append(act)
         for project in Project.objects.order_by('project_id'):
             display_data[project.project_id] = sorted(activities_by_project.get(project.id, []), key=lambda a: a.start_date)
+            project_lookup[project.project_id] = project
 
     gantt_init_data = {
         'activities': [
@@ -465,7 +468,9 @@ def consolidated_planner_view(request):
         ],
         'holidays': [h.isoformat() for h in context['holidays_map'].keys()],
         'leaves': _get_leaves_map(),  # NEW: Inject leaves
-        'today': context['today'].isoformat()
+        'today': context['today'].isoformat(),
+        'grouping_method': grouping_method,
+        'is_single_project': False,
     }
 
     context.update({
@@ -477,7 +482,8 @@ def consolidated_planner_view(request):
         'gantt_init_data': gantt_init_data,
         'segments': segments,
         'team_leads': team_leads,
-        'assignees': assignees
+        'assignees': assignees,
+        'project_lookup': project_lookup
     })
     return render(request, 'planner/activity_planner.html', context)
 
@@ -524,14 +530,17 @@ def activity_planner_view(request, project_pk):
         ],
         'holidays': [h.isoformat() for h in context['holidays_map'].keys()],
         'leaves': _get_leaves_map(),  # NEW: Inject leaves
-        'today': context['today'].isoformat()
+        'today': context['today'].isoformat(),
+        'grouping_method': 'none',
+        'is_single_project': True,
     }
 
     context.update({
         'project': project,
         'form': form,
         'active_nav': 'projects',
-        'gantt_init_data': gantt_init_data
+        'gantt_init_data': gantt_init_data,
+        'assignees': Employee.objects.filter(is_active=True).order_by('name')
     })
     return render(request, 'planner/activity_planner.html', context)
 
@@ -853,6 +862,129 @@ def export_site_history_pdf(request):
     c.save()
     return response
 
+def resource_availability_report_view(request):
+    """
+    Ranks active employees by how much of an upcoming window they're booked for,
+    based on non-completed Activity assignments overlapping that window. Lets users
+    quickly spot the most free (available) and most booked (occupied) resources,
+    with each resource's current/upcoming tasks listed underneath their name.
+    """
+    today = date.today()
+
+    # A custom date range (both ends provided and valid) takes precedence over the quick
+    # look-ahead window, and unlike that window it isn't anchored to today — it can be a
+    # past or future range, so availability can be checked for any period.
+    custom_start = parse_date(request.GET.get('start_date', '') or '')
+    custom_end = parse_date(request.GET.get('end_date', '') or '')
+    use_custom_range = bool(custom_start and custom_end and custom_start <= custom_end)
+
+    if use_custom_range:
+        period_start = custom_start
+        period_end = custom_end
+        if (period_end - period_start).days + 1 > 366:
+            period_end = period_start + timedelta(days=365)
+        days = (period_end - period_start).days + 1
+    else:
+        custom_start = None
+        custom_end = None
+        try:
+            days = int(request.GET.get('days', 30))
+        except (TypeError, ValueError):
+            days = 30
+        days = max(1, min(days, 365))
+        period_start = today
+        period_end = period_start + timedelta(days=days - 1)
+
+    try:
+        top_n = int(request.GET.get('top_n', 10))
+    except (TypeError, ValueError):
+        top_n = 10
+    top_n = max(1, min(top_n, 100))
+
+    selected_designation = request.GET.get('designation', '')
+    selected_assignee_ids = [v for v in request.GET.getlist('assignee') if v]
+
+    holidays = list(Holiday.objects.values_list('date', flat=True))
+    holidays_set = set(holidays)
+    total_working_days = count_working_days(period_start, period_end, holidays) or 0
+
+    all_assignable_employees = Employee.objects.filter(is_active=True).exclude(name__startswith='Unassigned').order_by('name')
+
+    employees_qs = all_assignable_employees
+    if selected_designation:
+        employees_qs = employees_qs.filter(designation=selected_designation)
+    if selected_assignee_ids:
+        employees_qs = employees_qs.filter(pk__in=selected_assignee_ids)
+
+    # Non-completed activities for these employees whose date range overlaps the window.
+    activities = Activity.objects.filter(
+        assignee__in=employees_qs,
+        is_completed=False,
+        start_date__lte=period_end,
+        end_date__gte=period_start,
+    ).select_related('project', 'assignee').order_by('start_date')
+
+    activities_by_employee = defaultdict(list)
+    occupied_days_by_employee = defaultdict(set)
+
+    for act in activities:
+        activities_by_employee[act.assignee_id].append(act)
+
+        # Only count the portion of the activity that actually falls inside the window,
+        # and de-duplicate days covered by more than one overlapping activity.
+        seg_start = max(act.start_date, period_start)
+        seg_end = min(act.end_date, period_end)
+        current_date = seg_start
+        while current_date <= seg_end:
+            if current_date.weekday() < 5 and current_date not in holidays_set:
+                occupied_days_by_employee[act.assignee_id].add(current_date)
+            current_date += timedelta(days=1)
+
+    resources = []
+    for emp in employees_qs:
+        occupied_days = len(occupied_days_by_employee.get(emp.id, ()))
+        occupancy_pct = round((occupied_days / total_working_days) * 100, 1) if total_working_days else 0
+
+        # Group this resource's tasks by project (each project links back to its planner page).
+        emp_activities = sorted(activities_by_employee.get(emp.id, []), key=lambda a: a.start_date)
+        project_groups = OrderedDict()
+        for act in emp_activities:
+            group = project_groups.setdefault(act.project_id, {'project': act.project, 'tasks': []})
+            group['tasks'].append(act)
+
+        resources.append({
+            'employee': emp,
+            'occupied_days': occupied_days,
+            'available_days': max(0, total_working_days - occupied_days),
+            'occupancy_pct': occupancy_pct,
+            'project_groups': list(project_groups.values()),
+            'task_count': len(emp_activities),
+        })
+
+    most_occupied = sorted(resources, key=lambda r: (-r['occupancy_pct'], r['employee'].name))[:top_n]
+    most_available = sorted(resources, key=lambda r: (r['occupancy_pct'], r['employee'].name))[:top_n]
+
+    context = {
+        'active_nav': 'resource_report',
+        'today': today,
+        'period_start': period_start,
+        'period_end': period_end,
+        'days': days,
+        'use_custom_range': use_custom_range,
+        'custom_start': custom_start,
+        'custom_end': custom_end,
+        'top_n': top_n,
+        'total_working_days': total_working_days,
+        'total_resources': employees_qs.count(),
+        'designation_choices': Employee.DESIGNATION_CHOICES,
+        'selected_designation': selected_designation,
+        'all_assignable_employees': all_assignable_employees,
+        'selected_assignee_ids': selected_assignee_ids,
+        'most_available': most_available,
+        'most_occupied': most_occupied,
+    }
+    return render(request, 'planner/resource_availability_report.html', context)
+
 def update_employee_view(request, pk):
     employee = get_object_or_404(Employee, pk=pk)
     if request.method == 'POST':
@@ -1009,6 +1141,178 @@ def delete_activity_view(request, pk):
     default_redirect_url = reverse('planner_activity_planner', kwargs={'project_pk': project_pk})
     return redirect(next_url or default_redirect_url)
 
+@require_POST
+def activity_quick_update_view(request, pk):
+    """Single-field inline edit endpoint used by the Activities Breakdown table.
+    Mirrors the calculation rules from ActivityForm / Activity.save(): providing
+    start_date or duration re-derives end_date, providing end_date re-derives duration.
+    """
+    activity = get_object_or_404(Activity, pk=pk)
+    field = request.POST.get('field', '')
+    value = request.POST.get('value', '')
+
+    if field == 'activity_name':
+        value = value.strip()
+        if not value:
+            return JsonResponse({'success': False, 'error': 'Activity name cannot be empty.'}, status=400)
+        activity.activity_name = value
+
+    elif field == 'assignee':
+        if value:
+            employee = Employee.objects.filter(pk=value).first()
+            if not employee:
+                return JsonResponse({'success': False, 'error': 'Selected assignee not found.'}, status=400)
+            activity.assignee = employee
+        else:
+            activity.assignee = None
+
+    elif field == 'start_date':
+        dt = parse_date(value)
+        if not dt:
+            return JsonResponse({'success': False, 'error': 'Invalid start date.'}, status=400)
+        activity.start_date = dt
+        activity.end_date = None  # re-derive from the existing duration
+
+    elif field == 'duration':
+        try:
+            duration = int(value)
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'Duration must be a whole number.'}, status=400)
+        if duration < 1:
+            return JsonResponse({'success': False, 'error': 'Duration must be at least 1 day.'}, status=400)
+        activity.duration = duration
+        activity.end_date = None  # re-derive from the new duration
+
+    elif field == 'end_date':
+        dt = parse_date(value)
+        if not dt:
+            return JsonResponse({'success': False, 'error': 'Invalid end date.'}, status=400)
+        if dt < activity.start_date:
+            return JsonResponse({'success': False, 'error': 'End date cannot be before start date.'}, status=400)
+        activity.end_date = dt  # Activity.save() re-derives duration
+
+    elif field == 'remark':
+        activity.remark = value
+
+    elif field == 'completion_percentage':
+        try:
+            pct = int(value)
+        except (TypeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'Completion % must be a whole number.'}, status=400)
+        if pct < 0 or pct > 100:
+            return JsonResponse({'success': False, 'error': 'Completion % must be between 0 and 100.'}, status=400)
+        activity.completion_percentage = pct
+        if pct == 100:
+            activity.is_completed = True
+
+    elif field == 'is_completed':
+        is_completed = value in ('true', 'True', '1', 'on', 'yes')
+        activity.is_completed = is_completed
+        if is_completed:
+            activity.completion_percentage = 100
+
+    else:
+        return JsonResponse({'success': False, 'error': 'Unknown field.'}, status=400)
+
+    activity.save()
+
+    return JsonResponse({
+        'success': True,
+        'activity_name': activity.activity_name,
+        'assignee_id': activity.assignee_id,
+        'assignee_name': activity.assignee.name if activity.assignee else '',
+        'assignee_full_name': getattr(activity.assignee, 'full_name', activity.assignee.name) if activity.assignee else '',
+        'start_date': activity.start_date.isoformat(),
+        'end_date': activity.end_date.isoformat() if activity.end_date else '',
+        'duration': activity.duration,
+        'remark': activity.remark,
+        'completion_percentage': activity.completion_percentage,
+        'is_completed': activity.is_completed,
+    })
+
+@require_POST
+def activity_quick_create_view(request):
+    """Inline "add row" endpoint used at the bottom of the Activities Breakdown table
+    (and per project group in the consolidated view). Mirrors the essential fields of
+    ActivityForm; end_date/duration derivation is handled by Activity.save() as usual.
+    """
+    project = get_object_or_404(Project, pk=request.POST.get('project'))
+
+    activity_name = request.POST.get('activity_name', '').strip()
+    if not activity_name:
+        return JsonResponse({'success': False, 'error': 'Activity name is required.'}, status=400)
+
+    start_date = parse_date(request.POST.get('start_date', ''))
+    if not start_date:
+        return JsonResponse({'success': False, 'error': 'A valid start date is required.'}, status=400)
+
+    try:
+        duration = int(request.POST.get('duration') or 1)
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Duration must be a whole number.'}, status=400)
+    if duration < 1:
+        return JsonResponse({'success': False, 'error': 'Duration must be at least 1 day.'}, status=400)
+
+    assignee = None
+    assignee_id = request.POST.get('assignee')
+    if assignee_id:
+        assignee = Employee.objects.filter(pk=assignee_id).first()
+        if not assignee:
+            return JsonResponse({'success': False, 'error': 'Selected assignee not found.'}, status=400)
+
+    activity = Activity(
+        project=project,
+        activity_name=activity_name,
+        assignee=assignee,
+        start_date=start_date,
+        duration=duration,
+    )
+
+    end_date_str = request.POST.get('end_date')
+    if end_date_str:
+        dt = parse_date(end_date_str)
+        if dt:
+            activity.end_date = dt
+
+    activity.save()
+
+    # Employee.full_name isn't a real model field -- it's normally monkey-patched on by
+    # _prepare_gantt_context() (used when rendering the full page) before the row template
+    # reads it for data-assignee. This endpoint never calls that, so without this the new
+    # row's data-assignee would silently render "Unassigned" even when one is set.
+    if activity.assignee:
+        activity.assignee.full_name = activity.assignee.name
+
+    # Rendered client-side without a reload (see activity_planner.html), so the new row's
+    # frozen-pane HTML is rendered here and sent back for direct insertion. The timeline-pane
+    # half is trivial (an empty bar container) and gets built client-side instead -- only the
+    # frozen half needs real template logic (inline-edit inputs, filter attributes, etc).
+    render_context = {
+        'activities': [activity],
+        'pane': 'frozen',
+        'group_name': request.POST.get('group_name') or None,
+        'grouping_method': 'none',
+    }
+    if request.POST.get('is_single_project'):
+        render_context['project'] = activity.project  # any truthy value suppresses the Project column
+    frozen_row_html = render_to_string('planner/_activity_rows.html', render_context, request=request)
+
+    return JsonResponse({
+        'success': True,
+        'pk': activity.pk,
+        'activity_name': activity.activity_name,
+        'assignee_id': activity.assignee_id,
+        'assignee_name': activity.assignee.name if activity.assignee else '',
+        'assignee_full_name': getattr(activity.assignee, 'full_name', activity.assignee.name) if activity.assignee else '',
+        'start_date': activity.start_date.isoformat(),
+        'end_date': activity.end_date.isoformat() if activity.end_date else '',
+        'duration': activity.duration,
+        'completion_percentage': activity.completion_percentage,
+        'is_completed': activity.is_completed,
+        'project_code': activity.project.project_id,
+        'frozen_row_html': frozen_row_html,
+    })
+
 def edit_project_type_view(request, pk):
     project_type = get_object_or_404(ProjectType, pk=pk)
     next_url = request.GET.get('next')
@@ -1161,7 +1465,7 @@ def capacity_plan_view(request):
     forecasted_workload_by_segment = defaultdict(lambda: defaultdict(float))
     
     for activity in Activity.objects.select_related('assignee', 'project__segment').filter(
-        assignee__isnull=False, start_date__isnull=False, end_date__isnull=False
+        assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False
     ):
         daily_hours = general_settings.working_hours_per_day
         current_date = activity.start_date
@@ -1232,7 +1536,7 @@ def capacity_plan_view(request):
     global_forecast_workload = defaultdict(float)
     
     # Calculate global sums for Charts (Workload Volume)
-    for activity in Activity.objects.filter(assignee__isnull=False, start_date__isnull=False, end_date__isnull=False):
+    for activity in Activity.objects.filter(assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False):
         current_date = activity.start_date
         while current_date <= activity.end_date:
             if current_date.weekday() < 5 and current_date not in holidays:

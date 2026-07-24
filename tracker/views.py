@@ -73,11 +73,13 @@ def signup_view(request):
 
 @login_required
 def index(request):
-    projects = Project.objects.select_related('segment_con').all()
+    show_archived = request.GET.get('archived') == '1'
+    projects = Project.objects.filter(is_archived=show_archived).select_related('segment_con').prefetch_related('stages').all()
     context = {
         'projects': projects,
         'all_segments': trackerSegment.objects.all(),
-        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD')
+        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD'),
+        'show_archived': show_archived
     }
     return render(request, 'tracker/index.html', context)
 
@@ -103,7 +105,8 @@ def new_project(request):
             code=code, customer_name=request.POST['customer_name'],
             value=request.POST['value'], so_punch_date=parse_date(request.POST['so_punch_date']),
             segment_con=segment_con,
-            team_lead=team_lead
+            team_lead=team_lead,
+            description=request.POST.get('description', '')
         )
 
         # ... stage creation logic is unchanged ...
@@ -131,6 +134,7 @@ def edit_project(request, project_id):
         project.customer_name = request.POST['customer_name']
         project.value = request.POST['value']
         project.so_punch_date = parse_date(request.POST['so_punch_date'])
+        project.description = request.POST.get('description', '')
 
         segment_id = request.POST.get('segment')
         project.segment_con = trackerSegment.objects.get(id=segment_id) if segment_id else None
@@ -362,6 +366,16 @@ def delete_project(request, project_id):
     return redirect('tracker_index')
 
 @login_required
+def toggle_archive_project(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if request.method == 'POST':
+        project.is_archived = not project.is_archived
+        project.save()
+        status_str = "archived" if project.is_archived else "unarchived"
+        messages.success(request, f"Project '{project.code}' has been {status_str}.")
+    return redirect('tracker_project_detail', project_id=project.id)
+
+@login_required
 def edit_remark(request, remark_id):
     remark = get_object_or_404(StageRemark, pk=remark_id)
     project_id = remark.stage.project.id
@@ -435,8 +449,10 @@ def dashboard(request):
         label, start_date, end_date = period_map[period]
         display_period = label
 
-    completed_early_ids = Project.objects.filter(stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date).values_list('id', flat=True)
-    live_projects = Project.objects.filter(
+    completed_early_ids = Project.objects.filter(
+        is_archived=False, stages__name='Handover', stages__status='Completed', stages__actual_date__lt=start_date
+    ).values_list('id', flat=True)
+    live_projects = Project.objects.filter(is_archived=False).filter(
         Q(so_punch_date__lte=end_date) | Q(so_punch_date__isnull=True)
     ).exclude(id__in=completed_early_ids).select_related('segment_con', 'team_lead').prefetch_related('stages').distinct()
 
@@ -450,12 +466,13 @@ def dashboard(request):
     # NEW, ROBUST QUERY
     # 1. First, get the IDs of all projects that are genuinely completed.
     completed_project_ids = Project.objects.filter(
+        is_archived=False,
         stages__name='Handover',
         stages__status='Completed'
     ).values_list('id', flat=True)
 
     # 2. Then, find projects that are older than the cutoff AND are NOT in the completed list.
-    chronic_projects = Project.objects.exclude(
+    chronic_projects = Project.objects.filter(is_archived=False).exclude(
         id__in=completed_project_ids
     ).filter(
         so_punch_date__lt=chronic_cutoff_date
@@ -613,7 +630,7 @@ def project_reports(request):
     query_params = request.GET or request.session.get('report_filters', {})
     
     # --- The FIX is in this line: We add select_related and prefetch_related ---
-    projects_qs = Project.objects.select_related('segment_con', 'team_lead').prefetch_related('stages').all()
+    projects_qs = Project.objects.filter(is_archived=False).select_related('segment_con', 'team_lead').prefetch_related('stages').all()
 
     # --- Dynamic Financial Year Logic (Same as Dashboard) ---
     today = timezone.now().date()
@@ -663,6 +680,7 @@ def project_reports(request):
         # Match Dashboard Logic: Live Projects in Period (Carry-over + New)
         # 1. Exclude projects completed before the start of the FY
         completed_early_ids = Project.objects.filter(
+            is_archived=False,
             stages__name='Handover', 
             stages__status='Completed', 
             stages__actual_date__lt=fy_start
@@ -737,6 +755,7 @@ def project_reports(request):
     hide_completed = query_params.get('hide_completed') == '1'
     if hide_completed:
         completed_project_ids = Project.objects.filter(
+            is_archived=False,
             stages__name='Handover',
             stages__status='Completed'
         ).values_list('id', flat=True)
@@ -1096,19 +1115,22 @@ def get_filtered_stages(filter_type):
 
     if filter_type == 'overdue':
         return Stage.objects.filter(
+            project__is_archived=False,
             status__in=["Not started", "In Progress"],
             planned_date__lt=today
         ).order_by('planned_date')
     elif filter_type in date_ranges:
         start, end = date_ranges[filter_type]
         return Stage.objects.filter(
+            project__is_archived=False,
             status__in=["Not started", "In Progress"],
             planned_date__range=(start, end)
         ).order_by('planned_date')
     elif filter_type == 'all':
-        return Stage.objects.exclude(status__in=["Completed", "Not Applicable"]).order_by('planned_date')
+        return Stage.objects.filter(project__is_archived=False).exclude(status__in=["Completed", "Not Applicable"]).order_by('planned_date')
     else:
         return Stage.objects.filter(
+            project__is_archived=False,
             status__in=["Not started", "In Progress"],
             planned_date__gte=today
         ).order_by('planned_date')
@@ -1182,7 +1204,7 @@ def export_milestones_pdf(request):
 
 @login_required
 def export_report_pdf(request):
-    projects = Project.objects.select_related('segment_con').prefetch_related('stages').all()
+    projects = Project.objects.filter(is_archived=False).select_related('segment_con').prefetch_related('stages').all()
     selected_segment_ids = request.GET.getlist('segments')
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
@@ -1226,6 +1248,7 @@ def export_report_pdf(request):
     # --- NEW: Hide Completed Logic for PDF ---
     if request.GET.get('hide_completed') == '1':
         completed_project_ids = Project.objects.filter(
+            is_archived=False,
             stages__name='Handover',
             stages__status='Completed'
         ).values_list('id', flat=True)
@@ -1447,22 +1470,18 @@ def edit_project_update(request, update_id):
         
         referer = request.META.get('HTTP_REFERER')
         if referer and 'all-push-pull-content' in referer:
-            filter_type = 'all'
-            if 'filter=project' in referer:
-                filter_type = 'project'
-            elif 'filter=general' in referer:
-                filter_type = 'general'
-            return redirect('all_push_pull_content_filtered', filter=filter_type)
+            return redirect('all_push_pull_content')
+            
         if update.project:
             return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[update.project.id])}?bottom_tab=push_pull#project-notes")
         else:
-            return redirect('all_push_pull_content_filtered', filter='general')
+            return redirect('all_push_pull_content')
     else:
         messages.error(request, "You do not have permission to edit this update.")
         if update.project:
             return redirect('tracker_project_detail', project_id=update.project.id)
         else:
-            return redirect('all_push_pull_content_filtered', filter='general')
+            return redirect('all_push_pull_content')
 
 
 @login_required
@@ -1474,12 +1493,7 @@ def delete_project_update(request, update_id):
         messages.success(request, "Push-Pull content deleted.")
         referer = request.META.get('HTTP_REFERER')
         if referer and 'all-push-pull-content' in referer:
-            filter_type = 'all'
-            if 'filter=project' in referer:
-                filter_type = 'project'
-            elif 'filter=general' in referer:
-                filter_type = 'general'
-            return redirect('all_push_pull_content_filtered', filter=filter_type)
+            return redirect('all_push_pull_content')
         
         if project_id:
             return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[project_id])}?bottom_tab=push_pull#project-notes")
@@ -1533,22 +1547,29 @@ def all_project_updates(request, project_id):
 
 @login_required
 def all_push_pull_content(request, filter=None):
-    # Check for an explicit filter in the URL query parameters
-    if 'filter' in request.GET and request.GET['filter'] in ['all', 'project', 'general']:
-        if request.GET['filter'] == 'all':
-
-            if 'push_pull_filter' in request.session:
-                del request.session['push_pull_filter']
-        else:
-            request.session['push_pull_filter'] = request.GET['filter']
-
-        # This redirect is crucial for a clean URL and consistent filtering
+    # Handle explicit clear filters request
+    if request.GET.get('clear_filters') == '1':
+        for key in ['pp_category_filter', 'pp_status_filter', 'pp_type_filter']:
+            if key in request.session:
+                del request.session[key]
         return redirect('all_push_pull_content')
 
-    # Get the current filters from the session and request
-    current_filter = request.session.get('push_pull_filter', 'all')
-    status_filter = request.GET.get('status_filter', 'all')
-    push_pull_filter = request.GET.get('push_pull_filter', 'all') # ✅ NEW: Get push/pull filter
+    # If filter is passed as part of the URL path (e.g., from a redirect kwarg)
+    if filter:
+        request.session['pp_category_filter'] = filter
+
+    # Session-based filter persistence from query parameters
+    if 'filter' in request.GET:
+        request.session['pp_category_filter'] = request.GET['filter']
+    if 'status_filter' in request.GET:
+        request.session['pp_status_filter'] = request.GET['status_filter']
+    if 'push_pull_filter' in request.GET:
+        request.session['pp_type_filter'] = request.GET['push_pull_filter']
+
+    # Get the current filters from the session (default to 'all')
+    current_filter = request.session.get('pp_category_filter', 'all')
+    status_filter = request.session.get('pp_status_filter', 'all')
+    push_pull_filter = request.session.get('pp_type_filter', 'all')
 
     # Auto-archive logic: Move 'Closed' items older than 30 days to 'Archived'
     archive_threshold = timezone.now() - timedelta(days=30)
@@ -1556,7 +1577,7 @@ def all_push_pull_content(request, filter=None):
 
 
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1621,8 +1642,8 @@ def add_contact_person_ajax(request):
 
 @login_required
 def export_push_pull_excel(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
-    filter = request.GET.get('filter')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
+    filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
 
     if filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1630,14 +1651,14 @@ def export_push_pull_excel(request):
         updates_qs = updates_qs.filter(content_type='General')
 
     # Apply push/pull filtering
-    push_pull_filter = request.GET.get('push_pull_filter')
+    push_pull_filter = request.GET.get('push_pull_filter', request.session.get('pp_type_filter', 'all'))
     if push_pull_filter == 'push':
         updates_qs = updates_qs.filter(push_pull_type='Push')
     elif push_pull_filter == 'pull':
         updates_qs = updates_qs.filter(push_pull_type='Pull')
 
     # Apply status filtering
-    status_filter = request.GET.get('status_filter')
+    status_filter = request.GET.get('status_filter', request.session.get('pp_status_filter', 'all'))
     if status_filter == 'open':
         updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
@@ -1705,8 +1726,8 @@ def export_push_pull_excel(request):
 
 @login_required
 def export_push_pull_pdf(request):
-    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
-    filter = request.GET.get('filter')
+    updates_qs = ProjectUpdate.objects.select_related('project', 'author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
+    filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
 
     if filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -1714,14 +1735,14 @@ def export_push_pull_pdf(request):
         updates_qs = updates_qs.filter(content_type='General')
 
     # Apply push/pull filtering
-    push_pull_filter = request.GET.get('push_pull_filter')
+    push_pull_filter = request.GET.get('push_pull_filter', request.session.get('pp_type_filter', 'all'))
     if push_pull_filter == 'push':
         updates_qs = updates_qs.filter(push_pull_type='Push')
     elif push_pull_filter == 'pull':
         updates_qs = updates_qs.filter(push_pull_type='Pull')
 
     # Apply status filtering
-    status_filter = request.GET.get('status_filter')
+    status_filter = request.GET.get('status_filter', request.session.get('pp_status_filter', 'all'))
     if status_filter == 'open':
         updates_qs = updates_qs.exclude(status__in=['Closed', 'Archived'])
     elif status_filter == 'closed':
@@ -1734,8 +1755,8 @@ def export_push_pull_pdf(request):
     updates = updates_qs.all()
 
     buffer = BytesIO()
-    # Use portrait A4 for a list-style report
-    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    # Use landscape A4 for higher width capacity in a list-style report
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=1.5*cm, rightMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
     elements = []
     styles = getSampleStyleSheet()
 
@@ -1814,12 +1835,12 @@ def export_push_pull_pdf(request):
 def send_push_pull_email(request):
     # 1. Retrieve filters (similar to all_push_pull_content)
     # Check GET first, then session, default to 'all'
-    current_filter = request.GET.get('filter', request.session.get('push_pull_filter', 'all'))
-    status_filter = request.GET.get('status_filter', 'all')
-    push_pull_filter = request.GET.get('push_pull_filter', 'all')
+    current_filter = request.GET.get('filter', request.session.get('pp_category_filter', 'all'))
+    status_filter = request.GET.get('status_filter', request.session.get('pp_status_filter', 'all'))
+    push_pull_filter = request.GET.get('push_pull_filter', request.session.get('pp_type_filter', 'all'))
 
     # 2. Filter the updates
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -2041,11 +2062,11 @@ def add_update_remark(request, update_id):
             
     # ✅ Corrected redirect logic to handle both project and non-project updates
     if redirect_to == 'project_detail' and update.project:
-        # Redirect back to the specific project detail page
-        return redirect('tracker_project_detail', project_id=update.project.id)
+        # Redirect back to the specific project detail page on the push-pull tab
+        return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[update.project.id])}?bottom_tab=push_pull#project-notes")
     else:
         # Default to the general content page or the filtered page
-        return redirect('all_push_pull_content_filtered', filter='general')
+        return redirect('all_push_pull_content')
 
 @login_required
 def edit_update_remark(request, remark_id):
@@ -2068,11 +2089,11 @@ def edit_update_remark(request, remark_id):
     
     # ✅ Corrected redirect logic
     if redirect_to == 'project_detail' and remark.update.project:
-        # Redirect back to the project page
-        return redirect('tracker_project_detail', project_id=remark.update.project.id)
+        # Redirect back to the project page on the push-pull tab
+        return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[remark.update.project.id])}?bottom_tab=push_pull#project-notes")
     else:
         # Default to the all push-pull content page
-        return redirect('all_push_pull_content_filtered', filter='general')
+        return redirect('all_push_pull_content')
 
 
 @login_required
@@ -2091,11 +2112,11 @@ def delete_update_remark(request, remark_id):
 
     # ✅ Corrected redirect logic
     if redirect_to == 'project_detail' and remark.update.project:
-        # Redirect back to the project page if the update has a project
-        return redirect('tracker_project_detail', project_id=remark.update.project.id)
+        # Redirect back to the project page on the push-pull tab if the update has a project
+        return HttpResponseRedirect(f"{reverse('tracker_project_detail', args=[remark.update.project.id])}?bottom_tab=push_pull#project-notes")
     else:
         # Redirect back to the general content page
-        return redirect('all_push_pull_content_filtered', filter='general')
+        return redirect('all_push_pull_content')
     
 
 from uuid import UUID
@@ -2116,7 +2137,7 @@ def public_push_pull_content(request, access_token):
     status_filter = request.GET.get('status_filter', 'all')
     push_pull_filter = request.GET.get('push_pull_filter', 'all')
 
-    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks', 'remarks__added_by').order_by('-created_at')
+    updates_qs = ProjectUpdate.objects.select_related('author', 'project', 'raised_by').prefetch_related('who_contact', 'remarks', 'remarks__added_by').exclude(project__is_archived=True).order_by('-created_at')
 
     if current_filter == 'project':
         updates_qs = updates_qs.filter(content_type='Project')
@@ -2149,11 +2170,18 @@ def public_push_pull_content(request, access_token):
         update_id = request.POST.get('update_id')
         update = get_object_or_404(ProjectUpdate, id=update_id)
 
+        # Build query string to retain filters for the public view
+        from urllib.parse import urlencode
+        q_string = request.GET.urlencode()
+        redirect_url = reverse('public_push_pull_content', args=[str(access_token)])
+        if q_string:
+            redirect_url += f"?{q_string}"
+
         if 'update_status' in request.POST:
             update.status = request.POST['update_status']
             update.save()
             messages.success(request, f"Update status for item {update.id} changed to {update.status}.")
-            return redirect('public_push_pull_content', access_token=str(access_token))
+            return redirect(redirect_url)
         
         if 'remark_text' in request.POST:
             text = request.POST.get('remark_text')
@@ -2169,7 +2197,7 @@ def public_push_pull_content(request, access_token):
                     added_by=public_user
                 )
                 messages.success(request, "Remark added successfully.")
-            return redirect('public_push_pull_content', access_token=str(access_token))
+            return redirect(redirect_url)
     
     context = {
         'updates': updates,

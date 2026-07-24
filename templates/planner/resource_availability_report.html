@@ -1,0 +1,240 @@
+{% extends 'planner/_base.html' %}
+
+{% block title %}Resource Availability Report{% endblock %}
+
+{% block content %}
+<style>
+    .resource-card { transition: box-shadow 0.15s ease, transform 0.15s ease; }
+    .resource-card:hover { box-shadow: 0 8px 20px -6px rgba(0,0,0,0.12); transform: translateY(-1px); }
+    .occ-bar-track { background: #e5e7eb; border-radius: 9999px; height: 6px; overflow: hidden; }
+    .occ-bar-fill { height: 100%; border-radius: 9999px; }
+    .task-chip { border-left: 3px solid #cbd5e1; }
+</style>
+
+<header class="shadow-xl" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div class="max-w-7xl mx-auto py-5 px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <svg class="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <div>
+                    <h1 class="text-2xl font-bold text-white">Resource Availability Report</h1>
+                    <p class="text-indigo-100 text-xs mt-0.5">Who's free and who's booked, based on active (non-completed) assignments</p>
+                </div>
+            </div>
+            <a href="{% url 'planner_workforce' %}" class="bg-white bg-opacity-20 backdrop-blur-sm text-white py-1.5 px-4 rounded-lg hover:bg-opacity-30 transition-all duration-200 flex items-center text-xs font-medium">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Back to Workforce
+            </a>
+        </div>
+    </div>
+</header>
+
+<div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+
+    <form method="GET" class="bg-white rounded-xl shadow-lg border border-gray-100 p-4 mb-6 flex flex-wrap items-end gap-4">
+        <div id="lookAheadWrap">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Look-ahead window</label>
+            <select name="days" id="daysSelect" {% if use_custom_range %}disabled{% endif %} class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-400">
+                <option value="7" {% if days == 7 and not use_custom_range %}selected{% endif %}>Next 7 days</option>
+                <option value="14" {% if days == 14 and not use_custom_range %}selected{% endif %}>Next 14 days</option>
+                <option value="30" {% if days == 30 and not use_custom_range %}selected{% endif %}>Next 30 days</option>
+                <option value="60" {% if days == 60 and not use_custom_range %}selected{% endif %}>Next 60 days</option>
+                <option value="90" {% if days == 90 and not use_custom_range %}selected{% endif %}>Next 90 days</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Custom range: From</label>
+                <input type="date" name="start_date" id="startDateInput" value="{{ custom_start|date:'Y-m-d'|default:'' }}" class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">To</label>
+                <input type="date" name="end_date" id="endDateInput" value="{{ custom_end|date:'Y-m-d'|default:'' }}" class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            {% if use_custom_range %}
+            <button type="submit" formnovalidate class="text-xs text-indigo-600 hover:text-indigo-800 font-medium py-2" onclick="document.getElementById('startDateInput').value=''; document.getElementById('endDateInput').value='';">Clear dates</button>
+            {% endif %}
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Designation</label>
+            <select name="designation" class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="">All Designations</option>
+                {% for value, label in designation_choices %}
+                <option value="{{ value }}" {% if selected_designation == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="relative">
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Assignee</label>
+            <button type="button" id="assigneeDropdownBtn" class="inline-flex justify-between items-center w-52 rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-gray-700 hover:bg-gray-50">
+                <span id="assigneeDropdownBtnText">{% if selected_assignee_ids %}{{ selected_assignee_ids|length }} selected{% else %}All Assignees{% endif %}</span>
+                <svg class="w-4 h-4 ml-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <div id="assigneeDropdownMenu" class="hidden absolute z-20 mt-1 w-64 max-h-64 overflow-y-auto rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 p-2">
+                {% if selected_assignee_ids %}
+                <button type="submit" formnovalidate class="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 mb-1" onclick="document.querySelectorAll('#assigneeDropdownMenu input').forEach(c => c.checked = false);">Clear selection</button>
+                {% endif %}
+                {% for emp in all_assignable_employees %}
+                <label class="flex items-center space-x-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer text-sm">
+                    <input type="checkbox" name="assignee" value="{{ emp.pk }}" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" {% if emp.pk|stringformat:"s" in selected_assignee_ids %}checked{% endif %}>
+                    <span class="text-gray-700">{{ emp.name }}</span>
+                    <span class="text-gray-400 text-xs">({{ emp.get_designation_display }})</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Show top</label>
+            <select name="top_n" class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="5" {% if top_n == 5 %}selected{% endif %}>5</option>
+                <option value="10" {% if top_n == 10 %}selected{% endif %}>10</option>
+                <option value="15" {% if top_n == 15 %}selected{% endif %}>15</option>
+                <option value="20" {% if top_n == 20 %}selected{% endif %}>20</option>
+                <option value="50" {% if top_n == 50 %}selected{% endif %}>50 (All)</option>
+            </select>
+        </div>
+        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 shadow-sm">
+            Apply
+        </button>
+        <div class="ml-auto text-xs text-gray-500 text-right">
+            <div>
+                {% if use_custom_range %}<span class="text-indigo-600 font-semibold">Custom range:</span>{% else %}Window:{% endif %}
+                <span class="font-semibold text-gray-700">{{ period_start|date:"M j, Y" }} &ndash; {{ period_end|date:"M j, Y" }}</span> ({{ total_working_days }} working days)
+            </div>
+            <div>{{ total_resources }} active resource{{ total_resources|pluralize }} considered</div>
+        </div>
+    </form>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Most Available -->
+        <div>
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h2 class="text-lg font-bold text-gray-800">Top Available Resources</h2>
+            </div>
+            <div class="space-y-3">
+                {% for r in most_available %}
+                <div class="resource-card bg-white rounded-xl shadow border border-gray-100 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center">
+                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold mr-3 flex-shrink-0">
+                                {{ r.employee.name|first|upper }}
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-gray-900">{{ r.employee.name }}</div>
+                                <div class="text-xs text-gray-500">{{ r.employee.get_designation_display }}</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full whitespace-nowrap">{{ r.available_days }} days free</span>
+                    </div>
+                    <div class="occ-bar-track mb-1">
+                        <div class="occ-bar-fill bg-emerald-500" style="width: {{ r.occupancy_pct }}%; background: {% if r.occupancy_pct >= 70 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+                    </div>
+                    <div class="text-[11px] text-gray-500 mb-2">{{ r.occupancy_pct }}% occupied &middot; {{ r.occupied_days }}/{{ total_working_days }} working days</div>
+
+                    {% if r.project_groups %}
+                    <div class="mt-2 space-y-2">
+                        {% for g in r.project_groups %}
+                        <div>
+                            <a href="{% url 'planner_activity_planner' g.project.pk %}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center">
+                                {{ g.project.project_id }}
+                                <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                            </a>
+                            <div class="space-y-1 mt-1">
+                                {% for act in g.tasks %}
+                                <div class="task-chip bg-gray-50 rounded-r-md px-2 py-1">
+                                    <div class="text-xs font-medium text-gray-800 truncate">{{ act.activity_name }}</div>
+                                    <div class="text-[10px] text-gray-500">{{ act.start_date|date:"M j" }}&ndash;{{ act.end_date|date:"M j" }} &middot; {{ act.completion_percentage }}% done</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-xs text-gray-400 italic mt-1">No active tasks in this window &mdash; fully free.</div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="bg-white rounded-xl shadow border border-gray-100 p-6 text-center text-sm text-gray-500">No matching resources.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Most Occupied -->
+        <div>
+            <div class="flex items-center mb-3">
+                <svg class="w-5 h-5 text-rose-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h2 class="text-lg font-bold text-gray-800">Top Occupied Resources</h2>
+            </div>
+            <div class="space-y-3">
+                {% for r in most_occupied %}
+                <div class="resource-card bg-white rounded-xl shadow border border-gray-100 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center">
+                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-rose-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold mr-3 flex-shrink-0">
+                                {{ r.employee.name|first|upper }}
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-gray-900">{{ r.employee.name }}</div>
+                                <div class="text-xs text-gray-500">{{ r.employee.get_designation_display }}</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full whitespace-nowrap">{{ r.occupancy_pct }}% booked</span>
+                    </div>
+                    <div class="occ-bar-track mb-1">
+                        <div class="occ-bar-fill" style="width: {{ r.occupancy_pct }}%; background: {% if r.occupancy_pct >= 90 %}#e11d48{% elif r.occupancy_pct >= 70 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+                    </div>
+                    <div class="text-[11px] text-gray-500 mb-2">{{ r.occupied_days }}/{{ total_working_days }} working days &middot; {{ r.available_days }} days free</div>
+
+                    {% if r.project_groups %}
+                    <div class="mt-2 space-y-2">
+                        {% for g in r.project_groups %}
+                        <div>
+                            <a href="{% url 'planner_activity_planner' g.project.pk %}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center">
+                                {{ g.project.project_id }}
+                                <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                            </a>
+                            <div class="space-y-1 mt-1">
+                                {% for act in g.tasks %}
+                                <div class="task-chip bg-gray-50 rounded-r-md px-2 py-1">
+                                    <div class="text-xs font-medium text-gray-800 truncate">{{ act.activity_name }}</div>
+                                    <div class="text-[10px] text-gray-500">{{ act.start_date|date:"M j" }}&ndash;{{ act.end_date|date:"M j" }} &middot; {{ act.completion_percentage }}% done</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-xs text-gray-400 italic mt-1">No active tasks in this window.</div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="bg-white rounded-xl shadow border border-gray-100 p-6 text-center text-sm text-gray-500">No matching resources.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('assigneeDropdownBtn');
+    const menu = document.getElementById('assigneeDropdownMenu');
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+        if (!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target !== btn) {
+            menu.classList.add('hidden');
+        }
+    });
+});
+</script>
+{% endblock %}

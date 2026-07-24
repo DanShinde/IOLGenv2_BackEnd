@@ -9,12 +9,17 @@
 <div class="page-header">
     <div class="d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="page-title"><i class="fas fa-list-ul me-2"></i>All Projects</h1>
+            <h1 class="page-title"><i class="fas fa-list-ul me-2"></i>{% if show_archived %}Archived Projects{% else %}All Projects{% endif %}</h1>
             <p class="page-subtitle">Manage your entire project portfolio</p>
         </div>
-        <a href="{% url 'tracker_new_project' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i>Add New Project
-        </a>
+        <div class="d-flex gap-2">
+            <a href="?archived={% if show_archived %}0{% else %}1{% endif %}" class="btn btn-outline-secondary">
+                <i class="fas fa-archive me-2"></i>{% if show_archived %}View Active{% else %}View Archived{% endif %}
+            </a>
+            <a href="{% url 'tracker_new_project' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Add New Project
+            </a>
+        </div>
     </div>
 </div>
 
@@ -35,6 +40,8 @@
                         <th>Segment</th>
                         <th>Value in Cr.</th>
                         <th>SO Punch Date</th>
+                        <th>Automation Stage</th>
+                        <th>Emulation Stage</th>
                         <th>Status</th>
                         <th>Progress</th>
                         <th>Actions</th>
@@ -45,6 +52,8 @@
                         <th><input type="text" class="form-control form-control-sm" placeholder="Filter Segment..." onkeyup="filterTable(this)"></th>
                         <th></th> {# No filter for Value #}
                         <th></th> {# No filter for Date #}
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Auto..." onkeyup="filterTable(this)"></th>
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Emu..." onkeyup="filterTable(this)"></th>
                         <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterTable(this)"></th>
                         <th></th> {# No filter for Progress #}
                         <th></th> {# No filter for Actions #}
@@ -58,6 +67,8 @@
                         <td>{{ project.segment_con.name|default:'N/A' }}</td>
                         <td>₹{{ project.value|floatformat:2|intcomma }}</td>
                         <td>{{ project.so_punch_date|date:"M d, Y" }}</td>
+                        <td><small class="fw-semibold text-secondary">{{ project.get_current_automation_stage }}</small></td>
+                        <td><small class="fw-semibold text-secondary">{{ project.get_current_emulation_stage }}</small></td>
                         <td>
                             <span class="status-badge bg-{{ project.get_overall_status|slugify }}">{{ project.get_overall_status }}</span>
                         </td>
@@ -87,7 +98,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-5">
+                        <td colspan="10" class="text-center py-5">
                              <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
                              <p class="text-muted">No projects found. <a href="{% url 'tracker_new_project' %}">Add your first project!</a></p>
                         </td>

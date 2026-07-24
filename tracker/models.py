@@ -18,6 +18,8 @@ class Project(models.Model):
     customer_name = models.CharField(max_length=100)
     value = models.DecimalField(max_digits=12, decimal_places=2)
     so_punch_date = models.DateField()
+    is_archived = models.BooleanField(default=False)
+    description = models.TextField(blank=True, null=True)
     # The redundant 'segment' CharField and the custom 'save' method have been removed.
     # 'segment_con' is now the single source of truth.
     segment_con = models.ForeignKey(
@@ -72,6 +74,22 @@ class Project(models.Model):
             return 'Not started'
         else:
             return 'Not started'  # fallback
+
+    def get_current_automation_stage(self):
+        stages = [s for s in self.stages.all() if s.stage_type == 'Automation']
+        stages.sort(key=lambda x: x.id)
+        for stage in stages:
+            if stage.status not in ['Completed', 'Not Applicable']:
+                return stage.name
+        return "Completed" if stages else "N/A"
+
+    def get_current_emulation_stage(self):
+        stages = [s for s in self.stages.all() if s.stage_type == 'Emulation']
+        stages.sort(key=lambda x: x.id)
+        for stage in stages:
+            if stage.status not in ['Completed', 'Not Applicable']:
+                return stage.name
+        return "Completed" if stages else "N/A"
 
 
     @property
