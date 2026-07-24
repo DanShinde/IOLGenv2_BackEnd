@@ -64,6 +64,15 @@
                 {% endfor %}
             </select>
         </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Segment</label>
+            <select name="segment" class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="">All Segments</option>
+                {% for segment in segment_choices %}
+                <option value="{{ segment.pk }}" {% if selected_segment_id == segment.pk|stringformat:"s" %}selected{% endif %}>{{ segment.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="relative">
             <label class="block text-xs font-semibold text-gray-600 mb-1">Assignee</label>
             <button type="button" id="assigneeDropdownBtn" class="inline-flex justify-between items-center w-52 rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-gray-700 hover:bg-gray-50">
@@ -96,6 +105,12 @@
         <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 shadow-sm">
             Apply
         </button>
+        {% if has_active_filters %}
+        <a href="{{ clear_url }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-md inline-flex items-center">
+            <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            Clear filters
+        </a>
+        {% endif %}
         <div class="ml-auto text-xs text-gray-500 text-right">
             <div>
                 {% if use_custom_range %}<span class="text-indigo-600 font-semibold">Custom range:</span>{% else %}Window:{% endif %}
@@ -104,6 +119,26 @@
             <div>{{ total_resources }} active resource{{ total_resources|pluralize }} considered</div>
         </div>
     </form>
+
+    <div class="mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold text-gray-700">Availability at a glance</h2>
+            {% if selected_bucket %}
+            <a href="{{ selected_bucket.url }}" class="text-xs font-medium text-indigo-600 hover:text-indigo-800 inline-flex items-center">
+                Filtered to &ldquo;{{ selected_bucket.label }}&rdquo;
+                <svg class="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </a>
+            {% endif %}
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {% for bucket in free_buckets %}
+            <a href="{{ bucket.url }}" class="bg-white rounded-xl shadow border p-4 text-center transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 {% if bucket.active %}border-indigo-400 ring-2 ring-indigo-200{% else %}border-gray-100{% endif %}">
+                <div class="text-3xl font-extrabold text-{{ bucket.color }}-600">{{ bucket.count }}</div>
+                <div class="text-xs font-semibold text-gray-500 mt-1">{{ bucket.label }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
