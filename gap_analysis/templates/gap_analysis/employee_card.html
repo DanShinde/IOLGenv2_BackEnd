@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Skill Card: {{ employee.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        * { box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f0f4ff 0%, #f8fafc 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .card { 
+            background: white; 
+            width: 100%; 
+            max-width: 700px; 
+            margin: 0 auto;
+            border-radius: 20px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1); 
+            overflow: hidden;
+        }
+        
+        .card-header { 
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white; 
+            padding: 2.5rem 2rem; 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+        
+        .company-name { 
+            font-size: 12px; 
+            text-transform: uppercase; 
+            letter-spacing: 2px; 
+            opacity: 0.9; 
+            margin-bottom: 8px;
+        }
+        
+        .emp-name { 
+            margin: 0; 
+            font-size: 2rem; 
+            font-weight: 700;
+        }
+        
+        .emp-role { 
+            margin: 8px 0 0 0; 
+            font-size: 1rem; 
+            opacity: 0.9;
+        }
+        
+        .card-body { 
+            padding: 2rem; 
+        }
+        
+        .stats-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-item {
+            flex: 1;
+            text-align: center;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 12px;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4f46e5;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-title i { color: #4f46e5; }
+        
+        .skill-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 1rem 0; 
+            border-bottom: 1px solid #f1f5f9; 
+        }
+        
+        .skill-row:last-child { border-bottom: none; }
+        
+        .skill-info { flex: 1; }
+        
+        .skill-name { 
+            font-weight: 600; 
+            font-size: 1rem; 
+            color: #1e293b; 
+            margin: 0 0 4px 0;
+        }
+        
+        .skill-numbers { 
+            font-size: 0.875rem; 
+            color: #64748b; 
+            margin: 0;
+        }
+        
+        .skill-levels {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+        
+        .level-bar-container {
+            flex: 1;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .level-bar-actual {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #818cf8);
+            border-radius: 4px;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        .level-bar-required {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #f87171);
+            border-radius: 4px;
+            position: absolute;
+            top: 0;
+        }
+        
+        .skill-badge { 
+            padding: 0.5rem 1rem; 
+            border-radius: 20px; 
+            font-size: 0.75rem; 
+            font-weight: 600; 
+            text-align: center;
+            min-width: 100px;
+            white-space: nowrap;
+        }
+        
+        .badge-proficient { 
+            background-color: rgba(16, 185, 129, 0.1); 
+            color: #10b981; 
+        }
+        
+        .badge-gap { 
+            background-color: rgba(239, 68, 68, 0.1); 
+            color: #ef4444; 
+        }
+        
+        .badge-warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+        
+        .gap-critical { border-left: 4px solid #ef4444; }
+        .gap-warning { border-left: 4px solid #f59e0b; }
+        .gap-met { border-left: 4px solid #10b981; }
+
+        .plans-section { margin-top: 2rem; }
+
+        .plan-row {
+            padding: 1rem;
+            border: 1px solid #f1f5f9;
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+        }
+
+        .plan-row:last-child { margin-bottom: 0; }
+
+        .plan-skill {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: #4f46e5;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 4px 0;
+        }
+
+        .plan-action {
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0 0 4px 0;
+        }
+
+        .plan-meta {
+            font-size: 0.8125rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .plan-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .plan-status-not_started { background-color: rgba(100, 116, 139, 0.1); color: #64748b; }
+        .plan-status-in_progress { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .plan-status-completed { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .plan-status-cancelled { background-color: rgba(100, 116, 139, 0.1); color: #64748b; }
+
+        .plan-overdue { color: #ef4444; font-weight: 600; }
+        
+        .print-btn {
+            text-align: center;
+            padding: 1.5rem;
+            background: #f8fafc;
+        }
+        
+        .btn-print {
+            background: #4f46e5;
+            color: white;
+            padding: 0.75rem 2rem;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-print:hover {
+            background: #4338ca;
+        }
+        
+        @media print {
+            body { background: white; padding: 0; }
+            .card { box-shadow: none; border: 1px solid #e2e8f0; }
+            .print-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="company-name">Skill Gap Analysis</div>
+            <h1 class="emp-name">{{ employee.name }}</h1>
+            <p class="emp-role">
+                <i class="bi bi-briefcase me-2"></i>
+                {{ employee.role_matrix.title|default:"No designation assigned" }}
+            </p>
+            
+            <div class="stats-row mt-3">
+                <div class="stat-item">
+                    <div class="stat-value">{{ skill_details|length }}</div>
+                    <div class="stat-label">Required Skills</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ skills_met_pct }}%</div>
+                    <div class="stat-label">Skills Met</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <h3 class="section-title">
+                <i class="bi bi-clipboard-data"></i>Technical Skill Profile
+            </h3>
+            
+            {% for skill in skill_details %}
+                <div class="skill-row gap-{{ skill.status }}">
+                    <div class="skill-info">
+                        <p class="skill-name">{{ skill.name }}</p>
+                        <p class="skill-numbers">
+                            <i class="bi bi-target"></i> Required: <strong>{{ skill.required }}/5</strong>
+                            &nbsp;&nbsp;
+                            <i class="bi bi-person-check"></i> Actual: <strong>{{ skill.actual }}/5</strong>
+                        </p>
+                        
+                        <div class="skill-levels">
+                            <div class="level-bar-container">
+                                <div class="level-bar-actual" style="width: {{ skill.level_percentage }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ skill.actual }}/5</small>
+                        </div>
+                    </div>
+                    
+                    {% if skill.status == 'proficient' %}
+                        <div class="skill-badge badge-proficient">
+                            <i class="bi bi-check-circle me-1"></i>Met
+                        </div>
+                    {% elif skill.gap <= 1 %}
+                        <div class="skill-badge badge-warning">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Gap: -{{ skill.gap }}
+                        </div>
+                    {% else %}
+                        <div class="skill-badge badge-gap">
+                            <i class="bi bi-x-circle me-1"></i>Gap: -{{ skill.gap }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% empty %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox d-block mb-2" style="font-size: 2rem;"></i>
+                    No skills recorded for this employee yet.
+                </div>
+            {% endfor %}
+
+            {% if development_plans %}
+                <div class="plans-section">
+                    <h3 class="section-title">
+                        <i class="bi bi-signpost-2"></i>Development Plans
+                    </h3>
+                    {% for plan in development_plans %}
+                        <div class="plan-row">
+                            <p class="plan-skill">{{ plan.skill.name }}</p>
+                            <p class="plan-action">
+                                {{ plan.action }}
+                                {% if plan.resource_url %}
+                                    <a href="{{ plan.resource_url }}" target="_blank" rel="noopener" title="Open resource">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                {% endif %}
+                            </p>
+                            <div class="plan-meta">
+                                {% if plan.target_date %}
+                                    <span class="{% if plan.is_overdue %}plan-overdue{% endif %}">
+                                        <i class="bi bi-calendar-event"></i> Target: {{ plan.target_date }}
+                                        {% if plan.is_overdue %}<i class="bi bi-exclamation-triangle ms-1" title="Overdue"></i>{% endif %}
+                                    </span>
+                                {% endif %}
+                                <span class="plan-status plan-status-{{ plan.status }}">{{ plan.get_status_display }}</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="print-btn">
+            <button class="btn-print" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print / Save to PDF
+            </button>
+        </div>
+    </div>
+
+</body>
+</html>

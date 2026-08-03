@@ -1,0 +1,120 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Development Plans - Skill Gap Analyzer{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-clipboard2-check me-2 text-primary"></i>Development Plans
+            </h1>
+            <p class="text-muted mt-1">Track the actions employees are taking to close their skill gaps</p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-filter me-1"></i>Filter
+                    </button>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <a href="{% url 'skillgap_development_plan_list' %}" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-x-circle me-1"></i>Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if plans %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 mobile-cards">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Skill</th>
+                            <th>Action</th>
+                            <th>Target Date</th>
+                            <th>Status</th>
+                            {% if user.is_staff %}<th class="text-end">Actions</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plan in plans %}
+                        <tr>
+                            <td data-label="Employee">
+                                <a href="{% url 'skillgap_employee_profile' plan.skill_matrix.id %}">{{ plan.skill_matrix.name }}</a>
+                            </td>
+                            <td data-label="Skill"><strong>{{ plan.skill.name }}</strong></td>
+                            <td data-label="Action">
+                                {{ plan.action }}
+                                {% if plan.resource_url %}
+                                    <a href="{{ plan.resource_url }}" target="_blank" rel="noopener" title="Open resource" class="ms-1">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                {% endif %}
+                            </td>
+                            <td data-label="Target Date">
+                                {% if plan.target_date %}
+                                    <span class="{% if plan.is_overdue %}text-danger fw-bold{% endif %}">
+                                        {{ plan.target_date }}
+                                        {% if plan.is_overdue %}<i class="bi bi-exclamation-triangle ms-1" title="Overdue"></i>{% endif %}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Status">
+                                {% if plan.status == 'completed' %}
+                                    <span class="badge bg-success">Completed</span>
+                                {% elif plan.status == 'in_progress' %}
+                                    <span class="badge bg-warning">In Progress</span>
+                                {% elif plan.status == 'cancelled' %}
+                                    <span class="badge bg-secondary">Cancelled</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">Not Started</span>
+                                {% endif %}
+                            </td>
+                            {% if user.is_staff %}
+                            <td data-label="Actions">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'skillgap_development_plan_update' plan.id %}" class="btn btn-warning btn-icon" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'skillgap_development_plan_delete' plan.id %}" class="btn btn-danger btn-icon" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% include 'gap_analysis/pagination.html' %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-clipboard2-check"></i>
+        <p>No development plans recorded yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

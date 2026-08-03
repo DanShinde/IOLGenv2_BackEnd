@@ -1,0 +1,307 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Skill Matrix - Skill Gap Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-subtitle {
+        color: #64748b;
+        margin-top: 0.25rem;
+    }
+
+    .search-box {
+        position: relative;
+        max-width: 300px;
+    }
+
+    .search-box input {
+        padding-left: 2.5rem;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: #f8fafc;
+        transform: scale(1.01);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-people me-2 text-primary"></i>Skill Matrix
+            </h1>
+            <p class="page-subtitle">Manage your team members and their skill profiles</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'skillgap_employee_export' %}" class="btn btn-success">
+                <i class="bi bi-download me-2"></i>Export CSV
+            </a>
+            {% if user.is_staff %}
+            <a href="{% url 'skillgap_team_report_excel' %}" class="btn btn-outline-success" title="Whole-team skill matrix + dashboard">
+                <i class="bi bi-file-earmark-spreadsheet me-2"></i>Team Report (Excel)
+            </a>
+            <a href="{% url 'skillgap_team_report_pdf' %}" class="btn btn-outline-danger" title="Whole-team skill matrix + dashboard">
+                <i class="bi bi-file-earmark-pdf me-2"></i>Team Report (PDF)
+            </a>
+            <a href="{% url 'skillgap_add_employee' %}" class="btn btn-primary">
+                <i class="bi bi-person-plus me-2"></i>Add Employee
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Designation</label>
+                    <select name="designation" class="form-select">
+                        <option value="">All Designations</option>
+                        {% for desig in designations %}
+                        <option value="{{ desig.id }}" {% if selected_designation == desig.id|stringformat:"s" %}selected{% endif %}>
+                            {{ desig.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="on_leave" {% if selected_status == 'on_leave' %}selected{% endif %}>On Leave</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-filter me-1"></i>Filter
+                    </button>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <a href="{% url 'skillgap_employee_list' %}" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-x-circle me-1"></i>Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 mobile-cards">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Designation</th>
+                            <th>Status</th>
+                            <th>Total Skills</th>
+                            <th>Avg Gap</th>
+                            <th>Skills Met %</th>
+                            <th>Training Req.</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for employee in employees %}
+                        <tr>
+                            <td data-label="Employee">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar me-3">
+                                        {{ employee.name|make_list|first|upper }}
+                                    </div>
+                                    <div>
+                                        <strong>{{ employee.name }}</strong>
+                                        {% if employee.email %}
+                                        <br><small class="text-muted">{{ employee.email }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="Designation">
+                                {% if employee.role_matrix %}
+                                    <span class="badge bg-light text-dark">
+                                        <i class="bi bi-briefcase me-1"></i>{{ employee.role_matrix.title }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Status">
+                                {% if employee.status == 'active' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle me-1"></i>Active
+                                    </span>
+                                {% elif employee.status == 'on_leave' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-clock me-1"></i>On Leave
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle me-1"></i>Inactive
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Total Skills">
+                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
+                                    {% with employee.role_matrix.benchmarks.count as total %}
+                                    <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: #4f46e5;">
+                                        {{ total }}
+                                    </span>
+                                    {% endwith %}
+                                {% else %}
+                                <span class="badge bg-warning">No role</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Avg Gap">
+                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
+                                {% with employee.get_overall_gap_score as gap %}
+                                    {% if gap > 1.5 %}
+                                        <span class="badge bg-danger">{{ gap|floatformat:1 }}</span>
+                                    {% elif gap > 0.5 %}
+                                        <span class="badge bg-warning">{{ gap|floatformat:1 }}</span>
+                                    {% elif gap > 0 %}
+                                        <span class="badge bg-info">{{ gap|floatformat:1 }}</span>
+                                    {% else %}
+                                        <span class="badge bg-success">0.0</span>
+                                    {% endif %}
+                                {% endwith %}
+                                {% else %}
+                                <span class="badge bg-secondary">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Skills Met %">
+                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
+                                {% with employee.get_skills_met_percentage as met_pct %}
+                                    {% if met_pct >= 80 %}
+                                        <span class="badge bg-success">{{ met_pct }}%</span>
+                                    {% elif met_pct >= 50 %}
+                                        <span class="badge bg-warning">{{ met_pct }}%</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">{{ met_pct }}%</span>
+                                    {% endif %}
+                                {% endwith %}
+                                {% else %}
+                                <span class="badge bg-secondary">-</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Training Req.">
+                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
+                                    {% with employee.get_skills_needing_training as training_gaps %}
+                                        {% if training_gaps %}
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="modal" data-bs-target="#trainingReqModal"
+                                                data-employee-name="{{ employee.name }}"
+                                                data-skills="{% for g in training_gaps %}{{ g.skill.name }}{% if not forloop.last %}|{% endif %}{% endfor %}">
+                                            <i class="bi bi-list-check me-1"></i>{{ training_gaps|length }} skill{{ training_gaps|length|pluralize }}
+                                        </button>
+                                        {% else %}
+                                        <span class="badge bg-success">All skills met</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                <span class="badge bg-warning">No benchmarks</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Actions">
+                                <div class="action-buttons justify-content-end">
+                                    <a href="{% url 'skillgap_employee_profile' employee.id %}" class="btn btn-primary btn-icon" title="View Profile">
+                                        <i class="bi bi-person"></i>
+                                    </a>
+                                    {% if user.is_staff %}
+                                    <a href="{% url 'skillgap_employee_update' employee.id %}" class="btn btn-warning btn-icon" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'skillgap_employee_delete' employee.id %}" class="btn btn-danger btn-icon" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8">
+                                <div class="empty-state py-5">
+                                    <i class="bi bi-people d-block"></i>
+                                    <p>No employees found yet.</p>
+                                    {% if user.is_staff %}
+                                    <a href="{% url 'skillgap_add_employee' %}" class="btn btn-primary mt-2">
+                                        <i class="bi bi-plus-circle me-2"></i>Add First Employee
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% include 'gap_analysis/pagination.html' %}
+    </div>
+</div>
+
+<!-- Shared modal for the Training Req. button, populated per-row via data attributes -->
+<div class="modal fade" id="trainingReqModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-list-check me-2 text-primary"></i>Training Required &mdash; <span id="trainingReqEmployeeName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="list-group" id="trainingReqSkillList"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('trainingReqModal').addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        document.getElementById('trainingReqEmployeeName').textContent = button.getAttribute('data-employee-name');
+
+        const skills = button.getAttribute('data-skills').split('|').filter(Boolean);
+        const list = document.getElementById('trainingReqSkillList');
+        list.innerHTML = '';
+        skills.forEach(function (skillName) {
+            const item = document.createElement('li');
+            item.className = 'list-group-item';
+            item.textContent = skillName;
+            list.appendChild(item);
+        });
+    });
+</script>
+{% endblock %}

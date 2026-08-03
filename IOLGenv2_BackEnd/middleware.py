@@ -49,3 +49,24 @@ class PlannerAuthRequiredMiddleware:
             if not request.user.is_authenticated:
                 return redirect('loginw')
         return self.get_response(request)
+
+class SkillGapGroupRequiredMiddleware:
+    """
+    Blocks any URL under /skillgap/ unless the user is authenticated
+    and their profile is flagged for Skill Gap Analyzer access.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path_info.startswith('/skillgap/'):
+            if not request.user.is_authenticated:
+                return redirect('loginw')
+            userprofile = UserProfile.objects.filter(user=request.user).first()
+            try:
+                if userprofile and not userprofile.is_skillgap:
+                    return HttpResponseForbidden("Access denied. User not allowed to access Skill Gap Analyzer.")
+            except UserProfile.DoesNotExist:
+                return HttpResponseForbidden("Access denied. User Profile Not Found.")
+        return self.get_response(request)

@@ -1,0 +1,84 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Benchmarks - Skill Gap Analyzer{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-bookmark-check me-2 text-primary"></i>Benchmarks
+            </h1>
+            <p class="text-muted mt-1">View all skill requirements across roles</p>
+        </div>
+    </div>
+
+    {% if benchmarks %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 mobile-cards">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Skill</th>
+                            <th>Required Level</th>
+                            <th>Mandatory</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for benchmark in benchmarks %}
+                        <tr>
+                            <td data-label="Role">
+                                <strong>{{ benchmark.role_matrix.title }}</strong>
+                                {% if benchmark.role_matrix.department %}
+                                    <span class="badge bg-light text-muted ms-2">{{ benchmark.role_matrix.department }}</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Skill">
+                                <strong>{{ benchmark.skill.name }}</strong>
+                                {% if benchmark.skill.category %}
+                                    <span class="badge bg-light text-muted ms-2">{{ benchmark.skill.category }}</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Required Level">
+                                <span class="level-badge level-{{ benchmark.required_level }}">{{ benchmark.required_level }}/5</span>
+                            </td>
+                            <td data-label="Mandatory">
+                                {% if benchmark.is_mandatory %}
+                                    <span class="badge bg-danger">Mandatory</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Optional</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Actions">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'skillgap_designation_benchmark' benchmark.role_matrix.id %}" class="btn btn-info btn-icon" title="View Role">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if user.is_staff %}
+                                    <a href="{% url 'skillgap_benchmark_delete' benchmark.id %}" class="btn btn-danger btn-icon" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <p>No benchmarks defined yet.</p>
+        <a href="{% url 'skillgap_designation_list' %}" class="btn btn-primary">
+            <i class="bi bi-briefcase me-2"></i>Go to Role Matrix
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

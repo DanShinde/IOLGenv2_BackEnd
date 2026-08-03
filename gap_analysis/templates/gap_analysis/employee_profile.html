@@ -1,0 +1,791 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Employee Profile - {{ employee.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-header {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        color: white;
+        margin-bottom: 2rem;
+    }
+    
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: white;
+        color: #4f46e5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        font-weight: 700;
+    }
+    
+    .profile-info h2 {
+        margin-bottom: 0.25rem;
+    }
+    
+    .profile-info .designation {
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .kpi-row {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+    
+    .kpi-item {
+        background: rgba(255,255,255,0.2);
+        padding: 0.75rem 1.25rem;
+        border-radius: 10px;
+        text-align: center;
+    }
+    
+    .kpi-item .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    
+    .kpi-item .label {
+        font-size: 0.75rem;
+        opacity: 0.9;
+    }
+    
+    .skill-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .skill-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+    
+    .skill-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    
+    .skill-name {
+        font-weight: 600;
+        color: #1e293b;
+    }
+    
+    .skill-category {
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+    }
+    
+    .skill-body {
+        padding: 1rem 1.25rem;
+    }
+    
+    .level-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .level-label {
+        min-width: 80px;
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+    
+    .level-bar {
+        flex: 1;
+        height: 10px;
+        background: #e2e8f0;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    
+    .level-bar-fill {
+        height: 100%;
+        border-radius: 5px;
+        transition: width 0.5s ease;
+    }
+    
+    .level-bar-fill.required {
+        background: linear-gradient(90deg, #ef4444, #f87171);
+    }
+    
+    .level-bar-fill.actual {
+        background: linear-gradient(90deg, #4f46e5, #818cf8);
+    }
+    
+    .level-value {
+        min-width: 30px;
+        text-align: right;
+        font-weight: 600;
+    }
+    
+    .gap-indicator {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .gap-indicator.met {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+    
+    .gap-indicator.warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+    
+    .gap-indicator.critical {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+    
+    .skill-level-input {
+        width: 70px;
+        padding: 0.5rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: 600;
+    }
+    
+    .skill-level-input:focus {
+        border-color: #4f46e5;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+    
+    .edit-btn {
+        background: none;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        padding: 0.25rem;
+    }
+    
+    .edit-btn:hover {
+        color: #4f46e5;
+    }
+    
+    .chart-container {
+        height: 550px;
+        max-width: 700px;
+        margin: 1.5rem auto 0;
+    }
+
+    .skill-level-input {
+        width: 60px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <!-- Profile Header -->
+    <div class="profile-header">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <div class="profile-avatar">
+                    {{ employee.name|make_list|first|upper }}
+                </div>
+            </div>
+            <div class="col profile-info">
+                <h2>{{ employee.name }}</h2>
+                <p class="designation">
+                    <i class="bi bi-briefcase me-2"></i>
+                    {{ employee.role_matrix.title|default:"No designation assigned" }}
+                </p>
+                <p class="mb-0">
+                    {% if employee.email %}
+                        <i class="bi bi-envelope me-2"></i>{{ employee.email }}
+                    {% endif %}
+                </p>
+                <div class="kpi-row">
+                    <div class="kpi-item">
+                        <div class="value">{{ skill_data|length }}</div>
+                        <div class="label">Required Skills</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="value">{{ skills_met }}%</div>
+                        <div class="label">Skills Met</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="value">{{ overall_gap|floatformat:1 }}</div>
+                        <div class="label">Avg Gap</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto">
+                {% if user.is_staff %}
+                <a href="{% url 'skillgap_employee_update' employee.id %}" class="btn btn-light">
+                    <i class="bi bi-pencil me-2"></i>Edit Profile
+                </a>
+                {% endif %}
+                <a href="{% url 'skillgap_employee_card' employee.id %}" class="btn btn-light ms-2" target="_blank">
+                    <i class="bi bi-file-earmark-person me-2"></i>Skill Card
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-nav">
+        <button class="tab-btn active" onclick="showTab('skills')">
+            <i class="bi bi-list-ul me-2"></i>Skills Assessment
+        </button>
+        <button class="tab-btn" onclick="showTab('chart')">
+            <i class="bi bi-bar-chart me-2"></i>Visualization
+        </button>
+        <button class="tab-btn" onclick="showTab('history')">
+            <i class="bi bi-graph-up me-2"></i>History
+        </button>
+        <button class="tab-btn" onclick="showTab('plans')">
+            <i class="bi bi-clipboard2-check me-2"></i>Development Plans
+        </button>
+    </div>
+
+    <!-- Skills Tab -->
+    <div id="skills-tab" class="tab-content active">
+        {% if skill_data %}
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 mobile-cards">
+                            <thead>
+                                <tr>
+                                    <th>Skill</th>
+                                    <th>Category</th>
+                                    <th>Required</th>
+                                    <th>Self Rating</th>
+                                    <th>Manager Level</th>
+                                    <th>Gap</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for skill in skill_data %}
+                                <tr>
+                                    <td data-label="Skill">
+                                        <strong>{{ skill.skill_name }}</strong>
+                                    </td>
+                                    <td data-label="Category">
+                                        {% if skill.skill_category %}
+                                            <span class="badge bg-light text-dark">{{ skill.skill_category }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td data-label="Required">
+                                        <span class="fw-bold text-danger">{{ skill.required_level }}</span>
+                                    </td>
+                                    <td data-label="Self Rating" id="self-rating-cell-{{ skill.skill_id }}">
+                                        {% if skill.self_rated_level is not None %}
+                                            <span class="fw-bold">{{ skill.self_rated_level }}/5</span>
+                                            <span id="rating-status-badge-{{ skill.skill_id }}">
+                                                {% if skill.rating_status == 'pending' %}
+                                                    <span class="badge bg-warning ms-1">Pending</span>
+                                                {% elif skill.rating_status == 'approved' %}
+                                                    <span class="badge bg-success ms-1">Approved</span>
+                                                {% elif skill.rating_status == 'overridden' %}
+                                                    <span class="badge bg-secondary ms-1">Overridden</span>
+                                                {% endif %}
+                                            </span>
+                                            {% if can_rate_employee %}
+                                            <button type="button" class="btn btn-sm {% if skill.has_active_development_plan %}btn-outline-secondary{% else %}btn-outline-success{% endif %} mt-1 d-block"
+                                                    id="approve-btn-{{ skill.skill_id }}"
+                                                    onclick="approveSelfRating({{ employee.id }}, {{ skill.skill_id }})"
+                                                    {% if skill.rating_status != 'pending' %}style="display: none;"{% endif %}
+                                                    {% if skill.has_active_development_plan %}disabled title="Blocked: mark this skill's development plan Completed before approving"{% endif %}>
+                                                <i class="bi bi-{% if skill.has_active_development_plan %}lock{% else %}check-lg{% endif %} me-1"></i>{% if skill.has_active_development_plan %}Blocked{% else %}Approve{% endif %}
+                                            </button>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">Not rated</span>
+                                        {% endif %}
+                                    </td>
+                                    <td data-label="Manager Level">
+                                        <div class="d-flex align-items-center gap-2">
+                                            {% if can_rate_employee %}
+                                            <input type="number"
+                                                   class="skill-level-input"
+                                                   id="skill-{{ skill.skill_id }}"
+                                                   value="{{ skill.actual_level }}"
+                                                   min="0"
+                                                   max="5"
+                                                   onchange="updateSkill({{ employee.id }}, {{ skill.skill_id }}, this.value)"
+                                                   style="width: 60px;">
+                                            {% else %}
+                                            <span class="fw-bold" style="width: 60px;">{{ skill.actual_level }}</span>
+                                            {% endif %}
+                                            <div class="progress flex-grow-1" style="height: 8px;">
+                                                <div class="progress-bar bg-primary" id="bar-{{ skill.skill_id }}" style="width: {{ skill.level_percentage }}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td data-label="Gap" id="gap-cell-{{ skill.skill_id }}">
+                                        {% if skill.gap > 0 %}
+                                            <span class="text-danger fw-bold">-{{ skill.gap }}</span>
+                                        {% else %}
+                                            <span class="text-success">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td data-label="Status" id="status-cell-{{ skill.skill_id }}">
+                                        {% if skill.status == 'met' %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle me-1"></i>Met
+                                            </span>
+                                        {% elif skill.status == 'warning' %}
+                                            <span class="badge bg-warning">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>Warning
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-x-circle me-1"></i>Gap
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ skills_met }}%</h3>
+                            <small>Skills Met</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ skill_data|length }}</h3>
+                            <small>Total Skills</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ overall_gap|floatformat:1 }}</h3>
+                            <small>Avg Gap Score</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="bi bi-clipboard-x"></i>
+                <p>No skill benchmarks defined for this role.</p>
+                <a href="{% url 'skillgap_designation_list' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-2"></i>Add Benchmarks
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Chart Tab -->
+    <div id="chart-tab" class="tab-content">
+        <div class="card">
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="skillRadarChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Tab -->
+    <div id="history-tab" class="tab-content">
+        {% if skill_data %}
+            <div class="row">
+                {% for skill in skill_data %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <strong>{{ skill.skill_name }}</strong>
+                                    {% if skill.skill_category %}
+                                        <div><span class="badge bg-light text-dark">{{ skill.skill_category }}</span></div>
+                                    {% endif %}
+                                </div>
+                                <span id="history-current-{{ skill.skill_id }}"></span>
+                            </div>
+                            <div style="height: 120px;">
+                                <canvas id="history-chart-{{ skill.skill_id }}" data-skill-name="{{ skill.skill_name|escapejs }}"></canvas>
+                            </div>
+                            <div class="small mt-2" id="history-caption-{{ skill.skill_id }}"></div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="bi bi-graph-up"></i>
+                <p>No skill history to show yet.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Development Plans Tab -->
+    <div id="plans-tab" class="tab-content">
+        <div class="d-flex justify-content-end mb-3">
+            {% if user.is_staff %}
+            <a href="{% url 'skillgap_development_plan_add' employee.id %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>New Plan
+            </a>
+            {% endif %}
+        </div>
+        {% if development_plans %}
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Skill</th>
+                                    <th>Action</th>
+                                    <th>Target Date</th>
+                                    <th>Status</th>
+                                    {% if user.is_staff %}<th class="text-end">Actions</th>{% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for plan in development_plans %}
+                                <tr>
+                                    <td><strong>{{ plan.skill.name }}</strong></td>
+                                    <td>
+                                        {{ plan.action }}
+                                        {% if plan.resource_url %}
+                                            <a href="{{ plan.resource_url }}" target="_blank" rel="noopener" title="Open resource" class="ms-1">
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if plan.target_date %}
+                                            <span class="{% if plan.is_overdue %}text-danger fw-bold{% endif %}">
+                                                {{ plan.target_date }}
+                                                {% if plan.is_overdue %}<i class="bi bi-exclamation-triangle ms-1" title="Overdue"></i>{% endif %}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if plan.status == 'completed' %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% elif plan.status == 'in_progress' %}
+                                            <span class="badge bg-warning">In Progress</span>
+                                        {% elif plan.status == 'cancelled' %}
+                                            <span class="badge bg-secondary">Cancelled</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">Not Started</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if user.is_staff %}
+                                    <td>
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a href="{% url 'skillgap_development_plan_update' plan.id %}" class="btn btn-warning btn-icon" title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'skillgap_development_plan_delete' plan.id %}" class="btn btn-danger btn-icon" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="bi bi-clipboard2-check"></i>
+                <p>No development plans yet for this employee.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Tab switching
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+        document.getElementById(tabId + '-tab').classList.add('active');
+        event.target.classList.add('active');
+
+        // Chart.js sizes a canvas from its container at construction time, so a chart built
+        // inside a tab that starts hidden (display: none) can render blank. Dispatching a
+        // resize event once the tab becomes visible makes Chart.js re-measure and draw correctly.
+        window.dispatchEvent(new Event('resize'));
+    }
+
+    // Rebuild the Gap and Status cells from a JSON response shared by both endpoints below
+    function renderGapAndStatus(skillId, gap, status) {
+        const gapCell = document.getElementById(`gap-cell-${skillId}`);
+        if (gapCell) {
+            gapCell.innerHTML = gap > 0
+                ? `<span class="text-danger fw-bold">-${gap}</span>`
+                : `<span class="text-success">0</span>`;
+        }
+        const statusCell = document.getElementById(`status-cell-${skillId}`);
+        if (statusCell) {
+            const byStatus = {
+                met: '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Met</span>',
+                warning: '<span class="badge bg-warning"><i class="bi bi-exclamation-triangle me-1"></i>Warning</span>',
+                critical: '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Gap</span>',
+            };
+            statusCell.innerHTML = byStatus[status] || byStatus.critical;
+        }
+    }
+
+    function renderRatingBadge(skillId, ratingStatus) {
+        const badge = document.getElementById(`rating-status-badge-${skillId}`);
+        if (badge) {
+            const byStatus = {
+                pending: '<span class="badge bg-warning ms-1">Pending</span>',
+                approved: '<span class="badge bg-success ms-1">Approved</span>',
+                overridden: '<span class="badge bg-secondary ms-1">Overridden</span>',
+            };
+            badge.innerHTML = byStatus[ratingStatus] || '';
+        }
+        const approveBtn = document.getElementById(`approve-btn-${skillId}`);
+        if (approveBtn) {
+            approveBtn.style.display = ratingStatus === 'pending' ? '' : 'none';
+        }
+    }
+
+    // Update skill level via AJAX
+    function updateSkill(employeeId, skillId, newLevel) {
+        const input = document.getElementById(`skill-${skillId}`);
+        input.disabled = true;
+
+        fetch(`/employee/${employeeId}/skill-update/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: `skill_id=${skillId}&actual_level=${newLevel}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const bar = document.getElementById(`bar-${skillId}`);
+                if (bar) {
+                    bar.style.width = (data.actual_level * 20) + '%';
+                }
+                renderGapAndStatus(skillId, data.gap, data.status);
+                if (data.rating_status) {
+                    renderRatingBadge(skillId, data.rating_status);
+                }
+                showToast('Skill level updated', 'success');
+            } else {
+                showToast('Failed to update skill level', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Failed to update skill level', 'danger');
+        })
+        .finally(() => {
+            input.disabled = false;
+        });
+    }
+
+    // Accept the employee's self-rating as the official manager level
+    function approveSelfRating(employeeId, skillId) {
+        const btn = document.getElementById(`approve-btn-${skillId}`);
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Approving…';
+
+        fetch(`/employee/${employeeId}/skill/${skillId}/approve/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const input = document.getElementById(`skill-${skillId}`);
+                if (input) {
+                    input.value = data.actual_level;
+                }
+                const bar = document.getElementById(`bar-${skillId}`);
+                if (bar) {
+                    bar.style.width = (data.actual_level * 20) + '%';
+                }
+                renderGapAndStatus(skillId, data.gap, data.status);
+                renderRatingBadge(skillId, data.rating_status);
+                showToast('Self-rating approved', 'success');
+            } else {
+                showToast(data.error || 'Failed to approve rating', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Failed to approve rating', 'danger');
+        })
+        .finally(() => {
+            // Always resolve the button's "Approving…" state, no matter what happened
+            // above — including a DOM update throwing partway through, which previously
+            // left it stuck spinning forever even after the approval had succeeded.
+            // If renderRatingBadge already hid the button (the success path), resetting
+            // its disabled/text here is harmless since it's no longer visible.
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        });
+    }
+
+    // Radar Chart
+    const ctx = document.getElementById('skillRadarChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [
+                {
+                    label: 'Actual Level',
+                    data: {{ chart_actual|safe }},
+                    backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                },
+                {
+                    label: 'Required Level',
+                    data: {{ chart_required|safe }},
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        font: { size: 13 },
+                    },
+                },
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 5,
+                    ticks: { stepSize: 1, font: { size: 12 } },
+                    pointLabels: { font: { size: 14 } },
+                }
+            }
+        }
+    });
+
+    // Skill History sparklines
+    const skillHistory = {{ skill_history|safe }};
+    document.querySelectorAll('[id^="history-chart-"]').forEach((canvas) => {
+        const points = skillHistory[canvas.dataset.skillName] || [];
+        const currentBadge = document.getElementById(canvas.id.replace('history-chart-', 'history-current-'));
+        const caption = document.getElementById(canvas.id.replace('history-chart-', 'history-caption-'));
+        if (points.length === 0) {
+            if (caption) {
+                caption.innerHTML = '<span class="text-muted">Not yet assessed</span>';
+            }
+            return;
+        }
+
+        const first = points[0];
+        const last = points[points.length - 1];
+        const delta = last.level - first.level;
+
+        if (currentBadge) {
+            currentBadge.innerHTML = `<span class="badge bg-light text-dark">${last.level}/5</span>`;
+        }
+
+        if (caption) {
+            if (points.length === 1) {
+                caption.innerHTML = `<span class="text-muted">First recorded ${first.date}</span>`;
+            } else {
+                const arrow = delta > 0 ? '▲' : (delta < 0 ? '▼' : '▬');
+                const trendClass = delta > 0 ? 'text-success' : (delta < 0 ? 'text-danger' : 'text-muted');
+                const sign = delta > 0 ? '+' : '';
+                caption.innerHTML = `<span class="${trendClass}">${arrow} ${sign}${delta} since ${first.date}</span>`;
+            }
+        }
+
+        new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: points.map(p => p.date),
+                datasets: [{
+                    data: points.map(p => p.level),
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.12)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.25,
+                    pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                    pointRadius: points.map((_, i) => i === points.length - 1 ? 6 : 4),
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { mode: 'nearest', intersect: false },
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 5,
+                        ticks: { stepSize: 1 },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                    },
+                    x: {
+                        grid: { display: false },
+                    },
+                },
+            },
+        });
+    });
+</script>
+{% endblock %}

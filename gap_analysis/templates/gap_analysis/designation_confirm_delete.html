@@ -1,0 +1,34 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Delete Designation - Skill Gap Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .delete-card { max-width: 500px; margin: 0 auto; text-align: center; }
+    .delete-icon { width: 80px; height: 80px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 2.5rem; color: #ef4444; }
+    .delete-title { font-size: 1.5rem; font-weight: 700; color: #ef4444; margin-bottom: 1rem; }
+    .delete-message { color: #64748b; margin-bottom: 1rem; }
+    .delete-warning { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: #92400e; }
+    .btn-group-delete { display: flex; gap: 1rem; justify-content: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="delete-card">
+        <div class="card">
+            <div class="card-body py-5">
+                <div class="delete-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <h2 class="delete-title">Delete Designation</h2>
+                <p class="delete-message">Are you sure you want to permanently delete <strong>{{ object.title }}</strong>?</p>
+                <div class="delete-warning"><i class="bi bi-info-circle me-2"></i>This will also permanently delete all skill benchmarks associated with this role.</div>
+                <form method="POST" class="btn-group-delete">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-2"></i>Yes, Delete</button>
+                    <a href="{% url 'skillgap_designation_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-2"></i>Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

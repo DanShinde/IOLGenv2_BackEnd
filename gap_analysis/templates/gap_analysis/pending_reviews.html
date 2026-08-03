@@ -1,0 +1,74 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Pending Reviews - Skill Gap Analyzer{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-hourglass-split me-2 text-primary"></i>Pending Reviews
+            </h1>
+            <p class="text-muted mt-1">
+                {% if user.is_staff %}
+                    Self-ratings across the organization awaiting manager approval
+                {% else %}
+                    Self-ratings from your direct reports awaiting your approval
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    {% if pending_ratings %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 mobile-cards">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Skill</th>
+                            <th>Manager Level</th>
+                            <th>Self-Rating</th>
+                            <th>Submitted</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rating in pending_ratings %}
+                        <tr>
+                            <td data-label="Employee">
+                                <a href="{% url 'skillgap_employee_profile' rating.skill_matrix.id %}">{{ rating.skill_matrix.name }}</a>
+                            </td>
+                            <td data-label="Skill"><strong>{{ rating.skill.name }}</strong></td>
+                            <td data-label="Manager Level">{{ rating.actual_level }}/5</td>
+                            <td data-label="Self-Rating">
+                                <span class="fw-bold">{{ rating.self_rated_level }}/5</span>
+                                {% if rating.rating_gap %}
+                                    <span class="text-muted small">({{ rating.rating_gap|stringformat:"+d" }})</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Submitted">{{ rating.self_rated_on }}</td>
+                            <td data-label="Actions">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'skillgap_employee_profile' rating.skill_matrix.id %}" class="btn btn-outline-secondary btn-icon" title="Review on profile">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% include 'gap_analysis/pagination.html' %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-check2-circle"></i>
+        <p>No self-ratings waiting for review.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

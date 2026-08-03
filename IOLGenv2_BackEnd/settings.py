@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'inventory',
     'planner',
     'employees',
+    'gap_analysis',
 ]
 
 MIDDLEWARE = [
@@ -76,6 +77,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'IOLGenv2_BackEnd.middleware.TrackerGroupRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.PlannerAuthRequiredMiddleware',
+    'IOLGenv2_BackEnd.middleware.SkillGapGroupRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

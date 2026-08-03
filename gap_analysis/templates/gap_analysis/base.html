@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Skill Gap Analyzer{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --light: #f8fafc;
+            --dark: #1e293b;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --card-hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #f8fafc 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        /* Navbar Styling */
+        .navbar {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .navbar-brand:hover {
+            transform: scale(1.02);
+            transition: var(--transition);
+        }
+
+        .nav-link {
+            font-weight: 500;
+            padding: 0.5rem 1rem !important;
+            border-radius: 8px;
+            transition: var(--transition);
+            margin: 0 4px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* Card Styling */
+        .card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+            background: white;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            box-shadow: var(--card-hover-shadow);
+            transform: translateY(-4px);
+        }
+
+        .card-header {
+            background: white;
+            border-bottom: 2px solid #f1f5f9;
+            padding: 1.25rem 1.5rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* KPI Cards */
+        .kpi-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--card-hover-shadow);
+        }
+
+        .kpi-card.success::before { background: var(--success); }
+        .kpi-card.warning::before { background: var(--warning); }
+        .kpi-card.danger::before { background: var(--danger); }
+
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark);
+            line-height: 1;
+        }
+
+        .kpi-label {
+            color: var(--secondary);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Buttons */
+        .btn {
+            border-radius: 10px;
+            font-weight: 500;
+            padding: 0.5rem 1.25rem;
+            transition: var(--transition);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            border: none;
+        }
+
+        /* Tables */
+        .table {
+            margin-bottom: 0;
+        }
+
+        .table thead th {
+            background: #f8fafc;
+            color: var(--secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e2e8f0;
+            padding: 1rem;
+        }
+
+        .table tbody tr {
+            transition: var(--transition);
+        }
+
+        .table tbody tr:hover {
+            background: #f8fafc;
+            transform: scale(1.01);
+        }
+
+        .table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+            border-color: #f1f5f9;
+        }
+
+        /* Status Badges */
+        .badge {
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .badge.bg-success {
+            background: rgba(16, 185, 129, 0.15) !important;
+            color: #059669;
+        }
+
+        .badge.bg-warning {
+            background: rgba(245, 158, 11, 0.15) !important;
+            color: #d97706;
+        }
+
+        .badge.bg-danger {
+            background: rgba(239, 68, 68, 0.15) !important;
+            color: #dc2626;
+        }
+
+        /* Form Controls */
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            padding: 0.75rem 1rem;
+            transition: var(--transition);
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        /* Progress Bars */
+        .progress {
+            height: 10px;
+            border-radius: 10px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            border-radius: 10px;
+            transition: width 1s ease;
+        }
+
+        /* Gap Status Colors */
+        .gap-met { color: var(--success); }
+        .gap-warning { color: var(--warning); }
+        .gap-critical { color: var(--danger); }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeInUp 0.5s ease forwards;
+        }
+
+        .animate-delay-1 { animation-delay: 0.1s; }
+        .animate-delay-2 { animation-delay: 0.2s; }
+        .animate-delay-3 { animation-delay: 0.3s; }
+        .animate-delay-4 { animation-delay: 0.4s; }
+
+        /* Main container */
+        main {
+            padding-bottom: 3rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--secondary);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Shared list-page header (was copy-pasted per template) */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        /* Shared small square icon button (was copy-pasted per template) */
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+
+        /* Shared proficiency-level pill (was copy-pasted per template) */
+        .level-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 24px;
+            padding: 0 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .level-0 { background: #f1f5f9; color: #64748b; }
+        .level-1 { background: #dbeafe; color: #1d4ed8; }
+        .level-2 { background: #d1fae5; color: #059669; }
+        .level-3 { background: #fef3c7; color: #d97706; }
+        .level-4 { background: #fed7aa; color: #ea580c; }
+        .level-5 { background: #fee2e2; color: #dc2626; }
+
+        /* Shared tab switcher (used on the employee profile and the dashboard) */
+        .tabs-nav {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            font-weight: 500;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            background: #f8fafc;
+        }
+
+        .tab-btn.active {
+            color: #4f46e5;
+            background: #f8fafc;
+            border-bottom: 2px solid #4f46e5;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Mobile card-view for dense tables: add class="mobile-cards" to the <table> and
+           data-label="Column Name" to each <td>. Below 640px, thead disappears and each row
+           becomes a bordered card of label/value pairs instead of a horizontally-scrolling table. */
+        @media (max-width: 640px) {
+            table.mobile-cards thead {
+                display: none;
+            }
+
+            table.mobile-cards, table.mobile-cards tbody, table.mobile-cards tr, table.mobile-cards td {
+                display: block;
+                width: 100%;
+            }
+
+            table.mobile-cards tr {
+                margin-bottom: 1rem;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 0.5rem 1rem;
+            }
+
+            table.mobile-cards tr:last-child {
+                margin-bottom: 0;
+            }
+
+            table.mobile-cards td {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                padding: 0.5rem 0;
+                border: none;
+                text-align: right;
+            }
+
+            table.mobile-cards td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: #64748b;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+                text-align: left;
+            }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'skillgap_dashboard' %}">
+                <i class="bi bi-bar-chart-fill me-2"></i>
+                <span>SkillGap Analyzer</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if user.is_authenticated %}
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'home' %}" title="Back to the main portal">
+                            <i class="bi bi-house-door-fill me-1"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'skillgap_dashboard' %}">
+                            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'designation' in request.resolver_match.url_name or 'benchmark' in request.resolver_match.url_name or 'bulk_skill_update' in request.resolver_match.url_name or 'employee' in request.resolver_match.url_name and 'search' not in request.resolver_match.url_name %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-people me-1"></i> People
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'skillgap_employee_list' %}"><i class="bi bi-people me-2"></i>Skill Matrix</a></li>
+                            <li><a class="dropdown-item" href="{% url 'skillgap_designation_list' %}"><i class="bi bi-briefcase me-2"></i>Role Matrix</a></li>
+                            {% if user.is_staff %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'skillgap_bulk_skill_update' %}"><i class="bi bi-collection me-2"></i>Bulk Update</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'employee_skill_search' in request.resolver_match.url_name or request.resolver_match.url_name == 'my_skills' %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-award me-1"></i> Skills
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'skillgap_employee_skill_search' %}"><i class="bi bi-search me-2"></i>Skill Search</a></li>
+                            <li><a class="dropdown-item" href="{% url 'skillgap_my_skills' %}"><i class="bi bi-person-check me-2"></i>My Skills</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'development_plan' in request.resolver_match.url_name or request.resolver_match.url_name == 'pending_reviews' %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-clipboard2-check me-1"></i> Plans
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'skillgap_development_plan_list' %}"><i class="bi bi-clipboard2-check me-2"></i>Development Plans</a></li>
+                            <li><a class="dropdown-item" href="{% url 'skillgap_pending_reviews' %}"><i class="bi bi-hourglass-split me-2"></i>Pending Reviews</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'help' %}active{% endif %}" href="{% url 'skillgap_help' %}" title="Help &amp; Guide">
+                            <i class="bi bi-question-circle me-1"></i> Help
+                        </a>
+                    </li>
+                    <li class="nav-item d-flex align-items-center ms-lg-2">
+                        <span class="text-white-50 small me-2">
+                            <i class="bi bi-person-circle me-1"></i>{{ user.get_username }}{% if user.is_staff %} <span class="badge bg-light text-dark ms-1">staff</span>{% endif %}
+                        </span>
+                        <form method="post" action="{% url 'logoutw' %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="nav-link border-0 bg-transparent" style="cursor:pointer;">
+                                <i class="bi bi-box-arrow-right me-1"></i>Log out
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+                {% else %}
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'loginw' %}">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Log in
+                        </a>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="container">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show mt-3" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- Toast notifications -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;" id="toastContainer"></div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Shared toast helper: showToast('Skill level updated', 'success')
+        function showToast(message, variant) {
+            variant = variant || 'success';
+            const iconByVariant = {
+                success: 'bi-check-circle-fill',
+                danger: 'bi-exclamation-triangle-fill',
+                warning: 'bi-exclamation-circle-fill',
+                info: 'bi-info-circle-fill',
+            };
+            const container = document.getElementById('toastContainer');
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-bg-${variant} border-0`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="bi ${iconByVariant[variant] || iconByVariant.info} me-2"></i>${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>`;
+            container.appendChild(toastEl);
+            const toast = new bootstrap.Toast(toastEl, { delay: 3500 });
+            toast.show();
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

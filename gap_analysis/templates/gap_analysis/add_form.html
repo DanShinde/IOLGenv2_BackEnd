@@ -1,0 +1,126 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}{{ title }} - Skill Gap Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .form-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .form-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .form-header p {
+        color: #64748b;
+        margin-top: 0.5rem;
+    }
+
+    .form-card .card-body {
+        padding: 2rem;
+    }
+
+    .form-label {
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+    }
+
+    .btn-group-form {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .btn-group-form .btn {
+        flex: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="form-card">
+        <div class="form-header">
+            <h1>
+                <i class="bi {% if 'Plan' in title %}bi-clipboard2-check{% elif 'Employee' in title %}bi-person-plus{% elif 'Designation' in title %}bi-briefcase-plus{% elif 'Skill' in title %}bi-lightning{% elif 'Benchmark' in title %}bi-bookmark-plus{% else %}bi-plus-circle{% endif %} me-2 text-primary"></i>
+                {{ title }}
+            </h1>
+            <p>Fill in the details below to continue</p>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    {% csrf_token %}
+                    
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                        {% if field.name == 'skill_name' and existing_skills %}
+                            <datalist id="skill-suggestions">
+                                {% for skill in existing_skills %}
+                                    <option value="{{ skill.name }}">{{ skill.category|default:'' }}</option>
+                                {% endfor %}
+                            </datalist>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <small class="text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in field.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="btn-group-form">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-2"></i>Save Record
+                        </button>
+                        {% if designation %}
+                            <a href="{% url 'skillgap_designation_benchmark' designation.id %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Cancel
+                            </a>
+                        {% elif employee %}
+                            <a href="{% url 'skillgap_employee_profile' employee.id %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Cancel
+                            </a>
+                        {% else %}
+                            <a href="{% url 'skillgap_dashboard' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Cancel
+                            </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

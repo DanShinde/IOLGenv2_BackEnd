@@ -1,0 +1,901 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #06b6d4 100%);
+        border-radius: 20px;
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 400px;
+        height: 400px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+    }
+
+    .hero-section::after {
+        content: '';
+        position: absolute;
+        bottom: -30%;
+        left: -10%;
+        width: 300px;
+        height: 300px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 50%;
+    }
+
+    .hero-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .hero-subtitle {
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+
+    /* Bento KPI row: Skills Met % promoted to a hero tile, three supporting tiles beside it.
+       All four tiles sit in a single row as plain column tracks (hero's column is just wider,
+       2fr vs 1fr) rather than spanning rows or stacking — that keeps every tile's natural
+       content height in play for the row, so nothing gets stretched to match a taller
+       neighbor. */
+    .kpi-bento {
+        display: grid;
+        grid-template-columns: 2fr repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+        align-items: stretch;
+    }
+
+    .kpi-bento .kpi-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .kpi-bento .kpi-card.hero-tile .kpi-value {
+        font-size: 2.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .kpi-bento {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .kpi-bento .kpi-card.hero-tile {
+            grid-column: span 2;
+        }
+    }
+
+    .kpi-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .kpi-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+    }
+
+    .kpi-card.primary::before { background: linear-gradient(to bottom, #4f46e5, #7c3aed); }
+    .kpi-card.success::before { background: linear-gradient(to bottom, #10b981, #059669); }
+    .kpi-card.warning::before { background: linear-gradient(to bottom, #f59e0b, #d97706); }
+    .kpi-card.danger::before { background: linear-gradient(to bottom, #ef4444, #dc2626); }
+    .kpi-card.info::before { background: linear-gradient(to bottom, #06b6d4, #0891b2); }
+
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .kpi-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .kpi-icon.primary { background: rgba(79, 70, 229, 0.1); color: #4f46e5; }
+    .kpi-icon.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .kpi-icon.warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .kpi-icon.danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    .kpi-icon.info { background: rgba(6, 182, 212, 0.1); color: #06b6d4; }
+
+    .kpi-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1;
+    }
+
+    .kpi-label {
+        color: #64748b;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+
+    .dashboard-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+
+    .dashboard-card-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 2px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .dashboard-card-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .dashboard-card-title i {
+        color: #4f46e5;
+    }
+
+    .chart-container {
+        padding: 1.5rem;
+        position: relative;
+    }
+
+    .chart-container-bar {
+        height: 300px;
+    }
+
+    .filter-bar {
+        background: #f8fafc;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .filter-bar label {
+        font-weight: 500;
+        color: #64748b;
+        white-space: nowrap;
+    }
+
+    .filter-bar select {
+        min-width: 200px;
+    }
+
+    .filter-bar .btn {
+        padding: 0.5rem 1.25rem;
+    }
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+
+    .quick-action-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+        background: #f8fafc;
+        border: 2px solid transparent;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #64748b;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .quick-action-btn:hover {
+        background: white;
+        border-color: #4f46e5;
+        color: #4f46e5;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+    }
+
+    .quick-action-btn i {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 3rem;
+        color: #94a3b8;
+    }
+
+    .no-data i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .no-data p {
+        font-size: 1rem;
+    }
+
+    .animate-delay-1 { animation-delay: 0.1s; }
+    .animate-delay-2 { animation-delay: 0.2s; }
+    .animate-delay-3 { animation-delay: 0.3s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero-section animate-fade-in">
+    <div class="hero-title">
+        <i class="bi bi-bar-chart-fill me-2"></i>Skill Gap Analysis Dashboard
+    </div>
+    <div class="hero-subtitle">Track and analyze skill gaps across your organization</div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs-nav">
+    <button class="tab-btn active" onclick="showTab('overview')">
+        <i class="bi bi-speedometer2 me-2"></i>Overview
+    </button>
+    <button class="tab-btn" onclick="showTab('charts')">
+        <i class="bi bi-bar-chart me-2"></i>Charts
+    </button>
+    <button class="tab-btn" onclick="showTab('insights')">
+        <i class="bi bi-lightbulb me-2"></i>Insights
+    </button>
+    <button class="tab-btn" onclick="showTab('distribution')">
+        <i class="bi bi-pie-chart me-2"></i>Distribution
+    </button>
+</div>
+
+<!-- Overview Tab: the one number that answers "is everything okay?", then what needs attention now -->
+<div id="overview-tab" class="tab-content active">
+    <div class="kpi-bento">
+        <div class="kpi-card hero-tile {% if skills_met >= 80 %}success{% elif skills_met >= 50 %}warning{% else %}danger{% endif %} animate-fade-in">
+            <div class="kpi-icon {% if skills_met >= 80 %}success{% elif skills_met >= 50 %}warning{% else %}danger{% endif %}">
+                <i class="bi bi-check-circle-fill"></i>
+            </div>
+            <div class="kpi-value">{{ skills_met|default:"0" }}%</div>
+            <div class="kpi-label">Org-wide Skills Met</div>
+        </div>
+
+        <div class="kpi-card primary animate-fade-in animate-delay-1">
+            <div class="kpi-icon primary">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="kpi-value">{{ total_employees|default:"0" }}</div>
+            <div class="kpi-label">Total Skill Matrix</div>
+        </div>
+
+        <div class="kpi-card success animate-fade-in animate-delay-2">
+            <div class="kpi-icon success">
+                <i class="bi bi-lightning-fill"></i>
+            </div>
+            <div class="kpi-value">{{ total_skills|default:"0" }}</div>
+            <div class="kpi-label">Skills Tracked</div>
+        </div>
+
+        <div class="kpi-card warning animate-fade-in animate-delay-3">
+            <div class="kpi-icon warning">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div class="kpi-value">{{ avg_gap_score|default:"0" }}</div>
+            <div class="kpi-label">Avg Gap Score</div>
+        </div>
+    </div>
+
+    {% if critical_gaps %}
+    <div class="dashboard-card animate-fade-in">
+        <div class="dashboard-card-header bg-danger text-white">
+            <div class="dashboard-card-title text-white">
+                <i class="bi bi-exclamation-octagon"></i> Critical Gaps (Gap &gt; 2 levels)
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 mobile-cards">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Role</th>
+                            <th>Critical Skills</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in critical_gaps %}
+                        <tr>
+                            <td data-label="Employee"><strong>{{ emp.name }}</strong></td>
+                            <td data-label="Role">{{ emp.role }}</td>
+                            <td data-label="Critical Skills">
+                                {% for skill in emp.skills %}
+                                    <span class="badge bg-danger me-1">{{ skill }}</span>
+                                {% endfor %}
+                            </td>
+                            <td data-label="Count"><span class="badge bg-danger">{{ emp.critical_count }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="dashboard-card animate-fade-in">
+        <div class="dashboard-card-header">
+            <div class="dashboard-card-title">
+                <i class="bi bi-lightning"></i> Quick Actions
+            </div>
+        </div>
+        <div class="quick-actions">
+            {% if user.is_staff %}
+            <a href="{% url 'skillgap_add_employee' %}" class="quick-action-btn">
+                <i class="bi bi-person-plus"></i>
+                Add Employee
+            </a>
+            <a href="{% url 'skillgap_add_designation' %}" class="quick-action-btn">
+                <i class="bi bi-briefcase-plus"></i>
+                Add Role
+            </a>
+            <a href="{% url 'skillgap_add_employee_skill' %}" class="quick-action-btn">
+                <i class="bi bi-award"></i>
+                Record Skill
+            </a>
+            {% endif %}
+            <a href="{% url 'skillgap_employee_list' %}" class="quick-action-btn">
+                <i class="bi bi-people"></i>
+                View Employees
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Tab -->
+<div id="charts-tab" class="tab-content">
+    <!-- Team Overview Chart -->
+    <div class="dashboard-card animate-fade-in">
+        <div class="dashboard-card-header">
+            <div class="dashboard-card-title">
+                <i class="bi bi-people"></i> Team Overview
+            </div>
+            <span class="badge bg-light text-dark">All Skills</span>
+        </div>
+        <div class="chart-container">
+            {% if team_labels != "[]" %}
+                <div class="chart-container-bar">
+                    <canvas id="teamChart"></canvas>
+                </div>
+            {% else %}
+                <div class="no-data">
+                    <i class="bi bi-inbox"></i>
+                    <p>No skill data available for the team yet.</p>
+                    {% if user.is_staff %}
+                    <a href="{% url 'skillgap_add_employee_skill' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-2"></i>Record First Skill
+                    </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Role Analysis -->
+    <div class="dashboard-card animate-fade-in">
+        <div class="dashboard-card-header">
+            <div class="dashboard-card-title">
+                <i class="bi bi-briefcase"></i> Role Analysis
+            </div>
+        </div>
+        <div class="filter-bar">
+            <form method="GET" action="{% url 'skillgap_dashboard' %}" class="d-flex align-items-center gap-2 w-100">
+                {% if selected_employee %}<input type="hidden" name="employee" value="{{ selected_employee.id }}">{% endif %}
+                <label><i class="bi bi-funnel me-1"></i>Select Role:</label>
+                <select name="designation" class="form-select">
+                    {% for desig in designations %}
+                        <option value="{{ desig.id }}" {% if selected_designation and selected_designation.id == desig.id %}selected{% endif %}>{{ desig.title }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-filter me-1"></i>Filter
+                </button>
+            </form>
+        </div>
+        <div class="chart-container">
+            {% if desig_labels != "[]" %}
+                <div class="chart-container-bar">
+                    <canvas id="designationChart"></canvas>
+                </div>
+            {% else %}
+                <div class="no-data">
+                    <i class="bi bi-inbox"></i>
+                    <p>No data available for this role.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Insights Tab -->
+<div id="insights-tab" class="tab-content">
+    <div class="row">
+        <!-- Role Gap Summary -->
+        <div class="col-lg-6 animate-fade-in">
+            <div class="dashboard-card h-100">
+                <div class="dashboard-card-header">
+                    <div class="dashboard-card-title">
+                        <i class="bi bi-pie-chart"></i> Role Gap Summary
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if role_gap_data %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 mobile-cards">
+                            <thead>
+                                <tr>
+                                    <th>Role</th>
+                                    <th>Department</th>
+                                    <th>Employees</th>
+                                    <th>Avg Gap</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for role in role_gap_data %}
+                                <tr>
+                                    <td data-label="Role"><strong>{{ role.role }}</strong></td>
+                                    <td data-label="Department">{{ role.department }}</td>
+                                    <td data-label="Employees">{{ role.employee_count }}</td>
+                                    <td data-label="Avg Gap">
+                                        {% if role.avg_gap > 1.5 %}
+                                            <span class="badge bg-danger">{{ role.avg_gap }}</span>
+                                        {% elif role.avg_gap > 0.5 %}
+                                            <span class="badge bg-warning">{{ role.avg_gap }}</span>
+                                        {% else %}
+                                            <span class="badge bg-success">{{ role.avg_gap }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No role data available</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Skill Gaps -->
+        <div class="col-lg-6 animate-fade-in">
+            <div class="dashboard-card h-100">
+                <div class="dashboard-card-header">
+                    <div class="dashboard-card-title">
+                        <i class="bi bi-exclamation-triangle"></i> Top Skill Gaps
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if top_gap_employees %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 mobile-cards">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Role</th>
+                                    <th>Skills with Gap</th>
+                                    <th>Total Gap</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for emp in top_gap_employees %}
+                                <tr>
+                                    <td data-label="Employee"><strong>{{ emp.name }}</strong></td>
+                                    <td data-label="Role">{{ emp.role }}</td>
+                                    <td data-label="Skills with Gap">{{ emp.gap_count }}</td>
+                                    <td data-label="Total Gap">
+                                        <span class="badge bg-danger">{{ emp.total_gap }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No employee skill gaps</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Top Performers -->
+        <div class="col-lg-6 animate-fade-in">
+            <div class="dashboard-card h-100">
+                <div class="dashboard-card-header">
+                    <div class="dashboard-card-title">
+                        <i class="bi bi-trophy"></i> Top Performers
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if top_performers %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 mobile-cards">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Role</th>
+                                    <th>Skills Exceeding</th>
+                                    <th>Compliance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for emp in top_performers %}
+                                <tr>
+                                    <td data-label="Employee"><strong>{{ emp.name }}</strong></td>
+                                    <td data-label="Role">{{ emp.role }}</td>
+                                    <td data-label="Skills Exceeding">{{ emp.exceed_count }}/{{ emp.total_evaluated }}</td>
+                                    <td data-label="Compliance"><span class="badge bg-success">{{ emp.exceed_percent }}%</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No performer data available</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Skills Needing Training -->
+        <div class="col-lg-6 animate-fade-in">
+            <div class="dashboard-card h-100">
+                <div class="dashboard-card-header">
+                    <div class="dashboard-card-title">
+                        <i class="bi bi-book"></i> Skills Needing Training
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if skills_needing_training %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 mobile-cards">
+                            <thead>
+                                <tr>
+                                    <th>Skill</th>
+                                    <th>Category</th>
+                                    <th>Affected</th>
+                                    <th>Avg Gap</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for skill in skills_needing_training %}
+                                <tr>
+                                    <td data-label="Skill"><strong>{{ skill.skill }}</strong></td>
+                                    <td data-label="Category">{{ skill.category }}</td>
+                                    <td data-label="Affected">{{ skill.affected_count }}</td>
+                                    <td data-label="Avg Gap">
+                                        {% if skill.avg_gap > 1.5 %}
+                                            <span class="badge bg-danger">{{ skill.avg_gap }}</span>
+                                        {% elif skill.avg_gap > 0.5 %}
+                                            <span class="badge bg-warning">{{ skill.avg_gap }}</span>
+                                        {% else %}
+                                            <span class="badge bg-success">{{ skill.avg_gap }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No skill gap data available</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Distribution Tab -->
+<div id="distribution-tab" class="tab-content">
+    <div class="row">
+        <!-- Benchmark Compliance -->
+        <div class="col-lg-6 animate-fade-in">
+            <div class="dashboard-card h-100">
+                <div class="dashboard-card-header">
+                    <div class="dashboard-card-title">
+                        <i class="bi bi-check2-circle"></i> Benchmark Compliance
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if compliance_stats.total > 0 %}
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="p-3">
+                                <div class="h3 text-success">{{ compliance_stats.meeting }}</div>
+                                <small class="text-muted">Meeting</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3">
+                                <div class="h3 text-warning">{{ compliance_stats.partial }}</div>
+                                <small class="text-muted">Partial</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3">
+                                <div class="h3 text-danger">{{ compliance_stats.needs_training }}</div>
+                                <small class="text-muted">Needs Training</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-success" style="width: {{ compliance_stats.meeting_pct }}%"></div>
+                            <div class="progress-bar bg-warning" style="width: {{ compliance_stats.partial_pct }}%"></div>
+                            <div class="progress-bar bg-danger" style="width: {{ compliance_stats.needs_training_pct }}%"></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No compliance data available</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Skill Distribution by Category -->
+        <div class="col-lg-6 animate-fade-in">
+            <div class="dashboard-card h-100">
+                <div class="dashboard-card-header">
+                    <div class="dashboard-card-title">
+                        <i class="bi bi-pie-fill"></i> Skill Distribution
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if skill_category_dist %}
+                    <div class="row">
+                        {% for category, count in skill_category_dist.items %}
+                        <div class="col-6 mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>{{ category }}</span>
+                                <span class="badge bg-primary">{{ count }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No skills defined</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab switching (same pattern as the employee profile page)
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+        document.getElementById(tabId + '-tab').classList.add('active');
+        event.target.closest('.tab-btn').classList.add('active');
+
+        // Chart.js sizes a canvas from its container at construction time, so a chart built
+        // inside a tab that starts hidden renders blank. Dispatching resize once the tab
+        // becomes visible makes Chart.js re-measure and draw correctly.
+        window.dispatchEvent(new Event('resize'));
+    }
+
+    const barChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    usePointStyle: true,
+                    padding: 20,
+                    font: { size: 12 }
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                padding: 12,
+                cornerRadius: 8
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 5,
+                ticks: { stepSize: 1 },
+                grid: { color: '#f1f5f9' }
+            },
+            x: {
+                grid: { display: false }
+            }
+        }
+    };
+
+    const chartColors = {
+        actual: {
+            bg: 'rgba(79, 70, 229, 0.7)',
+            border: 'rgba(79, 70, 229, 1)'
+        },
+        benchmark: {
+            bg: 'rgba(239, 68, 68, 0.7)',
+            border: 'rgba(239, 68, 68, 1)'
+        }
+    };
+
+    if (document.getElementById('teamChart')) {
+        new Chart(document.getElementById('teamChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: {{ team_labels|safe }},
+                datasets: [
+                    {
+                        label: 'Average Actual',
+                        data: {{ team_actual|safe }},
+                        backgroundColor: chartColors.actual.bg,
+                        borderColor: chartColors.actual.border,
+                        borderWidth: 1,
+                        borderRadius: 6
+                    },
+                    {
+                        label: 'Benchmark Required',
+                        data: {{ team_benchmark|safe }},
+                        backgroundColor: chartColors.benchmark.bg,
+                        borderColor: chartColors.benchmark.border,
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: barChartOptions
+        });
+    }
+
+    if (document.getElementById('designationChart')) {
+        new Chart(document.getElementById('designationChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: {{ desig_labels|safe }},
+                datasets: [
+                    {
+                        label: 'Actual Level',
+                        data: {{ desig_actual|safe }},
+                        backgroundColor: chartColors.actual.bg,
+                        borderColor: chartColors.actual.border,
+                        borderWidth: 1,
+                        borderRadius: 6
+                    },
+                    {
+                        label: 'Benchmark Required',
+                        data: {{ desig_benchmark|safe }},
+                        backgroundColor: chartColors.benchmark.bg,
+                        borderColor: chartColors.benchmark.border,
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: barChartOptions
+        });
+    }
+
+    if (document.getElementById('individualChart')) {
+        new Chart(document.getElementById('individualChart').getContext('2d'), {
+            type: 'radar',
+            data: {
+                labels: {{ ind_labels|safe }},
+                datasets: [
+                    {
+                        label: 'Actual Level',
+                        data: {{ ind_actual|safe }},
+                        backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                        borderColor: chartColors.actual.border,
+                        borderWidth: 2,
+                        pointBackgroundColor: chartColors.actual.border,
+                        pointRadius: 4
+                    },
+                    {
+                        label: 'Benchmark Required',
+                        data: {{ ind_benchmark|safe }},
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderColor: chartColors.benchmark.border,
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointBackgroundColor: chartColors.benchmark.border,
+                        pointRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 5,
+                        ticks: {
+                            stepSize: 1,
+                            backdropColor: 'transparent'
+                        },
+                        grid: { color: '#e2e8f0' },
+                        angleLines: { color: '#e2e8f0' },
+                        pointLabels: {
+                            font: { size: 12 }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

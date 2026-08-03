@@ -1,0 +1,125 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}My Skills - Skill Gap Analyzer{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-person-check me-2 text-primary"></i>My Skills
+            </h1>
+            <p class="text-muted mt-1">Rate yourself on each required skill — your manager will review and approve it</p>
+        </div>
+    </div>
+
+    {% if not employee %}
+    <div class="empty-state">
+        <i class="bi bi-person-x"></i>
+        <p>Your login isn't linked to an employee record yet. Ask HR to link your account before you can self-rate.</p>
+    </div>
+    {% elif skill_data %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 mobile-cards">
+                    <thead>
+                        <tr>
+                            <th>Skill</th>
+                            <th>Category</th>
+                            <th>Required</th>
+                            <th>Manager Level</th>
+                            <th>My Self-Rating</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for skill in skill_data %}
+                        <tr>
+                            <td data-label="Skill"><strong>{{ skill.skill_name }}</strong></td>
+                            <td data-label="Category">
+                                {% if skill.skill_category %}
+                                    <span class="badge bg-light text-dark">{{ skill.skill_category }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Required"><span class="fw-bold text-danger">{{ skill.required_level }}</span></td>
+                            <td data-label="Manager Level">{{ skill.actual_level }}/5</td>
+                            <td data-label="My Self-Rating">
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="number"
+                                           class="form-control"
+                                           id="self-skill-{{ skill.skill_id }}"
+                                           value="{{ skill.self_rated_level|default_if_none:'' }}"
+                                           min="0" max="5"
+                                           style="width: 70px;"
+                                           onchange="updateSelfRating({{ employee.id }}, {{ skill.skill_id }}, this.value)">
+                                </div>
+                            </td>
+                            <td data-label="Status" id="self-status-{{ skill.skill_id }}">
+                                {% if skill.rating_status == 'pending' %}
+                                    <span class="badge bg-warning">Pending Review</span>
+                                {% elif skill.rating_status == 'approved' %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% elif skill.rating_status == 'overridden' %}
+                                    <span class="badge bg-secondary">Overridden by Manager</span>
+                                {% else %}
+                                    <span class="text-muted">Not yet rated</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-clipboard-x"></i>
+        <p>No skill benchmarks defined for your role yet.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function updateSelfRating(employeeId, skillId, newLevel) {
+        const input = document.getElementById(`self-skill-${skillId}`);
+        input.disabled = true;
+
+        fetch(`/employee/${employeeId}/self-rating-update/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: `skill_id=${skillId}&self_rated_level=${newLevel}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const statusCell = document.getElementById(`self-status-${skillId}`);
+                if (statusCell) {
+                    const byStatus = {
+                        pending: '<span class="badge bg-warning">Pending Review</span>',
+                        approved: '<span class="badge bg-success">Approved</span>',
+                        overridden: '<span class="badge bg-secondary">Overridden by Manager</span>',
+                    };
+                    statusCell.innerHTML = byStatus[data.rating_status] || '<span class="text-muted">Not yet rated</span>';
+                }
+                showToast('Self-rating submitted for review', 'success');
+            } else {
+                showToast('Failed to submit self-rating', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Failed to submit self-rating', 'danger');
+        })
+        .finally(() => {
+            input.disabled = false;
+        });
+    }
+</script>
+{% endblock %}

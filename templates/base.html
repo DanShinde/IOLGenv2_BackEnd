@@ -274,6 +274,11 @@
             <i class="bi bi-calendar-range-fill"></i> Planner
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if 'skillgap' in request.path %}active{% endif %}" href="{% url 'skillgap_dashboard' %}">
+            <i class="bi bi-bar-chart-steps"></i> Skill Gap
+          </a>
+        </li>
                 <li class="nav-item">
           <a class="nav-link {% if 'forum' in request.path %}active{% endif %}" href="{% url 'forum-home' %}">
             <i class="bi bi-lightbulb-fill"></i> Knowledge Base

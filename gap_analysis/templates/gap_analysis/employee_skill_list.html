@@ -1,0 +1,80 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Employee Skills - Skill Gap Analyzer{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-award me-2 text-primary"></i>Employee Skills
+            </h1>
+            <p class="text-muted mt-1">View skill assessments for all employees</p>
+        </div>
+    </div>
+
+    {% if employee_skills %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 mobile-cards">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Skill</th>
+                            <th>Actual Level</th>
+                            <th>Last Evaluated</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for es in employee_skills %}
+                        <tr>
+                            <td data-label="Employee">
+                                <strong>{{ es.skill_matrix.name }}</strong>
+                                {% if es.skill_matrix.role_matrix %}
+                                    <span class="badge bg-light text-muted ms-2">{{ es.skill_matrix.role_matrix.title }}</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Skill">
+                                <strong>{{ es.skill.name }}</strong>
+                                {% if es.skill.category %}
+                                    <span class="badge bg-light text-muted ms-2">{{ es.skill.category }}</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Actual Level">
+                                <span class="level-badge level-{{ es.actual_level }}">{{ es.actual_level }}/5</span>
+                            </td>
+                            <td data-label="Last Evaluated">{{ es.last_evaluated|date:"M d, Y" }}</td>
+                            <td data-label="Actions">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'skillgap_employee_profile' es.skill_matrix.id %}" class="btn btn-info btn-icon" title="View Profile">
+                                        <i class="bi bi-person"></i>
+                                    </a>
+                                    {% if user.is_staff %}
+                                    <a href="{% url 'skillgap_employee_skill_delete' es.id %}" class="btn btn-danger btn-icon" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <p>No employee skills recorded yet.</p>
+        {% if user.is_staff %}
+        <a href="{% url 'skillgap_add_employee_skill' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Record First Skill
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

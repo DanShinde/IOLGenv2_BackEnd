@@ -29,6 +29,7 @@ urlpatterns = [
     path('tracker/', include('tracker.urls')),
     path('inventory/', include('inventory.urls')),
     path('planner/', include('planner.urls')),
+    path('skillgap/', include('gap_analysis.urls')),
 ]
 
 if settings.DEBUG:

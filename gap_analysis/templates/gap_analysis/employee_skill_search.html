@@ -1,0 +1,160 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Find Experts by Skill - Skill Gap Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-container {
+        max-width: 600px;
+        margin: 0 auto 2rem;
+    }
+
+    .search-input {
+        padding: 1rem 1.5rem;
+        font-size: 1.1rem;
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .result-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+    }
+
+    .result-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .employee-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .employee-role {
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+
+    .skill-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .rank-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.875rem;
+        background: #f1f5f9;
+        color: #64748b;
+        flex: none;
+    }
+
+    .rank-badge.top {
+        background: rgba(245, 158, 11, 0.15);
+        color: #d97706;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-search me-2 text-primary"></i>Find Experts by Skill
+            </h1>
+            <p class="text-muted mt-1">Pick a skill to see everyone rated on it, top scorers first</p>
+        </div>
+    </div>
+
+    <div class="search-container">
+        <form method="GET" action="{% url 'skillgap_employee_skill_search' %}">
+            <div class="input-group">
+                <select name="skill" class="form-select search-input" onchange="this.form.submit()">
+                    <option value="">Select a skill&hellip;</option>
+                    {% for skill in skills %}
+                        <option value="{{ skill.id }}" {% if selected_skill and selected_skill.id == skill.id %}selected{% endif %}>
+                            {{ skill.name }}{% if skill.category %} ({{ skill.category }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary ms-2">
+                    <i class="bi bi-search me-2"></i>View
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% if selected_skill %}
+        <div class="results-section">
+            {% if results %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people me-2"></i>{{ results|length }} employee{{ results|length|pluralize }} rated on {{ selected_skill.name }}
+                    </h5>
+                </div>
+
+                {% for result in results %}
+                <div class="result-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rank-badge {% if forloop.counter == 1 and result.level > 0 %}top{% endif %}">
+                                {% if forloop.counter == 1 and result.level > 0 %}
+                                    <i class="bi bi-trophy-fill"></i>
+                                {% else %}
+                                    {{ forloop.counter }}
+                                {% endif %}
+                            </div>
+                            <div>
+                                <div class="employee-name">{{ result.employee.name }}</div>
+                                <div class="employee-role">
+                                    {% if result.employee.role_matrix %}
+                                        <i class="bi bi-briefcase me-1"></i>{{ result.employee.role_matrix.title }}
+                                    {% else %}
+                                        <span class="text-muted">No designation</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="skill-badge level-{{ result.level }}">
+                            <i class="bi bi-star-fill me-1"></i>Level {{ result.level }}/5
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-emoji-frown display-1 text-muted"></i>
+                    <p class="mt-3 text-muted">No one has been rated on "{{ selected_skill.name }}" yet</p>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-search display-1 text-muted"></i>
+            <p class="mt-3 text-muted">Select a skill above to see who has it, ranked highest first</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Confirm Delete - Skill Gap Analyzer{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in" style="max-width: 500px; margin: 3rem auto;">
+    <div class="card">
+        <div class="card-body text-center py-4">
+            <div class="mb-4">
+                <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+            </div>
+            <h4>Confirm Delete</h4>
+            <p class="text-muted mb-4">
+                Are you sure you want to remove <strong>{{ object.skill.name }}</strong> 
+                from the benchmark for <strong>{{ object.role_matrix.title }}</strong>?
+            </p>
+            <p class="text-muted small">
+                This action cannot be undone. Employees in this designation will no longer
+                be assessed on this skill.
+            </p>
+            <form method="post" class="d-flex justify-content-center gap-3">
+                {% csrf_token %}
+                <a href="{% url 'skillgap_designation_benchmark' object.role_matrix.id %}" class="btn btn-secondary">
+                    Cancel
+                </a>
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash me-2"></i>Delete
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

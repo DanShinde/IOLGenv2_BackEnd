@@ -1,0 +1,407 @@
+{% extends 'gap_analysis/base.html' %}
+
+{% block title %}Help & Guide - Skill Gap Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .toc-card {
+        position: sticky;
+        top: 1rem;
+    }
+
+    .toc-card a {
+        display: block;
+        padding: 0.4rem 0.75rem;
+        border-radius: 8px;
+        color: #475569;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .toc-card a:hover {
+        background: #f1f5f9;
+        color: #4f46e5;
+    }
+
+    .help-section {
+        scroll-margin-top: 90px;
+    }
+
+    .feature-card {
+        border-left: 3px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.75rem;
+        background: #f8fafc;
+        border-radius: 0 10px 10px 0;
+    }
+
+    .feature-card h6 {
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+        color: #1e293b;
+    }
+
+    .feature-card p {
+        margin: 0;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+
+    .role-badge {
+        font-size: 0.7rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+        margin-right: 0.35rem;
+    }
+
+    .role-staff { background: rgba(79, 70, 229, 0.12); color: #4f46e5; }
+    .role-manager { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+    .role-everyone { background: rgba(16, 185, 129, 0.12); color: #059669; }
+
+    .accordion-button:not(.collapsed) {
+        background-color: rgba(79, 70, 229, 0.06);
+        color: #4338ca;
+    }
+
+    .accordion-button:focus {
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+
+    .step-list {
+        counter-reset: step;
+        list-style: none;
+        padding-left: 0;
+    }
+
+    .step-list li {
+        counter-increment: step;
+        position: relative;
+        padding: 0.5rem 0 0.5rem 2.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .step-list li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.4rem;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 50%;
+        background: #4f46e5;
+        color: white;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-question-circle me-2 text-primary"></i>Help &amp; Guide
+            </h1>
+            <p class="text-muted mt-1">Everything the Skill Gap Analyzer does, page by page and tab by tab.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Table of contents -->
+        <div class="col-lg-3 mb-4">
+            <div class="card toc-card">
+                <div class="card-header"><i class="bi bi-list-ul me-2"></i>On this page</div>
+                <div class="card-body py-2">
+                    <a href="#roles"><i class="bi bi-shield-lock me-2"></i>Who can do what</a>
+                    <a href="#dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                    <a href="#people"><i class="bi bi-people me-2"></i>People menu</a>
+                    <a href="#skills-menu"><i class="bi bi-award me-2"></i>Skills menu</a>
+                    <a href="#plans-menu"><i class="bi bi-clipboard2-check me-2"></i>Plans menu</a>
+                    <a href="#profile"><i class="bi bi-person-badge me-2"></i>Employee profile</a>
+                    <a href="#self-rating"><i class="bi bi-arrow-left-right me-2"></i>Self vs. manager rating</a>
+                    <a href="#faq"><i class="bi bi-patch-question me-2"></i>Tips &amp; FAQ</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="col-lg-9">
+
+            <!-- Roles -->
+            <section id="roles" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-shield-lock me-2"></i>Who can do what</div>
+                    <div class="card-body">
+                        <p class="text-muted">Every page requires logging in. Beyond that, what you can do depends on your account:</p>
+                        <div class="table-responsive">
+                            <table class="table table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Account type</th>
+                                        <th>Can view</th>
+                                        <th>Can do</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="role-badge role-staff">Staff</span></td>
+                                        <td>Everything</td>
+                                        <td>Everything: create/edit/delete employees, roles, skills, benchmarks, bulk update, approve or override any self-rating, create development plans.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="role-badge role-manager">Manager</span></td>
+                                        <td>Everything</td>
+                                        <td>Approve or override <strong>their own direct reports'</strong> self-ratings and edit their skill levels. Everything else is read-only. See <a href="#self-rating">Self vs. manager rating</a> for how the manager link is set up.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="role-badge role-everyone">Any other user</span></td>
+                                        <td>Everything</td>
+                                        <td>Read-only everywhere, plus submitting their own self-ratings on <a href="#skills-menu">My Skills</a> if their account is linked to an employee record.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-muted small mt-3 mb-0">
+                            "Staff" is the <code>is_staff</code> flag on a Django account (set via <code>createsuperuser</code> or Django admin).
+                            A staff badge next to your name in the top-right of every page confirms it.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dashboard -->
+            <section id="dashboard" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-speedometer2 me-2"></i>Dashboard</div>
+                    <div class="card-body">
+                        <p class="text-muted">The homepage. Organized into four tabs so the one number that matters most loads first.</p>
+
+                        <div class="feature-card">
+                            <h6><i class="bi bi-1-circle me-1"></i>Overview tab</h6>
+                            <p>A large "Org-wide Skills Met %" tile (colored green/amber/red by how healthy it is) next to three supporting numbers: total people tracked, skills tracked, and average gap score. If any employee has a skill gap greater than 2 levels, a red "Critical Gaps" table appears right below, naming who and which skills. Quick Actions at the bottom jump straight to adding an employee, role, or skill record (staff only) or viewing the employee list.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h6><i class="bi bi-2-circle me-1"></i>Charts tab</h6>
+                            <p><strong>Team Overview</strong>: a bar chart comparing the average actual level vs. the average benchmark required level, per skill, across everyone. <strong>Role Analysis</strong>: the same comparison, but filtered to one role at a time — pick a role from the dropdown and click Filter.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h6><i class="bi bi-3-circle me-1"></i>Insights tab</h6>
+                            <p><strong>Role Gap Summary</strong> (average gap per role), <strong>Top Skill Gaps</strong> (employees with the most total gap), <strong>Top Performers</strong> (employees exceeding their benchmarks most often), and <strong>Skills Needing Training</strong> (skills with the highest average gap org-wide).</p>
+                        </div>
+                        <div class="feature-card">
+                            <h6><i class="bi bi-4-circle me-1"></i>Distribution tab</h6>
+                            <p><strong>Benchmark Compliance</strong>: how many employees are fully meeting their benchmarks, partially meeting them, or need training, shown as a stacked bar. <strong>Skill Distribution</strong>: how many skills fall into each category (Technical, Soft Skills, Leadership, etc).</p>
+                        </div>
+                        <p class="text-muted small mb-0">
+                            A skill counts double toward every gap score on this page if it's flagged <strong>Mandatory</strong> on its role benchmark — a missed must-have skill moves the numbers more than a missed nice-to-have.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- People menu -->
+            <section id="people" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-people me-2"></i>People menu</div>
+                    <div class="card-body">
+                        <div class="accordion" id="peopleAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#peopleSkillMatrix">
+                                        <i class="bi bi-people me-2"></i>Skill Matrix (employee list)
+                                    </button>
+                                </h2>
+                                <div id="peopleSkillMatrix" class="accordion-collapse collapse show" data-bs-parent="#peopleAccordion">
+                                    <div class="accordion-body">
+                                        <p>The full list of employees tracked in the system. Filter by designation or status. Each row shows total skills, average gap, skills-met %, and a <strong>Training Req.</strong> button — click it to open a popup listing exactly which skills that person still needs to reach benchmark, instead of cramming them into the row. <span class="role-badge role-staff">Staff</span> can add, edit, or delete employees (including linking them to a login and a manager — see <a href="#self-rating">below</a>); everyone can export the current filtered list to CSV.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#peopleRoleMatrix">
+                                        <i class="bi bi-briefcase me-2"></i>Role Matrix (designations)
+                                    </button>
+                                </h2>
+                                <div id="peopleRoleMatrix" class="accordion-collapse collapse" data-bs-parent="#peopleAccordion">
+                                    <div class="accordion-body">
+                                        <p>The list of job roles/designations. Click a role's "Manage Benchmark" icon to open its required-skills page, where <span class="role-badge role-staff">Staff</span> can add or remove which skills that role requires, at what level (0&ndash;5), and whether each one is <strong>Mandatory</strong> (counts double in gap scoring) or optional.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#peopleBulk">
+                                        <i class="bi bi-collection me-2"></i>Bulk Update <span class="role-badge role-staff ms-1">Staff only</span>
+                                    </button>
+                                </h2>
+                                <div id="peopleBulk" class="accordion-collapse collapse" data-bs-parent="#peopleAccordion">
+                                    <div class="accordion-body">
+                                        <p>Set one skill to one level for many employees at once — useful right after onboarding a whole team. Tick the employees, pick the skill, click the target level (0&ndash;5), submit.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Skills menu -->
+            <section id="skills-menu" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-award me-2"></i>Skills menu</div>
+                    <div class="card-body">
+                        <div class="feature-card">
+                            <h6><i class="bi bi-search me-1"></i>Skill Search &mdash; "Find Experts by Skill"</h6>
+                            <p>Pick any skill from the dropdown to see everyone who's been rated on it, ranked from the highest level down &mdash; the top scorer gets a trophy badge. Useful for finding who to ask for help, or who could mentor others, on a specific skill.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h6><i class="bi bi-person-check me-1"></i>My Skills &mdash; self-service rating</h6>
+                            <p>Your own view of the skills your role requires. Enter how you'd rate yourself (0&ndash;5) per skill; it's saved as <strong>Pending Review</strong> until your manager or staff approves or corrects it. This page only works if your login is linked to an employee record &mdash; see <a href="#self-rating">Self vs. manager rating</a>.</p>
+                        </div>
+                        <div class="feature-card mb-0">
+                            <h6><i class="bi bi-lightning me-1"></i>Manage Skills &amp; Benchmarks <span class="role-badge role-staff ms-1">Staff only</span></h6>
+                            <p>The master list of every skill that exists in the system (name, category, description) and the raw list of every role&ndash;skill benchmark. This is where new skills get created before they can be attached to a role.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Plans menu -->
+            <section id="plans-menu" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-clipboard2-check me-2"></i>Plans menu</div>
+                    <div class="card-body">
+                        <div class="feature-card">
+                            <h6><i class="bi bi-clipboard2-check me-1"></i>Development Plans</h6>
+                            <p>Every gap-closing action recorded across the whole organization, in one filterable list &mdash; who it's for, which skill, the action (e.g. "Complete Django REST course"), an optional resource link, a target date (flagged red if overdue), and status (Not Started / In Progress / Completed / Cancelled). <span class="role-badge role-staff">Staff</span> create, edit, and delete plans, usually from an employee's own profile.</p>
+                        </div>
+                        <div class="feature-card mb-0">
+                            <h6><i class="bi bi-hourglass-split me-1"></i>Pending Reviews</h6>
+                            <p>Every self-rating awaiting a decision. <span class="role-badge role-staff">Staff</span> see every pending rating org-wide; a <span class="role-badge role-manager">Manager</span> sees only their own direct reports'. Click through to the employee's profile to approve or override.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Employee profile -->
+            <section id="profile" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-person-badge me-2"></i>Employee profile</div>
+                    <div class="card-body">
+                        <p class="text-muted">Click any employee's name (from Skill Matrix, Skill Search, or a dashboard table) to open their profile. It has four tabs:</p>
+
+                        <div class="feature-card">
+                            <h6><i class="bi bi-list-ul me-1"></i>Skills Assessment</h6>
+                            <p>One row per required skill: Required level, the employee's Self Rating (with its review-status badge and an Approve button when pending), the official Manager Level (editable inline by <span class="role-badge role-staff">Staff</span> or that person's <span class="role-badge role-manager">Manager</span>), the Gap, and a Met/Warning/Gap status badge. Editing the Manager Level updates the gap and status instantly, without a page reload.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h6><i class="bi bi-bar-chart me-1"></i>Visualization</h6>
+                            <p>A radar chart plotting actual level against required level across every skill at once &mdash; the fastest way to see someone's overall shape: where they're strong (inside the red dashed line) and where they're short (outside it).</p>
+                        </div>
+                        <div class="feature-card">
+                            <h6><i class="bi bi-graph-up me-1"></i>History</h6>
+                            <p>One small trend card per skill, showing every recorded level change over time with the date. A skill only ever rated once shows a single point labeled "First recorded"; a skill with no rating at all yet is labeled "Not yet assessed."</p>
+                        </div>
+                        <div class="feature-card mb-0">
+                            <h6><i class="bi bi-clipboard2-check me-1"></i>Development Plans</h6>
+                            <p>Every action plan created for this specific person. <span class="role-badge role-staff">Staff</span> can add a new one directly from here, pre-scoped to this employee's own required/assessed skills.</p>
+                        </div>
+
+                        <p class="mt-3 mb-0 text-muted">
+                            The <strong>Skill Card</strong> button opens a printable one-page summary of the same data &mdash; handy for a performance review conversation or a PDF export (<em>Print &rarr; Save as PDF</em>).
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Self vs manager rating -->
+            <section id="self-rating" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-arrow-left-right me-2"></i>Self vs. manager rating &mdash; how it fits together</div>
+                    <div class="card-body">
+                        <p class="text-muted">This is the most connected feature in the app, so here's the full loop end to end:</p>
+                        <ol class="step-list">
+                            <li><strong>Link the employee to a login.</strong> <span class="role-badge role-staff">Staff</span> open the employee's Edit page (People &rarr; Skill Matrix &rarr; Edit) and set <em>Linked Login</em> to their Django user account. Without this, that person can't use My Skills at all.</li>
+                            <li><strong>Link the employee to their manager.</strong> On the same Edit page, set the <em>Manager</em> field to the employee's manager &mdash; who must themselves already exist as an employee record with their own Linked Login. This is the step that's easiest to miss, and skipping it is the single most common reason an "Approve" click never seems to complete: without this link, the system can't confirm the person clicking Approve is actually this employee's manager, so the request is silently rejected every time.</li>
+                            <li><strong>Employee submits a self-rating.</strong> They go to Skills &rarr; My Skills, enter a level per skill. It's saved immediately as <span class="badge bg-warning">Pending Review</span>.</li>
+                            <li><strong>Manager or staff reviews it.</strong> Either from Plans &rarr; Pending Reviews, or directly on the employee's profile (Skills Assessment tab), they see the self-rating next to the current official level.</li>
+                            <li><strong>Approve or override.</strong> Clicking <em>Approve</em> accepts the self-rating as-is and copies it into the official Manager Level, marking it <span class="badge bg-success">Approved</span>. Typing a different number directly into the Manager Level field instead marks it <span class="badge bg-secondary">Overridden</span> &mdash; the self-rating stays visible for reference, but the manager's number is what counts toward every gap score.</li>
+                        </ol>
+                        <p class="text-muted small mb-0">
+                            Only the approved/overridden <strong>Manager Level</strong> ever feeds into gap scores, the dashboard, or skill history &mdash; a pending self-rating is informational only until someone acts on it.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FAQ -->
+            <section id="faq" class="help-section mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-patch-question me-2"></i>Tips &amp; FAQ</div>
+                    <div class="card-body">
+                        <div class="accordion" id="faqAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                        I clicked Approve but nothing seems to happen &mdash; why?
+                                    </button>
+                                </h2>
+                                <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        Almost always a missing <strong>Manager</strong> link. Ask staff to open your employee record and confirm the Manager field points to you, and that your own employee record has your login set under Linked Login. See <a href="#self-rating">Self vs. manager rating</a> above.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                        Why is "Avg Gap Score" different from "Skills Met %"?
+                                    </button>
+                                </h2>
+                                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        Skills Met % is a simple count &mdash; what fraction of skills have zero gap. Avg Gap Score is weighted: a missed <strong>Mandatory</strong> skill counts twice as much as a missed optional one, so it can move even when the raw met-percentage doesn't.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                        Can I undo a skill deletion or employee deletion?
+                                    </button>
+                                </h2>
+                                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        No &mdash; every delete confirmation page says so before you commit, and it's final. Deleting an employee also removes their skill records, history, and development plans.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                        Why don't I see any "Add" or "Edit" buttons?
+                                    </button>
+                                </h2>
+                                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                    <div class="accordion-body">
+                                        Creating, editing, and deleting most records is staff-only. If you manage people, you can still edit your own direct reports' skill levels and approve their self-ratings &mdash; everything else is read-only for non-staff accounts by design.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
