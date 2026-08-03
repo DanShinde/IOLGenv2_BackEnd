@@ -97,7 +97,6 @@
         flex: 1 1 auto;
         min-width: 0;
         max-height: 75vh;
-        scroll-behavior: smooth;
         overflow-anchor: none;
         position: relative;
     }
@@ -1067,28 +1066,38 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Select/date/number/checkbox fields commit on 'change' (i.e. once the user finalizes the value).
+        // Select/number/checkbox fields commit on 'change' (i.e. once the user finalizes the value).
+        // Date fields deliberately do NOT commit on 'change' -- see the focusout handler below.
         tableContainerEl.addEventListener('change', (e) => {
             const el = e.target;
             if (!el.classList.contains('inline-edit-input')) return;
-            if (el.tagName === 'SELECT' || el.type === 'date' || el.type === 'number' || el.type === 'checkbox') {
+            if (el.tagName === 'SELECT' || el.type === 'number' || el.type === 'checkbox') {
                 commitInlineEdit(el);
             }
         });
 
-        // Text fields (activity name) commit on blur. 'focusout' bubbles, unlike 'blur'.
+        // Text fields (activity name) and date fields commit on blur, not 'change'. 'focusout'
+        // bubbles, unlike 'blur'. Dates specifically must NOT use 'change': a native date input
+        // is edited segment-by-segment (day/month/year), and when editing an EXISTING date the
+        // other two segments are already pre-filled from the old value -- so typing just a new
+        // day already reads as a "complete" (if wrong) date, and Chromium fires 'change' on
+        // every keystroke within that segment. That fired commitInlineEdit()'s validation
+        // against a half-typed date before the user finished the month/year, throwing a
+        // premature alert() that stole focus mid-entry. Waiting for blur/Enter lets the user
+        // finish typing the whole date first.
         tableContainerEl.addEventListener('focusout', (e) => {
             const el = e.target;
             if (!el.classList.contains('inline-edit-input')) return;
-            if (el.tagName === 'INPUT' && el.type === 'text') {
+            if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'date')) {
                 commitInlineEdit(el);
             }
         });
 
         tableContainerEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.classList.contains('inline-edit-input') && e.target.type === 'text') {
+            const el = e.target;
+            if (e.key === 'Enter' && el.classList.contains('inline-edit-input') && (el.type === 'text' || el.type === 'date')) {
                 e.preventDefault();
-                e.target.blur();
+                el.blur();
             }
         });
 
