@@ -4,11 +4,36 @@
 
 {% block content %}
 <style>
-    .resource-card { transition: box-shadow 0.15s ease, transform 0.15s ease; }
-    .resource-card:hover { box-shadow: 0 8px 20px -6px rgba(0,0,0,0.12); transform: translateY(-1px); }
-    .occ-bar-track { background: #e5e7eb; border-radius: 9999px; height: 6px; overflow: hidden; }
-    .occ-bar-fill { height: 100%; border-radius: 9999px; }
     .task-chip { border-left: 3px solid #cbd5e1; }
+
+    .timeline-strip { display: flex; gap: 2px; padding: 2px 0; }
+    .tcell { width: 9px; height: 20px; border-radius: 2px; background: #eef2f7; flex-shrink: 0; }
+    .tcell.free { background: #a7f3d0; }
+    .tcell.task { background: #6366f1; }
+    .tcell.leave { background: #f59e0b; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 2px, transparent 2px 4px); }
+    .tcell.off { background: transparent; border: 1px dashed #dbe1ea; }
+    .tcell.is-today { box-shadow: 0 0 0 1.5px #4f46e5; }
+    .legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .leave-swatch { background: #f59e0b; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 2px, transparent 2px 4px); }
+
+    .status-badge { display: inline-flex; align-items: center; font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 9999px; white-space: nowrap; }
+    .status-badge.leave { background: #fffbeb; color: #b45309; }
+    .status-badge.occ { background: #fff1f2; color: #be123c; }
+    .status-badge.free { background: #ecfdf5; color: #047857; }
+
+    .rtable { width: 100%; border-collapse: collapse; }
+    .rtable th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 700; padding: 9px 16px; border-bottom: 1px solid #eef0f4; white-space: nowrap; }
+    .rtable td { padding: 9px 16px; border-bottom: 1px solid #f1f3f7; vertical-align: middle; }
+    .rtable tbody tr.rrow { cursor: pointer; }
+    .rtable tbody tr.rrow:hover td { background: #fafbfc; }
+    .rtable tbody tr.detail-row:last-child td, .rtable tbody tr.rrow:last-child td { border-bottom: none; }
+    .sticky-col { position: sticky; left: 0; background: #fff; z-index: 1; }
+    .chevron { transition: transform .15s ease; }
+    .rrow.open .chevron { transform: rotate(90deg); }
+    .detail-row td { background: #fbfbfd; padding: 12px 16px 16px 46px; }
+    .detail-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+    .detail-grid > div { min-width: 180px; }
+    .mono { font-variant-numeric: tabular-nums; }
 </style>
 
 <header class="shadow-xl" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
@@ -93,6 +118,14 @@
             </div>
         </div>
         <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Sort by</label>
+            <select name="sort" class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="all" {% if selected_sort == 'all' %}selected{% endif %}>All</option>
+                <option value="available" {% if selected_sort == 'available' %}selected{% endif %}>Most available first</option>
+                <option value="occupied" {% if selected_sort == 'occupied' %}selected{% endif %}>Most booked first</option>
+            </select>
+        </div>
+        <div>
             <label class="block text-xs font-semibold text-gray-600 mb-1">Show top</label>
             <select name="top_n" class="rounded-md border-gray-300 shadow-sm text-sm border p-2 focus:border-indigo-500 focus:ring-indigo-500">
                 <option value="5" {% if top_n == 5 %}selected{% endif %}>5</option>
@@ -140,150 +173,115 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <!-- Most Available -->
-        <div>
-            <div class="flex items-center mb-3">
-                <svg class="w-5 h-5 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <h2 class="text-lg font-bold text-gray-800">Top Available Resources</h2>
-            </div>
-            <div class="space-y-3">
-                {% for r in most_available %}
-                <div class="resource-card bg-white rounded-xl shadow border border-gray-100 p-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center">
-                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold mr-3 flex-shrink-0">
-                                {{ r.employee.name|first|upper }}
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-gray-900">{{ r.employee.name }}</div>
-                                <div class="text-xs text-gray-500">{{ r.employee.get_designation_display }}</div>
-                            </div>
-                        </div>
-                        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full whitespace-nowrap">{{ r.available_days }} days free</span>
-                    </div>
-                    <div class="occ-bar-track mb-1">
-                        <div class="occ-bar-fill bg-emerald-500" style="width: {{ r.occupancy_pct }}%; background: {% if r.occupancy_pct >= 70 %}#f59e0b{% else %}#10b981{% endif %};"></div>
-                    </div>
-                    <div class="text-[11px] text-gray-500 mb-2">{{ r.occupancy_pct }}% occupied &middot; {{ r.occupied_days }}/{{ total_working_days }} working days</div>
-
-                    {% if r.project_groups or r.leaves %}
-                    <div class="mt-2 space-y-2">
-                        {% for g in r.project_groups %}
-                        <div>
-                            <a href="{% url 'planner_activity_planner' g.project.pk %}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center">
-                                {{ g.project.project_id }}
-                                <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                            </a>
-                            <div class="space-y-1 mt-1">
-                                {% for act in g.tasks %}
-                                <div class="task-chip bg-gray-50 rounded-r-md px-2 py-1">
-                                    <div class="text-xs font-medium text-gray-800 truncate">{{ act.activity_name }}</div>
-                                    <div class="text-[10px] text-gray-500">{{ act.start_date|date:"M j" }}&ndash;{{ act.end_date|date:"M j" }} &middot; {{ act.completion_percentage }}% done</div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endfor %}
-                        {% if r.leaves %}
-                        <div>
-                            <div class="text-xs font-semibold text-amber-700 inline-flex items-center">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                On Leave
-                            </div>
-                            <div class="space-y-1 mt-1">
-                                {% for lv in r.leaves %}
-                                <div class="task-chip bg-amber-50 rounded-r-md px-2 py-1">
-                                    <div class="text-xs font-medium text-amber-800 truncate">{{ lv.reason|default:"Leave" }}</div>
-                                    <div class="text-[10px] text-amber-600">{{ lv.start_date|date:"M j" }}&ndash;{{ lv.end_date|date:"M j" }}</div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% else %}
-                    <div class="text-xs text-gray-400 italic mt-1">No active tasks in this window &mdash; fully free.</div>
-                    {% endif %}
-                </div>
-                {% empty %}
-                <div class="bg-white rounded-xl shadow border border-gray-100 p-6 text-center text-sm text-gray-500">No matching resources.</div>
-                {% endfor %}
+    <div class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 flex-wrap gap-2">
+            <h2 class="text-sm font-bold text-gray-700">
+                {% if selected_sort == 'occupied' %}Most booked resources{% elif selected_sort == 'all' %}All resources{% else %}Most available resources{% endif %}
+                <span class="text-gray-400 font-normal">&middot; click a row for task &amp; leave detail</span>
+            </h2>
+            <div class="flex items-center gap-4 text-[11px] text-gray-500 flex-wrap">
+                <span class="inline-flex items-center gap-1.5"><i class="legend-swatch" style="background:#a7f3d0"></i>Free</span>
+                <span class="inline-flex items-center gap-1.5"><i class="legend-swatch" style="background:#6366f1"></i>Task</span>
+                <span class="inline-flex items-center gap-1.5"><i class="legend-swatch leave-swatch"></i>Leave</span>
+                <span class="inline-flex items-center gap-1.5"><i class="legend-swatch" style="background:transparent;border:1px dashed #cbd5e1"></i>Weekend/holiday</span>
             </div>
         </div>
 
-        <!-- Most Occupied -->
-        <div>
-            <div class="flex items-center mb-3">
-                <svg class="w-5 h-5 text-rose-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <h2 class="text-lg font-bold text-gray-800">Top Occupied Resources</h2>
-            </div>
-            <div class="space-y-3">
-                {% for r in most_occupied %}
-                <div class="resource-card bg-white rounded-xl shadow border border-gray-100 p-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center">
-                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-rose-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold mr-3 flex-shrink-0">
-                                {{ r.employee.name|first|upper }}
-                            </div>
-                            <div>
-                                <div class="text-sm font-semibold text-gray-900">{{ r.employee.name }}</div>
-                                <div class="text-xs text-gray-500">{{ r.employee.get_designation_display }}</div>
-                            </div>
-                        </div>
-                        <span class="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full whitespace-nowrap">{{ r.occupancy_pct }}% booked</span>
-                    </div>
-                    <div class="occ-bar-track mb-1">
-                        <div class="occ-bar-fill" style="width: {{ r.occupancy_pct }}%; background: {% if r.occupancy_pct >= 90 %}#e11d48{% elif r.occupancy_pct >= 70 %}#f59e0b{% else %}#10b981{% endif %};"></div>
-                    </div>
-                    <div class="text-[11px] text-gray-500 mb-2">{{ r.occupied_days }}/{{ total_working_days }} working days &middot; {{ r.available_days }} days free</div>
-
-                    {% if r.project_groups or r.leaves %}
-                    <div class="mt-2 space-y-2">
-                        {% for g in r.project_groups %}
-                        <div>
-                            <a href="{% url 'planner_activity_planner' g.project.pk %}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center">
-                                {{ g.project.project_id }}
-                                <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                            </a>
-                            <div class="space-y-1 mt-1">
-                                {% for act in g.tasks %}
-                                <div class="task-chip bg-gray-50 rounded-r-md px-2 py-1">
-                                    <div class="text-xs font-medium text-gray-800 truncate">{{ act.activity_name }}</div>
-                                    <div class="text-[10px] text-gray-500">{{ act.start_date|date:"M j" }}&ndash;{{ act.end_date|date:"M j" }} &middot; {{ act.completion_percentage }}% done</div>
+        <div class="overflow-x-auto">
+            <table class="rtable">
+                <thead>
+                    <tr>
+                        <th class="sticky-col">Resource</th>
+                        <th>{{ period_start|date:"M j" }} &ndash; {{ period_end|date:"M j, Y" }}</th>
+                        <th>Status</th>
+                        <th>Free days</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in resources_display %}
+                    <tr class="rrow" data-detail="detail-{{ forloop.counter }}">
+                        <td class="sticky-col">
+                            <div class="flex items-center gap-2.5">
+                                <svg class="w-3.5 h-3.5 text-gray-300 chevron flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br {% if r.occupancy_pct >= 70 %}from-rose-400 to-orange-500{% else %}from-emerald-400 to-teal-500{% endif %} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
+                                    {{ r.employee.name|first|upper }}
                                 </div>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-gray-900 truncate">{{ r.employee.name }}</div>
+                                    <div class="text-[11px] text-gray-500 truncate">{{ r.employee.get_designation_display }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="timeline-strip">
+                                {% for day in r.timeline %}
+                                <div class="tcell {{ day.status }}{% if day.is_today %} is-today{% endif %}" title="{{ day.date|date:'D, M j' }} &middot; {% if day.status == 'free' %}Free{% elif day.status == 'task' %}Booked{% elif day.status == 'leave' %}On leave{% else %}Weekend/holiday{% endif %}"></div>
                                 {% endfor %}
                             </div>
-                        </div>
-                        {% endfor %}
-                        {% if r.leaves %}
-                        <div>
-                            <div class="text-xs font-semibold text-amber-700 inline-flex items-center">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                On Leave
-                            </div>
-                            <div class="space-y-1 mt-1">
-                                {% for lv in r.leaves %}
-                                <div class="task-chip bg-amber-50 rounded-r-md px-2 py-1">
-                                    <div class="text-xs font-medium text-amber-800 truncate">{{ lv.reason|default:"Leave" }}</div>
-                                    <div class="text-[10px] text-amber-600">{{ lv.start_date|date:"M j" }}&ndash;{{ lv.end_date|date:"M j" }}</div>
+                        </td>
+                        <td class="whitespace-nowrap">
+                            {% if r.status_badge.kind == 'leave_now' %}
+                            <span class="status-badge leave">On leave &middot; back {{ r.status_badge.back_date|date:"M j" }}</span>
+                            {% elif r.status_badge.kind == 'leave_upcoming' %}
+                            <span class="status-badge leave">Leave {{ r.status_badge.start|date:"M j" }}&ndash;{{ r.status_badge.end|date:"M j" }}</span>
+                            {% elif r.status_badge.kind == 'fully_booked' %}
+                            <span class="status-badge occ">Fully booked</span>
+                            {% elif r.status_badge.kind == 'available' %}
+                            <span class="status-badge free">Available</span>
+                            {% else %}
+                            <span class="status-badge {% if r.occupancy_pct >= 50 %}occ{% else %}free{% endif %}">{{ r.occupancy_pct }}% booked</span>
+                            {% endif %}
+                        </td>
+                        <td class="whitespace-nowrap text-sm font-semibold text-gray-700 mono">{{ r.available_days }}<span class="text-gray-400 font-normal"> / {{ total_working_days }}</span></td>
+                    </tr>
+                    <tr class="detail-row hidden" id="detail-{{ forloop.counter }}">
+                        <td colspan="4">
+                            {% if r.project_groups or r.leaves %}
+                            <div class="detail-grid">
+                                {% for g in r.project_groups %}
+                                <div>
+                                    <a href="{% url 'planner_activity_planner' g.project.pk %}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center">
+                                        {{ g.project.project_id }}
+                                        <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                    </a>
+                                    <div class="space-y-1 mt-1">
+                                        {% for act in g.tasks %}
+                                        <div class="task-chip bg-gray-50 rounded-r-md px-2 py-1">
+                                            <div class="text-xs font-medium text-gray-800 truncate">{{ act.activity_name }}</div>
+                                            <div class="text-[10px] text-gray-500">{{ act.start_date|date:"M j" }}&ndash;{{ act.end_date|date:"M j" }} &middot; {{ act.completion_percentage }}% done</div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
                                 </div>
                                 {% endfor %}
+                                {% if r.leaves %}
+                                <div>
+                                    <div class="text-xs font-semibold text-amber-700 inline-flex items-center">
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        On Leave
+                                    </div>
+                                    <div class="space-y-1 mt-1">
+                                        {% for lv in r.leaves %}
+                                        <div class="task-chip bg-amber-50 rounded-r-md px-2 py-1">
+                                            <div class="text-xs font-medium text-amber-800 truncate">{{ lv.reason|default:"Leave" }}</div>
+                                            <div class="text-[10px] text-amber-600">{{ lv.start_date|date:"M j" }}&ndash;{{ lv.end_date|date:"M j" }}</div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
                             </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% else %}
-                    <div class="text-xs text-gray-400 italic mt-1">No active tasks in this window.</div>
-                    {% endif %}
-                </div>
-                {% empty %}
-                <div class="bg-white rounded-xl shadow border border-gray-100 p-6 text-center text-sm text-gray-500">No matching resources.</div>
-                {% endfor %}
-            </div>
+                            {% else %}
+                            <div class="text-xs text-gray-400 italic">No active tasks or leave in this window &mdash; fully free.</div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-sm text-gray-500 py-8">No matching resources.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-
     </div>
 </div>
 
@@ -301,6 +299,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target !== btn) {
             menu.classList.add('hidden');
         }
+    });
+
+    document.querySelectorAll('.rrow').forEach((row) => {
+        row.addEventListener('click', () => {
+            const detail = document.getElementById(row.dataset.detail);
+            if (!detail) return;
+            const wasHidden = detail.classList.contains('hidden');
+            detail.classList.toggle('hidden');
+            row.classList.toggle('open', wasHidden);
+        });
     });
 });
 </script>

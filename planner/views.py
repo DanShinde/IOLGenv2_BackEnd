@@ -930,22 +930,22 @@ def resource_availability_report_view(request):
     ).select_related('project', 'assignee').order_by('start_date')
 
     activities_by_employee = defaultdict(list)
-    occupied_days_by_employee = defaultdict(set)
+    task_days_by_employee = defaultdict(set)
+    leave_days_by_employee = defaultdict(set)
 
-    def _add_occupied_range(employee_id, range_start, range_end):
-        # Only count the portion that actually falls inside the window, and de-duplicate
-        # days covered by more than one overlapping activity/leave for the same employee.
+    def _mark_days(day_set, range_start, range_end):
+        # Only count the portion that actually falls inside the window.
         seg_start = max(range_start, period_start)
         seg_end = min(range_end, period_end)
         current_date = seg_start
         while current_date <= seg_end:
             if current_date.weekday() < 5 and current_date not in holidays_set:
-                occupied_days_by_employee[employee_id].add(current_date)
+                day_set.add(current_date)
             current_date += timedelta(days=1)
 
     for act in activities:
         activities_by_employee[act.assignee_id].append(act)
-        _add_occupied_range(act.assignee_id, act.start_date, act.end_date)
+        _mark_days(task_days_by_employee[act.assignee_id], act.start_date, act.end_date)
 
     # Approved leave counts as occupied too -- otherwise someone on leave with no assigned
     # task would misleadingly show up as fully available.
@@ -957,11 +957,13 @@ def resource_availability_report_view(request):
     leaves_by_employee = defaultdict(list)
     for leave in leaves:
         leaves_by_employee[leave.employee_id].append(leave)
-        _add_occupied_range(leave.employee_id, leave.start_date, leave.end_date)
+        _mark_days(leave_days_by_employee[leave.employee_id], leave.start_date, leave.end_date)
 
     resources = []
     for emp in employees_qs:
-        occupied_days = len(occupied_days_by_employee.get(emp.id, ()))
+        emp_task_days = task_days_by_employee.get(emp.id, set())
+        emp_leave_days = leave_days_by_employee.get(emp.id, set())
+        occupied_days = len(emp_task_days | emp_leave_days)
         occupancy_pct = round((occupied_days / total_working_days) * 100, 1) if total_working_days else 0
 
         # Group this resource's tasks by project (each project links back to its planner page).
@@ -973,6 +975,37 @@ def resource_availability_report_view(request):
 
         emp_leaves = sorted(leaves_by_employee.get(emp.id, []), key=lambda lv: lv.start_date)
 
+        # Day-by-day strip for the timeline visual. Leave wins visually over a task booked on
+        # the same day -- either way the person isn't available, and leave is the more useful
+        # reason to surface at a glance.
+        timeline = []
+        current_date = period_start
+        while current_date <= period_end:
+            if current_date.weekday() >= 5 or current_date in holidays_set:
+                status = 'off'
+            elif current_date in emp_leave_days:
+                status = 'leave'
+            elif current_date in emp_task_days:
+                status = 'task'
+            else:
+                status = 'free'
+            timeline.append({'date': current_date, 'status': status, 'is_today': current_date == today})
+            current_date += timedelta(days=1)
+
+        # Headline badge: currently-on-leave beats upcoming leave beats a plain occupancy read.
+        current_leave = next((lv for lv in emp_leaves if lv.start_date <= today <= lv.end_date), None)
+        if current_leave:
+            status_badge = {'kind': 'leave_now', 'back_date': current_leave.end_date + timedelta(days=1)}
+        elif emp_leaves:
+            nxt = emp_leaves[0]
+            status_badge = {'kind': 'leave_upcoming', 'start': nxt.start_date, 'end': nxt.end_date}
+        elif occupancy_pct >= 90:
+            status_badge = {'kind': 'fully_booked'}
+        elif occupancy_pct <= 20:
+            status_badge = {'kind': 'available'}
+        else:
+            status_badge = {'kind': 'pct'}
+
         resources.append({
             'employee': emp,
             'occupied_days': occupied_days,
@@ -981,6 +1014,8 @@ def resource_availability_report_view(request):
             'project_groups': list(project_groups.values()),
             'task_count': len(emp_activities),
             'leaves': emp_leaves,
+            'timeline': timeline,
+            'status_badge': status_badge,
         })
 
     # Free-% distribution: how many resources fall into each availability tier, each resource
@@ -1022,12 +1057,21 @@ def resource_availability_report_view(request):
             if selected_bucket['min'] <= (100 - r['occupancy_pct']) <= selected_bucket['max']
         ]
 
-    most_occupied = sorted(display_resources, key=lambda r: (-r['occupancy_pct'], r['employee'].name))[:top_n]
-    most_available = sorted(display_resources, key=lambda r: (r['occupancy_pct'], r['employee'].name))[:top_n]
+    selected_sort = request.GET.get('sort', 'available')
+    if selected_sort not in ('available', 'occupied', 'all'):
+        selected_sort = 'available'
+    if selected_sort == 'occupied':
+        sorted_resources = sorted(display_resources, key=lambda r: (-r['occupancy_pct'], r['employee'].name))
+    elif selected_sort == 'all':
+        sorted_resources = sorted(display_resources, key=lambda r: r['employee'].name)
+    else:
+        sorted_resources = sorted(display_resources, key=lambda r: (r['occupancy_pct'], r['employee'].name))
+    resources_display = sorted_resources[:top_n]
 
     has_active_filters = bool(
         selected_designation or selected_segment_id or selected_assignee_ids
         or selected_free_bucket or use_custom_range or days != 30 or top_n != 10
+        or selected_sort != 'available'
     )
 
     context = {
@@ -1048,8 +1092,8 @@ def resource_availability_report_view(request):
         'selected_segment_id': selected_segment_id,
         'all_assignable_employees': all_assignable_employees,
         'selected_assignee_ids': selected_assignee_ids,
-        'most_available': most_available,
-        'most_occupied': most_occupied,
+        'resources_display': resources_display,
+        'selected_sort': selected_sort,
         'free_buckets': list(free_buckets.values()),
         'selected_bucket': selected_bucket,
         'has_active_filters': has_active_filters,
