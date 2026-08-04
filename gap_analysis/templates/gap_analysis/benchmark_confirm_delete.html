@@ -20,7 +20,7 @@
             </p>
             <form method="post" class="d-flex justify-content-center gap-3">
                 {% csrf_token %}
-                <a href="{% url 'skillgap_designation_benchmark' object.role_matrix.id %}" class="btn btn-secondary">
+                <a href="{{ cancel_url }}" class="btn btn-secondary">
                     Cancel
                 </a>
                 <button type="submit" class="btn btn-danger">

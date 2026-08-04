@@ -24,3 +24,15 @@ class EmployeeSelfOrManagerRequiredMixin:
         if not (user_can_manage_employee(user, obj) or obj.user_id == user.id):
             raise PermissionDenied("You don't have access to this employee's profile.")
         return obj
+
+
+class CancelUrlMixin:
+    """Exposes this view's own success_url as `cancel_url` in the template context, so a
+    Cancel button lands on the same page a successful save would -- both should be the one
+    fixed, content-appropriate destination for this kind of record (e.g. Role Matrix after
+    a Designation), regardless of which page the form happened to be opened from."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cancel_url'] = self.get_success_url()
+        return context

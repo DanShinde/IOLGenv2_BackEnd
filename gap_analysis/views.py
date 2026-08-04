@@ -15,7 +15,7 @@ from .forms import (
     RoleMatrixForm, SkillBenchmarkForm, SkillMatrixForm, EmployeeSkillForm, SkillForm,
     RoleMatrixBenchmarkForm, DevelopmentPlanForm,
 )
-from .mixins import StaffRequiredMixin, EmployeeSelfOrManagerRequiredMixin
+from .mixins import StaffRequiredMixin, EmployeeSelfOrManagerRequiredMixin, CancelUrlMixin
 from .models import (
     RoleMatrix, SkillBenchmark, SkillMatrix, EmployeeSkill, Skill, DevelopmentPlan,
     gap_weight, user_can_manage_employee,
@@ -354,45 +354,55 @@ class SkillMatrixCardView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMixin
         return context
 
 # --- CREATE VIEWS ---
-class RoleMatrixCreateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, CreateView):
+class RoleMatrixCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
     model = RoleMatrix
     form_class = RoleMatrixForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_dashboard')
     success_message = "RoleMatrix created successfully!"
     extra_context = {'title': 'Add RoleMatrix'}
 
-class SkillBenchmarkCreateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, CreateView):
+    def get_success_url(self):
+        return reverse('skillgap_designation_list')
+
+class SkillBenchmarkCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
     model = SkillBenchmark
     form_class = SkillBenchmarkForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_dashboard')
     success_message = "Skill benchmark created successfully!"
     extra_context = {'title': 'Add Skill Benchmark'}
 
-class SkillMatrixCreateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, CreateView):
+    def get_success_url(self):
+        return reverse('skillgap_benchmark_list')
+
+class SkillMatrixCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
     model = SkillMatrix
     form_class = SkillMatrixForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_dashboard')
     success_message = "Skill Matrix created successfully!"
     extra_context = {'title': 'Add Employee'}
 
-class EmployeeSkillCreateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, CreateView):
+    def get_success_url(self):
+        return reverse('skillgap_employee_list')
+
+class EmployeeSkillCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
     model = EmployeeSkill
     form_class = EmployeeSkillForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_dashboard')
     success_message = "Employee skill recorded successfully!"
     extra_context = {'title': 'Add Employee Skill'}
 
-class SkillCreateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, CreateView):
+    def get_success_url(self):
+        return reverse('skillgap_employee_skill_list')
+
+class SkillCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
     model = Skill
     form_class = SkillForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_dashboard')
     success_message = "Skill created successfully!"
     extra_context = {'title': 'Add Skill'}
+
+    def get_success_url(self):
+        return reverse('skillgap_skill_list')
 
 # --- SKILL CRUD VIEWS ---
 class SkillListView(LoginRequiredMixin, ListView):
@@ -402,12 +412,14 @@ class SkillListView(LoginRequiredMixin, ListView):
     ordering = ['name']
     paginate_by = 15
 
-class SkillUpdateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, UpdateView):
+class SkillUpdateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
     model = Skill
     form_class = SkillForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_skill_list')
     success_message = "Skill updated successfully!"
+
+    def get_success_url(self):
+        return reverse('skillgap_skill_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -542,12 +554,14 @@ class BulkSkillUpdateView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
         
         return redirect('bulk_skill_update')
 
-class SkillMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, UpdateView):
+class SkillMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
     model = SkillMatrix
     form_class = SkillMatrixForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_employee_list')
     success_message = "Employee updated successfully!"
+
+    def get_success_url(self):
+        return reverse('skillgap_employee_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -571,12 +585,14 @@ class RoleMatrixListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return super().get_queryset().prefetch_related('benchmarks')
 
-class RoleMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, UpdateView):
+class RoleMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
     model = RoleMatrix
     form_class = RoleMatrixForm
     template_name = 'gap_analysis/add_form.html'
-    success_url = reverse_lazy('skillgap_designation_list')
     success_message = "RoleMatrix updated successfully!"
+
+    def get_success_url(self):
+        return reverse('skillgap_designation_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -596,13 +612,16 @@ class BenchmarkListView(LoginRequiredMixin, ListView):
     context_object_name = 'benchmarks'
     queryset = SkillBenchmark.objects.select_related('role_matrix', 'skill').all()
 
-class BenchmarkDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, DeleteView):
+class BenchmarkDeleteView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, DeleteView):
     model = SkillBenchmark
     template_name = 'gap_analysis/benchmark_confirm_delete.html'
     success_message = "Benchmark deleted successfully!"
 
     def get_success_url(self):
-        return reverse('skillgap_designation_benchmark', kwargs={'pk': self.object.role_matrix.pk})
+        # Only ever linked from the global Benchmark List, not a specific role's page --
+        # this view previously always redirected to skillgap_designation_benchmark, which
+        # made no sense coming from there.
+        return reverse('skillgap_benchmark_list')
 
 class EmployeeSkillListView(LoginRequiredMixin, StaffRequiredMixin, ListView):
     model = EmployeeSkill
@@ -613,7 +632,7 @@ class EmployeeSkillListView(LoginRequiredMixin, StaffRequiredMixin, ListView):
 class EmployeeSkillDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, DeleteView):
     model = EmployeeSkill
     template_name = 'gap_analysis/employee_skill_confirm_delete.html'
-    success_url = reverse_lazy('skillgap_dashboard')
+    success_url = reverse_lazy('skillgap_employee_skill_list')
     success_message = "Employee skill deleted successfully!"
 
 # --- EMPLOYEE PROFILE VIEWS ---
@@ -846,11 +865,11 @@ class RoleMatrixBenchmarkAddView(LoginRequiredMixin, StaffRequiredMixin, Success
         return super().form_valid(form)
 
 
-class RoleMatrixBenchmarkDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, DeleteView):
+class RoleMatrixBenchmarkDeleteView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, DeleteView):
     model = SkillBenchmark
     template_name = 'gap_analysis/benchmark_confirm_delete.html'
     success_message = "Benchmark removed successfully!"
-    
+
     def get_success_url(self):
         return reverse('skillgap_designation_benchmark', kwargs={'pk': self.object.role_matrix.pk})
 
@@ -907,6 +926,8 @@ class DevelopmentPlanUpdateView(LoginRequiredMixin, StaffRequiredMixin, SuccessM
         return context
 
     def get_success_url(self):
+        # Reachable from both the Development Plans list and the employee's own profile --
+        # falls back to the profile (still useful context) when there's no usable referer.
         return reverse('skillgap_employee_profile', kwargs={'pk': self.object.skill_matrix.pk})
 
 
