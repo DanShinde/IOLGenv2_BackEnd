@@ -49,21 +49,40 @@
             flex-direction: column;
         }
         
-        /* Navigation */
-        .navbar-custom {
-            background: #0f172a !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            padding: 0.8rem 2rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
+        /* Navigation: floating toggle button + vertical off-canvas sidebar */
+        .sidebar-toggle-btn {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1045;
+            width: 46px;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0f172a;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            font-size: 1.3rem;
+            transition: var(--transition);
+        }
+        .sidebar-toggle-btn:hover {
+            background: #1b263b;
+            color: #4cc9f0;
         }
 
-        .navbar-custom .navbar-nav, .navbar-custom .container-fluid, .navbar-custom .d-flex {
-            background: transparent !important;
+        .sidebar-offcanvas {
+            background: #0f172a !important;
+            width: 270px;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25);
         }
-        
+
+        .sidebar-offcanvas .offcanvas-header {
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
         .navbar-brand {
             font-weight: 700;
             font-size: 1.5rem;
@@ -71,51 +90,64 @@
             display: flex;
             align-items: center;
         }
-        
-        .nav-item {
-            margin: 0 2px;
+
+        .sidebar-offcanvas .navbar-nav {
+            width: 100%;
         }
-        
+
+        .sidebar-offcanvas .nav-item {
+            margin: 2px 0;
+            width: 100%;
+        }
+
+        .sidebar-offcanvas .nav-link,
+        .sidebar-offcanvas .btn-nav-admin,
+        .sidebar-offcanvas .btn-nav-logout {
+            width: 100%;
+            text-align: left;
+        }
+
         .nav-link {
             color: #94a3b8 !important;
             font-weight: 600;
             font-size: 0.9rem;
-            padding: 0.6rem 1rem !important;
+            padding: 0.7rem 1rem !important;
             border-radius: 8px;
-            transition: color 0.2s ease-in-out, transform 0.2s ease;
+            transition: color 0.2s ease-in-out, background 0.2s ease;
             position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
         }
-        
+
         .nav-link:hover, .nav-link.active {
             color: white !important;
-            background: transparent !important;
-            transform: translateY(-1px);
+            background: rgba(255,255,255,0.06) !important;
         }
 
         .nav-link.active {
-            background: transparent !important;
             color: #4cc9f0 !important;
         }
-        
-        .nav-link.active::after {
+
+        .nav-link.active::before {
             content: '';
             position: absolute;
-            bottom: 5px;
-            left: 1rem;
-            width: 20px;
-            height: 2px;
+            top: 6px;
+            bottom: 6px;
+            left: 0;
+            width: 3px;
             background-color: #4cc9f0;
             border-radius: 2px;
         }
-        
+
         .nav-link i {
             font-size: 1.1rem;
         }
-        
+
         .nav-link:hover i {
             transform: scale(1.2);
         }
-        
+
         .user-dropdown .dropdown-toggle::after {
             display: none;
         }
@@ -206,16 +238,10 @@
         
 
         /* Responsive */
-        @media (max-width: 768px) {
-            .navbar-nav {
-                margin-top: 15px;
+        @media (max-width: 480px) {
+            .sidebar-offcanvas {
+                width: 85vw;
             }
-            
-            .nav-link {
-                margin: 3px 0;
-            }
-            
-
         }
     </style>
 </head>
@@ -237,13 +263,32 @@
         <i class="bi bi-gear-wide-connected" style="font-size: 18rem; top: 40%; left: 40%; opacity: 0.5; animation: float-1 30s infinite alternate;"></i>
     </div>
     
-  {# ========== NAVBAR ========== #}
-  <nav 
-    class="navbar navbar-expand-lg px-4 navbar-custom navbar-dark" 
+  {# ========== FLOATING NAV TOGGLE ========== #}
+  <button
+    class="sidebar-toggle-btn"
+    type="button"
+    data-bs-toggle="offcanvas"
+    data-bs-target="#sidebarNav"
+    aria-controls="sidebarNav"
+    aria-label="Toggle navigation"
   >
-    <div class="container-fluid">
-      <!-- LEFT: Nav Items -->
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0 d-flex flex-row">
+    <i class="bi bi-list"></i>
+  </button>
+
+  {# ========== VERTICAL FLOATING NAVBAR (off-canvas, left) ========== #}
+  <div class="offcanvas offcanvas-start sidebar-offcanvas navbar-dark text-white" tabindex="-1" id="sidebarNav" aria-labelledby="sidebarNavLabel">
+    <div class="offcanvas-header">
+      <a class="navbar-brand" id="sidebarNavLabel" href="{% url 'home' %}">
+        <img
+          src="{% static 'base/ADLogo.png' %}"
+          alt="Logo"
+          style="height: 34px;"
+        >
+      </a>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column">
+      <ul class="navbar-nav flex-column mb-auto">
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
             <i class="bi bi-house-door-fill"></i> Home
@@ -259,7 +304,7 @@
             <i class="bi bi-kanban-fill"></i> Tracker
           </a>
         </li>
-          <li class="nav-item">
+        <li class="nav-item">
           <a class="nav-link {% if 'inventory' in request.path %}active{% endif %}" href="{% url 'inventory-dashboard' %}">
             <i class="bi bi-box-seam-fill"></i> Inventory
           </a>
@@ -279,51 +324,44 @@
             <i class="bi bi-bar-chart-steps"></i> Skill Gap
           </a>
         </li>
-                <li class="nav-item">
+        <li class="nav-item">
+          <a class="nav-link {% if 'testvault' in request.path %}active{% endif %}" href="{% url 'testvault_index' %}">
+            <i class="bi bi-clipboard-check-fill"></i> TestVault
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if 'forum' in request.path %}active{% endif %}" href="{% url 'forum-home' %}">
             <i class="bi bi-lightbulb-fill"></i> Knowledge Base
           </a>
         </li>
       </ul>
 
-
-      <!-- RIGHT: Logo + Logout -->
-      <div class="d-flex align-items-center">
-        <img 
-          src="{% static 'base/ADLogo.png' %}" 
-          alt="Logo" 
-          class="me-3" 
-          style="height: 40px;"
-        >
-
-        <ul class="navbar-nav mb-0 d-flex flex-row align-items-center">
-          {% if user.is_staff %}
-          <li class="nav-item">
-            <a 
-              class="btn ms-2 btn-nav-admin" 
-              href="{% url 'admin:index' %}"
+      <!-- BOTTOM: Admin + Logout -->
+      <ul class="navbar-nav flex-column mt-3 pt-3 border-top border-secondary">
+        {% if user.is_staff %}
+        <li class="nav-item">
+          <a
+            class="btn mb-2 btn-nav-admin"
+            href="{% url 'admin:index' %}"
+          >
+            Admin
+          </a>
+        </li>
+        {% endif %}
+        <li class="nav-item">
+          <form method="post" action="{% url 'logoutw' %}">
+            {% csrf_token %}
+            <button
+              type="submit"
+              class="btn btn-nav-logout"
             >
-              Admin
-            </a>
-          </li>
-          {% endif %}
-          <li class="nav-item">
-            <form method="post" action="{% url 'logoutw' %}">
-              {% csrf_token %}
-              {# Use your .btn-primary here #}
-              <button 
-                type="submit" 
-                class="btn ms-2 btn-nav-logout"
-              >
-                Logout
-              </button>
-            </form>
-          </li>
-        </ul>
-      </div>
-
+              Logout
+            </button>
+          </form>
+        </li>
+      </ul>
     </div>
-  </nav>
+  </div>
 
   {# ========== HEADER ========== #}
   <header>

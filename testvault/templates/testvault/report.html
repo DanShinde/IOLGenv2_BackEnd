@@ -1,0 +1,616 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EFS TestCaseGenerator - Commissioning Report</title>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-app: #0b0f19;
+            --bg-card: #161f30;
+            --bg-input: #0d131f;
+            --border-color: #24324a;
+            --primary-color: #2563eb;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --text-white: #ffffff;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 40px 20px;
+        }
+
+        .report-wrapper {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* Centered Logo block */
+        .logo-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px 0;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .logo-image {
+            height: 80px;
+            width: auto;
+            display: block;
+        }
+
+        /* Project Info grid */
+        .info-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .info-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-white);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 6px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px 40px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 6px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .info-val {
+            font-weight: 500;
+            color: var(--text-main);
+            font-size: 13px;
+            text-align: right;
+        }
+
+        /* Section Tables */
+        .section-block {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .section-header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #38bdf8;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-input);
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        .report-table th {
+            background-color: #0f172a;
+            color: var(--text-white);
+            font-weight: 700;
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .report-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+            white-space: pre-line;
+        }
+
+        .report-table tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.01);
+        }
+
+        .category-header-row {
+            background-color: #1e293b !important;
+        }
+
+        .category-header-cell {
+            font-weight: 700;
+            color: #38bdf8 !important;
+            padding: 8px 10px !important;
+            font-size: 12px;
+        }
+
+        .cell-center {
+            text-align: center;
+        }
+
+        .status-pass {
+            color: var(--success-color);
+            font-weight: 700;
+        }
+
+        .status-fail {
+            color: var(--danger-color);
+            font-weight: 700;
+        }
+
+        .status-pending {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .loading-text {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-muted);
+            padding: 40px;
+        }
+
+        /* ─── Auto Refresh Controls ─────────────────────────────────── */
+        .refresh-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 24px;
+        }
+
+        .refresh-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.3px;
+        }
+
+        .refresh-status {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: auto;
+        }
+
+        .refresh-status .live-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
+            margin-right: 6px;
+            animation: livePulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Toggle switch */
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #334155;
+            border-radius: 24px;
+            transition: background-color 0.25s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.25s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: var(--success-color);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(20px);
+        }
+
+        .btn-refresh {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-refresh:hover {
+            background: #1d4ed8;
+        }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-wrapper">
+        <!-- Logo block -->
+        <header class="logo-header">
+            <img src="{% static 'testvault/assets/company_logo.png' %}" alt="Armstrong Dematic" class="logo-image">
+        </header>
+
+        <!-- Auto Refresh Controls (only visible for live reports) -->
+        <div class="refresh-controls hidden" id="refresh-controls">
+            <div class="refresh-status" id="refresh-status">
+                <span class="live-dot"></span> Live Report
+            </div>
+            <span class="refresh-label">Auto Refresh:</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="auto-refresh-toggle" checked>
+                <span class="toggle-slider"></span>
+            </label>
+            <button class="btn-refresh hidden" id="btn-manual-refresh">Refresh</button>
+        </div>
+
+        <!-- Project Info -->
+        <section class="info-card">
+            <h2 class="info-title">Project Information</h2>
+            <div class="info-grid" id="info-grid-container">
+                <!-- Dynamic values -->
+            </div>
+        </section>
+
+        <!-- Test cases sections block list -->
+        <div id="sections-container">
+            <div class="loading-text" id="loader">Loading report test cases...</div>
+        </div>
+    </div>
+
+    <script>
+        // ─── GLOBALS ─────────────────────────────────────────────────
+        let currentReportId = null;
+        let autoRefreshInterval = null;
+        let currentProject = null;
+
+        async function fetchAPI(endpoint, options = {}) {
+            const res = await fetch(endpoint, options);
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || `HTTP error ${res.status}`);
+            }
+            return res.json();
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            const params = new URLSearchParams(window.location.search);
+
+            // ── Mode 1: Server-side report session (v2.7+) ──
+            const reportId = params.get("id");
+            if (reportId) {
+                currentReportId = reportId;
+                try {
+                    const data = await fetchAPI(`/testvault/api/report/data/${reportId}`);
+                    currentProject = data.project;
+                    renderReport(currentProject);
+
+                    // Show auto-refresh controls
+                    document.getElementById("refresh-controls").classList.remove("hidden");
+                    setupAutoRefresh();
+                } catch (e) {
+                    document.getElementById("sections-container").innerHTML = `<div class="loading-text" style="color: var(--danger-color);">Failed to load report: ${e.message}</div>`;
+                }
+                return;
+            }
+
+            // ── Mode 2: Legacy base64 URL (backward compat) ──
+            const viewData = params.get("view");
+            if (viewData) {
+                try {
+                    const decoded = decodeURIComponent(escape(atob(viewData)));
+                    const project = JSON.parse(decoded);
+                    if (!project || !project.info || !project.sections) {
+                        throw new Error("Invalid project structure");
+                    }
+                    currentProject = project;
+                    renderReport(project);
+                } catch (e) {
+                    document.getElementById("sections-container").innerHTML = `<div class="loading-text" style="color: var(--danger-color);">Failed to load report: ${e.message}</div>`;
+                }
+                return;
+            }
+
+            // ── No data ──
+            document.getElementById("sections-container").innerHTML = '<div class="loading-text" style="color: var(--danger-color);">Error: No report data found in the link URL.</div>';
+        });
+
+        // ─── AUTO REFRESH ────────────────────────────────────────────
+        function setupAutoRefresh() {
+            const toggle = document.getElementById("auto-refresh-toggle");
+            const manualBtn = document.getElementById("btn-manual-refresh");
+
+            toggle.addEventListener("change", () => {
+                if (toggle.checked) {
+                    startAutoRefresh();
+                    manualBtn.classList.add("hidden");
+                } else {
+                    stopAutoRefresh();
+                    manualBtn.classList.remove("hidden");
+                }
+            });
+
+            manualBtn.addEventListener("click", () => {
+                refreshReport();
+            });
+
+            // Start auto-refresh (default: ON)
+            startAutoRefresh();
+        }
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            autoRefreshInterval = setInterval(refreshReport, 5000);
+            const statusEl = document.getElementById("refresh-status");
+            statusEl.innerHTML = '<span class="live-dot"></span> Live Report — Auto refreshing every 5s';
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            const statusEl = document.getElementById("refresh-status");
+            statusEl.innerHTML = '<span class="live-dot" style="background: var(--warning-color);"></span> Live Report — Paused';
+        }
+
+        async function refreshReport() {
+            if (!currentReportId) return;
+            try {
+                const scrollY = window.scrollY;
+                const data = await fetchAPI(`/testvault/api/report/data/${currentReportId}`);
+                currentProject = data.project;
+                await renderReport(currentProject);
+                window.scrollTo({ top: scrollY, behavior: "instant" });
+            } catch (e) {
+                console.warn("Auto-refresh failed:", e);
+            }
+        }
+
+        // ─── RENDER REPORT ───────────────────────────────────────────
+        async function renderReport(project) {
+            if (!project || !project.info || !project.sections) {
+                document.getElementById("sections-container").innerHTML = '<div class="loading-text" style="color: var(--danger-color);">Invalid project data.</div>';
+                return;
+            }
+
+            // Populate Project Information
+            populateProjectInfo(project.info);
+
+            // Load sections test cases
+            const container = document.getElementById("sections-container");
+            container.innerHTML = "";
+
+            for (const section of project.sections) {
+                const hasSelectedGroups = section.selected_groups && section.selected_groups.length > 0;
+                const isCustomWithTestCases = (section.section_type !== "conveyor" && section.section_type !== "vrc") && (section.project_only_test_cases && section.project_only_test_cases.length > 0);
+                if (!hasSelectedGroups && !isCustomWithTestCases) {
+                    continue;
+                }
+
+                // Fetch generated test cases from backend
+                const res = await fetchAPI("/testvault/api/generate-test-cases", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(section)
+                });
+                
+                const testCases = res.test_cases || [];
+                if (testCases.length === 0) continue;
+
+                // Create Section block
+                const block = document.createElement("section");
+                block.className = "section-block";
+
+                const title = document.createElement("h2");
+                title.className = "section-header-title";
+                const typeTag = section.section_type === "conveyor" ? "CONVEYOR" : (section.section_type === "vrc" ? "VRC" : section.section_type.toUpperCase());
+                title.textContent = `${section.name} (${typeTag})`;
+                block.appendChild(title);
+
+                const tableContainer = document.createElement("div");
+                tableContainer.className = "table-container";
+
+                const table = document.createElement("table");
+                table.className = "report-table";
+
+                const thead = document.createElement("thead");
+                thead.innerHTML = `
+                    <tr>
+                        <th style="width: 60px;" class="cell-center">Sr. No.</th>
+                        <th style="width: 240px;">Test Case Name</th>
+                        <th style="width: 160px;">Prerequisites</th>
+                        <th style="width: 180px;">Action / Procedure</th>
+                        <th style="width: 180px;">Expected Result</th>
+                        <th style="width: 80px;" class="cell-center">Result</th>
+                        <th style="width: 160px;">Observation</th>
+                    </tr>
+                `;
+                table.appendChild(thead);
+
+                const tbody = document.createElement("tbody");
+                
+                let currentCategory = null;
+                testCases.forEach(tc => {
+                    // Category Divider Row
+                    if (tc.category !== currentCategory) {
+                        currentCategory = tc.category;
+                        const divTr = document.createElement("tr");
+                        divTr.className = "category-header-row";
+                        divTr.innerHTML = `
+                            <td colspan="7" class="category-header-cell">${currentCategory}</td>
+                        `;
+                        tbody.appendChild(divTr);
+                    }
+
+                    const tr = document.createElement("tr");
+                    
+                    const tdSr = document.createElement("td");
+                    tdSr.className = "cell-center";
+                    tdSr.textContent = tc.sr_no;
+                    tr.appendChild(tdSr);
+
+                    const tdName = document.createElement("td");
+                    tdName.style.fontWeight = "500";
+                    tdName.textContent = tc.test_case_name;
+                    tr.appendChild(tdName);
+
+                    const tdPre = document.createElement("td");
+                    tdPre.textContent = tc.pre_required_state || "-";
+                    tr.appendChild(tdPre);
+
+                    const tdAct = document.createElement("td");
+                    tdAct.textContent = tc.action || "-";
+                    tr.appendChild(tdAct);
+
+                    const tdExp = document.createElement("td");
+                    tdExp.textContent = tc.expected_result || "-";
+                    tr.appendChild(tdExp);
+
+                    const tdRes = document.createElement("td");
+                    tdRes.className = "cell-center";
+                    const result = section.results[tc.test_case_name] || "Pending";
+                    tdRes.textContent = result;
+                    if (result === "Pass") tdRes.className += " status-pass";
+                    else if (result === "Fail") tdRes.className += " status-fail";
+                    else tdRes.className += " status-pending";
+                    tr.appendChild(tdRes);
+
+                    const tdObs = document.createElement("td");
+                    tdObs.textContent = section.observations[tc.test_case_name] || "-";
+                    tr.appendChild(tdObs);
+
+                    tbody.appendChild(tr);
+                });
+
+                table.appendChild(tbody);
+                tableContainer.appendChild(table);
+                block.appendChild(tableContainer);
+                container.appendChild(block);
+            }
+
+            if (container.children.length === 0) {
+                container.innerHTML = '<div class="loading-text">No active test cases to display in this report.</div>';
+            }
+        }
+
+        function populateProjectInfo(info) {
+            const container = document.getElementById("info-grid-container");
+            
+            let validatorVal = "";
+            if (info.validator_type === "Self") {
+                validatorVal = `Self - ${info.done_by}`;
+            } else {
+                validatorVal = `${info.validator_type} - ${info.validator_name || ''}`;
+            }
+
+            container.innerHTML = `
+                <div class="info-row">
+                    <span class="info-label">Project Code / Title:</span>
+                    <span class="info-val">${info.project_code || '-'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Date of Validation:</span>
+                    <span class="info-val">${info.date_of_validation || '-'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Customer Name:</span>
+                    <span class="info-val">${info.customer_name || '-'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Validator:</span>
+                    <span class="info-val">${validatorVal}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Test Cases Prepared By:</span>
+                    <span class="info-val">${info.done_by || '-'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Testing Phase:</span>
+                    <span class="info-val">${info.testing_phase || '-'}</span>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

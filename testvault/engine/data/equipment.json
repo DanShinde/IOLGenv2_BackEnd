@@ -1,0 +1,37 @@
+{
+  "categories": [
+    {
+      "name": "Conveyor Systems",
+      "equipment": [
+        { "id": "conv_vrc", "label": "Conveyors - VRC" },
+        { "id": "vrc_conv", "label": "VRC - Conveyors" },
+        { "id": "cross_2", "label": "2 Stand Cross Transfer" },
+        { "id": "cross_3", "label": "3 Stand Cross Transfer" },
+        { "id": "buffer_conv", "label": "Buffer Conveyor" },
+        { "id": "conv_4d", "label": "Conveyor - 4D" },
+        { "id": "4d_conv", "label": "4D - Conveyor" },
+        { "id": "vrc_4d", "label": "VRC - 4D" },
+        { "id": "4d_vrc", "label": "4D - VRC" },
+        { "id": "turntable", "label": "Turntable" }
+      ]
+    },
+    {
+      "name": "Safety",
+      "equipment": [
+        { "id": "safety_door", "label": "Safety Door" },
+        { "id": "estop", "label": "Emergency Stop" },
+        { "id": "light_curtain", "label": "Light Curtain" },
+        { "id": "safety_scanner", "label": "Safety Scanner" }
+      ]
+    },
+    {
+      "name": "Interfaces",
+      "equipment": [
+        { "id": "wcs_interface", "label": "WCS Interface" },
+        { "id": "plc_interface", "label": "PLC Interface" },
+        { "id": "hmi_interface", "label": "HMI Interface" },
+        { "id": "it_handshake", "label": "IT Handshake" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,497 @@
+{
+  "categories": [
+    {
+      "category_number": 1,
+      "groups": [
+        {
+          "id": "conv_si",
+          "label": "Conveyors_SI",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "1. Press any E-Stop button of respective CP or OP.",
+              "expected_result": "1. Conveyors of particular zone will not start.\n2. Emergency stop alarm will be displayed on HMI/SCADA\n3. Emergency stop symbol will be popped up at respective location on HMI/SCADA.\n4. Red colour tower lamp and reset push button lamps will be turn ON (flashing).\n5. Hooter will be ON.",
+              "name": "Start Abort - ESTOP Test",
+              "pre_required_state": "Control panel Main Power Isolator ON"
+            },
+            {
+              "action": "1. Do not clear the fault and press reset button from control Panel/HMI/SCADA and Operating panel of respective zone",
+              "expected_result": "1. Fault will not disappear from the alarm list of HMI/SCADA\n2. Conveyor layout on HMI/SCADA will be red\n3. Red colour tower lamp and reset push button lamp will be solid\n4. Hooter will be OFF",
+              "name": "Fault Acknowledgement Test",
+              "pre_required_state": "1. Any Fault on HMI/SCADA\n2. Red colour tower lamp for particular zone and reset push button lamp of Control Panel should be ON (Flashing)\n3. Hooter of control panel should be ON"
+            },
+            {
+              "action": "Clear the fault and press reset button from control Panel, /HMI/SCADA and operating panel of respective zone",
+              "expected_result": "1. Fault will disappear from the alarm list on HMI/SCADA\n2. Conveyor layout on HMI/SCADA will be Green/ Grey [Depends on conveyor state running or stopped]\n3. Red colour tower lamp and reset push button lamp will be OFF\n4. Green colour tower lamp and start push button will be ON",
+              "name": "Fault Reset Test",
+              "pre_required_state": "1. Any Fault on HMI/SCADA\n2. Red colour tower lamp and reset push button lamp of control panel should be ON"
+            },
+            {
+              "action": "Press start PB from Control Panel or HMI/SCADA",
+              "expected_result": "1. Hooter will On for 10 sec (System Start warning for operator)\n2. System will start after warning and hooter is off\n3. Green tower lamp and start PB lamps will be ON (solid)\n4. Conveyor will be running",
+              "name": "System Start Test",
+              "pre_required_state": "1. System in stop mode\n2. Green tower lamp and start PB lamps should be flashing"
+            },
+            {
+              "action": "Press the system cycle Stop push button from Control panel/HMI/SCADA",
+              "expected_result": "1. Respective Conveyor zone will be stopped\n2. System stop PB will be ON indicating system is stopped\n3. Associated conveyors will be Light Green on HMI/SCADA screens\n4. Green tower lamp and start PB lamp will be on (Flashing) if system is healthy",
+              "name": "System Cycle Stop Test",
+              "pre_required_state": "System Running"
+            },
+            {
+              "action": "Create Phase loss of incoming power supply or create fault by pressing test button on PFR",
+              "expected_result": "1. Control Panel safety relay operate and cut off AC power supply of main control panel\n2. All drives power supply cut off\n3. Phase failure fault alarm will be displayed on HMI/SCADA\n4. Red colour tower lamp and reset push button lamps will be turned ON (flashing)\n5. Hooter will be ON",
+              "name": "PFR Fault (Phase Failure Relay)",
+              "pre_required_state": "Control panel Mains Power Isolator ON"
+            },
+            {
+              "action": "Create safety relay fault by pressing control panel EMG stop or removing Safety relay Inputs",
+              "expected_result": "1. Control Panel safety relay operate and cut off AC power supply of main control panel\n2. All drives power supply cut off\n3. Safety relay fault alarm will be displayed on HMI/SCADA\n4. Red colour tower lamp and reset push button lamps will be turned ON (flashing)\n5. Hooter will be ON",
+              "name": "SR Fault (Safety Relay)",
+              "pre_required_state": "Control panel Mains Power Isolator ON"
+            },
+            {
+              "action": "Create earth leakage relay fault by pressing test button on ELR",
+              "expected_result": "1. Control Panel main contactor get's trip and cut off power supply of main control panel\n2. Earth leakage power supply cut off\n3. Earth leakage relay fault alarm will be displayed on HMI/SCADA\n4. Red colour tower lamp and reset push button lamps will be turned ON (flashing)",
+              "name": "ELR Fault (Earth Leakage Relay)",
+              "pre_required_state": "Control panel Mains Power Isolator ON"
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "safety",
+      "name": "Safety Interlock & Start / Stop Test"
+    },
+    {
+      "category_number": 2,
+      "groups": [
+        {
+          "id": "infeed_conv",
+          "label": "Infeed Conveyors",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "1. Send multiple pallets from infeed point\n2. Observe cascading/sequencing behavior of conveyors",
+              "expected_result": "1. Pallets move through conveyor chain in correct sequence\n2. Downstream conveyor starts before pallet arrives from upstream\n3. No collision between pallets\n4. Each conveyor waits for downstream clear signal before transferring",
+              "name": "Cascading Logic Test",
+              "pre_required_state": "1. System running in Auto mode\n2. All conveyors healthy\n3. No active alarms"
+            },
+            {
+              "action": "1. Block/trigger the exit sensor while receiving pallet from upstream conveyor",
+              "expected_result": "1. Hooter will be ON\n2. Red tower lamp and reset PB lamp of associated zone will be ON (Flashing)\n3. Exit sensor fault alarm displayed on HMI/SCADA\n4. Conveyor will stop\n5. Upstream conveyor will stop transferring",
+              "name": "Exit Sensor Fault (Receiving)",
+              "pre_required_state": "1. System running in Auto mode\n2. Conveyor healthy\n3. Pallet being received from upstream"
+            },
+            {
+              "action": "1. Block/trigger the exit sensor while transferring pallet to downstream conveyor",
+              "expected_result": "1. Hooter will be ON\n2. Red tower lamp and reset PB lamp of associated zone will be ON (Flashing)\n3. Exit sensor fault alarm displayed on HMI/SCADA\n4. Conveyor will stop\n5. Transfer operation will be halted",
+              "name": "Exit Sensor Fault (Transferring)",
+              "pre_required_state": "1. System running in Auto mode\n2. Conveyor healthy\n3. Pallet being transferred to downstream"
+            },
+            {
+              "action": "1. Place single pallet at infeed entry point\n2. Observe indexing behavior",
+              "expected_result": "1. Pallet is indexed to correct position on infeed conveyor\n2. Conveyor stops at indexed position\n3. Pallet data is registered in system\n4. Conveyor ready for next operation",
+              "name": "Infeed Conv Logic (Pallet Indexing) Single Indexing",
+              "pre_required_state": "1. System running in Auto mode\n2. Infeed conveyor ready\n3. Single pallet at infeed point"
+            },
+            {
+              "action": "1. Place multiple pallets at infeed entry point\n2. Observe sequential indexing behavior",
+              "expected_result": "1. Pallets are indexed one by one in correct sequence\n2. Each pallet stops at correct indexed position\n3. No collision between consecutive pallets\n4. System maintains correct pallet count and tracking",
+              "name": "Infeed Conv Logic (Pallet Indexing)",
+              "pre_required_state": "1. System running in Auto mode\n2. Infeed conveyor ready\n3. Multiple pallets queued at infeed"
+            },
+            {
+              "action": "1. Trigger release command from WCS/system\n2. Observe pallet release behavior",
+              "expected_result": "1. Pallet is released from infeed position\n2. Pallet transfers to downstream conveyor smoothly\n3. Infeed position becomes available for next pallet\n4. Pallet tracking data transfers correctly",
+              "name": "Infeed Conv Logic (Pallet Releasing)",
+              "pre_required_state": "1. System running in Auto mode\n2. Pallet indexed on infeed conveyor\n3. Downstream conveyor ready to receive"
+            },
+            {
+              "action": "1. Observe pallet as it approaches alignment sensors\n2. Verify slow speed operation near sensors",
+              "expected_result": "1. Conveyor reduces to slow speed near alignment sensors\n2. Pallet aligns correctly at target position\n3. Conveyor stops accurately at sensor position\n4. No overshoot beyond sensor",
+              "name": "Pallet Alignment on Slow Speed",
+              "pre_required_state": "1. System running in Auto mode\n2. Conveyor set to slow speed for alignment\n3. Pallet approaching alignment position"
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Throughput Test",
+              "pre_required_state": ""
+            }
+          ],
+          "ui_type": "checkbox"
+        },
+        {
+          "id": "outfeed_conv",
+          "label": "Outfeed Conveyors",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "1. Send multiple pallets from infeed point\n2. Observe cascading/sequencing behavior of conveyors",
+              "expected_result": "1. Pallets move through conveyor chain in correct sequence\n2. Downstream conveyor starts before pallet arrives from upstream\n3. No collision between pallets\n4. Each conveyor waits for downstream clear signal before transferring",
+              "name": "Cascading Logic Test",
+              "pre_required_state": "1. System running in Auto mode\n2. All conveyors healthy\n3. No active alarms"
+            },
+            {
+              "action": "1. Block/trigger the exit sensor while receiving pallet from upstream conveyor",
+              "expected_result": "1. Hooter will be ON\n2. Red tower lamp and reset PB lamp of associated zone will be ON (Flashing)\n3. Exit sensor fault alarm displayed on HMI/SCADA\n4. Conveyor will stop\n5. Upstream conveyor will stop transferring",
+              "name": "Exit Sensor Fault (Receiving)",
+              "pre_required_state": "1. System running in Auto mode\n2. Conveyor healthy\n3. Pallet being received from upstream"
+            },
+            {
+              "action": "1. Block/trigger the exit sensor while transferring pallet to downstream conveyor",
+              "expected_result": "1. Hooter will be ON\n2. Red tower lamp and reset PB lamp of associated zone will be ON (Flashing)\n3. Exit sensor fault alarm displayed on HMI/SCADA\n4. Conveyor will stop\n5. Transfer operation will be halted",
+              "name": "Exit Sensor Fault (Transferring)",
+              "pre_required_state": "1. System running in Auto mode\n2. Conveyor healthy\n3. Pallet being transferred to downstream"
+            },
+            {
+              "action": "Load one pallet on loading conveyor",
+              "expected_result": "Load one pallet on loading conveyor and HPT removed from conveyor then  pallet will move to next conveyor.",
+              "name": "Outfeed Conv Logic (Pallet Indexing) Single Indexing",
+              "pre_required_state": "1. System is Healthy and Running\n2. Loading (Infeed) conv loading lamp ON ( green)."
+            },
+            {
+              "action": "1. Load one pallet on the loading conveyor and let it move to next conveyor.\n2. After then conveyor loading lamp is green, load 2nd pallet on the loading conveyor.",
+              "expected_result": "1. Loading conveyor will transfer the first pallet to next conveyor.\n2. Once 1st pallet moved to at exit pos, then loading pos will be free and then operator will load 2nd pallet.\n3. Once next conv is free then 1st pallet will move to next conveyor and 2nd pallet will move/stop to Exit pos.",
+              "name": "Outfeed Conv Logic (Pallet Indexing)",
+              "pre_required_state": "1. System is Healthy and Running\n2. Loading (Infeed) conveyor loading lamp ON ( green).\n3. Next conveyor is busy."
+            },
+            {
+              "action": "Pallet reached on conveyor's exit pos.",
+              "expected_result": "1. Once downstream conveyor is empty then pallet will transfer on downstream conveyor\n2. After transferring the pallets to the next conveyor it's ready for next pallet",
+              "name": "Outfeed Conv Logic (Pallet Releasing)",
+              "pre_required_state": "1. System is Healthy and Running\n2. Downstream conveyor is empty"
+            },
+            {
+              "action": "1. Observe pallet as it approaches alignment sensors\n2. Verify slow speed operation near sensors",
+              "expected_result": "1. Conveyor reduces to slow speed near alignment sensors\n2. Pallet aligns correctly at target position\n3. Conveyor stops accurately at sensor position\n4. No overshoot beyond sensor",
+              "name": "Pallet Alignment on Slow Speed",
+              "pre_required_state": "1. System running in Auto mode\n2. Conveyor set to slow speed for alignment\n3. Pallet approaching alignment position"
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Throughput Test",
+              "pre_required_state": ""
+            }
+          ],
+          "ui_type": "checkbox"
+        },
+        {
+          "id": "cross_2",
+          "label": "2 Stand Cross Transfer",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "Transfer pallet towards cross transfer.",
+              "expected_result": "1. 2 stand roller conv will run fwd to receive pallet.\n2. Roller will slow down based on timer\n3. Pallet will overtravel at Limit switch sensor for __sec for perfect alignment.\n4. Lifter will go up till up proxy sensor is triggered.\n5. Pallet will move on centaury conveyor and exit the corss transfer.",
+              "name": "2 Stand Cross Transfer Testing for Changing Direction with Lifter DOWN",
+              "pre_required_state": "1. System is Healthy and Running\n2. Cross transfer is free\n3. Lifter is at DOWN position"
+            },
+            {
+              "action": "Transfer pallet towards cross transfer.",
+              "expected_result": "1. If Lifter up proxy sensor is triggered then lifter goes down and down proxy sensor will be triggered\n2. 2 stand roller conv will run fwd to receive pallet.\n3. Roller will slow down based on timer\n4. Pallet will overtravel at Limit switch sensor for __sec for perfect alignment.\n5. Lifter will go up till up proxy sensor is triggered.\n6. Pallet will move on centaury conveyor and exit the corss transfer.",
+              "name": "2 Stand Cross Transfer Testing for Changing Direction with Lifter UP",
+              "pre_required_state": "1. System is Healthy and Running\n2. Cross transfer is free\n3. Lifter is at UP position"
+            }
+          ],
+          "ui_type": "dropdown"
+        },
+        {
+          "id": "cross_3",
+          "label": "3 Stand Cross Transfer",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "Transfer pallet towards cross transfer.",
+              "expected_result": "1. 3-stand roller conv will run fwd to receive pallet from downstream conveyor\n2. Roller will slow down based on timer\n3. Pallet will perfectly align on the corss transfer. [If not then adjust the sensors position]\n4. Lifter will go up till up proxy sensor is triggered.\n5. Pallet will move on centaury conveyor and exit the corss transfer.",
+              "name": "3 Stand Cross Transfer Testing for Changing Direction with Lifter DOWN",
+              "pre_required_state": "1. System is Healthy and Running\n2. Cross transfer is free\n3. Lifter is at DOWN position"
+            },
+            {
+              "action": "Transfer pallet towards cross transfer.",
+              "expected_result": "1. 3-stand roller conv will run fwd to receive pallet from downstream conveyor\n2. Roller will keep running to transfer the pallet.\n3. Lifter won't come up.\n4. Pallet will move on next conveyor and exit the corss transfer.",
+              "name": "3 Stand Cross Transfer Testing for Transferring the Pallet Ahead with Lifter DOWN",
+              "pre_required_state": "1. System is Healthy and Running\n2. Cross transfer is free\n3. Lifter is at DOWN position"
+            },
+            {
+              "action": "Transfer pallet towards cross transfer.",
+              "expected_result": "1. If Lifter up proxy sensor is triggered then lifter goes down and down proxy sensor will be triggered\n2. 3 stand roller conv will run fwd to receive pallet.\n3. Roller will slow down based on timer\n4. Pallet will overtravel at Limit switch sensor for __sec for perfect alignment.\n5. Lifter will go up till up proxy sensor is triggered.\n6. Pallet will move on centaury conveyor and exit the corss transfer.",
+              "name": "3 Stand Cross Transfer Testing for Changing Direction with Lifter UP",
+              "pre_required_state": "1. System is Healthy and Running\n2. Cross transfer is free\n3. Lifter is at UP position"
+            },
+            {
+              "action": "Transfer pallet towards cross transfer.",
+              "expected_result": "1. If Lifter up proxy sensor is triggered then lifter goes down and down proxy sensor will be triggered\n2. 3-stand centaury conv will run fwd to receive pallet from downstream conveyor\n3. Centaury will keep running to transfer the pallet.\n4. Lifter won't come up.\n5. Pallet will move on net conveyor and exit the corss transfer.",
+              "name": "3 Stand Cross Transfer Testing for Transferring the Pallet Ahead with Lifter UP",
+              "pre_required_state": "1. System is Healthy and Running\n2. Cross transfer is free\n3. Lifter is at UP position"
+            }
+          ],
+          "ui_type": "dropdown"
+        },
+        {
+          "id": "walkover",
+          "label": "Walkover",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "Press Walkover enable button from OP or sense Walkover sensor",
+              "expected_result": "1. Conv will stop immediately\n2. Walkover enable PB lamp will flashing\n3. Walkover flashing symbol shown in HMI/SCADA\n4. Conv will start again after pressing crossover Start PB from OP for disable walkover function.",
+              "name": "Walkover Conveyor",
+              "pre_required_state": "1. System is Healthy and Running\n2. Walkover conv healthy"
+            }
+          ],
+          "ui_type": "checkbox"
+        },
+        {
+          "id": "4d_ops",
+          "label": "4D",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "4D to Conveyor Transfer",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Conveyor to 4D Transfer",
+              "pre_required_state": ""
+            }
+          ],
+          "ui_type": "dropdown"
+        }
+      ],
+      "id": "conv_operation",
+      "name": "Conveyor Operation"
+    },
+    {
+      "category_number": 3,
+      "groups": [
+        {
+          "id": "manual_conv",
+          "label": "Conveyor",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "1. Open Control screen\n2. Select particular conveyor in Conveyor Motor Manual Control\n3. Press manual [JOG] mode ON button",
+              "expected_result": "1. All conveyor goes into manual [JOG] mode on overview screen\n2. Conveyor layout on HMI/SCADA will turn Yellow\n3. Amber colour tower lamp will be glow solid\n4. All conveyor zone will stop",
+              "name": "Manual Mode Enable",
+              "pre_required_state": "System running in auto mode or system is stopped."
+            },
+            {
+              "action": "1. Open Control screen\n2. Select particular conveyor in Conveyor Motor Manual [JOG] Control\n3. Press motor start/stop button",
+              "expected_result": "1. Conveyor starts in forward direction on start\n2. Conveyor layout on HMI/SCADA will turn green when running\n3. Conveyor will stop on stop command\n4. Conveyor layout on HMI/SCADA will turn Yellow when stopped",
+              "name": "Conveyor Start-Stop in Manual Mode",
+              "pre_required_state": "System maintenance mode ON"
+            },
+            {
+              "action": "1. Open Control screen\n2. Select particular conveyor in Conveyor Motor Manual [JOG] Control\n3. Press motor start button\n4. After pallet reached at Exit sensor Disable Manual Mode On button and press auto start",
+              "expected_result": "1. Conveyor will start in fwd direction in fast or slow speed as per selection from HMI/SCADA\n2. Conveyor layout on HMI/SCADA will turn Green\n3. Amber tower lamp will glow solid\n4. After pallet reached to exit sensor, switch to auto mode.\n5. Hooter will be ON to indicate mode transition warning.\n6. Amber tower lamp will be OFF.\n7. Pallet will transfer to next conveyor as per auto mode cases.",
+              "name": "Conveyor Start in Manual Mode and Pallet Transfer to Next Conveyor Exit Sensor",
+              "pre_required_state": "1. System maintenance mode ON\n2. Pallet present on conveyor"
+            },
+            {
+              "action": "1. Open Control screen\n2. Press Manual mode ON button on HMI for disable Manual Mode\n3. Press Start button for system start in auto mode",
+              "expected_result": "1. Hooter will be ON to indicate mode transition warning\n2. Amber tower lamp will be OFF.\n3. Auto mode ON status shown on HMI main screen and green tower lamp glow solid",
+              "name": "Manual Mode to Auto Mode Transition",
+              "pre_required_state": "System maintenance mode ON"
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "manual_mode",
+      "name": "Manual (Maintenance) Mode Test"
+    },
+    {
+      "category_number": 5,
+      "groups": [
+        {
+          "id": "faults_conv",
+          "label": "Conveyor",
+          "section_type": "conveyor",
+          "test_cases": [
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "ESTOP/Safety Relay Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Drive/MPCB/Isolator Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Contactor ON Feedback Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Start Transfer PE Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "End Transfer PE Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Position Unoccupied PE Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Pallet Transfer Run Time Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Communication Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "Data Tracking Fault",
+              "pre_required_state": ""
+            },
+            {
+              "action": "",
+              "expected_result": "",
+              "name": "WCS Communication Disconnected",
+              "pre_required_state": ""
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "faults_alarms",
+      "name": "Faults And Alarms Test"
+    },
+    {
+      "category_number": 7,
+      "groups": [
+        {
+          "id": "group_1783312847872_119",
+          "label": "T",
+          "section_type": "vrc",
+          "test_cases": [
+            {
+              "action": "T3",
+              "expected_result": "TEST",
+              "name": "T",
+              "pre_required_state": "T1, T2"
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "cat_1783312847_91",
+      "name": "T"
+    },
+    {
+      "category_number": 8,
+      "groups": [
+        {
+          "id": "group_1783313830071_716",
+          "label": "Test Zone",
+          "section_type": "test zone",
+          "test_cases": [
+            {
+              "action": "Test Case Name",
+              "expected_result": "Test Case Name",
+              "name": "Test Case Name",
+              "pre_required_state": "Test Case Name"
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "cat_1783313830_90",
+      "name": "Test Zone"
+    },
+    {
+      "category_number": 9,
+      "groups": [
+        {
+          "id": "group_1783606606158_193",
+          "label": "Zone Name",
+          "section_type": "lklkl",
+          "test_cases": [
+            {
+              "action": "ojojojm",
+              "expected_result": "nuhin",
+              "name": "uygyg",
+              "pre_required_state": "lmomolm,"
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "cat_1783606606_38",
+      "name": "Zone Name"
+    },
+    {
+      "category_number": 10,
+      "groups": [
+        {
+          "id": "group_1783610798202_247",
+          "label": "ABC",
+          "section_type": "testing",
+          "test_cases": [
+            {
+              "action": "hehehe",
+              "expected_result": "lalala",
+              "name": "Khush",
+              "pre_required_state": "Patel"
+            },
+            {
+              "action": "jnvj",
+              "expected_result": "jnjn",
+              "name": "jj",
+              "pre_required_state": "kk"
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "cat_1783610798_23",
+      "name": "ABC"
+    },
+    {
+      "category_number": 11,
+      "groups": [
+        {
+          "id": "group_1783610798202_894",
+          "label": ":)",
+          "section_type": "testing",
+          "test_cases": [
+            {
+              "action": "jjd",
+              "expected_result": "kekeke",
+              "name": "jndvjn",
+              "pre_required_state": "nnv"
+            }
+          ],
+          "ui_type": "checkbox"
+        }
+      ],
+      "id": "cat_1783610798_31",
+      "name": ":)"
+    }
+  ]
+}

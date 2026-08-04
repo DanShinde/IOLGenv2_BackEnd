@@ -30,6 +30,7 @@ urlpatterns = [
     path('inventory/', include('inventory.urls')),
     path('planner/', include('planner.urls')),
     path('skillgap/', include('gap_analysis.urls')),
+    path('testvault/', include('testvault.urls')),
 ]
 
 if settings.DEBUG:

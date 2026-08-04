@@ -1,0 +1,114 @@
+[
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "PLC Communication Verification",
+    "pre_required_state": "PLC powered ON and network cable connected",
+    "action": "1. Verify PLC is online from HMI/SCADA communication status page\n2. Check PLC heartbeat signal",
+    "expected_result": "1. PLC communication status shows Online/Connected on HMI/SCADA\n2. PLC heartbeat signal is toggling\n3. No communication fault alarms generated"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "HMI Communication Verification",
+    "pre_required_state": "HMI/SCADA powered ON and network cable connected",
+    "action": "1. Verify HMI/SCADA is online and communicating with PLC\n2. Check data exchange between HMI and PLC",
+    "expected_result": "1. HMI/SCADA displays live data from PLC\n2. All screens load correctly without communication errors\n3. Tag values update in real-time"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Auto Mode Verification",
+    "pre_required_state": "System healthy, no active faults, all safety interlocks satisfied",
+    "action": "1. Press Start PB from Control Panel or HMI/SCADA\n2. Verify system enters auto mode",
+    "expected_result": "1. System enters auto mode\n2. Green tower lamp is ON (solid)\n3. Auto mode status displayed on HMI/SCADA\n4. Conveyors are ready to receive commands"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Manual Mode Verification",
+    "pre_required_state": "System in auto mode or stopped",
+    "action": "1. Switch to Manual/Maintenance mode from HMI/SCADA\n2. Verify mode transition",
+    "expected_result": "1. System enters manual mode\n2. Amber tower lamp is ON (solid)\n3. Manual mode status displayed on HMI/SCADA\n4. Individual conveyor control is available"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Emergency Stop Verification",
+    "pre_required_state": "System running in auto mode",
+    "action": "1. Press any Emergency Stop button\n2. Verify system response",
+    "expected_result": "1. All conveyors in associated zone stop immediately\n2. Red tower lamp and reset PB lamp ON (flashing)\n3. Emergency stop alarm displayed on HMI/SCADA\n4. Hooter will be ON\n5. ESTOP symbol displayed at respective location on HMI/SCADA"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Alarm Reset Verification",
+    "pre_required_state": "Active fault/alarm present on HMI/SCADA",
+    "action": "1. Clear the root cause of the fault\n2. Press reset button from Control Panel/HMI/SCADA",
+    "expected_result": "1. Fault disappears from alarm list on HMI/SCADA\n2. Tower lamp returns to normal state\n3. System is ready to restart"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Sensor Health Verification",
+    "pre_required_state": "System powered ON, all sensors connected",
+    "action": "1. Verify all sensors are detected by PLC\n2. Check sensor status on HMI/SCADA diagnostics page\n3. Manually trigger each sensor type to verify response",
+    "expected_result": "1. All sensors show healthy status on HMI/SCADA\n2. Sensor signals correctly reflected in PLC I/O status\n3. No sensor fault alarms generated"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Startup Sequence Verification",
+    "pre_required_state": "System in stopped state, all safety interlocks satisfied, no active faults",
+    "action": "1. Press Start PB from Control Panel or HMI/SCADA\n2. Observe startup sequence",
+    "expected_result": "1. Hooter sounds for warning period (10 sec)\n2. System starts after warning period\n3. Green tower lamp ON (solid)\n4. All conveyors initialize in correct sequence\n5. System status shows Running on HMI/SCADA"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Shutdown Sequence Verification",
+    "pre_required_state": "System running in auto mode",
+    "action": "1. Press System Cycle Stop from Control Panel or HMI/SCADA\n2. Observe shutdown sequence",
+    "expected_result": "1. Conveyors complete current transfers before stopping\n2. System stop PB ON indicating system is stopped\n3. Conveyors shown Grey on HMI/SCADA\n4. Green tower lamp and start PB lamp flashing if system is healthy"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Safety Interlock Verification",
+    "pre_required_state": "System healthy, safety devices connected",
+    "action": "1. Verify all safety interlocks are connected and monitored\n2. Trigger each safety device individually\n3. Verify system response to safety device activation",
+    "expected_result": "1. Each safety interlock correctly stops associated zone\n2. Safety fault alarm generated on HMI/SCADA\n3. System cannot restart until safety interlock is restored and reset"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Power Recovery Verification",
+    "pre_required_state": "System was running before power loss",
+    "action": "1. Simulate power loss by turning off main isolator\n2. Wait 10 seconds\n3. Restore power by turning on main isolator\n4. Observe system recovery behavior",
+    "expected_result": "1. System initializes after power restoration\n2. PLC restarts and establishes communication\n3. HMI/SCADA reconnects and displays current status\n4. System requires manual restart (does not auto-start)\n5. No data corruption or incorrect states"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Communication Loss Recovery Verification",
+    "pre_required_state": "System healthy and running",
+    "action": "1. Disconnect communication cable between PLC and HMI/SCADA\n2. Wait 30 seconds\n3. Reconnect communication cable\n4. Observe recovery behavior",
+    "expected_result": "1. Communication fault alarm generated on disconnection\n2. System enters safe state\n3. Communication re-establishes after cable reconnection\n4. HMI/SCADA updates to current system state\n5. System requires manual intervention to restart"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "Alarm Logging Verification",
+    "pre_required_state": "System healthy, HMI/SCADA running",
+    "action": "1. Create a fault condition\n2. Check alarm history/log on HMI/SCADA\n3. Clear the fault and reset\n4. Verify alarm log entry",
+    "expected_result": "1. Alarm appears in alarm list with timestamp\n2. Alarm details include fault description, location, and time\n3. Alarm acknowledgement is logged\n4. Alarm clear/reset is logged with timestamp\n5. Alarm history is maintained and accessible"
+  },
+  {
+    "category": "Global System Verification",
+    "test_case_id_prefix": "GLB",
+    "test_case_name": "User Access Verification",
+    "pre_required_state": "HMI/SCADA running, user accounts configured",
+    "action": "1. Login with different user levels (Operator, Maintenance, Admin)\n2. Verify access permissions for each level\n3. Attempt restricted operations at lower access levels",
+    "expected_result": "1. Each user level has correct access permissions\n2. Restricted operations are blocked at lower levels\n3. User login/logout is logged\n4. Session timeout works correctly"
+  }
+]

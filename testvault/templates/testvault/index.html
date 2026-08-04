@@ -1,0 +1,547 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TestVault — EFS Test Case Generator</title>
+    <meta name="description" content="Generate and execute warehouse commissioning test cases.">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'testvault/index.css' %}">
+</head>
+<body class="dark-theme">
+    {% csrf_token %}
+    <!-- ═══ PROJECT MANAGEMENT SCREEN ══════════════════════════════════ -->
+    <div id="project-mgmt-screen" class="screen-container hidden">
+        <header class="top-bar">
+            <div class="header-left">
+                <a href="{% url 'home' %}" class="btn btn-secondary btn-sm" title="Back to IOLGen Home">Home</a>
+                <h1 class="header-title">TestVault</h1>
+                <span class="version-badge" id="version-display-mgmt">v3.0</span>
+                <button class="btn btn-secondary btn-sm" id="btn-changelog-mgmt">Changelog</button>
+                <a href="{% url 'testvault_api_manual' %}" target="_blank" class="btn btn-secondary btn-sm">User Manual</a>
+            </div>
+            <div class="logo-container">
+                <img src="{% static 'testvault/assets/company_logo.png' %}" alt="Armstrong Dematic" class="header-logo">
+            </div>
+            <div class="header-right">
+                <span class="user-badge">{{ request.user.username }}</span>
+                <form method="post" action="{% url 'logoutw' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Logout</button>
+                </form>
+            </div>
+        </header>
+        <section class="project-mgmt-content">
+            <div class="project-mgmt-header">
+                <h2>Project Dashboard</h2>
+                <div class="project-mgmt-actions">
+                    <button class="btn btn-primary" id="btn-create-project">+ New Project</button>
+                    <button class="btn btn-accent" id="btn-master-dashboard">Master Dashboard</button>
+                    <button class="btn btn-secondary" id="btn-edit-tc-global">Edit Test Case Library</button>
+                </div>
+            </div>
+            <div class="project-cards-grid" id="project-cards-container">
+                <!-- Dynamic project cards rendered by JS -->
+            </div>
+        </section>
+        <div class="app-footer">
+            <p>For bug reports and suggestions, contact Khush Patel.</p>
+        </div>
+    </div>
+
+    <!-- ═══ MASTER DASHBOARD SCREEN ══════════════════════════════════ -->
+    <div id="master-dashboard-screen" class="screen-container hidden">
+        <header class="top-bar">
+            <div class="header-left">
+                <button class="btn btn-secondary btn-sm" id="btn-dash-back">Back to Projects</button>
+                <h1 class="header-title">Master Dashboard</h1>
+            </div>
+            <div class="logo-container">
+                <img src="{% static 'testvault/assets/company_logo.png' %}" alt="Armstrong Dematic" class="header-logo">
+            </div>
+            <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
+                <div id="dash-live-time" class="dash-live-time"></div>
+                <span class="version-badge">v3.0</span>
+                <button class="btn btn-secondary btn-sm" id="btn-changelog-dash">Changelog</button>
+            </div>
+        </header>
+        <div class="dashboard-content">
+            <div class="dashboard-control-row">
+                <h2 class="dash-section-title">Projects Status Overview</h2>
+                <div class="dash-control-actions">
+                    <span class="dash-auto-update-lbl">Auto-updates every 5 mins</span>
+                    <button class="btn btn-secondary btn-sm" id="btn-dash-refresh">Refresh</button>
+                </div>
+            </div>
+            <div class="dash-stats-row master-stats-grid" id="dash-stats-row">
+                <!-- Dynamic: Total Projects, Ongoing, Completed, Overall Completion -->
+            </div>
+            <div class="dash-project-cards-grid" id="dash-project-cards">
+                <!-- Dynamic project cards -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ EDIT TEST CASE OVERLAY (accessible from Project Mgmt) ═════ -->
+    <div id="edit-tc-overlay" class="hidden">
+        <div class="edit-tc-overlay-header">
+            <button class="btn btn-secondary btn-sm" id="btn-overlay-back">Back to Projects</button>
+            <h2>Edit Test Case Library</h2>
+            <div class="edit-tc-breadcrumbs" id="edit-tc-breadcrumbs">
+                <!-- Dynamic breadcrumbs like: Home > Conveyor > Types -->
+            </div>
+        </div>
+        <div class="edit-tc-overlay-body">
+            
+            <!-- Page 0: Main Menu -->
+            <div class="edit-page hidden" id="edit-page-menu">
+                <div class="edit-menu-grid">
+                    <div class="edit-menu-card" id="btn-menu-manage-selections">
+                        <h3>Manage Selections</h3>
+                        <p>Create, rename, or delete global master Selection categories (e.g. Conveyor, VRC, Shuttle, ASRS).</p>
+                        <div class="card-arrow">Manage &rarr;</div>
+                    </div>
+                    <div class="edit-menu-card" id="btn-menu-edit-library">
+                        <h3>Edit Test Case Library</h3>
+                        <p>Browse and edit master Types, Clusters, and Test Cases within each Selection library.</p>
+                        <div class="card-arrow">Edit &rarr;</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 1: Manage Selections -->
+            <div class="edit-page hidden" id="edit-page-manage-selections">
+                <div class="edit-toolbar">
+                    <h3 class="edit-toolbar-title">Manage Selections</h3>
+                    <button class="btn btn-primary" id="btn-sel-add">+ Add Selection</button>
+                    <button class="btn btn-secondary" id="btn-sel-rename" disabled>Rename Selection</button>
+                    <button class="btn btn-danger" id="btn-sel-delete" disabled>Delete Selection</button>
+                    <button class="btn btn-secondary btn-back-nav" data-target="menu" style="margin-left: auto;">Back to Home</button>
+                </div>
+                <div class="cards-grid" id="selections-grid-manage">
+                    <!-- Dynamic selection cards -->
+                </div>
+            </div>
+
+            <!-- Page 2: Select Selection -->
+            <div class="edit-page hidden" id="edit-page-select-selection">
+                <div class="edit-toolbar">
+                    <h3 class="edit-toolbar-title">Selections</h3>
+                    <button class="btn btn-secondary btn-back-nav" data-target="menu" style="margin-left: auto;">Back to Home</button>
+                </div>
+                <div class="cards-grid" id="selections-grid-select">
+                    <!-- Dynamic selection cards -->
+                </div>
+            </div>
+
+            <!-- Page 3: Manage Types -->
+            <div class="edit-page hidden" id="edit-page-manage-types">
+                <div class="edit-toolbar">
+                    <h3 class="edit-toolbar-title" id="types-page-title">Types</h3>
+                    <button class="btn btn-primary" id="btn-type-add">+ Add Type</button>
+                    <button class="btn btn-secondary" id="btn-type-rename" disabled>Rename Type</button>
+                    <button class="btn btn-danger" id="btn-type-delete" disabled>Delete Type</button>
+                    <button class="btn btn-secondary" id="btn-type-move-up" disabled>Move Up</button>
+                    <button class="btn btn-secondary" id="btn-type-move-down" disabled>Move Down</button>
+                    <button class="btn btn-secondary btn-back-nav" data-target="select-selection" style="margin-left: auto;">Back to Selections</button>
+                </div>
+                <div class="cards-grid" id="types-grid">
+                    <!-- Dynamic type cards -->
+                </div>
+            </div>
+
+            <!-- Page 4: Manage Clusters -->
+            <div class="edit-page hidden" id="edit-page-manage-clusters">
+                <div class="edit-toolbar">
+                    <h3 class="edit-toolbar-title" id="clusters-page-title">Clusters</h3>
+                    <button class="btn btn-primary" id="btn-cluster-add">+ Add Cluster</button>
+                    <button class="btn btn-secondary" id="btn-cluster-rename" disabled>Rename Cluster</button>
+                    <button class="btn btn-danger" id="btn-cluster-delete" disabled>Delete Cluster</button>
+                    <button class="btn btn-secondary" id="btn-cluster-move-up" disabled>Move Up</button>
+                    <button class="btn btn-secondary" id="btn-cluster-move-down" disabled>Move Down</button>
+                    <button class="btn btn-secondary btn-back-nav" data-target="manage-types" style="margin-left: auto;">Back to Types</button>
+                </div>
+                <div class="cards-grid" id="clusters-grid">
+                    <!-- Dynamic cluster cards -->
+                </div>
+            </div>
+
+            <!-- Page 5: Manage Test Cases -->
+            <div class="edit-page hidden" id="edit-page-manage-test-cases">
+                <div class="edit-toolbar">
+                    <h3 class="edit-toolbar-title" id="tc-page-title">Test Cases</h3>
+                    <button class="btn btn-primary" id="btn-tc-add">+ Add Test Case</button>
+                    <button class="btn btn-secondary" id="btn-tc-edit" disabled>Edit Details</button>
+                    <button class="btn btn-danger" id="btn-tc-delete" disabled>Delete Test Case</button>
+                    <button class="btn btn-secondary" id="btn-tc-move-up" disabled>Move Up</button>
+                    <button class="btn btn-secondary" id="btn-tc-move-down" disabled>Move Down</button>
+                    <button class="btn btn-secondary btn-back-nav" data-target="manage-clusters" style="margin-left: auto;">Back to Clusters</button>
+                </div>
+                <div class="tc-cards-list" id="tc-cards-container">
+                    <!-- Dynamic test case cards -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ NEW PROJECT MODAL ══════════════════════════════════════════ -->
+    <div class="modal" id="new-project-modal">
+        <div class="modal-dialog" style="width: 420px;">
+            <div class="modal-header">
+                <h2>Create New Project</h2>
+                <button class="modal-close-btn" id="new-project-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-project-source-select">Link To</label>
+                    <select id="new-project-source-select" class="form-select">
+                        <option value="tracker">Tracker Project</option>
+                        <option value="planner">Planner Project</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-project-tracker-project-select">Project (Code — Customer)</label>
+                    <select id="new-project-tracker-project-select" class="form-select"></select>
+                </div>
+                <div class="form-group">
+                    <label for="new-project-zone-input">Zone Name (optional label)</label>
+                    <input type="text" id="new-project-zone-input" class="form-input" placeholder="e.g. Inbound Conveyor FAT">
+                </div>
+                <button class="btn btn-primary w-100" id="btn-confirm-create-project" style="margin-top: 8px;">Create Project</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ EDIT TEST CASE MODAL (v2.7) ══════════════════════ -->
+    <div class="modal" id="edit-tc-modal">
+        <div class="modal-dialog" style="width: 650px;">
+            <div class="modal-header">
+                <h2 id="edit-tc-modal-title">Edit Test Case Details</h2>
+                <button class="modal-close-btn" id="edit-tc-modal-close">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px; padding: 20px;">
+                <div class="form-group-sub">
+                    <label for="edit-modal-tc-name">Test Case Name:</label>
+                    <input type="text" id="edit-modal-tc-name" class="form-input">
+                </div>
+                <div class="form-group-sub">
+                    <label for="edit-modal-tc-prereq">Prerequisites:</label>
+                    <textarea id="edit-modal-tc-prereq" class="form-input custom-textarea" rows="3" placeholder="Press Shift + Enter for new line"></textarea>
+                </div>
+                <div class="form-group-sub">
+                    <label for="edit-modal-tc-action">Action / Procedure:</label>
+                    <textarea id="edit-modal-tc-action" class="form-input custom-textarea" rows="4" placeholder="Press Shift + Enter for new line"></textarea>
+                </div>
+                <div class="form-group-sub">
+                    <label for="edit-modal-tc-expected">Expected Result:</label>
+                    <textarea id="edit-modal-tc-expected" class="form-input custom-textarea" rows="4" placeholder="Press Shift + Enter for new line"></textarea>
+                </div>
+                <button class="btn btn-success w-100 btn-lg" id="btn-save-modal-tc" style="height: 44px; margin-top: 10px;">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MAIN APPLICATION ══════════════════════════════════════════ -->
+    <div class="app-container hidden" id="app-screen">
+        <!-- ─── TOP BAR ─────────────────────────────────────────────────── -->
+        <header class="top-bar" id="app-header">
+            <div class="header-left">
+                <button class="btn btn-secondary btn-sm" id="btn-back-to-projects">Back to Projects</button>
+                <h1 class="header-title">EFS TestCaseGenerator</h1>
+            </div>
+            <div class="logo-container">
+                <img src="{% static 'testvault/assets/company_logo.png' %}" alt="Armstrong Dematic" id="header-logo" class="header-logo">
+            </div>
+            <div class="header-right">
+                <span class="version-badge" id="version-display">v3.0</span>
+                <button class="btn btn-secondary btn-sm" id="btn-changelog">Changelog</button>
+            </div>
+        </header>
+
+        <!-- ─── PROJECT INFORMATION CARD ────────────────────────────────── -->
+        <section class="project-info-card" id="project-info-section">
+            <h2 class="card-title">Project Information</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="project-code">Project Code / Title:</label>
+                    <input type="text" id="project-code" class="form-input" readonly title="Linked from the Tracker project — set when the project was created">
+                </div>
+                <div class="form-group">
+                    <label for="date-of-validation">Date of Validation:</label>
+                    <input type="text" id="date-of-validation" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="customer-name">Customer Name:</label>
+                    <input type="text" id="customer-name" class="form-input" readonly title="Linked from the Tracker project — set when the project was created">
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="validator-type">Validator:</label>
+                        <select id="validator-type" class="form-select">
+                            <option value="Self">Self</option>
+                            <option value="Internal Validator">Internal Validator</option>
+                            <option value="External Validator">External Validator</option>
+                        </select>
+                    </div>
+                    <!-- Dynamic Validator Name field (External Validator) -->
+                    <div class="form-group hidden" id="validator-name-group">
+                        <label for="validator-name">Validator Name:</label>
+                        <input type="text" id="validator-name" placeholder="e.g. Sandip Khairnar" class="form-input">
+                    </div>
+                    <!-- Dynamic Validator Employee field (Internal Validator) -->
+                    <div class="form-group hidden" id="validator-employee-group">
+                        <label for="validator-employee-select">Validator:</label>
+                        <select id="validator-employee-select" class="form-select"></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="prepared-by-select">Test Cases Prepared By:</label>
+                    <select id="prepared-by-select" class="form-select"></select>
+                </div>
+                <div class="form-group">
+                    <label for="testing-phase">Testing Phase:</label>
+                    <select id="testing-phase" class="form-select">
+                        <option value="Emulation">Emulation</option>
+                        <option value="FAT">FAT</option>
+                        <option value="SAT">SAT</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── MAIN WORKSPACE split layout ─────────────────────────────── -->
+        <main class="workspace" id="main-workspace">
+            <!-- Sidebar: Zones panel -->
+            <aside class="sidebar-sections" id="sections-sidebar">
+                <div class="sidebar-header">
+                    <h3>Zones</h3>
+                </div>
+                <div class="add-section-row">
+                    <input type="text" id="new-section-name" placeholder="Zone name..." class="form-input">
+                    <button class="btn btn-primary" id="btn-add-section">+ Add</button>
+                </div>
+                <div class="section-list-container" id="sections-list">
+                    <!-- Dynamic zone list buttons -->
+                </div>
+                <button class="btn btn-danger btn-sm" id="btn-delete-section" style="width: 130px; margin: 6px auto 0 auto;" disabled>Delete Zone</button>
+                <button class="btn btn-secondary btn-sm" id="btn-duplicate-section" style="width: 130px; margin: 6px auto 0 auto;" disabled>Duplicate Zone</button>
+            </aside>
+
+            <!-- Right Workspace tabs -->
+            <section class="tabview-container" id="workspace-tabs-container">
+                <nav class="tab-headers" id="workspace-nav">
+                    <button class="tab-btn active" data-tab="tab-selection">Selection</button>
+                    <button class="tab-btn" data-tab="tab-view">View Test Cases</button>
+                    <button class="tab-btn" data-tab="tab-guided">Guided Execution</button>
+                    <button class="tab-btn" data-tab="tab-summary">Summary</button>
+                </nav>
+
+                <div class="tab-content-container">
+                    <!-- Tab 1: Selection (Equipment selection dropdowns) -->
+                    <div class="tab-content active" id="tab-selection">
+                        <div class="section-type-toggle-row">
+                            <span class="toggle-label">Selection:</span>
+                            <div class="toggle-switch-container" id="section-type-toggles-container">
+                                <label class="radio-label">
+                                    <input type="radio" name="section-type" value="conveyor" checked> Conveyor
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="section-type" value="vrc"> VRC
+                                </label>
+                            </div>
+                            <div class="selection-action-buttons">
+                                <button class="btn btn-primary btn-sm" id="btn-select-all-tcs">Select All</button>
+                                <button class="btn btn-secondary btn-sm" id="btn-deselect-all-tcs">Deselect All</button>
+                            </div>
+                        </div>
+                        <div class="categories-accordion-container" id="categories-accordion">
+                            <!-- Dynamic selection accordions -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: View Test Cases -->
+                    <div class="tab-content" id="tab-view">
+                        <div class="tab-controls-row">
+                            <input type="text" id="view-search" placeholder="Search test cases..." class="form-input">
+                            <span id="view-count-label" class="count-label">Showing 0 test cases</span>
+                            <div class="control-actions">
+                                <button class="btn btn-secondary" id="btn-export-excel">Export to Excel</button>
+                                <button class="btn btn-secondary btn-maximize" data-target="tab-view">Maximize</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="test-cases-table" id="view-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60px;">Sr. No.</th>
+                                        <th style="width: 250px;">Test Case Name</th>
+                                        <th style="width: 180px;">Prerequisites</th>
+                                        <th style="width: 200px;">Action / Procedure</th>
+                                        <th style="width: 200px;">Expected Result</th>
+                                        <th style="width: 80px;">Result</th>
+                                        <th style="width: 180px;">Observation</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="view-table-body">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Guided Test Execution Mode -->
+                    <div class="tab-content" id="tab-guided">
+                        <div class="guided-no-data" id="guided-empty-message">
+                            <p>No test cases selected for this zone.<br>Select test groups in the 'Selection' tab first.</p>
+                        </div>
+                        <div class="guided-execution-card hidden" id="guided-main-card">
+                            <div class="guided-progress-row">
+                                <span class="guided-progress-text" id="guided-progress-label">Test Case 0 of 0</span>
+                                <div class="progress-bar-track">
+                                    <div class="progress-bar-fill" id="guided-progress-bar" style="width: 0%;"></div>
+                                </div>
+                                <div class="guided-search-container">
+                                    <input type="text" id="guided-search-input" placeholder="Search test case..." class="form-input">
+                                    <div class="guided-search-results hidden" id="guided-search-results"></div>
+                                </div>
+                                <button class="btn btn-secondary btn-sm btn-maximize" data-target="tab-guided">Maximize</button>
+                            </div>
+                            <div class="test-case-detail-card">
+                                <h3 class="test-case-title" id="guided-title">Test Case Title</h3>
+                                <div class="scrollable-detail-body">
+                                    <div class="detail-block">
+                                        <div class="detail-title">Prerequisites:</div>
+                                        <div class="detail-content" id="guided-prereq">-</div>
+                                    </div>
+                                    <div class="detail-block">
+                                        <div class="detail-title">Action / Procedure:</div>
+                                        <div class="detail-content" id="guided-action">-</div>
+                                    </div>
+                                    <div class="detail-block">
+                                        <div class="detail-title">Expected Result:</div>
+                                        <div class="detail-content" id="guided-expected">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="guided-controls-box">
+                                <div class="result-selection-row">
+                                    <span class="field-lbl">Result Status:</span>
+                                    <div class="segmented-control" id="guided-result-segmented">
+                                        <button class="segment-btn" data-val="Pass">Pass</button>
+                                        <button class="segment-btn" data-val="Fail">Fail</button>
+                                        <button class="segment-btn active" data-val="Pending">Pending</button>
+                                    </div>
+                                </div>
+                                <div class="observation-input-row">
+                                    <span class="field-lbl">Observation (Validator Comments):</span>
+                                    <input type="text" id="guided-observation" placeholder="Enter check observations here..." class="form-input">
+                                </div>
+                            </div>
+                            <div class="guided-nav-row">
+                                <button class="btn btn-secondary" id="guided-btn-prev">Previous</button>
+                                <button class="btn btn-secondary" id="guided-btn-skip">Skip</button>
+                                <button class="btn btn-primary" id="guided-btn-next">Next</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 4: Summary -->
+                    <div class="tab-content" id="tab-summary">
+                        <div class="tab-controls-row">
+                            <h3 class="tab-section-title" style="margin:0;">Project Summary</h3>
+                            <button class="btn btn-secondary btn-sm btn-maximize" data-target="tab-summary" style="margin-left: auto;">Maximize</button>
+                        </div>
+                        <div class="summary-tab-content" id="summary-tab-content">
+                            <!-- Dynamic: stats row + per-selection breakdown -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ─── GENERATE PANEL (BOTTOM) ─────────────────────────────────── -->
+        <footer class="generate-panel" id="bottom-generate-panel">
+            <div class="panel-left">
+                <button class="btn btn-secondary" id="btn-save-project">Save Project</button>
+                <button class="btn btn-secondary" id="btn-load-project">Load Project</button>
+                <input type="file" id="project-file-input" style="display: none;" accept=".json">
+            </div>
+            <div class="panel-center">
+                <span class="status-message" id="panel-status-text"></span>
+            </div>
+            <div class="panel-right">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chk-view-only"> View-Only Export
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chk-unlocked"> Unlocked Export
+                </label>
+                <button class="btn btn-success btn-lg" id="btn-generate-action">GENERATE TEST CASES</button>
+            </div>
+        </footer>
+
+        <!-- ─── FOOTER CONTACT ──────────────────────────────────────────── -->
+        <div class="app-footer">
+            <p>For bug reports and suggestions, contact Khush Patel.</p>
+        </div>
+    </div>
+
+    <!-- ─── EXPORT OPTIONS CHOICE MODAL ──────────────────────────────── -->
+    <div class="modal" id="export-choice-modal">
+        <div class="modal-dialog" style="width: 400px;">
+            <div class="modal-header">
+                <h2>Select Export Option</h2>
+                <button class="modal-close-btn" id="export-modal-close">&times;</button>
+            </div>
+            <div class="modal-body" style="gap: 15px; padding: 20px;">
+                <button class="btn btn-success w-100 btn-lg" id="btn-opt-excel-export" style="height: 48px;">Export as Excel</button>
+                <button class="btn btn-primary w-100 btn-lg" id="btn-opt-shareable-link" style="height: 48px;">Generate Shareable View-Only Link</button>
+                
+                <div class="link-result-container hidden" id="shareable-link-box" style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: bold; color: var(--text-muted);">Shareable View-Only Link:</label>
+                    <input type="text" id="shareable-link-url" readonly class="form-input" style="background: var(--bg-app); font-size: 11px;">
+                    <button class="btn btn-secondary btn-sm" id="btn-copy-shareable-link">Copy Link</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── CHANGELOG MODAL ──────────────────────────────────────────── -->
+    <div class="modal" id="changelog-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2>Version History</h2>
+                <button class="modal-close-btn" id="changelog-modal-close-icon">&times;</button>
+            </div>
+            <div class="modal-body" id="changelog-modal-body">
+                <!-- Dynamic changelog history loaded from api -->
+            </div>
+            <div class="modal-footer">
+                <span class="footer-brand">KP</span>
+                <button class="btn btn-secondary" id="changelog-modal-close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+    <!-- ─── MASTER DASHBOARD PROJECT DETAIL MODAL ────────────────────── -->
+    <div class="modal" id="dash-project-detail-modal">
+        <div class="modal-dialog" style="width: 650px;">
+            <div class="modal-header">
+                <h2 id="dash-modal-project-name">Project Details</h2>
+                <button class="modal-close-btn" id="dash-project-detail-modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="dash-modal-body" style="max-height: 70vh; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                <!-- Dynamic project stats & breakdown -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="dash-project-detail-modal-close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{% static 'testvault/index.js' %}"></script>
+</body>
+</html>

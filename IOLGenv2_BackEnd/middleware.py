@@ -50,6 +50,34 @@ class PlannerAuthRequiredMiddleware:
                 return redirect('loginw')
         return self.get_response(request)
 
+class TestVaultAuthRequiredMiddleware:
+    """
+    Blocks any URL under /testvault/ unless the user is authenticated.
+    Redirects unauthenticated users to 'loginw'.
+
+    Exempts the shareable read-only report page and the two endpoints it depends on
+    (report data lookup, live test-case generation) -- these back the "Share Report" /
+    "Shareable View-Only Link" feature, which is meant to be sent to people (customers,
+    external validators) who don't have a login, mirroring /tracker/public/.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path_info.startswith('/testvault/'):
+            public_prefixes = (
+                '/testvault/report/',
+                '/testvault/api/report/data/',
+                '/testvault/api/generate-test-cases/',
+            )
+            if request.path_info.startswith(public_prefixes):
+                return self.get_response(request)
+
+            if not request.user.is_authenticated:
+                return redirect('loginw')
+        return self.get_response(request)
+
 class SkillGapGroupRequiredMiddleware:
     """
     Blocks any URL under /skillgap/ unless the user is authenticated

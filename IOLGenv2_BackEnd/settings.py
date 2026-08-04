@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'planner',
     'employees',
     'gap_analysis',
+    'testvault',
 ]
 
 MIDDLEWARE = [
@@ -78,6 +79,7 @@ MIDDLEWARE = [
     'IOLGenv2_BackEnd.middleware.TrackerGroupRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.PlannerAuthRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.SkillGapGroupRequiredMiddleware',
+    'IOLGenv2_BackEnd.middleware.TestVaultAuthRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -267,6 +269,11 @@ else:
         MEDIA_ROOT = r'C:\media'
     else:
         MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Writable directory for TestVault's reference data (test_groups.json, equipment.json,
+# custom_test_cases.json). Read/written directly with open() by testvault/engine, not through
+# Django's storage backend, so it stays local even when MEDIA_ROOT is S3/MinIO-backed above.
+TESTVAULT_DATA_DIR = BASE_DIR / "testvault_data"
 
 LOGIN_URL = '/accounts/loginw/'
 LOGIN_REDIRECT_URL = '/'  # or wherever you want to land after login
