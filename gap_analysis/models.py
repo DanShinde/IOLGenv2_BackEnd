@@ -25,6 +25,31 @@ def user_can_manage_employee(user, employee):
     return bool(manager_record and employee.manager_id == manager_record.id)
 
 
+def find_matching_user(employee_name):
+    """Match an Employee's name against auth.User first_name/last_name, so a SkillMatrix's
+    self-service login can be auto-linked instead of requiring a manual pick every time.
+
+    Compares only the FIRST and LAST word of the employee's name (case-insensitive) against
+    User.first_name/last_name -- employee names here often carry a middle name/initial
+    ("Aakash K Kumar") that a User record won't have ("Aakash" / "Kumar"), so an exact full
+    string match would miss real matches.
+
+    Returns the User only if there's exactly one match -- zero or multiple candidates (e.g.
+    someone with two login accounts) are left for a human to resolve via the existing manual
+    "Linked Login" dropdown on the Edit Employee form, rather than guessing.
+    """
+    parts = employee_name.split()
+    if len(parts) < 2:
+        return None
+    first, last = parts[0].strip().lower(), parts[-1].strip().lower()
+
+    candidates = [
+        u for u in User.objects.exclude(first_name='').exclude(last_name='')
+        if u.first_name.strip().lower() == first and u.last_name.strip().lower() == last
+    ]
+    return candidates[0] if len(candidates) == 1 else None
+
+
 class RoleMatrix(models.Model):
     title = models.CharField(max_length=100, help_text="Role/Job Title")
     department = models.CharField(max_length=100, blank=True, null=True, help_text="Department name")

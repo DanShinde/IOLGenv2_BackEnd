@@ -15,7 +15,7 @@ from .forms import (
     RoleMatrixForm, SkillBenchmarkForm, SkillMatrixForm, EmployeeSkillForm, SkillForm,
     RoleMatrixBenchmarkForm, DevelopmentPlanForm,
 )
-from .mixins import StaffRequiredMixin
+from .mixins import StaffRequiredMixin, EmployeeSelfOrManagerRequiredMixin
 from .models import (
     RoleMatrix, SkillBenchmark, SkillMatrix, EmployeeSkill, Skill, DevelopmentPlan,
     gap_weight, user_can_manage_employee,
@@ -36,6 +36,14 @@ def safe_json(data):
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'gap_analysis/dashboard.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # The dashboard aggregates everyone's skill data -- only staff (the "see everything"
+        # tier) get it. Everyone else is sent to their own self-service skill view instead of
+        # a bare 403, since Dashboard is the app's default landing page (brand link, nav item).
+        if request.user.is_authenticated and not request.user.is_staff:
+            return redirect('skillgap_my_skills')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -297,7 +305,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         })
         return context
 
-class SkillMatrixCardView(LoginRequiredMixin, DetailView):
+class SkillMatrixCardView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMixin, DetailView):
     model = SkillMatrix
     template_name = 'gap_analysis/employee_card.html'
     pk_url_kwarg = 'emp_id'
@@ -413,7 +421,7 @@ class SkillDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixi
     success_message = "Skill deleted successfully!"
 
 # --- EMPLOYEE CRUD VIEWS ---
-class SkillMatrixListView(LoginRequiredMixin, ListView):
+class SkillMatrixListView(LoginRequiredMixin, StaffRequiredMixin, ListView):
     model = SkillMatrix
     template_name = 'gap_analysis/employee_list.html'
     context_object_name = 'employees'
@@ -443,9 +451,12 @@ class SkillMatrixListView(LoginRequiredMixin, ListView):
 
 @login_required
 def employee_export_csv(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Staff access required.")
+
     import csv
     from django.http import HttpResponse
-    
+
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="employees.csv"'
     
@@ -593,7 +604,7 @@ class BenchmarkDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessage
     def get_success_url(self):
         return reverse('skillgap_designation_benchmark', kwargs={'pk': self.object.role_matrix.pk})
 
-class EmployeeSkillListView(LoginRequiredMixin, ListView):
+class EmployeeSkillListView(LoginRequiredMixin, StaffRequiredMixin, ListView):
     model = EmployeeSkill
     template_name = 'gap_analysis/employee_skill_list.html'
     context_object_name = 'employee_skills'
@@ -606,7 +617,7 @@ class EmployeeSkillDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessMes
     success_message = "Employee skill deleted successfully!"
 
 # --- EMPLOYEE PROFILE VIEWS ---
-class SkillMatrixProfileView(LoginRequiredMixin, DetailView):
+class SkillMatrixProfileView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMixin, DetailView):
     model = SkillMatrix
     template_name = 'gap_analysis/employee_profile.html'
     pk_url_kwarg = 'pk'
@@ -908,7 +919,7 @@ class DevelopmentPlanDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessM
         return reverse('skillgap_employee_profile', kwargs={'pk': self.object.skill_matrix.pk})
 
 
-class DevelopmentPlanListView(LoginRequiredMixin, ListView):
+class DevelopmentPlanListView(LoginRequiredMixin, StaffRequiredMixin, ListView):
     model = DevelopmentPlan
     template_name = 'gap_analysis/development_plan_list.html'
     context_object_name = 'plans'
@@ -970,7 +981,7 @@ class PendingReviewsListView(LoginRequiredMixin, ListView):
 
 
 # --- Employee Skill Search ---
-class EmployeeSkillSearchView(LoginRequiredMixin, TemplateView):
+class EmployeeSkillSearchView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
     template_name = 'gap_analysis/employee_skill_search.html'
 
     def get_context_data(self, **kwargs):

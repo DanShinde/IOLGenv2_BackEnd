@@ -451,18 +451,22 @@
                             <i class="bi bi-house-door-fill me-1"></i> Home
                         </a>
                     </li>
+                    {% if user.is_staff %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'skillgap_dashboard' %}">
                             <i class="bi bi-speedometer2 me-1"></i> Dashboard
                         </a>
                     </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {% if 'designation' in request.resolver_match.url_name or 'benchmark' in request.resolver_match.url_name or 'bulk_skill_update' in request.resolver_match.url_name or 'employee' in request.resolver_match.url_name and 'search' not in request.resolver_match.url_name %}active{% endif %}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-people me-1"></i> People
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            {% if user.is_staff %}
                             <li><a class="dropdown-item" href="{% url 'skillgap_employee_list' %}"><i class="bi bi-people me-2"></i>Skill Matrix</a></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="{% url 'skillgap_designation_list' %}"><i class="bi bi-briefcase me-2"></i>Role Matrix</a></li>
                             {% if user.is_staff %}
                             <li><hr class="dropdown-divider"></li>
@@ -476,7 +480,9 @@
                             <i class="bi bi-award me-1"></i> Skills
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            {% if user.is_staff %}
                             <li><a class="dropdown-item" href="{% url 'skillgap_employee_skill_search' %}"><i class="bi bi-search me-2"></i>Skill Search</a></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="{% url 'skillgap_my_skills' %}"><i class="bi bi-person-check me-2"></i>My Skills</a></li>
                         </ul>
                     </li>
@@ -486,7 +492,9 @@
                             <i class="bi bi-clipboard2-check me-1"></i> Plans
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            {% if user.is_staff %}
                             <li><a class="dropdown-item" href="{% url 'skillgap_development_plan_list' %}"><i class="bi bi-clipboard2-check me-2"></i>Development Plans</a></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="{% url 'skillgap_pending_reviews' %}"><i class="bi bi-hourglass-split me-2"></i>Pending Reviews</a></li>
                         </ul>
                     </li>
