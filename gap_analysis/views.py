@@ -389,9 +389,40 @@ class EmployeeSkillCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlM
     form_class = EmployeeSkillForm
     template_name = 'gap_analysis/add_form.html'
     success_message = "Employee skill recorded successfully!"
-    extra_context = {'title': 'Add Employee Skill'}
+
+    def get_employee(self):
+        # Reached two ways: generically (Dashboard/Employee Skill list, pick anyone from a
+        # dropdown) or from a specific employee's own profile ("Record Skill" there) -- the
+        # latter locks the employee instead of asking the user to find themselves again in
+        # a dropdown they were just looking away from.
+        if 'pk' in self.kwargs:
+            return get_object_or_404(SkillMatrix, pk=self.kwargs['pk'])
+        return None
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        employee = self.get_employee()
+        if employee:
+            del form.fields['skill_matrix']
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        employee = self.get_employee()
+        context['title'] = f'Record Skill for {employee.name}' if employee else 'Record Employee Skill'
+        context['employee'] = employee
+        return context
+
+    def form_valid(self, form):
+        employee = self.get_employee()
+        if employee:
+            form.instance.skill_matrix = employee
+        return super().form_valid(form)
 
     def get_success_url(self):
+        employee = self.get_employee()
+        if employee:
+            return reverse('skillgap_employee_profile', kwargs={'pk': employee.pk})
         return reverse('skillgap_employee_skill_list')
 
 class SkillCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
@@ -647,14 +678,14 @@ class SkillMatrixProfileView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMi
         employee = self.object
         
         benchmarks = employee.get_required_benchmarks()
-        
+
         skill_data = []
         for benchmark in benchmarks:
             emp_skill = EmployeeSkill.objects.filter(skill_matrix=employee, skill=benchmark.skill).first()
             actual_level = emp_skill.actual_level if emp_skill else 0
             gap = benchmark.required_level - actual_level
             level_percentage = (actual_level / 5) * 100  # Convert 0-5 to percentage
-            
+
             skill_data.append({
                 'benchmark_id': benchmark.id,
                 'skill_id': benchmark.skill.id,
@@ -672,18 +703,49 @@ class SkillMatrixProfileView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMi
                 'rating_gap': emp_skill.rating_gap if emp_skill else None,
                 'has_active_development_plan': emp_skill.has_active_development_plan if emp_skill else False,
             })
-        
-        # Sort by gap (critical first)
-        skill_data.sort(key=lambda x: (0 if x['gap'] > 0 else 1, -x['gap']))
+
+        # Skills actually recorded for this employee but not part of their role's benchmark --
+        # e.g. no role assigned yet, or a skill recorded outside that role's formal list. These
+        # have no "required level" to compare against, but still need to show up somewhere,
+        # otherwise a skill added via "Record Skill" would save successfully and then appear
+        # to vanish on the very page it was added from.
+        benchmarked_skill_ids = {b.skill_id for b in benchmarks}
+        extra_skills = employee.skills.exclude(skill_id__in=benchmarked_skill_ids).select_related('skill')
+        for emp_skill in extra_skills:
+            skill_data.append({
+                'benchmark_id': None,
+                'skill_id': emp_skill.skill.id,
+                'skill_name': emp_skill.skill.name,
+                'skill_category': emp_skill.skill.category,
+                'required_level': None,
+                'actual_level': emp_skill.actual_level,
+                'level_percentage': (emp_skill.actual_level / 5) * 100,
+                'gap': None,
+                'status': 'extra',
+                'is_mandatory': False,
+                'emp_skill_id': emp_skill.id,
+                'self_rated_level': emp_skill.self_rated_level,
+                'rating_status': emp_skill.rating_status,
+                'rating_gap': emp_skill.rating_gap,
+                'has_active_development_plan': emp_skill.has_active_development_plan,
+            })
+
+        # Sort by gap (critical first); skills with no benchmark (gap=None) sort last.
+        skill_data.sort(key=lambda x: (0 if x['gap'] is None else -1, 0 if (x['gap'] or 0) > 0 else 1, -(x['gap'] or 0)))
         
         context['skill_data'] = skill_data
         context['skills_met'] = employee.get_skills_met_percentage()
         context['overall_gap'] = employee.get_overall_gap_score()
-        
-        # Chart data
-        context['chart_labels'] = safe_json([s['skill_name'] for s in skill_data])
-        context['chart_actual'] = safe_json([s['actual_level'] for s in skill_data])
-        context['chart_required'] = safe_json([s['required_level'] for s in skill_data])
+
+        # Chart data, and the "Required Skills" KPI, both deliberately exclude the no-benchmark
+        # "extra" entries above -- required-vs-actual only means something for a skill that
+        # actually has a required level (their required_level is None, which a radar chart
+        # can't plot meaningfully either).
+        benchmarked = [s for s in skill_data if s['required_level'] is not None]
+        context['required_skills_count'] = len(benchmarked)
+        context['chart_labels'] = safe_json([s['skill_name'] for s in benchmarked])
+        context['chart_actual'] = safe_json([s['actual_level'] for s in benchmarked])
+        context['chart_required'] = safe_json([s['required_level'] for s in benchmarked])
 
         context['skill_history'] = safe_json(employee.get_skill_history())
         context['development_plans'] = employee.development_plans.select_related('skill')

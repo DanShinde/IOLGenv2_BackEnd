@@ -23,6 +23,7 @@ urlpatterns = [
     path('employee/<int:pk>/skill-update/', views.employee_skill_update, name='skillgap_employee_skill_update'),
     path('employee/<int:pk>/self-rating-update/', views.employee_self_rating_update, name='skillgap_employee_self_rating_update'),
     path('employee/<int:pk>/skill/<int:skill_id>/approve/', views.employee_skill_approve, name='skillgap_employee_skill_approve'),
+    path('employee/<int:pk>/add-skill/', views.EmployeeSkillCreateView.as_view(), name='skillgap_employee_add_skill'),
     path('employee/<int:emp_id>/card/', views.SkillMatrixCardView.as_view(), name='skillgap_employee_card'),
     
     # Skills URLs

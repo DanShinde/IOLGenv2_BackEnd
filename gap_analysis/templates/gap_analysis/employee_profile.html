@@ -217,7 +217,7 @@
                 </p>
                 <div class="kpi-row">
                     <div class="kpi-item">
-                        <div class="value">{{ skill_data|length }}</div>
+                        <div class="value">{{ required_skills_count }}</div>
                         <div class="label">Required Skills</div>
                     </div>
                     <div class="kpi-item">
@@ -261,6 +261,13 @@
 
     <!-- Skills Tab -->
     <div id="skills-tab" class="tab-content active">
+        {% if user.is_staff %}
+        <div class="d-flex justify-content-end mb-3">
+            <a href="{% url 'skillgap_employee_add_skill' employee.id %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>Record Skill
+            </a>
+        </div>
+        {% endif %}
         {% if skill_data %}
             <div class="card">
                 <div class="card-body p-0">
@@ -291,7 +298,11 @@
                                         {% endif %}
                                     </td>
                                     <td data-label="Required">
-                                        <span class="fw-bold text-danger">{{ skill.required_level }}</span>
+                                        {% if skill.required_level is not None %}
+                                            <span class="fw-bold text-danger">{{ skill.required_level }}</span>
+                                        {% else %}
+                                            <span class="text-muted" title="No benchmark defined for this skill">&mdash;</span>
+                                        {% endif %}
                                     </td>
                                     <td data-label="Self Rating" id="self-rating-cell-{{ skill.skill_id }}">
                                         {% if skill.self_rated_level is not None %}
@@ -338,7 +349,9 @@
                                         </div>
                                     </td>
                                     <td data-label="Gap" id="gap-cell-{{ skill.skill_id }}">
-                                        {% if skill.gap > 0 %}
+                                        {% if skill.gap is None %}
+                                            <span class="text-muted">&mdash;</span>
+                                        {% elif skill.gap > 0 %}
                                             <span class="text-danger fw-bold">-{{ skill.gap }}</span>
                                         {% else %}
                                             <span class="text-success">0</span>
@@ -352,6 +365,10 @@
                                         {% elif skill.status == 'warning' %}
                                             <span class="badge bg-warning">
                                                 <i class="bi bi-exclamation-triangle me-1"></i>Warning
+                                            </span>
+                                        {% elif skill.status == 'extra' %}
+                                            <span class="badge bg-light text-dark" title="Recorded, but not part of this employee's role benchmark">
+                                                <i class="bi bi-info-circle me-1"></i>No Benchmark
                                             </span>
                                         {% else %}
                                             <span class="badge bg-danger">
