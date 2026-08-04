@@ -954,7 +954,9 @@ def resource_availability_report_view(request):
         start_date__lte=period_end,
         end_date__gte=period_start,
     )
+    leaves_by_employee = defaultdict(list)
     for leave in leaves:
+        leaves_by_employee[leave.employee_id].append(leave)
         _add_occupied_range(leave.employee_id, leave.start_date, leave.end_date)
 
     resources = []
@@ -969,6 +971,8 @@ def resource_availability_report_view(request):
             group = project_groups.setdefault(act.project_id, {'project': act.project, 'tasks': []})
             group['tasks'].append(act)
 
+        emp_leaves = sorted(leaves_by_employee.get(emp.id, []), key=lambda lv: lv.start_date)
+
         resources.append({
             'employee': emp,
             'occupied_days': occupied_days,
@@ -976,6 +980,7 @@ def resource_availability_report_view(request):
             'occupancy_pct': occupancy_pct,
             'project_groups': list(project_groups.values()),
             'task_count': len(emp_activities),
+            'leaves': emp_leaves,
         })
 
     # Free-% distribution: how many resources fall into each availability tier, each resource
