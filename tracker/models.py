@@ -300,5 +300,20 @@ class UpdateRemark(models.Model):
     added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+class SavedReportFilter(models.Model):
+    """A user's named, bookmarked filter combination for the Project Reports page."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_report_filters')
+    name = models.CharField(max_length=100)
+    query_string = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ('user', 'name')
+
+    def __str__(self):
+        return f"{self.user} - {self.name}"
+
     def __str__(self):
         return f"Remark on Update {self.update.id} by {self.added_by.username} at {self.created_at}"

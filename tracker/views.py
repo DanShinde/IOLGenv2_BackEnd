@@ -7,12 +7,18 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
 from employees.models import Employee
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson, ProjectComment
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson, ProjectComment, SavedReportFilter
 
 from django.db.models import Q, F, Sum, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date, timedelta, datetime
+
+# Guards the Avg Delay / Avg Cycle Time report metrics against bad data-entry dates
+# (e.g. a stray "0020" or "0226" year) that would otherwise blow the average up to
+# hundreds of thousands of days. Any day-delta outside this bound is treated as bad
+# data and excluded rather than allowed to skew the average.
+MAX_PLAUSIBLE_DAY_DELTA = 3650  # ~10 years
 from dateutil.relativedelta import relativedelta
 from collections import Counter
 from collections import Counter, defaultdict 
@@ -634,6 +640,11 @@ def project_reports(request):
 
     # --- Dynamic Financial Year Logic (Same as Dashboard) ---
     today = timezone.now().date()
+    # A handful of seed/legacy records have corrupted planned_date values (e.g. year
+    # 0002, 0020, 0226 — clearly truncated typos). Without a floor, "All Time" bucketing
+    # walks the trend chart's x-axis back to the year those records claim, and they also
+    # inflate "planned" counts in every period. Treat anything older than this as bad data.
+    plausible_planned_date_floor = today - timedelta(days=MAX_PLAUSIBLE_DAY_DELTA)
     if today.month >= 4:
         current_fy_year = today.year
     else:
@@ -660,29 +671,62 @@ def project_reports(request):
     params_for_getlist.update(query_params)
     selected_segment_ids = params_for_getlist.getlist('segments')
     selected_team_lead_ids = params_for_getlist.getlist('team_leads')
+    selected_stage_keys = params_for_getlist.getlist('stages')
 
-    start_date = parse_date(query_params.get('start_date')) if query_params.get('start_date') else None
-    end_date = parse_date(query_params.get('end_date')) if query_params.get('end_date') else None
     min_value = query_params.get('min_value')
     max_value = query_params.get('max_value')
     selected_fy = query_params.get('financial_year')
 
-    # Apply Financial Year Filter (Overrides custom dates if present)
+    actual_start_date = parse_date(query_params.get('actual_start_date')) if query_params.get('actual_start_date') else None
+    actual_end_date = parse_date(query_params.get('actual_end_date')) if query_params.get('actual_end_date') else None
+
+    # --- Resolve the reporting period (Planned Date Range) ---
+    # Defaults to the current month so the page opens on a live, meaningful window
+    # instead of silently dumping "all time". "period" drives this; explicit custom
+    # dates imply period=custom even if the param itself wasn't sent.
+    period = query_params.get('period')
+    if not period:
+        period = 'custom' if (query_params.get('planned_start_date') and query_params.get('planned_end_date')) else 'this_month'
+
+    def _month_range(d):
+        month_start = d.replace(day=1)
+        month_end = (month_start + relativedelta(months=1)) - timedelta(days=1)
+        return month_start, month_end
+
+    def _quarter_range(d):
+        q_start_month = ((d.month - 1) // 3) * 3 + 1
+        q_start = date(d.year, q_start_month, 1)
+        q_end = (q_start + relativedelta(months=3)) - timedelta(days=1)
+        return q_start, q_end
+
+    if period == 'this_quarter':
+        start_date, end_date = _quarter_range(today)
+    elif period == 'all':
+        start_date, end_date = date(2000, 1, 1), today
+    elif period == 'custom':
+        start_date = parse_date(query_params.get('planned_start_date')) if query_params.get('planned_start_date') else None
+        end_date = parse_date(query_params.get('planned_end_date')) if query_params.get('planned_end_date') else None
+        if not (start_date and end_date):
+            period = 'this_month'
+            start_date, end_date = _month_range(today)
+    else:  # 'this_month' (default)
+        period = 'this_month'
+        start_date, end_date = _month_range(today)
+
+    # Financial Year overrides the resolved period entirely (same precedence as before)
     if selected_fy:
         year = int(selected_fy)
         fy_start = date(year, 4, 1)
         fy_end = date(year + 1, 3, 31)
-        
-        # Update start/end date for chart filtering
         start_date = fy_start
         end_date = fy_end
-        
+
         # Match Dashboard Logic: Live Projects in Period (Carry-over + New)
         # 1. Exclude projects completed before the start of the FY
         completed_early_ids = Project.objects.filter(
             is_archived=False,
-            stages__name='Handover', 
-            stages__status='Completed', 
+            stages__name='Handover',
+            stages__status='Completed',
             stages__actual_date__lt=fy_start
         ).values_list('id', flat=True)
 
@@ -691,15 +735,38 @@ def project_reports(request):
             Q(so_punch_date__lte=fy_end) | Q(so_punch_date__isnull=True)
         ).exclude(id__in=completed_early_ids)
 
+        if selected_stage_keys:
+            projects_qs = projects_qs.filter(stages__name__in=selected_stage_keys)
+    else:
+        # Scope to projects with a stage (optionally restricted to selected stage types)
+        # due in this window, including backlog carried forward from earlier windows.
+        planned_window_stages = Stage.objects.filter(
+            planned_date__isnull=False,
+            planned_date__gte=plausible_planned_date_floor,
+            planned_date__lte=end_date,
+        ).exclude(Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=start_date)))
+        if selected_stage_keys:
+            planned_window_stages = planned_window_stages.filter(name__in=selected_stage_keys)
+        projects_qs = projects_qs.filter(id__in=planned_window_stages.values_list('project_id', flat=True))
+
+    # Actual Date Range: independent filter, applies on top of the above either way
+    if actual_start_date and actual_end_date:
+        actual_window_stages = Stage.objects.filter(
+            status='Completed',
+            actual_date__range=[actual_start_date, actual_end_date],
+        )
+        if selected_stage_keys:
+            actual_window_stages = actual_window_stages.filter(name__in=selected_stage_keys)
+        projects_qs = projects_qs.filter(id__in=actual_window_stages.values_list('project_id', flat=True))
+
+    has_explicit_period = period != 'all'
+
     if selected_segment_ids:
         projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
 
     if selected_team_lead_ids:
         projects_qs = projects_qs.filter(team_lead__id__in=selected_team_lead_ids)
 
-    # Only apply custom date range if FY is NOT selected
-    if start_date and end_date and not selected_fy:
-        projects_qs = projects_qs.filter(so_punch_date__range=[start_date, end_date])
     if min_value:
         try:
             projects_qs = projects_qs.filter(value__gte=float(min_value))
@@ -709,47 +776,12 @@ def project_reports(request):
             projects_qs = projects_qs.filter(value__lte=float(max_value))
         except (ValueError, TypeError): pass
 
-    # --- Process Stage-Specific Filters ---
-    stage_filters_from_request = {}
-    for stage_key, stage_display in Stage.STAGE_NAMES:
-        status = query_params.get(f'stage_{stage_key}_status')
-        start = query_params.get(f'stage_{stage_key}_start')
-        end = query_params.get(f'stage_{stage_key}_end')
-        planned_start = query_params.get(f'stage_{stage_key}_planned_start')
-        planned_end = query_params.get(f'stage_{stage_key}_planned_end')
-        schedule_statuses = params_for_getlist.getlist(f'stage_{stage_key}_schedule_status')
-
-        if status or (start and end) or (planned_start and planned_end) or schedule_statuses:
-            stage_filters_from_request[stage_key] = {
-                'status': status, 
-                'start': start, 
-                'end': end,
-                'planned_start': planned_start,
-                'planned_end': planned_end,
-                'schedule_status': schedule_statuses
-            }
-            
-            # Base filter for the specific stage name
-            stage_q = Q(stages__name=stage_key)
-
-            # Apply Schedule Logic (Planned vs Actual)
-            if schedule_statuses:
-                schedule_q = Q()
-                if 'delayed' in schedule_statuses:
-                    schedule_q |= Q(stages__actual_date__gt=F('stages__planned_date'))
-                if 'on_time' in schedule_statuses:
-                    schedule_q |= Q(stages__actual_date__lte=F('stages__planned_date'))
-                if 'overdue' in schedule_statuses:
-                    schedule_q |= Q(stages__status__in=['Not started', 'In Progress'], stages__planned_date__lt=timezone.now().date())
-                stage_q &= schedule_q
-
-            stage_query_filters = {}
-            if status: stage_query_filters['stages__status'] = status
-            if start and end: stage_query_filters['stages__actual_date__range'] = [start, end]
-            if planned_start and planned_end: stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
-            
-            # Combine Q object with standard kwargs
-            projects_qs = projects_qs.filter(stage_q, **stage_query_filters)
+    # Which stages the rest of the report (summary table, charts, cross-tab) covers
+    if selected_stage_keys:
+        stage_names_to_report = [(k, v) for k, v in Stage.STAGE_NAMES if k in selected_stage_keys]
+    else:
+        stage_names_to_report = Stage.STAGE_NAMES
+    stage_keys_to_report = [k for k, _ in stage_names_to_report]
 
     # --- Check for the 'hide_completed' filter ---
     hide_completed = query_params.get('hide_completed') == '1'
@@ -761,44 +793,82 @@ def project_reports(request):
         ).values_list('id', flat=True)
         projects_qs = projects_qs.exclude(id__in=completed_project_ids)
 
+    # --- Active filter chips (for quick removal in the UI) ---
+    active_filters = []
+    base_qd = request.GET.copy()
+
+    if selected_fy:
+        fy_label = dict(fy_options).get(selected_fy, selected_fy)
+        qd = base_qd.copy(); qd.pop('financial_year', None)
+        active_filters.append({'label': f'FY: {fy_label}', 'href': f"?{qd.urlencode()}"})
+
+    if selected_segment_ids:
+        names = list(trackerSegment.objects.filter(id__in=selected_segment_ids).values_list('name', flat=True))
+        qd = base_qd.copy(); qd.pop('segments', None)
+        active_filters.append({'label': f"Segments: {', '.join(names)}", 'href': f"?{qd.urlencode()}"})
+
+    if selected_team_lead_ids:
+        names = list(Employee.objects.filter(id__in=selected_team_lead_ids).values_list('name', flat=True))
+        qd = base_qd.copy(); qd.pop('team_leads', None)
+        active_filters.append({'label': f"Team Leads: {', '.join(names)}", 'href': f"?{qd.urlencode()}"})
+
+    if not selected_fy and (query_params.get('period') or query_params.get('planned_start_date')):
+        qd = base_qd.copy(); qd.pop('period', None); qd.pop('planned_start_date', None); qd.pop('planned_end_date', None)
+        period_labels = {'this_month': 'This Month', 'this_quarter': 'This Quarter', 'all': 'All Time'}
+        period_label = period_labels.get(period, f"{start_date} to {end_date}")
+        active_filters.append({'label': f"Planned Period: {period_label}", 'href': f"?{qd.urlencode()}"})
+
+    if selected_stage_keys:
+        stage_display_map = dict(Stage.STAGE_NAMES)
+        names = [stage_display_map.get(k, k) for k in selected_stage_keys]
+        qd = base_qd.copy(); qd.pop('stages', None)
+        active_filters.append({'label': f"Stages: {', '.join(names)}", 'href': f"?{qd.urlencode()}"})
+
+    if actual_start_date and actual_end_date:
+        qd = base_qd.copy(); qd.pop('actual_start_date', None); qd.pop('actual_end_date', None)
+        active_filters.append({'label': f"Actual Completed: {actual_start_date} to {actual_end_date}", 'href': f"?{qd.urlencode()}"})
+
+    if min_value or max_value:
+        qd = base_qd.copy(); qd.pop('min_value', None); qd.pop('max_value', None)
+        active_filters.append({'label': f"Value: {min_value or '0'} - {max_value or '∞'} Cr", 'href': f"?{qd.urlencode()}"})
+
+    if hide_completed:
+        qd = base_qd.copy(); qd.pop('hide_completed', None)
+        active_filters.append({'label': 'Hide Completed', 'href': f"?{qd.urlencode()}"})
+
     # --- Capture QS for Charts (Before Hide Completed) ---
     chart_projects_qs = projects_qs
 
     # --- Chart Click Filtering ---
-    chart_filter_stage = query_params.get('chart_filter_stage')
+    # The trend chart is an aggregate across all currently-reported stages (no per-stage
+    # picker), so a bar click scopes to stage_keys_to_report rather than one stage name.
     chart_filter_month = query_params.get('chart_filter_month')
     chart_filter_type = query_params.get('chart_filter_type')
 
-    if chart_filter_stage and chart_filter_month and chart_filter_type:
+    if chart_filter_month and chart_filter_type:
         try:
             filter_date = parse_date(chart_filter_month)
             if filter_date:
                 if chart_filter_type == 'planned':
-                    projects_qs = projects_qs.filter(
-                        stages__name=chart_filter_stage,
-                        stages__planned_date__year=filter_date.year,
-                        stages__planned_date__month=filter_date.month
-                    )
+                    # Matches the trend chart's backlog-inclusive "planned" bucket: due by
+                    # this month's end and not already resolved before this month started.
+                    month_start = filter_date.replace(day=1)
+                    month_end = (month_start + relativedelta(months=1)) - timedelta(days=1)
+                    matching_stage_ids = Stage.objects.filter(
+                        name__in=stage_keys_to_report,
+                        planned_date__gte=plausible_planned_date_floor,
+                        planned_date__lte=month_end,
+                    ).exclude(
+                        Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=month_start))
+                    ).values_list('project_id', flat=True)
+                    projects_qs = projects_qs.filter(id__in=matching_stage_ids)
                 elif chart_filter_type == 'actual':
-                    projects_qs = projects_qs.filter(
-                        stages__name=chart_filter_stage,
-                        stages__actual_date__year=filter_date.year,
-                        stages__actual_date__month=filter_date.month
-                    )
-                elif chart_filter_type == 'otif_total':
-                    projects_qs = projects_qs.filter(
-                        stages__name=chart_filter_stage,
-                        stages__planned_date__year=filter_date.year,
-                        stages__planned_date__month=filter_date.month
-                    )
-                elif chart_filter_type == 'otif_on_time':
-                    projects_qs = projects_qs.filter(
-                        stages__name=chart_filter_stage,
-                        stages__planned_date__year=filter_date.year,
-                        stages__planned_date__month=filter_date.month,
-                        stages__actual_date__lte=F('stages__planned_date'),
-                        stages__actual_date__isnull=False
-                    )
+                    matching_stage_ids = Stage.objects.filter(
+                        name__in=stage_keys_to_report,
+                        actual_date__year=filter_date.year,
+                        actual_date__month=filter_date.month
+                    ).values_list('project_id', flat=True)
+                    projects_qs = projects_qs.filter(id__in=matching_stage_ids)
         except (ValueError, TypeError):
             pass
 
@@ -823,147 +893,337 @@ def project_reports(request):
             'emu_schedule': get_schedule_status(emu_stages),
         })
 
-    # --- Calculate Standard KPIs ---
-    
-    # --- Prepare standard chart data ---
-    status_counts = Counter(p.get_overall_status() for p in distinct_projects)
-    status_labels = list(status_counts.keys())
-    status_data = list(status_counts.values())
-    segment_counts = distinct_projects.values('segment_con__name').annotate(count=Count('id')).order_by('-count')
-    segment_labels = [item['segment_con__name'] for item in segment_counts if item['segment_con__name']]
-    segment_data = [item['count'] for item in segment_counts if item['segment_con__name']]
-
-    # --- NEW: Team Lead Distribution ---
-    team_lead_counts = Counter(p.team_lead.name if p.team_lead else 'Unassigned' for p in distinct_projects)
-    team_lead_labels = list(team_lead_counts.keys())
-    team_lead_data = list(team_lead_counts.values())
-
     # --- NEW: Stage Bottleneck Analysis (Top Delayed Stages) ---
     # Count stages where Actual > Planned OR (Status is active AND Today > Planned)
     today = timezone.now().date()
     delayed_stages_qs = Stage.objects.filter(
-        project__in=distinct_projects
+        project__in=distinct_projects,
+        planned_date__gte=plausible_planned_date_floor,
+    ).exclude(
+        status='Not Applicable'
     ).filter(
-        Q(actual_date__gt=F('planned_date')) | 
+        Q(actual_date__gt=F('planned_date')) |
         Q(status__in=['Not started', 'In Progress'], planned_date__lt=today)
-    ).values('name').annotate(count=Count('id')).order_by('-count')
-    
+    )
+    if selected_stage_keys:
+        delayed_stages_qs = delayed_stages_qs.filter(name__in=stage_keys_to_report)
+    delayed_stages_qs = delayed_stages_qs.values('name').annotate(count=Count('id')).order_by('-count')
+
     stage_delay_labels = [item['name'] for item in delayed_stages_qs[:10]] # Top 10 bottlenecks
     stage_delay_data = [item['count'] for item in delayed_stages_qs[:10]]
 
-    # --- NEW: Monthly Planned vs Actual Trends per Stage ---
-    stage_trend_data = {}
-    
-    # Aggregate Planned Counts by Month
-    planned_qs = Stage.objects.filter(
+    # --- NEW: Monthly Planned vs Actual Trend (aggregate across all reported stages, with
+    # backlog carry-forward) ---
+    # "Planned" per month is a point-in-time snapshot (like the summary table): anything
+    # due by that month's end that wasn't already completed before that month started, so
+    # a stage planned in an earlier month keeps showing as planned until it's resolved
+    # instead of only appearing once in its origin month. Combines every stage currently
+    # in scope (all stages, or just the ones picked in the "Stages" filter) into one trend.
+    trend_source_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
-        planned_date__isnull=False
-    )
-    if start_date and end_date:
-        planned_qs = planned_qs.filter(planned_date__range=[start_date, end_date])
-        
-    planned_qs = planned_qs.annotate(
-        month=TruncMonth('planned_date')
-    ).values('name', 'month').annotate(count=Count('id')).order_by('month')
+        planned_date__isnull=False,
+        planned_date__gte=plausible_planned_date_floor,
+        planned_date__lte=end_date,
+    ).exclude(status='Not Applicable')
+    if selected_stage_keys:
+        trend_source_qs = trend_source_qs.filter(name__in=stage_keys_to_report)
+    trend_rows = list(trend_source_qs.values('planned_date', 'actual_date', 'status'))
 
-    # Aggregate Actual Counts by Month
-    actual_qs = Stage.objects.filter(
-        project_id__in=chart_project_ids,
-        actual_date__isnull=False
-    )
-    if start_date and end_date:
-        actual_qs = actual_qs.filter(actual_date__range=[start_date, end_date])
-        
-    actual_qs = actual_qs.annotate(
-        month=TruncMonth('actual_date')
-    ).values('name', 'month').annotate(count=Count('id')).order_by('month')
+    if has_explicit_period:
+        trend_range_start = start_date
+    else:
+        earliest_planned = min((r['planned_date'] for r in trend_rows), default=end_date)
+        trend_range_start = earliest_planned
 
-    # Process into dictionary structure for Chart.js
-    temp_trends = defaultdict(lambda: defaultdict(lambda: {'p': 0, 'a': 0}))
+    months_list = []
+    cursor = trend_range_start.replace(day=1)
+    end_cursor = end_date.replace(day=1)
+    while cursor <= end_cursor:
+        months_list.append(cursor)
+        cursor = cursor + relativedelta(months=1)
 
-    for item in planned_qs:
-        if item['month']:
-            temp_trends[item['name']][item['month']]['p'] = item['count']
-            
-    for item in actual_qs:
-        if item['month']:
-            temp_trends[item['name']][item['month']]['a'] = item['count']
-            
-    for stage_name, month_data in temp_trends.items():
-        sorted_months = sorted(month_data.keys())
-        labels = [m.strftime('%b %Y') for m in sorted_months]
-        years = [m.year for m in sorted_months]
-        months = [m.month for m in sorted_months]
-        
-        financial_years = []
-        for m in sorted_months:
-            if m.month >= 4:
-                fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
-            else:
-                fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
-            financial_years.append(fy_str)
+    trend_planned = []
+    trend_actual = []
+    for month_start in months_list:
+        month_end = (month_start + relativedelta(months=1)) - timedelta(days=1)
+        trend_planned.append(sum(
+            1 for r in trend_rows
+            if r['planned_date'] <= month_end and not (
+                r['status'] == 'Completed' and r['actual_date'] and r['actual_date'] < month_start
+            )
+        ))
+        trend_actual.append(sum(
+            1 for r in trend_rows
+            if r['actual_date'] and month_start <= r['actual_date'] <= month_end
+        ))
 
-        p_data = [month_data[m]['p'] for m in sorted_months]
-        a_data = [month_data[m]['a'] for m in sorted_months]
-        
-        stage_trend_data[stage_name] = {
-            'labels': labels,
-            'years': years,
-            'financial_years': financial_years,
-            'months': months,
-            'planned': p_data,
-            'actual': a_data
-        }
+    trend_labels = [m.strftime('%b %Y') for m in months_list]
+    trend_years = [m.year for m in months_list]
+    trend_months = [m.month for m in months_list]
+    trend_financial_years = []
+    for m in months_list:
+        if m.month >= 4:
+            fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+        else:
+            fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+        trend_financial_years.append(fy_str)
 
-    # --- NEW: OTIF Trends per Stage ---
-    stage_otif_data = {}
-    
+    stage_trend_data = {
+        'labels': trend_labels,
+        'years': trend_years,
+        'financial_years': trend_financial_years,
+        'months': trend_months,
+        'planned': trend_planned,
+        'actual': trend_actual,
+    }
+
+    # --- NEW: OTIF Trend (aggregate across all reported stages) ---
     otif_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
-        planned_date__isnull=False
-    )
-    if start_date and end_date:
+        planned_date__isnull=False,
+        planned_date__gte=plausible_planned_date_floor,
+    ).exclude(status='Not Applicable')
+    if selected_stage_keys:
+        otif_qs = otif_qs.filter(name__in=stage_keys_to_report)
+    if has_explicit_period:
         otif_qs = otif_qs.filter(planned_date__range=[start_date, end_date])
-        
+
     otif_qs = otif_qs.annotate(
         month=TruncMonth('planned_date')
-    ).values('name', 'month').annotate(
+    ).values('month').annotate(
         total=Count('id'),
         on_time=Count('id', filter=Q(actual_date__isnull=False) & Q(actual_date__lte=F('planned_date')))
     ).order_by('month')
 
-    temp_otif = defaultdict(lambda: defaultdict(lambda: {'total': 0, 'on_time': 0}))
-
+    temp_otif = {}
     for item in otif_qs:
         if item['month']:
-            temp_otif[item['name']][item['month']]['total'] = item['total']
-            temp_otif[item['name']][item['month']]['on_time'] = item['on_time']
+            temp_otif[item['month']] = {'total': item['total'], 'on_time': item['on_time']}
 
-    for stage_name, month_data in temp_otif.items():
-        sorted_months = sorted(month_data.keys())
-        labels = [m.strftime('%b %Y') for m in sorted_months]
-        years = [m.year for m in sorted_months]
-        months = [m.month for m in sorted_months]
-        
-        financial_years = []
-        for m in sorted_months:
-            if m.month >= 4:
-                fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+    otif_sorted_months = sorted(temp_otif.keys())
+    otif_financial_years = []
+    for m in otif_sorted_months:
+        if m.month >= 4:
+            fy_str = f"FY {str(m.year)[-2:]}-{str(m.year + 1)[-2:]}"
+        else:
+            fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
+        otif_financial_years.append(fy_str)
+
+    stage_otif_data = {
+        'labels': [m.strftime('%b %Y') for m in otif_sorted_months],
+        'years': [m.year for m in otif_sorted_months],
+        'financial_years': otif_financial_years,
+        'months': [m.month for m in otif_sorted_months],
+        'total': [temp_otif[m]['total'] for m in otif_sorted_months],
+        'on_time': [temp_otif[m]['on_time'] for m in otif_sorted_months],
+    }
+
+    # --- NEW: Per-Stage Planned vs Actual Summary (with backlog carry-forward) ---
+    # "Planned" for the selected period = anything due on/before the period end that
+    # wasn't already completed before the period started (so overdue/pending work from
+    # earlier periods carries forward into the current one instead of disappearing).
+    summary_start = start_date
+    summary_end = end_date
+
+    # Equal-length preceding window, used for period-over-period OTIF comparison.
+    # Not meaningful for "All Time", which has no natural "previous period".
+    if has_explicit_period:
+        period_length_days = (summary_end - summary_start).days + 1
+        prev_period_end = summary_start - timedelta(days=1)
+        prev_period_start = prev_period_end - timedelta(days=period_length_days - 1)
+    else:
+        prev_period_start = prev_period_end = None
+
+    automation_stage_keys = dict(Stage.AUTOMATION_STAGES)
+    stage_summary = []
+    aggregate_planned_list = []
+    aggregate_actual_list = []
+
+    total_planned = total_actual = total_pending = total_delayed = total_on_time = 0
+
+    for stage_key, stage_display in stage_names_to_report:
+        planned_backlog_qs = Stage.objects.filter(
+            project_id__in=chart_project_ids,
+            name=stage_key,
+            planned_date__isnull=False,
+            planned_date__gte=plausible_planned_date_floor,
+            planned_date__lte=summary_end,
+        ).exclude(
+            Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=summary_start))
+        ).select_related('project').order_by('planned_date')
+
+        actual_period_qs = Stage.objects.filter(
+            project_id__in=chart_project_ids,
+            name=stage_key,
+            status='Completed',
+            actual_date__range=[summary_start, summary_end]
+        ).select_related('project').order_by('actual_date')
+
+        delayed_qs = planned_backlog_qs.filter(
+            status__in=['Not started', 'In Progress'],
+            planned_date__lt=today
+        )
+
+        planned_count = planned_backlog_qs.count()
+        pending_count = planned_backlog_qs.exclude(status='Completed').count()
+        delayed_count = delayed_qs.count()
+
+        actual_count = actual_period_qs.count()
+        on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
+        otif_pct = round((on_time_count / actual_count) * 100, 1) if actual_count else None
+
+        total_planned += planned_count
+        total_actual += actual_count
+        total_pending += pending_count
+        total_delayed += delayed_count
+        total_on_time += on_time_count
+
+        # Average staleness of the currently-overdue backlog, in days
+        avg_delay_days = None
+        overdue_planned_dates = list(delayed_qs.values_list('planned_date', flat=True))
+        overdue_deltas = [(today - d).days for d in overdue_planned_dates if 0 <= (today - d).days <= MAX_PLAUSIBLE_DAY_DELTA]
+        if overdue_deltas:
+            avg_delay_days = round(sum(overdue_deltas) / len(overdue_deltas), 1)
+
+        # Cycle time: planned start -> actual completion, for stages completed in this period
+        avg_cycle_time = None
+        cycle_pairs = list(
+            actual_period_qs.exclude(planned_start_date__isnull=True).values_list('planned_start_date', 'actual_date')
+        )
+        cycle_deltas = [(a - p).days for p, a in cycle_pairs if 0 <= (a - p).days <= MAX_PLAUSIBLE_DAY_DELTA]
+        if cycle_deltas:
+            avg_cycle_time = round(sum(cycle_deltas) / len(cycle_deltas), 1)
+
+        # Period-over-period OTIF trend
+        otif_trend = None
+        if has_explicit_period:
+            prev_actual_qs = Stage.objects.filter(
+                project_id__in=chart_project_ids,
+                name=stage_key,
+                status='Completed',
+                actual_date__range=[prev_period_start, prev_period_end]
+            )
+            prev_actual_count = prev_actual_qs.count()
+            if prev_actual_count and actual_count:
+                prev_on_time = prev_actual_qs.filter(actual_date__lte=F('planned_date')).count()
+                prev_otif = (prev_on_time / prev_actual_count) * 100
+                if otif_pct > prev_otif:
+                    otif_trend = 'up'
+                elif otif_pct < prev_otif:
+                    otif_trend = 'down'
+                else:
+                    otif_trend = 'flat'
+
+        # Risk color-coding based on how much of the planned backlog is currently delayed
+        if planned_count == 0:
+            risk = 'none'
+        else:
+            delay_ratio = delayed_count / planned_count
+            risk = 'high' if delay_ratio >= 0.3 else ('medium' if delay_ratio >= 0.1 else 'low')
+
+        stage_summary.append({
+            'key': stage_key,
+            'display': stage_display,
+            'type': 'Automation' if stage_key in automation_stage_keys else 'Emulation',
+            'planned': planned_count,
+            'actual': actual_count,
+            'pending': pending_count,
+            'delayed': delayed_count,
+            'otif': otif_pct,
+            'otif_trend': otif_trend,
+            'avg_delay_days': avg_delay_days,
+            'avg_cycle_time': avg_cycle_time,
+            'risk': risk,
+        })
+
+        aggregate_planned_list.extend(
+            {
+                'code': s.project.code,
+                'customer': s.project.customer_name,
+                'stage': stage_display,
+                'planned_date_raw': s.planned_date,
+                'planned_date': s.planned_date.strftime('%d %b %Y') if s.planned_date else '',
+                'status': s.status,
+                'is_overdue': s.status in ['Not started', 'In Progress'] and s.planned_date and s.planned_date < today,
+            }
+            for s in planned_backlog_qs.exclude(status='Completed')
+        )
+        aggregate_actual_list.extend(
+            {
+                'code': s.project.code,
+                'customer': s.project.customer_name,
+                'stage': stage_display,
+                'actual_date_raw': s.actual_date,
+                'actual_date': s.actual_date.strftime('%d %b %Y') if s.actual_date else '',
+                'planned_date': s.planned_date.strftime('%d %b %Y') if s.planned_date else '',
+                'on_time': bool(s.actual_date and s.planned_date and s.actual_date <= s.planned_date),
+            }
+            for s in actual_period_qs
+        )
+
+    # Built stage-by-stage above; sort chronologically so the drill-down lists read
+    # naturally, then drop the raw date keys used only for sorting.
+    aggregate_planned_list.sort(key=lambda p: p['planned_date_raw'])
+    aggregate_actual_list.sort(key=lambda a: a['actual_date_raw'])
+    for p in aggregate_planned_list:
+        del p['planned_date_raw']
+    for a in aggregate_actual_list:
+        del a['actual_date_raw']
+
+    # --- NEW: Report-wide KPI summary (all stages combined, for the filtered set) ---
+    overall_otif = round((total_on_time / total_actual) * 100, 1) if total_actual else None
+    overall_otif_trend = None
+    if has_explicit_period and total_actual:
+        prev_overall_qs = Stage.objects.filter(
+            project_id__in=chart_project_ids,
+            status='Completed',
+            actual_date__range=[prev_period_start, prev_period_end]
+        )
+        prev_overall_actual = prev_overall_qs.count()
+        if prev_overall_actual:
+            prev_overall_on_time = prev_overall_qs.filter(actual_date__lte=F('planned_date')).count()
+            prev_overall_otif = (prev_overall_on_time / prev_overall_actual) * 100
+            if overall_otif > prev_overall_otif:
+                overall_otif_trend = 'up'
+            elif overall_otif < prev_overall_otif:
+                overall_otif_trend = 'down'
             else:
-                fy_str = f"FY {str(m.year - 1)[-2:]}-{str(m.year)[-2:]}"
-            financial_years.append(fy_str)
+                overall_otif_trend = 'flat'
 
-        total_data = [month_data[m]['total'] for m in sorted_months]
-        on_time_data = [month_data[m]['on_time'] for m in sorted_months]
-        
-        stage_otif_data[stage_name] = {
-            'labels': labels,
-            'years': years,
-            'financial_years': financial_years,
-            'months': months,
-            'total': total_data,
-            'on_time': on_time_data
-        }
+    report_kpis = {
+        'total_planned': total_planned,
+        'total_actual': total_actual,
+        'total_pending': total_pending,
+        'total_delayed': total_delayed,
+        'overall_otif': overall_otif,
+        'overall_otif_trend': overall_otif_trend,
+    }
+
+    # --- NEW: Who owns today's delays — cross-tab by Team Lead and Segment ---
+    delayed_now_qs = Stage.objects.filter(
+        project_id__in=chart_project_ids,
+        planned_date__isnull=False,
+        planned_date__gte=plausible_planned_date_floor,
+        planned_date__lte=summary_end,
+        status__in=['Not started', 'In Progress'],
+        planned_date__lt=today,
+    )
+    if selected_stage_keys:
+        delayed_now_qs = delayed_now_qs.filter(name__in=stage_keys_to_report)
+    delayed_now_qs = delayed_now_qs.select_related('project__team_lead', 'project__segment_con')
+
+    delay_by_team_lead = Counter()
+    delay_by_segment = Counter()
+    for s in delayed_now_qs:
+        delay_by_team_lead[s.project.team_lead.name if s.project.team_lead else 'Unassigned'] += 1
+        delay_by_segment[s.project.segment_con.name if s.project.segment_con else 'Unassigned'] += 1
+
+    delay_by_team_lead_top = delay_by_team_lead.most_common()
+    delay_by_segment_top = delay_by_segment.most_common()
+    delay_by_team_lead_labels = [x[0] for x in delay_by_team_lead_top]
+    delay_by_team_lead_data = [x[1] for x in delay_by_team_lead_top]
+    delay_by_segment_labels = [x[0] for x in delay_by_segment_top]
+    delay_by_segment_data = [x[1] for x in delay_by_segment_top]
 
     # --- NEW: Emulation Timing Analysis Trends ---
     # Categories:
@@ -983,7 +1243,7 @@ def project_reports(request):
             month_key = emu.actual_date.replace(day=1)
             
             # Filter by date range if selected
-            if start_date and end_date and not (start_date <= emu.actual_date <= end_date):
+            if has_explicit_period and not (start_date <= emu.actual_date <= end_date):
                 continue
             
             dispatch_date = dispatch.actual_date if (dispatch and dispatch.actual_date) else None
@@ -1028,23 +1288,56 @@ def project_reports(request):
         'selected_segment_ids': [int(i) for i in selected_segment_ids],
         'selected_team_lead_ids': [int(i) for i in selected_team_lead_ids],
         'start_date': start_date, 'end_date': end_date,
+        'period': period,
+        'actual_start_date': actual_start_date, 'actual_end_date': actual_end_date,
         'min_value': min_value, 'max_value': max_value,
-        'status_labels': status_labels, 'status_data': status_data,
-        'segment_labels': segment_labels, 'segment_data': segment_data,
-        'team_lead_labels': team_lead_labels, 'team_lead_data': team_lead_data,
         'stage_delay_labels': stage_delay_labels, 'stage_delay_data': stage_delay_data,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
-        'automation_stage_names': Stage.AUTOMATION_STAGES,
-        'emulation_stage_names': Stage.EMULATION_STAGES,
-        'stage_filters': stage_filters_from_request,
+        'all_automation_stage_names': Stage.AUTOMATION_STAGES,
+        'all_emulation_stage_names': Stage.EMULATION_STAGES,
+        'selected_stage_keys': selected_stage_keys,
         'hide_completed_active': hide_completed,
         'stage_trend_data': json.dumps(stage_trend_data),
         'stage_otif_data': json.dumps(stage_otif_data),
         'emu_timing_data': json.dumps(emu_chart_data),
         'fy_options': fy_options,
         'selected_fy': selected_fy,
+        'stage_summary': stage_summary,
+        'aggregate_project_lists': json.dumps({'planned': aggregate_planned_list, 'actual': aggregate_actual_list}),
+        'summary_start': summary_start,
+        'summary_end': summary_end,
+        'active_filters': active_filters,
+        'report_kpis': report_kpis,
+        'delay_by_team_lead_labels': delay_by_team_lead_labels,
+        'delay_by_team_lead_data': delay_by_team_lead_data,
+        'delay_by_segment_labels': delay_by_segment_labels,
+        'delay_by_segment_data': delay_by_segment_data,
+        'saved_report_presets': SavedReportFilter.objects.filter(user=request.user) if request.user.is_authenticated else [],
+        'current_query_string': request.GET.urlencode(),
     }
     return render(request, 'tracker/project_report.html', context)
+
+
+@login_required
+def save_report_preset(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        query_string = request.POST.get('query_string', '')
+        if name:
+            SavedReportFilter.objects.update_or_create(
+                user=request.user, name=name,
+                defaults={'query_string': query_string}
+            )
+            return redirect(f"{reverse('project_reports')}?{query_string}")
+    return redirect('project_reports')
+
+
+@login_required
+def delete_report_preset(request, preset_id):
+    if request.method == 'POST':
+        SavedReportFilter.objects.filter(user=request.user, id=preset_id).delete()
+    return redirect('project_reports')
+
 
 @login_required
 def project_activity(request, project_id):
@@ -1202,59 +1495,122 @@ def export_milestones_pdf(request):
     return response
 
 
-@login_required
-def export_report_pdf(request):
-    projects = Project.objects.filter(is_archived=False).select_related('segment_con').prefetch_related('stages').all()
-    selected_segment_ids = request.GET.getlist('segments')
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
+def _build_filtered_report_projects(request):
+    """Applies the Reports page's standard filters (segments, team leads, value range,
+    financial year, stages, planned & actual date windows) to the Project queryset.
+    Shared by the PDF and Excel exports so their filtering stays in lockstep with the
+    on-page report."""
+    query_params = request.GET
+    today = timezone.now().date()
+    plausible_planned_date_floor = today - timedelta(days=MAX_PLAUSIBLE_DAY_DELTA)
+
+    projects_qs = Project.objects.filter(is_archived=False).select_related('segment_con', 'team_lead').prefetch_related('stages').all()
+
+    selected_segment_ids = query_params.getlist('segments')
+    selected_team_lead_ids = query_params.getlist('team_leads')
+    selected_stage_keys = query_params.getlist('stages')
+    min_value = query_params.get('min_value')
+    max_value = query_params.get('max_value')
+    selected_fy = query_params.get('financial_year')
+
+    actual_start_date = parse_date(query_params.get('actual_start_date')) if query_params.get('actual_start_date') else None
+    actual_end_date = parse_date(query_params.get('actual_end_date')) if query_params.get('actual_end_date') else None
+
+    period = query_params.get('period')
+    if not period:
+        period = 'custom' if (query_params.get('planned_start_date') and query_params.get('planned_end_date')) else 'this_month'
+
+    def _month_range(d):
+        month_start = d.replace(day=1)
+        month_end = (month_start + relativedelta(months=1)) - timedelta(days=1)
+        return month_start, month_end
+
+    def _quarter_range(d):
+        q_start_month = ((d.month - 1) // 3) * 3 + 1
+        q_start = date(d.year, q_start_month, 1)
+        q_end = (q_start + relativedelta(months=3)) - timedelta(days=1)
+        return q_start, q_end
+
+    if period == 'this_quarter':
+        start_date, end_date = _quarter_range(today)
+    elif period == 'all':
+        start_date, end_date = date(2000, 1, 1), today
+    elif period == 'custom':
+        start_date = parse_date(query_params.get('planned_start_date')) if query_params.get('planned_start_date') else None
+        end_date = parse_date(query_params.get('planned_end_date')) if query_params.get('planned_end_date') else None
+        if not (start_date and end_date):
+            period = 'this_month'
+            start_date, end_date = _month_range(today)
+    else:
+        period = 'this_month'
+        start_date, end_date = _month_range(today)
+
+    if selected_fy:
+        year = int(selected_fy)
+        fy_start = date(year, 4, 1)
+        fy_end = date(year + 1, 3, 31)
+        start_date, end_date = fy_start, fy_end
+
+        completed_early_ids = Project.objects.filter(
+            is_archived=False, stages__name='Handover', stages__status='Completed', stages__actual_date__lt=fy_start
+        ).values_list('id', flat=True)
+        projects_qs = projects_qs.filter(
+            Q(so_punch_date__lte=fy_end) | Q(so_punch_date__isnull=True)
+        ).exclude(id__in=completed_early_ids)
+        if selected_stage_keys:
+            projects_qs = projects_qs.filter(stages__name__in=selected_stage_keys)
+    else:
+        planned_window_stages = Stage.objects.filter(
+            planned_date__isnull=False, planned_date__gte=plausible_planned_date_floor,
+            planned_date__lte=end_date,
+        ).exclude(Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=start_date)))
+        if selected_stage_keys:
+            planned_window_stages = planned_window_stages.filter(name__in=selected_stage_keys)
+        projects_qs = projects_qs.filter(id__in=planned_window_stages.values_list('project_id', flat=True))
+
+    if actual_start_date and actual_end_date:
+        actual_window_stages = Stage.objects.filter(
+            status='Completed', actual_date__range=[actual_start_date, actual_end_date],
+        )
+        if selected_stage_keys:
+            actual_window_stages = actual_window_stages.filter(name__in=selected_stage_keys)
+        projects_qs = projects_qs.filter(id__in=actual_window_stages.values_list('project_id', flat=True))
 
     if selected_segment_ids:
-        projects = projects.filter(segment_con__id__in=selected_segment_ids)
-    if start_date and end_date:
-        projects = projects.filter(so_punch_date__range=[start_date, end_date])
+        projects_qs = projects_qs.filter(segment_con__id__in=selected_segment_ids)
+    if selected_team_lead_ids:
+        projects_qs = projects_qs.filter(team_lead__id__in=selected_team_lead_ids)
+    if min_value:
+        try: projects_qs = projects_qs.filter(value__gte=float(min_value))
+        except (ValueError, TypeError): pass
+    if max_value:
+        try: projects_qs = projects_qs.filter(value__lte=float(max_value))
+        except (ValueError, TypeError): pass
 
-    for stage_key, stage_display in Stage.STAGE_NAMES:
-        status = request.GET.get(f'stage_{stage_key}_status')
-        start = request.GET.get(f'stage_{stage_key}_start')
-        end = request.GET.get(f'stage_{stage_key}_end')
-        planned_start = request.GET.get(f'stage_{stage_key}_planned_start')
-        planned_end = request.GET.get(f'stage_{stage_key}_planned_end')
-        schedule_statuses = request.GET.getlist(f'stage_{stage_key}_schedule_status')
-
-        if status or (start and end) or (planned_start and planned_end) or schedule_statuses:
-            stage_q = Q(stages__name=stage_key)
-
-            if schedule_statuses:
-                schedule_q = Q()
-                if 'delayed' in schedule_statuses:
-                    schedule_q |= Q(stages__actual_date__gt=F('stages__planned_date'))
-                if 'on_time' in schedule_statuses:
-                    schedule_q |= Q(stages__actual_date__lte=F('stages__planned_date'))
-                if 'overdue' in schedule_statuses:
-                    schedule_q |= Q(stages__status__in=['Not started', 'In Progress'], stages__planned_date__lt=timezone.now().date())
-                stage_q &= schedule_q
-
-            stage_query_filters = {}
-            if status:
-                stage_query_filters['stages__status'] = status
-            if start and end:
-                stage_query_filters['stages__actual_date__range'] = [start, end]
-            if planned_start and planned_end:
-                stage_query_filters['stages__planned_date__range'] = [planned_start, planned_end]
-            
-            projects = projects.filter(stage_q, **stage_query_filters)
-    
-    # --- NEW: Hide Completed Logic for PDF ---
-    if request.GET.get('hide_completed') == '1':
+    if query_params.get('hide_completed') == '1':
         completed_project_ids = Project.objects.filter(
-            is_archived=False,
-            stages__name='Handover',
-            stages__status='Completed'
+            is_archived=False, stages__name='Handover', stages__status='Completed'
         ).values_list('id', flat=True)
-        projects = projects.exclude(id__in=completed_project_ids)
+        projects_qs = projects_qs.exclude(id__in=completed_project_ids)
 
-    distinct_projects = projects.distinct()
+    stage_names_to_report = (
+        [(k, v) for k, v in Stage.STAGE_NAMES if k in selected_stage_keys] if selected_stage_keys
+        else Stage.STAGE_NAMES
+    )
+
+    return {
+        'projects_qs': projects_qs.distinct(),
+        'today': today,
+        'start_date': start_date,
+        'end_date': end_date,
+        'stage_names_to_report': stage_names_to_report,
+    }
+
+
+@login_required
+def export_report_pdf(request):
+    filtered = _build_filtered_report_projects(request)
+    distinct_projects = filtered['projects_qs']
 
     # --- Start Building the PDF ---
     response = HttpResponse(content_type='application/pdf')
@@ -1301,8 +1657,107 @@ def export_report_pdf(request):
     pdf = buffer.getvalue()
     buffer.close()
     response.write(pdf)
-    
+
     return response
+
+
+@login_required
+def export_report_excel(request):
+    """Excel version of the Reports page: full filter fidelity (segments, team leads,
+    financial year, stages, planned & actual date windows, value range, hide completed),
+    plus a Stage Summary sheet mirroring the on-page planned/actual/backlog table."""
+    filtered = _build_filtered_report_projects(request)
+    distinct_projects = filtered['projects_qs']
+    today = filtered['today']
+    summary_start = filtered['start_date']
+    summary_end = filtered['end_date']
+    stage_names_to_report = filtered['stage_names_to_report']
+    chart_project_ids = list(distinct_projects.values_list('id', flat=True))
+    plausible_planned_date_floor = today - timedelta(days=MAX_PLAUSIBLE_DAY_DELTA)
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M')
+    filename = f"Project_Report_{timestamp}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    workbook = Workbook()
+
+    # --- Sheet 1: Projects ---
+    projects_sheet = workbook.active
+    projects_sheet.title = "Projects"
+    projects_sheet.append(['Code', 'Customer', 'Segment', 'Team Lead', 'Value (Cr)', 'SO Punch Date', 'Completion %', 'Status', 'OTIF %'])
+    for cell in projects_sheet[1]:
+        cell.font = Font(bold=True)
+
+    for p in distinct_projects:
+        projects_sheet.append([
+            p.code,
+            p.customer_name,
+            p.segment_con.name if p.segment_con else '',
+            p.team_lead.name if p.team_lead else '',
+            float(p.value) if p.value is not None else None,
+            p.so_punch_date.strftime('%Y-%m-%d') if p.so_punch_date else '',
+            p.get_completion_percentage(),
+            p.get_overall_status(),
+            p.get_otif_percentage(),
+        ])
+
+    # --- Sheet 2: Stage Summary (mirrors the on-page Planned vs Actual table) ---
+    summary_sheet = workbook.create_sheet("Stage Summary")
+    summary_sheet.append([
+        'Stage', 'Type', 'Planned', 'Actual Completed', 'Pending (Backlog)',
+        'Currently Delayed', 'Avg Delay (days)', 'Avg Cycle Time (days)', 'OTIF %'
+    ])
+    for cell in summary_sheet[1]:
+        cell.font = Font(bold=True)
+
+    automation_stage_keys = dict(Stage.AUTOMATION_STAGES)
+    for stage_key, stage_display in stage_names_to_report:
+        planned_backlog_qs = Stage.objects.filter(
+            project_id__in=chart_project_ids, name=stage_key,
+            planned_date__isnull=False, planned_date__gte=plausible_planned_date_floor,
+            planned_date__lte=summary_end,
+        ).exclude(Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=summary_start)))
+
+        actual_period_qs = Stage.objects.filter(
+            project_id__in=chart_project_ids, name=stage_key, status='Completed',
+            actual_date__range=[summary_start, summary_end]
+        )
+
+        delayed_qs = planned_backlog_qs.filter(status__in=['Not started', 'In Progress'], planned_date__lt=today)
+
+        planned_count = planned_backlog_qs.count()
+        pending_count = planned_backlog_qs.exclude(status='Completed').count()
+        delayed_count = delayed_qs.count()
+        actual_count = actual_period_qs.count()
+        on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
+        otif_pct = round((on_time_count / actual_count) * 100, 1) if actual_count else None
+
+        overdue_planned_dates = list(delayed_qs.values_list('planned_date', flat=True))
+        overdue_deltas = [(today - d).days for d in overdue_planned_dates if 0 <= (today - d).days <= MAX_PLAUSIBLE_DAY_DELTA]
+        avg_delay_days = round(sum(overdue_deltas) / len(overdue_deltas), 1) if overdue_deltas else None
+
+        cycle_pairs = list(actual_period_qs.exclude(planned_start_date__isnull=True).values_list('planned_start_date', 'actual_date'))
+        cycle_deltas = [(a - p).days for p, a in cycle_pairs if 0 <= (a - p).days <= MAX_PLAUSIBLE_DAY_DELTA]
+        avg_cycle_time = round(sum(cycle_deltas) / len(cycle_deltas), 1) if cycle_deltas else None
+
+        summary_sheet.append([
+            stage_display,
+            'Automation' if stage_key in automation_stage_keys else 'Emulation',
+            planned_count, actual_count, pending_count, delayed_count,
+            avg_delay_days if avg_delay_days is not None else '',
+            avg_cycle_time if avg_cycle_time is not None else '',
+            otif_pct if otif_pct is not None else '',
+        ])
+
+    for sheet in (projects_sheet, summary_sheet):
+        for col_cells in sheet.columns:
+            length = max((len(str(c.value)) for c in col_cells if c.value is not None), default=10)
+            sheet.column_dimensions[col_cells[0].column_letter].width = min(length + 2, 40)
+
+    workbook.save(response)
+    return response
+
 
 @login_required
 def add_remark(request, stage_id):

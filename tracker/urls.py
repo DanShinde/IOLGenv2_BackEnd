@@ -34,6 +34,9 @@ urlpatterns = [
     path('upcoming-milestones/export/pdf/', views.export_milestones_pdf, name='tracker_export_milestones_pdf'),
     
     path('reports/export/pdf/', views.export_report_pdf, name='export_report_pdf'),
+    path('reports/export/excel/', views.export_report_excel, name='export_report_excel'),
+    path('reports/preset/save/', views.save_report_preset, name='save_report_preset'),
+    path('reports/preset/<int:preset_id>/delete/', views.delete_report_preset, name='delete_report_preset'),
 
     # Remark editing - Restored names to prevent breaking other templates
     path('remark/<int:remark_id>/edit/', views.edit_remark, name='tracker_edit_remark'),

@@ -29,6 +29,14 @@
         font-weight: 500;
         margin-bottom: 0;
     }
+    .risk-high { background-color: rgba(220, 53, 69, 0.08); }
+    .risk-medium { background-color: rgba(255, 193, 7, 0.10); }
+    .sortable-th { cursor: pointer; user-select: none; white-space: nowrap; }
+    .sortable-th .sort-icon { opacity: 0.35; font-size: 0.75rem; margin-left: 4px; }
+    .sortable-th.sorted-asc .sort-icon, .sortable-th.sorted-desc .sort-icon { opacity: 1; color: var(--primary); }
+    .trend-up { color: #198754; }
+    .trend-down { color: #dc3545; }
+    .trend-flat { color: #6c757d; }
 </style>
 {% endblock %}
 
@@ -41,12 +49,23 @@
 
 <div id="report-content">
 
+    {% if active_filters %}
+    <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+        <span class="text-muted small fw-bold"><i class="fas fa-filter me-1"></i>Active Filters:</span>
+        {% for f in active_filters %}
+        <a href="{{ f.href }}" class="badge bg-primary-subtle text-primary border border-primary-subtle text-decoration-none d-inline-flex align-items-center gap-1 px-2 py-1">
+            {{ f.label }} <i class="fas fa-times-circle"></i>
+        </a>
+        {% endfor %}
+        <a href="{% url 'project_reports' %}?reset=true" class="badge bg-light text-danger border text-decoration-none px-2 py-1">Clear All</a>
+    </div>
+    {% endif %}
+
     <form method="get">
         {% if hide_completed_active %}
         <input type="hidden" name="hide_completed" value="1">
         {% endif %}
         <input type="hidden" name="chart_view" id="input_chart_view" value="monthly">
-        <input type="hidden" name="chart_stage" id="input_chart_stage" value="">
         <div class="card mb-4">
             <a href="#filterCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button">
                 <h5 class="card-header-title mb-0"><i class="fas fa-sliders-h me-2"></i>Filter Options</h5>
@@ -54,12 +73,33 @@
             </a>
             <div class="collapse" id="filterCollapse">
                 <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-4 pb-3 border-bottom">
+                        <label class="small fw-bold text-muted mb-0"><i class="fas fa-bookmark me-1"></i>Saved Views:</label>
+                        {% if saved_report_presets %}
+                            {% for preset in saved_report_presets %}
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'project_reports' %}?{{ preset.query_string }}" class="btn btn-outline-primary">{{ preset.name }}</a>
+                                <form method="post" action="{% url 'delete_report_preset' preset.id %}" onsubmit="return confirm('Delete saved view \'{{ preset.name }}\'?');" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete this saved view"><i class="fas fa-times"></i></button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted small">None yet.</span>
+                        {% endif %}
+                        <div class="input-group input-group-sm ms-auto" style="max-width: 320px;">
+                            <input type="text" id="presetNameInput" class="form-control" placeholder="Name this filter combination...">
+                            <button type="button" id="savePresetBtn" class="btn btn-outline-secondary"><i class="fas fa-save me-1"></i>Save Current Filters</button>
+                        </div>
+                    </div>
+
                     <fieldset class="mb-4">
                         <legend class="h6">General Filters</legend>
                         <div class="row">
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Financial Year</label>
-                                <select name="financial_year" class="form-select">
+                                <select name="financial_year" id="input_financial_year" class="form-select">
                                     <option value="">All Years</option>
                                     {% for val, label in fy_options %}
                                     <option value="{{ val }}" {% if selected_fy == val %}selected{% endif %}>{{ label }}</option>
@@ -68,25 +108,62 @@
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Segments</label>
-                                <select name="segments" class="form-select" multiple size="4">
+                                <select name="segments" class="form-select select2-multi" multiple data-placeholder="All segments">
                                     {% for segment in all_segments %}<option value="{{ segment.id }}" {% if segment.id in selected_segment_ids %}selected{% endif %}>{{ segment.name }}</option>{% endfor %}
                                 </select>
-                                <small class="text-muted">Hold Ctrl or Cmd to select multiple.</small>
                             </div>
-                            <div class="col-md-2 mb-3">
+                            <div class="col-md-3 mb-3">
                                 <label class="form-label">Team Leads (PACe)</label>
-                                <select name="team_leads" class="form-select" multiple size="4">
+                                <select name="team_leads" class="form-select select2-multi" multiple data-placeholder="All team leads">
                                     {% for employee in all_team_leads %}<option value="{{ employee.id }}" {% if employee.id in selected_team_lead_ids %}selected{% endif %}>{{ employee.name }}</option>{% endfor %}
                                 </select>
-                                <small class="text-muted">Hold Ctrl or Cmd to select multiple.</small>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">SO Punch Date Range</label>
-                                <div class="input-group">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Stages</label>
+                                <select name="stages" class="form-select select2-multi" multiple data-placeholder="All stages">
+                                    <optgroup label="Automation">
+                                        {% for stage_key, stage_display in all_automation_stage_names %}<option value="{{ stage_key }}" {% if stage_key in selected_stage_keys %}selected{% endif %}>{{ stage_display }}</option>{% endfor %}
+                                    </optgroup>
+                                    <optgroup label="Emulation">
+                                        {% for stage_key, stage_display in all_emulation_stage_names %}<option value="{{ stage_key }}" {% if stage_key in selected_stage_keys %}selected{% endif %}>{{ stage_display }}</option>{% endfor %}
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-7 mb-3">
+                                <label class="form-label mb-1">
+                                    Planned Date Range
+                                    <span class="text-muted small">(drives the summary &amp; charts below; defaults to the current month; ignored if a Financial Year is selected)</span>
+                                </label>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                    <div class="btn-group btn-group-sm" role="group" id="periodQuickButtons">
+                                        <button type="button" class="btn btn-outline-primary" id="quickThisMonth" {% if selected_fy %}disabled{% endif %}>This Month</button>
+                                        <button type="button" class="btn btn-outline-primary" id="quickThisQuarter" {% if selected_fy %}disabled{% endif %}>This Quarter</button>
+                                        <button type="button" class="btn btn-outline-primary" id="quickAllTime" {% if selected_fy %}disabled{% endif %}>All Time</button>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="period" id="input_period" value="{{ period }}">
+                                <div class="input-group input-group-sm">
                                     <span class="input-group-text">From</span>
-                                    <input type="date" name="start_date" class="form-control" value="{{ start_date|default:'' }}">
+                                    <input type="date" name="planned_start_date" id="input_planned_start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}" {% if selected_fy %}disabled{% endif %}>
                                     <span class="input-group-text">To</span>
-                                    <input type="date" name="end_date" class="form-control" value="{{ end_date|default:'' }}">
+                                    <input type="date" name="planned_end_date" id="input_planned_end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}" {% if selected_fy %}disabled{% endif %}>
+                                </div>
+                            </div>
+                            <div class="col-md-5 mb-3">
+                                <label class="form-label mb-1">Actual Date Range <span class="text-muted small">(stages completed in this window)</span></label>
+                                <!-- Invisible spacer matching the Planned Date Range's quick-button row, so the
+                                     two "From/To" input groups line up on the same row instead of the Actual
+                                     one floating up next to the buttons. -->
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2 invisible" aria-hidden="true">
+                                    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-primary">This Month</button></div>
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">From</span>
+                                    <input type="date" name="actual_start_date" class="form-control" value="{{ actual_start_date|date:'Y-m-d'|default:'' }}">
+                                    <span class="input-group-text">To</span>
+                                    <input type="date" name="actual_end_date" class="form-control" value="{{ actual_end_date|date:'Y-m-d'|default:'' }}">
                                 </div>
                             </div>
                         </div>
@@ -102,39 +179,6 @@
                             </div>
                         </div>
                     </fieldset>
-                    
-                    <a href="#advancedFilterCollapse" data-bs-toggle="collapse" role="button" class="btn btn-outline-secondary btn-sm mb-3 text-decoration-none">
-                        <i class="fas fa-cogs me-2"></i>Advanced Stage Filters
-                    </a>
-
-                    <div class="collapse" id="advancedFilterCollapse">
-                        <div class="card card-body bg-light border-0 p-3">
-                            <ul class="nav nav-tabs mb-3" id="stageFilterTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="auto-tab" data-bs-toggle="tab" data-bs-target="#auto-filters" type="button" role="tab"><i class="fas fa-robot me-2"></i>Automation Stages</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="emu-tab" data-bs-toggle="tab" data-bs-target="#emu-filters" type="button" role="tab"><i class="fas fa-laptop-code me-2"></i>Emulation Stages</button>
-                                </li>
-                            </ul>
-                            
-                            <div class="tab-content" id="stageFilterContent">
-                                <!-- Automation Tab -->
-                                <div class="tab-pane fade show active" id="auto-filters" role="tabpanel">
-                                    {% for stage_key, stage_display in automation_stage_names %}
-                                        {% include "tracker/partials/stage_filter_row.html" with stage_key=stage_key stage_display=stage_display stage_values=stage_filters|get_item:stage_key %}
-                                    {% endfor %}
-                                </div>
-                                
-                                <!-- Emulation Tab -->
-                                <div class="tab-pane fade" id="emu-filters" role="tabpanel">
-                                    {% for stage_key, stage_display in emulation_stage_names %}
-                                        {% include "tracker/partials/stage_filter_row.html" with stage_key=stage_key stage_display=stage_display stage_values=stage_filters|get_item:stage_key %}
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
             <div class="card-footer d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -152,9 +196,47 @@
                 {% endif %}
                 
                 <a href="{% url 'export_report_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf me-2"></i>Export as PDF</a>
+                <a href="{% url 'export_report_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success" target="_blank"><i class="fas fa-file-excel me-2"></i>Export as Excel</a>
             </div>
         </div>
     </form>
+
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="metric-icon"><i class="fas fa-clipboard-list"></i></div>
+                <div class="metric-value">{{ report_kpis.total_planned }}</div>
+                <div class="metric-label">Planned (all stages)</div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card" style="border-top-color: #28a745;">
+                <div class="metric-icon" style="color: #28a745; background: rgba(40, 167, 69, 0.1);"><i class="fas fa-check-double"></i></div>
+                <div class="metric-value">{{ report_kpis.total_actual }}</div>
+                <div class="metric-label">Actually Completed (in period)</div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card" style="border-top-color: #6f42c1;">
+                <div class="metric-icon" style="color: #6f42c1; background: rgba(111, 66, 193, 0.1);"><i class="fas fa-percentage"></i></div>
+                <div class="metric-value">
+                    {% if report_kpis.overall_otif is not None %}{{ report_kpis.overall_otif }}%{% else %}N/A{% endif %}
+                    {% if report_kpis.overall_otif_trend == 'up' %}<i class="fas fa-arrow-up trend-up small ms-1" title="Improved vs previous equal-length period"></i>
+                    {% elif report_kpis.overall_otif_trend == 'down' %}<i class="fas fa-arrow-down trend-down small ms-1" title="Declined vs previous equal-length period"></i>
+                    {% elif report_kpis.overall_otif_trend == 'flat' %}<i class="fas fa-equals trend-flat small ms-1" title="Unchanged vs previous equal-length period"></i>
+                    {% endif %}
+                </div>
+                <div class="metric-label">Overall OTIF %</div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card" style="border-top-color: #dc3545;">
+                <div class="metric-icon" style="color: #dc3545; background: rgba(220, 53, 69, 0.1);"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="metric-value">{{ report_kpis.total_delayed }}</div>
+                <div class="metric-label">Delayed Now <span class="text-muted small">(stage instances)</span></div>
+            </div>
+        </div>
+    </div>
 
     <div class="card">
         <a href="#resultsCollapse" data-bs-toggle="collapse" class="card-header text-decoration-none d-flex justify-content-between align-items-center" role="button" aria-expanded="false" aria-controls="resultsCollapse">
@@ -281,38 +363,107 @@
     </div>
 
     <div class="row mt-4">
-        <div class="col-md-5">
+        <div class="col-12">
             <div class="card">
-                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-pie"></i>Status Distribution</h5></div>
-                <div class="card-body d-flex justify-content-center align-items-center">
-                    <canvas id="statusPieChart"></canvas>
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-layer-group me-2"></i>Stage-wise Planned vs Actual Summary
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Planned includes work due in this period plus pending backlog carried forward from earlier periods, so overdue work never just disappears from the count. Pending is the part of that planned total still not completed today. Click any row to inspect that stage in the chart and project list below."></i>
+                    </h5>
+                    <span class="badge bg-light text-dark border">
+                        {% if start_date and end_date %}{{ summary_start|date:"d M Y" }} &ndash; {{ summary_end|date:"d M Y" }}{% else %}All Time (up to today){% endif %}
+                    </span>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-7">
-            <div class="card">
-                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-chart-bar"></i>Projects by Segment</h5></div>
-                <div class="card-body">
-                    <canvas id="segmentBarChart"></canvas>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-custom table-hover mb-0 align-middle" id="stageSummaryTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="sortable-th" data-key="display" data-type="text">Stage <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="sortable-th" data-key="type" data-type="text">Type <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="text-center sortable-th" data-key="planned" data-type="num">Planned <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="text-center sortable-th" data-key="actual" data-type="num">Actual Completed <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="text-center sortable-th" data-key="pending" data-type="num">Pending (Backlog) <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="text-center sortable-th" data-key="delayed" data-type="num">Currently Delayed <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="text-center sortable-th" data-key="avg_delay" data-type="num">Avg Delay (days) <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="text-center sortable-th" data-key="cycle_time" data-type="num">Avg Cycle Time (days) <i class="fas fa-sort sort-icon"></i></th>
+                                    <th class="text-center sortable-th" data-key="otif" data-type="num">OTIF % <i class="fas fa-sort sort-icon"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in stage_summary %}
+                                <tr class="risk-{{ row.risk }}">
+                                    <td data-value="{{ row.display }}"><strong>{{ row.display }}</strong></td>
+                                    <td data-value="{{ row.type }}"><span class="badge {% if row.type == 'Automation' %}bg-primary{% else %}bg-info{% endif %}">{{ row.type }}</span></td>
+                                    <td class="text-center" data-value="{{ row.planned }}">{{ row.planned }}</td>
+                                    <td class="text-center text-success" data-value="{{ row.actual }}">{{ row.actual }}</td>
+                                    <td class="text-center {% if row.pending > 0 %}text-warning fw-bold{% endif %}" data-value="{{ row.pending }}">{{ row.pending }}</td>
+                                    <td class="text-center {% if row.delayed > 0 %}text-danger fw-bold{% endif %}" data-value="{{ row.delayed }}">{{ row.delayed }}</td>
+                                    <td class="text-center" data-value="{{ row.avg_delay_days|default_if_none:0 }}">
+                                        {% if row.avg_delay_days is not None %}{{ row.avg_delay_days }}{% else %}<span class="text-muted small">&mdash;</span>{% endif %}
+                                    </td>
+                                    <td class="text-center" data-value="{{ row.avg_cycle_time|default_if_none:0 }}">
+                                        {% if row.avg_cycle_time is not None %}{{ row.avg_cycle_time }}{% else %}<span class="text-muted small">&mdash;</span>{% endif %}
+                                    </td>
+                                    <td class="text-center" data-value="{{ row.otif|default_if_none:-1 }}">
+                                        {% if row.otif is not None %}
+                                            <span class="badge {% if row.otif >= 80 %}bg-success{% else %}bg-danger{% endif %}">{{ row.otif }}%</span>
+                                            {% if row.otif_trend == 'up' %}<i class="fas fa-arrow-up trend-up small ms-1" title="Improved vs previous equal-length period"></i>
+                                            {% elif row.otif_trend == 'down' %}<i class="fas fa-arrow-down trend-down small ms-1" title="Declined vs previous equal-length period"></i>
+                                            {% elif row.otif_trend == 'flat' %}<i class="fas fa-equals trend-flat small ms-1" title="Unchanged vs previous equal-length period"></i>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted small">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-users me-2"></i>Projects by Team Lead</h5></div>
-                <div class="card-body">
-                    <canvas id="teamLeadChart"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
+        <div class="col-12">
             <div class="card">
                 <div class="card-header"><h5 class="card-header-title"><i class="fas fa-exclamation-triangle me-2"></i>Top Process Bottlenecks (Delayed Stages)</h5></div>
                 <div class="card-body">
                     <canvas id="stageDelayChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-user-tie me-2"></i>Who Owns Today's Delays &mdash; by Team Lead</h5></div>
+                <div class="card-body">
+                    {% if delay_by_team_lead_labels %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="delayByTeamLeadChart"></canvas>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">No stages are currently overdue for the selected filters.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-layer-group me-2"></i>Who Owns Today's Delays &mdash; by Segment</h5></div>
+                <div class="card-body">
+                    {% if delay_by_segment_labels %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="delayBySegmentChart"></canvas>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">No stages are currently overdue for the selected filters.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -324,18 +475,6 @@
             <div class="card mb-3">
                 <div class="card-body d-flex align-items-center gap-3 py-2">
                     <h6 class="mb-0 text-muted"><i class="fas fa-filter me-2"></i>Chart Controls:</h6>
-                    
-                    <div class="d-flex align-items-center gap-2">
-                        <label class="small fw-bold">Stage:</label>
-                        <select id="commonStageSelector" class="form-select form-select-sm w-auto" onchange="handleCommonFilterChange()">
-                            <optgroup label="Automation">
-                                {% for stage_key, stage_display in automation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
-                            </optgroup>
-                            <optgroup label="Emulation">
-                                {% for stage_key, stage_display in emulation_stage_names %}<option value="{{ stage_key }}">{{ stage_display }}</option>{% endfor %}
-                            </optgroup>
-                        </select>
-                    </div>
 
                     <div class="d-flex align-items-center gap-2">
                         <label class="small fw-bold">View:</label>
@@ -344,6 +483,7 @@
                             <option value="quarterly">Quarterly</option>
                         </select>
                     </div>
+                    <span class="text-muted small">Covers all stages currently in scope (use the "Stages" filter above to narrow it down).</span>
                 </div>
             </div>
         </div>
@@ -353,10 +493,10 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-header-title mb-0"><i class="fas fa-chart-line me-2"></i>Stage Performance Trends (Planned vs Actual)</h5>
+                    <h5 class="card-header-title mb-0"><i class="fas fa-chart-line me-2"></i>Planned vs Actual Trend, with OTIF % Trend</h5>
                 </div>
                 <div class="card-body">
-                    <div style="height: 350px;">
+                    <div style="height: 400px;">
                         <canvas id="stageTrendChart"></canvas>
                     </div>
                 </div>
@@ -367,12 +507,30 @@
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-header-title mb-0"><i class="fas fa-percentage me-2"></i>Stage OTIF Trends (On Time In Full)</h5>
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="card-header-title mb-0"><i class="fas fa-list-check me-2"></i>Planned / Pending &amp; Actual Completed Projects</h5>
+                    <span class="text-muted small">Covers all stages currently in scope, over the selected date range.</span>
                 </div>
                 <div class="card-body">
-                    <div style="height: 350px;">
-                        <canvas id="stageOtifChart"></canvas>
+                    <div class="row">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <h6 class="text-warning"><i class="fas fa-hourglass-half me-1"></i>Planned / Pending <span class="badge bg-warning text-dark" id="plannedListCount">0</span></h6>
+                            <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                <table class="table table-sm table-custom mb-0">
+                                    <thead class="table-light"><tr><th>Code</th><th>Customer</th><th>Stage</th><th>Planned Date</th><th>Status</th></tr></thead>
+                                    <tbody id="plannedListBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success"><i class="fas fa-check-circle me-1"></i>Actual Completed <span class="badge bg-success" id="actualListCount">0</span></h6>
+                            <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                <table class="table table-sm table-custom mb-0">
+                                    <thead class="table-light"><tr><th>Code</th><th>Customer</th><th>Stage</th><th>Actual Date</th><th>On Time</th></tr></thead>
+                                    <tbody id="actualListBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -437,90 +595,92 @@ document.addEventListener('DOMContentLoaded', function() {
     // Register the datalabels plugin
     Chart.register(ChartDataLabels);
 
+    // --- Filtering UX enhancements ---
+
+    // Searchable multi-selects for Segments / Team Leads
+    function initSelect2() {
+        if (window.jQuery && jQuery.fn.select2) {
+            jQuery('.select2-multi').select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                closeOnSelect: false,
+                placeholder: function () { return jQuery(this).data('placeholder') || ''; }
+            });
+        }
+    }
+    initSelect2();
+    // The filter panel starts collapsed, which can make select2 compute a 0px width;
+    // re-run once it's actually visible.
+    const filterCollapseEl = document.getElementById('filterCollapse');
+    if (filterCollapseEl) {
+        filterCollapseEl.addEventListener('shown.bs.collapse', initSelect2);
+    }
+
+    // Financial Year overrides the Planned Date Range entirely (server-side too);
+    // reflect that in the UI so it's obvious which one is in effect. The Planned Date
+    // Range fields themselves stay directly editable at all times.
+    const fySelect = document.getElementById('input_financial_year');
+    const plannedStart = document.getElementById('input_planned_start_date');
+    const plannedEnd = document.getElementById('input_planned_end_date');
+    const periodInput = document.getElementById('input_period');
+    const quickButtons = document.querySelectorAll('#periodQuickButtons button');
+
+    function syncPlannedRangeInputs() {
+        const fyActive = fySelect && fySelect.value !== '';
+        quickButtons.forEach(b => { b.disabled = fyActive; });
+        if (plannedStart) plannedStart.disabled = fyActive;
+        if (plannedEnd) plannedEnd.disabled = fyActive;
+        if (fyActive && periodInput) periodInput.value = '';
+    }
+    if (fySelect) {
+        fySelect.addEventListener('change', syncPlannedRangeInputs);
+    }
+    syncPlannedRangeInputs();
+
+    // Manually editing the dates means "custom" — clear the quick-preset marker and FY
+    // so the typed range is what actually gets applied.
+    [plannedStart, plannedEnd].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', function() {
+            if (periodInput) periodInput.value = 'custom';
+            if (fySelect && fySelect.value) { fySelect.value = ''; syncPlannedRangeInputs(); }
+        });
+    });
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+    function toISODate(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+
+    function setPlannedRange(startD, endD, periodKey) {
+        if (plannedStart) plannedStart.value = startD ? toISODate(startD) : '';
+        if (plannedEnd) plannedEnd.value = endD ? toISODate(endD) : '';
+        if (periodInput) periodInput.value = periodKey;
+        if (fySelect) fySelect.value = '';
+    }
+
+    const quickThisMonthBtn = document.getElementById('quickThisMonth');
+    if (quickThisMonthBtn) quickThisMonthBtn.addEventListener('click', function() {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        setPlannedRange(start, end, 'this_month');
+    });
+
+    const quickThisQuarterBtn = document.getElementById('quickThisQuarter');
+    if (quickThisQuarterBtn) quickThisQuarterBtn.addEventListener('click', function() {
+        const now = new Date();
+        // Financial-year quarters: Apr-Jun, Jul-Sep, Oct-Dec, Jan-Mar
+        const qStartMonth = Math.floor(now.getMonth() / 3) * 3;
+        const start = new Date(now.getFullYear(), qStartMonth, 1);
+        const end = new Date(now.getFullYear(), qStartMonth + 3, 0);
+        setPlannedRange(start, end, 'this_quarter');
+    });
+
+    const quickAllTimeBtn = document.getElementById('quickAllTime');
+    if (quickAllTimeBtn) quickAllTimeBtn.addEventListener('click', function() {
+        setPlannedRange(null, null, 'all');
+    });
+
     // --- Chart Initialization Code ---
-
-    // Status Pie Chart
-    const statusCtx = document.getElementById('statusPieChart');
-    if (statusCtx && {{ status_data|safe }}.length > 0) {
-        new Chart(statusCtx, {
-            type: 'pie',
-            data: {
-                labels: {{ status_labels|safe }},
-                datasets: [{
-                    data: {{ status_data|safe }},
-                    backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d']
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top' },
-                    datalabels: {
-                        color: '#fff', font: { weight: 'bold' },
-                        formatter: (value, ctx) => {
-                            const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1) + '%';
-                            return `${value} (${percentage})`;
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    // Segment Bar Chart
-    const segmentCtx = document.getElementById('segmentBarChart');
-    const segmentData = {{ segment_data|safe }};
-    if (segmentCtx && segmentData.length > 0) {
-        const maxSegmentValue = Math.max(...segmentData);
-        new Chart(segmentCtx, {
-            type: 'bar',
-            data: {
-                labels: {{ segment_labels|safe }},
-                datasets: [{
-                    label: '# of Projects',
-                    data: segmentData,
-                    backgroundColor: 'rgba(67, 97, 238, 0.7)'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    datalabels: {
-                        anchor: 'end', align: 'end', color: '#444', font: { weight: 'bold' }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true, ticks: { stepSize: 1 }, max: maxSegmentValue + 2
-                    }
-                }
-            }
-        });
-    }
-
-    // Team Lead Bar Chart
-    const teamLeadCtx = document.getElementById('teamLeadChart');
-    const teamLeadData = {{ team_lead_data|safe }};
-    if (teamLeadCtx && teamLeadData.length > 0) {
-        new Chart(teamLeadCtx, {
-            type: 'bar',
-            data: {
-                labels: {{ team_lead_labels|safe }},
-                datasets: [{
-                    label: 'Active Projects',
-                    data: teamLeadData,
-                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-        });
-    }
 
     // Stage Delay Bar Chart
     const stageDelayCtx = document.getElementById('stageDelayChart');
@@ -541,153 +701,306 @@ document.addEventListener('DOMContentLoaded', function() {
             options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
         });
     }
-    
+
+    // Delay cross-tab: by Team Lead / by Segment (who owns today's overdue stages)
+    function initHorizontalBar(canvasId, labels, data, color) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx || !data || data.length === 0) return;
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Overdue Stages',
+                    data: data,
+                    backgroundColor: color.bg,
+                    borderColor: color.border,
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+    }
+    initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' });
+    initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' });
+
+    // Stage Summary table: sortable columns
+    const stageSummaryTable = document.getElementById('stageSummaryTable');
+    if (stageSummaryTable) {
+        let currentSort = { key: null, dir: 1 };
+        stageSummaryTable.querySelectorAll('thead .sortable-th').forEach(th => {
+            th.addEventListener('click', function() {
+                const key = th.getAttribute('data-key');
+                const type = th.getAttribute('data-type');
+                const dir = (currentSort.key === key) ? -currentSort.dir : 1;
+                currentSort = { key, dir };
+
+                stageSummaryTable.querySelectorAll('thead .sortable-th').forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
+                th.classList.add(dir === 1 ? 'sorted-asc' : 'sorted-desc');
+
+                const tbody = stageSummaryTable.querySelector('tbody');
+                const colIndex = Array.from(th.parentElement.children).indexOf(th);
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+
+                rows.sort((a, b) => {
+                    const aVal = a.children[colIndex].getAttribute('data-value');
+                    const bVal = b.children[colIndex].getAttribute('data-value');
+                    if (type === 'num') {
+                        return (parseFloat(aVal) - parseFloat(bVal)) * dir;
+                    }
+                    return aVal.localeCompare(bVal) * dir;
+                });
+
+                rows.forEach(r => tbody.appendChild(r));
+            });
+        });
+    }
+
+    // Save current filters as a named preset
+    const savePresetBtn = document.getElementById('savePresetBtn');
+    if (savePresetBtn) {
+        savePresetBtn.addEventListener('click', function() {
+            const nameInput = document.getElementById('presetNameInput');
+            const name = nameInput.value.trim();
+            if (!name) { nameInput.focus(); return; }
+            const qs = window.location.search.startsWith('?') ? window.location.search.slice(1) : window.location.search;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = "{% url 'save_report_preset' %}";
+            form.style.display = 'none';
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+            const nameField = document.createElement('input');
+            nameField.type = 'hidden';
+            nameField.name = 'name';
+            nameField.value = name;
+            const qsField = document.createElement('input');
+            qsField.type = 'hidden';
+            qsField.name = 'query_string';
+            qsField.value = qs;
+            form.append(csrfInput, nameField, qsField);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    }
+
     // ✅ NEW: Call the function to make the cards the same height
     equalizeChartCardHeights();
     // Optional: Re-run when the window is resized
     window.addEventListener('resize', equalizeChartCardHeights);
 
     // --- Chart Initialization with Persistence ---
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const filterStage = urlParams.get('chart_filter_stage');
-    const filterMonth = urlParams.get('chart_filter_month');
-    const filterType = urlParams.get('chart_filter_type');
-    const chartViewParam = urlParams.get('chart_view');
-    const chartStageParam = urlParams.get('chart_stage');
 
-    function getFYFromDateStr(dateStr) {
-        if (!dateStr) return null;
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return null;
-        const year = date.getFullYear();
-        const month = date.getMonth() + 1;
-        let fyStart = (month >= 4) ? year : year - 1;
-        let fyEnd = fyStart + 1;
-        return `FY ${String(fyStart).slice(-2)}-${String(fyEnd).slice(-2)}`;
-    }
+    const urlParams = new URLSearchParams(window.location.search);
+    const chartViewParam = urlParams.get('chart_view');
 
     // Initialize Common Controls and Charts
-    if (document.getElementById('commonStageSelector')) {
-        const stageSelector = document.getElementById('commonStageSelector');
+    if (document.getElementById('commonViewSelector')) {
         const viewSelector = document.getElementById('commonViewSelector');
-        
-        // 1. Set Stage
-        // Priority: Explicit chart_stage > Click filter stage
-        let targetStage = chartStageParam || (filterStage ? filterStage : null);
-        if (targetStage && [...stageSelector.options].some(o => o.value === targetStage)) {
-            stageSelector.value = targetStage;
-        }
-
-        // 2. Set View
         if (chartViewParam) {
             viewSelector.value = chartViewParam;
         }
 
-        // 5. Update Charts
         updateTrendChart();
-        updateOtifChart();
         updateEmuChart();
+        renderProjectLists();
     }
 });
 
-// Stage Trend Chart Logic
+// Stage Trend Chart Logic (Planned vs Actual, combined with OTIF % trend) — aggregated
+// across all currently-reported stages.
 const trendCtx = document.getElementById('stageTrendChart');
-const allTrendData = JSON.parse('{{ stage_trend_data|escapejs }}');
+const trendData = JSON.parse('{{ stage_trend_data|escapejs }}');
+const otifData = JSON.parse('{{ stage_otif_data|escapejs }}');
+const projectLists = JSON.parse('{{ aggregate_project_lists|escapejs }}');
 let trendChart = null;
 
 function handleCommonFilterChange() {
     updateTrendChart();
-    updateOtifChart();
     updateEmuChart();
+    renderProjectLists();
 }
 
-// Removed populateCommonYearSelector as filtering is now server-side
+function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Populates the "Planned / Pending" and "Actual Completed" lists below the chart
+function renderProjectLists() {
+    const plannedBody = document.getElementById('plannedListBody');
+    const actualBody = document.getElementById('actualListBody');
+    if (!plannedBody || !actualBody) return;
+
+    const data = projectLists || { planned: [], actual: [] };
+
+    plannedBody.innerHTML = data.planned.length ? data.planned.map(p => `
+        <tr>
+            <td>${escapeHtml(p.code)}</td>
+            <td>${escapeHtml(p.customer)}</td>
+            <td>${escapeHtml(p.stage)}</td>
+            <td>${escapeHtml(p.planned_date)}</td>
+            <td><span class="badge ${p.is_overdue ? 'bg-danger' : 'bg-secondary'}">${escapeHtml(p.status)}</span></td>
+        </tr>`).join('') : '<tr><td colspan="5" class="text-center text-muted py-3">Nothing pending.</td></tr>';
+
+    actualBody.innerHTML = data.actual.length ? data.actual.map(p => `
+        <tr>
+            <td>${escapeHtml(p.code)}</td>
+            <td>${escapeHtml(p.customer)}</td>
+            <td>${escapeHtml(p.stage)}</td>
+            <td>${escapeHtml(p.actual_date)}</td>
+            <td>${p.on_time ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-danger">No</span>'}</td>
+        </tr>`).join('') : '<tr><td colspan="5" class="text-center text-muted py-3">No completions in this period.</td></tr>';
+
+    document.getElementById('plannedListCount').textContent = data.planned.length;
+    document.getElementById('actualListCount').textContent = data.actual.length;
+}
+
+// Aggregates monthly rawData into FY-quarter buckets. sumKeys are additive (flow —
+// e.g. actual completions during the quarter); lastKeys take the final month's value
+// in the quarter instead of summing (stock — e.g. backlog-inclusive "planned", which is
+// a point-in-time snapshot and would be triple-counted if simply added across 3 months).
+function aggregateQuarterly(rawData, sumKeys, lastKeys) {
+    sumKeys = sumKeys || [];
+    lastKeys = lastKeys || [];
+    let quarterlyData = {};
+    let keysOrder = [];
+
+    if (rawData.financial_years) {
+        for (let i = 0; i < rawData.financial_years.length; i++) {
+            const fy = rawData.financial_years[i];
+            const month = rawData.months[i]; // 1-12
+
+            let qIndex, monthRange;
+            if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+            else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+            else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+            else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+
+            const key = `${fy}_Q${qIndex}`;
+            if (!quarterlyData[key]) {
+                const entry = { label: `Q${qIndex}_ ${fy} ${monthRange}` };
+                sumKeys.forEach(k => entry[k] = 0);
+                lastKeys.forEach(k => entry[k] = 0);
+                quarterlyData[key] = entry;
+                keysOrder.push(key);
+            }
+            sumKeys.forEach(k => { quarterlyData[key][k] += rawData[k][i]; });
+            // Months arrive in chronological order, so the last assignment here ends up
+            // being the latest month in the quarter — i.e. the end-of-quarter snapshot.
+            lastKeys.forEach(k => { quarterlyData[key][k] = rawData[k][i]; });
+        }
+    }
+    return { quarterlyData, keysOrder };
+}
 
 function updateTrendChart() {
     if (!trendCtx) return;
-    
-    const stageSelector = document.getElementById('commonStageSelector');
+
     const viewSelector = document.getElementById('commonViewSelector');
-    const selectedStage = stageSelector.value;
     const viewType = viewSelector ? viewSelector.value : 'monthly';
 
     // Update hidden input and URL state for persistence
     if (document.getElementById('input_chart_view')) document.getElementById('input_chart_view').value = viewType;
-    if (document.getElementById('input_chart_stage')) document.getElementById('input_chart_stage').value = selectedStage;
 
     const url = new URL(window.location.href);
     url.searchParams.set('chart_view', viewType);
-    url.searchParams.set('chart_stage', selectedStage);
     window.history.replaceState({}, '', url);
-    
-    const rawData = allTrendData[selectedStage] || { labels: [], years: [], financial_years: [], months: [], planned: [], actual: [] };
-    
-    // Use all data provided by server (already filtered by project)
-    let filteredLabels = [];
-    let filteredPlanned = [];
-    let filteredActual = [];
-    let filteredYears = [];
-    let filteredMonths = [];
+
+    const trendRaw = trendData || { labels: [], years: [], financial_years: [], months: [], planned: [], actual: [] };
+    const otifRaw = otifData || { labels: [], financial_years: [], months: [], total: [], on_time: [] };
+
+    let filteredLabels = [], filteredPlanned = [], filteredActual = [], filteredYears = [], filteredMonths = [], filteredOtif = [];
 
     if (viewType === 'monthly') {
-        // Directly use raw data arrays
-        filteredLabels = rawData.labels || [];
-        filteredPlanned = rawData.planned || [];
-        filteredActual = rawData.actual || [];
-        filteredYears = rawData.years || [];
-        filteredMonths = rawData.months || [];
+        filteredLabels = trendRaw.labels || [];
+        filteredPlanned = trendRaw.planned || [];
+        filteredActual = trendRaw.actual || [];
+        filteredYears = trendRaw.years || [];
+        filteredMonths = trendRaw.months || [];
+
+        const otifByLabel = {};
+        (otifRaw.labels || []).forEach((label, i) => {
+            const total = otifRaw.total[i];
+            const onTime = otifRaw.on_time[i];
+            otifByLabel[label] = total > 0 ? (onTime / total) * 100 : null;
+        });
+        filteredOtif = filteredLabels.map(l => otifByLabel.hasOwnProperty(l) ? otifByLabel[l] : null);
     } else {
-        // Quarterly Aggregation
-        let quarterlyData = {};
-        let keysOrder = [];
-        
-        if (rawData.financial_years) {
-            for (let i = 0; i < rawData.financial_years.length; i++) {
-                const fy = rawData.financial_years[i];
-                const month = rawData.months[i]; // 1-12
-                
-                let qIndex, monthRange;
-                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
-                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
-                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
-                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
-                
-                const key = `${fy}_Q${qIndex}`;
-                if (!quarterlyData[key]) {
-                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, planned: 0, actual: 0 };
-                    keysOrder.push(key);
-                }
-                
-                quarterlyData[key].planned += rawData.planned[i];
-                quarterlyData[key].actual += rawData.actual[i];
-            }
-        }
-        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
-        filteredPlanned = keysOrder.map(k => quarterlyData[k].planned);
-        filteredActual = keysOrder.map(k => quarterlyData[k].actual);
+        // Quarterly Aggregation. "Planned" is a backlog-inclusive snapshot (stock), so we
+        // take its end-of-quarter value rather than summing 3 months of the same backlog.
+        // "Actual" completions are a flow, so they sum across the quarter as before.
+        const trendQ = aggregateQuarterly(trendRaw, ['actual'], ['planned']);
+        filteredLabels = trendQ.keysOrder.map(k => trendQ.quarterlyData[k].label);
+        filteredPlanned = trendQ.keysOrder.map(k => trendQ.quarterlyData[k].planned);
+        filteredActual = trendQ.keysOrder.map(k => trendQ.quarterlyData[k].actual);
+
+        const otifQ = aggregateQuarterly(otifRaw, ['total', 'on_time']);
+        const otifByLabel = {};
+        Object.values(otifQ.quarterlyData).forEach(entry => {
+            otifByLabel[entry.label] = entry.total > 0 ? (entry.on_time / entry.total) * 100 : null;
+        });
+        filteredOtif = filteredLabels.map(l => otifByLabel.hasOwnProperty(l) ? otifByLabel[l] : null);
     }
 
     if (trendChart) {
         trendChart.destroy();
     }
 
+    const targetData = new Array(filteredLabels.length).fill(80);
+
     trendChart = new Chart(trendCtx, {
-        type: 'bar',
         data: {
             labels: filteredLabels,
             datasets: [
                 {
-                    label: 'Planned Completion',
+                    type: 'bar',
+                    label: 'Planned',
                     data: filteredPlanned,
                     borderColor: '#0d6efd', // Bootstrap Primary
                     backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                    yAxisID: 'y'
                 },
                 {
-                    label: 'Actual Completion',
+                    type: 'bar',
+                    label: 'Actual Completed',
                     data: filteredActual,
                     borderColor: '#198754', // Bootstrap Success
                     backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                    yAxisID: 'y'
+                },
+                {
+                    type: 'line',
+                    label: 'OTIF %',
+                    data: filteredOtif,
+                    borderColor: '#fd7e14',
+                    backgroundColor: 'rgba(253, 126, 20, 0.15)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#fd7e14',
+                    spanGaps: true,
+                    yAxisID: 'y1',
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#fd7e14',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: (value) => (value === null || value === undefined) ? '' : value.toFixed(0) + '%'
+                    }
+                },
+                {
+                    type: 'line',
+                    label: 'OTIF Target (80%)',
+                    data: targetData,
+                    borderColor: '#dc3545',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false,
+                    yAxisID: 'y1',
+                    datalabels: { display: false }
                 }
             ]
         },
@@ -700,23 +1013,22 @@ function updateTrendChart() {
             },
             onClick: (e, activeElements) => {
                 if (activeElements.length === 0 || viewType !== 'monthly') return;
-                
+
                 const index = activeElements[0].index;
                 const datasetIndex = activeElements[0].datasetIndex;
-                
+                if (datasetIndex > 1) return; // OTIF line / target line aren't click-through
+
                 const year = filteredYears[index];
                 const month = filteredMonths[index];
-                const stage = selectedStage;
                 const type = datasetIndex === 0 ? 'planned' : 'actual';
-                
+
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-01`;
-                
+
                 const url = new URL(window.location.href);
-                url.searchParams.set('chart_filter_stage', stage);
                 url.searchParams.set('chart_filter_month', dateStr);
                 url.searchParams.set('chart_filter_type', type);
                 url.hash = 'resultsCollapse';
-                
+
                 window.location.href = url.toString();
             },
             onHover: (event, chartElement) => {
@@ -727,6 +1039,13 @@ function updateTrendChart() {
                     callbacks: {
                         title: function(context) {
                             return context[0].label;
+                        },
+                        label: function(context) {
+                            if (context.dataset.label === 'OTIF Target (80%)') return null;
+                            if (context.dataset.label === 'OTIF %') {
+                                return context.parsed.y === null ? 'OTIF: N/A' : `OTIF: ${context.parsed.y.toFixed(1)}%`;
+                            }
+                            return `${context.dataset.label}: ${context.parsed.y}`;
                         }
                     }
                 },
@@ -742,182 +1061,13 @@ function updateTrendChart() {
                     beginAtZero: true,
                     ticks: { stepSize: 1 },
                     title: { display: true, text: 'Number of Projects' }
-                }
-            }
-        }
-    });
-}
-
-// --- Stage OTIF Chart Logic ---
-const otifCtx = document.getElementById('stageOtifChart');
-const allOtifData = JSON.parse('{{ stage_otif_data|escapejs }}');
-let otifChart = null;
-
-function updateOtifChart() {
-    if (!otifCtx) return;
-    
-    const stageSelector = document.getElementById('commonStageSelector');
-    const viewSelector = document.getElementById('commonViewSelector');
-    const selectedStage = stageSelector.value;
-    const viewType = viewSelector ? viewSelector.value : 'monthly';
-
-    // Hidden inputs and URL state are already updated by updateTrendChart, 
-    // but we can leave them here or remove them. 
-    // It's safer to keep them in case this function is called independently in future.
-    
-    const rawData = allOtifData[selectedStage] || { labels: [], financial_years: [], months: [], total: [], on_time: [] };
-    
-    let filteredLabels = [];
-    let filteredData = [];
-    let filteredTotal = [];
-    let filteredOnTime = [];
-    let filteredYears = [];
-    let filteredMonths = [];
-
-    if (viewType === 'monthly') {
-        if (rawData.labels) {
-            filteredLabels = rawData.labels;
-            filteredYears = rawData.years;
-            filteredMonths = rawData.months;
-            
-            for (let i = 0; i < rawData.total.length; i++) {
-                const total = rawData.total[i];
-                const onTime = rawData.on_time[i];
-                const percentage = total > 0 ? (onTime / total) * 100 : 0;
-                filteredData.push(percentage);
-                filteredTotal.push(total);
-                filteredOnTime.push(onTime);
-            }
-        }
-    } else {
-        // Quarterly Aggregation (IFY)
-        let quarterlyData = {};
-        let keysOrder = [];
-        
-        if (rawData.financial_years) {
-            for (let i = 0; i < rawData.financial_years.length; i++) {
-                const fy = rawData.financial_years[i];
-                const month = rawData.months[i];
-                
-                let qIndex, monthRange;
-                if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
-                else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
-                else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
-                else { qIndex = 4; monthRange = "(Jan-Mar)"; }
-                
-                const key = `${fy}_Q${qIndex}`;
-                if (!quarterlyData[key]) {
-                    quarterlyData[key] = { label: `Q${qIndex}_ ${fy} ${monthRange}`, total: 0, on_time: 0 };
-                    keysOrder.push(key);
-                }
-                quarterlyData[key].total += rawData.total[i];
-                quarterlyData[key].on_time += rawData.on_time[i];
-            }
-        }
-        
-        filteredLabels = keysOrder.map(k => quarterlyData[k].label);
-        filteredTotal = keysOrder.map(k => quarterlyData[k].total);
-        filteredOnTime = keysOrder.map(k => quarterlyData[k].on_time);
-        filteredData = keysOrder.map(k => {
-            const t = quarterlyData[k].total;
-            return t > 0 ? (quarterlyData[k].on_time / t) * 100 : 0;
-        });
-    }
-
-    if (otifChart) {
-        otifChart.destroy();
-    }
-
-    // Create target line data (80%)
-    const targetData = new Array(filteredLabels.length).fill(80);
-
-    otifChart = new Chart(otifCtx, {
-        type: 'line',
-        data: {
-            labels: filteredLabels,
-            datasets: [{
-                label: 'OTIF %',
-                data: filteredData,
-                totalData: filteredTotal,
-                onTimeData: filteredOnTime,
-                backgroundColor: 'rgba(111, 66, 193, 0.2)', // Purple with transparency
-                borderColor: '#6c757d',
-                segment: {
-                    borderColor: ctx => ctx.p1.parsed.y >= 80 ? '#198754' : '#dc3545'
                 },
-                pointBackgroundColor: ctx => ctx.parsed.y >= 80 ? '#198754' : '#dc3545',
-                pointBorderColor: ctx => ctx.parsed.y >= 80 ? '#198754' : '#dc3545',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: true
-            },
-            {
-                label: 'Target (80%)',
-                data: targetData,
-                borderColor: '#dc3545', // Bootstrap Danger (Red)
-                borderWidth: 2,
-                borderDash: [5, 5],
-                pointRadius: 0,
-                fill: false,
-                datalabels: { display: false }
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            onClick: (e, activeElements) => {
-                if (activeElements.length === 0 || viewType !== 'monthly') return;
-                
-                const index = activeElements[0].index;
-                // Dataset 0 is the OTIF line, Dataset 1 is the Target line
-                if (activeElements[0].datasetIndex !== 0) return;
-
-                const year = filteredYears[index];
-                const month = filteredMonths[index];
-                const stage = selectedStage;
-                
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-01`;
-                
-                const url = new URL(window.location.href);
-                url.searchParams.set('chart_filter_stage', stage);
-                url.searchParams.set('chart_filter_month', dateStr);
-                url.searchParams.set('chart_filter_type', 'otif_total');
-                url.hash = 'resultsCollapse';
-                
-                window.location.href = url.toString();
-            },
-            onHover: (event, chartElement) => {
-                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const percentage = context.parsed.y.toFixed(2) + '%';
-                            const index = context.dataIndex;
-                            const dataset = context.dataset;
-                            const onTime = dataset.onTimeData[index];
-                            const total = dataset.totalData[index];
-                            return `OTIF: ${percentage} (${onTime}/${total})`;
-                        }
-                    }
-                },
-                datalabels: {
-                    align: 'top',
-                    anchor: 'center',
-                    color: '#333',
-                    font: { weight: 'bold', size: 11 },
-                    formatter: function(value) {
-                        return value.toFixed(2) + '%';
-                    }
-                }
-            },
-            scales: {
-                y: {
+                y1: {
                     beginAtZero: true,
                     max: 100,
-                    title: { display: true, text: 'Percentage (%)' }
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'OTIF %' }
                 }
             }
         }
@@ -1030,18 +1180,6 @@ function updateEmuChart() {
                     formatter: (value) => value > 0 ? value : ''
                 }
             }
-        }
-    });
-}
-
-// Function to clear inputs for a specific stage row
-function clearStageRow(btn) {
-    const row = btn.closest('.row');
-    row.querySelectorAll('input, select').forEach(el => {
-        if (el.tagName === 'SELECT' && el.multiple) {
-             Array.from(el.options).forEach(opt => opt.selected = false);
-        } else {
-            el.value = '';
         }
     });
 }
