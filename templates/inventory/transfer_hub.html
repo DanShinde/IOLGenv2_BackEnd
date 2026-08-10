@@ -90,7 +90,7 @@
                         {% if item.item_type == 'TOOL' %}
                         <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-user-plus mr-1"></i>Assign</a>
                         {% endif %}
-                        <a href="{% url 'inventory-dispatch-create' %}?item={{ item.pk }}" class="text-orange-600 hover:text-orange-800"><i class="fas fa-truck mr-1"></i>Dispatch</a>
+                        <a href="{% url 'inventory-dispatch-create' %}?item={{ item.pk }}" class="text-yellow-600 hover:text-yellow-800"><i class="fas fa-truck mr-1"></i>Dispatch</a>
                     </div>
                 </div>
                 {% endfor %}
@@ -117,7 +117,7 @@
                     <div class="flex flex-col items-end space-y-1 text-xs">
                         {% if a.is_overdue %}<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Overdue {{ a.days_overdue }}d</span>{% endif %}
                         <a href="{% url 'inventory-assign-create' %}?item={{ a.item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-random mr-1"></i>Transfer</a>
-                        <a href="{% url 'inventory-return-assignment' a.pk %}" class="text-orange-600 hover:text-orange-800"><i class="fas fa-undo mr-1"></i>Return</a>
+                        <a href="{% url 'inventory-return-assignment' a.pk %}" class="text-yellow-600 hover:text-yellow-800"><i class="fas fa-undo mr-1"></i>Return</a>
                     </div>
                 </div>
                 {% endfor %}
@@ -136,13 +136,16 @@
                     <div>
                         <a href="{% url 'inventory-item-detail' d.item.pk %}" class="font-medium text-gray-900 hover:text-blue-600">{{ d.item.name }}</a>
                         <p class="text-xs text-gray-500">{{ d.item.serial_number }}</p>
-                        <p class="text-xs text-orange-600">
+                        <p class="text-xs text-yellow-600">
                             <i class="fas fa-map-marker-alt mr-1"></i>{{ d.project }}{% if d.site_location %} ({{ d.site_location }}){% endif %}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            <i class="fas fa-user mr-1"></i>{{ d.responsible_person }}
                         </p>
                     </div>
                     <div class="flex flex-col items-end space-y-1 text-xs">
                         {% if d.is_overdue %}<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Overdue {{ d.days_overdue }}d</span>{% endif %}
-                        <a href="{% url 'inventory-return-dispatch' d.pk %}" class="text-orange-600 hover:text-orange-800"><i class="fas fa-undo mr-1"></i>Return</a>
+                        <a href="{% url 'inventory-return-dispatch' d.pk %}" class="text-yellow-600 hover:text-yellow-800"><i class="fas fa-undo mr-1"></i>Return</a>
                     </div>
                 </div>
                 {% endfor %}

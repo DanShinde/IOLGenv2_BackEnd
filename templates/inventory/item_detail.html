@@ -63,7 +63,7 @@
         {% endif %}
 
         {% if item.status == 'AVAILABLE' or item.status == 'ASSIGNED' %}
-        <a href="{% url 'inventory-dispatch-create' %}?item={{ item.pk }}" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md">
+        <a href="{% url 'inventory-dispatch-create' %}?item={{ item.pk }}" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-truck mr-2"></i>Dispatch
         </a>
         {% endif %}

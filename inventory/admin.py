@@ -93,11 +93,11 @@ class AssignmentAdmin(admin.ModelAdmin):
 @admin.register(Dispatch)
 class DispatchAdmin(admin.ModelAdmin):
     list_display = (
-        'item', 'quantity', 'project', 'site_location',
+        'item', 'quantity', 'project', 'site_location', 'responsible_person',
         'dispatch_date', 'expected_return_date', 'return_date', 'return_condition', 'status_badge'
     )
     list_filter = ('dispatch_date', 'project', 'return_date', 'return_condition')
-    search_fields = ('item__name', 'item__serial_number', 'project', 'site_location')
+    search_fields = ('item__name', 'item__serial_number', 'project', 'site_location', 'responsible_person')
     date_hierarchy = 'dispatch_date'
 
     def status_badge(self, obj):

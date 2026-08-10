@@ -110,7 +110,8 @@ class Item(models.Model):
             # Get current dispatch
             dispatch = self.dispatches.filter(return_date__isnull=True).first()
             if dispatch:
-                return f"Dispatched to {dispatch.project} ({dispatch.site_location or 'N/A'})"
+                return (f"Dispatched to {dispatch.project} ({dispatch.site_location or 'N/A'}) - "
+                        f"with {dispatch.responsible_person}")
         elif self.status == 'CONSUMED':
             return "Consumed (No longer in inventory)"
         elif self.status == 'MAINTENANCE':
@@ -173,6 +174,8 @@ class Dispatch(models.Model):
     quantity = models.PositiveIntegerField(default=1, help_text="Quantity dispatched")
     project = models.CharField(max_length=100, db_index=True)
     site_location = models.CharField(max_length=100, null=True, blank=True)
+    responsible_person = models.CharField(max_length=100, default='', db_index=True,
+                                          help_text="Person at the site who is responsible for this item - needed to recover it")
     dispatched_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dispatched_items')
     dispatch_date = models.DateField()
     expected_return_date = models.DateField(null=True, blank=True,
@@ -190,9 +193,9 @@ class Dispatch(models.Model):
 
     def __str__(self):
         if self.item.item_type == 'TOOL':
-            return f"{self.item.name} dispatched to {self.project}"
+            return f"{self.item.name} dispatched to {self.project} (with {self.responsible_person})"
         else:
-            return f"{self.quantity} x {self.item.name} dispatched to {self.project} (Consumed)"
+            return f"{self.quantity} x {self.item.name} dispatched to {self.project} (Consumed, received by {self.responsible_person})"
 
     def is_active(self):
         """Check if this dispatch is currently active (only for tools)"""

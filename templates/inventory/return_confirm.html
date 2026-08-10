@@ -38,6 +38,10 @@
                     <dd class="text-gray-900">{{ dispatch.project }}{% if dispatch.site_location %} ({{ dispatch.site_location }}){% endif %}</dd>
                 </div>
                 <div class="flex justify-between">
+                    <dt class="font-medium text-gray-600">Responsible Person:</dt>
+                    <dd class="text-gray-900">{{ dispatch.responsible_person }}</dd>
+                </div>
+                <div class="flex justify-between">
                     <dt class="font-medium text-gray-600">Dispatch Date:</dt>
                     <dd class="text-gray-900">{{ dispatch.dispatch_date }}</dd>
                 </div>

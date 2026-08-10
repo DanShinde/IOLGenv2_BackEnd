@@ -765,6 +765,7 @@ def dispatch_item(request):
             item = form.cleaned_data['item']
             project = form.cleaned_data['project']
             site_location = form.cleaned_data.get('site_location', '')
+            responsible_person = form.cleaned_data['responsible_person']
             quantity = form.cleaned_data.get('quantity') or 1
             dispatch_date = form.cleaned_data['dispatch_date']
             expected_return_date = form.cleaned_data.get('expected_return_date')
@@ -774,6 +775,7 @@ def dispatch_item(request):
                 if item.item_type == 'MATERIAL':
                     Dispatch.objects.create(
                         item=item, quantity=quantity, project=project, site_location=site_location,
+                        responsible_person=responsible_person,
                         dispatched_by=request.user, dispatch_date=dispatch_date, notes=notes
                     )
 
@@ -787,7 +789,8 @@ def dispatch_item(request):
 
                     History.objects.create(
                         item=item, action='CONSUMED', user=request.user,
-                        details=f'{quantity} units dispatched to {project} (Site: {site_location or "N/A"})',
+                        details=f'{quantity} units dispatched to {project} (Site: {site_location or "N/A"}) - '
+                                f'received by {responsible_person}',
                         location=f'{project} - {site_location or "N/A"}'
                     )
                     messages.success(
@@ -808,6 +811,7 @@ def dispatch_item(request):
 
                     Dispatch.objects.create(
                         item=item, quantity=1, project=project, site_location=site_location,
+                        responsible_person=responsible_person,
                         dispatched_by=request.user, dispatch_date=dispatch_date,
                         expected_return_date=expected_return_date, notes=notes
                     )
@@ -818,9 +822,11 @@ def dispatch_item(request):
 
                     History.objects.create(
                         item=item, action='DISPATCHED', user=request.user,
-                        details=f'Dispatched to {project} (Site: {site_location or "N/A"})', location=item.location
+                        details=f'Dispatched to {project} (Site: {site_location or "N/A"}) - '
+                                f'responsible person: {responsible_person}',
+                        location=item.location
                     )
-                    messages.success(request, f'Dispatched {item.name} to {project}.')
+                    messages.success(request, f'Dispatched {item.name} to {project} (responsible: {responsible_person}).')
 
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')

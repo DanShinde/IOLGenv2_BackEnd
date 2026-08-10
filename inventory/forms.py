@@ -73,31 +73,37 @@ class HistoryFilterForm(forms.Form):
     ITEM_TYPE_CHOICES = [('', 'All Types')] + Item.ITEM_TYPES
 
     action = forms.ChoiceField(choices=ACTION_CHOICES, required=False,
-                               widget=forms.Select(attrs={'class': 'form-control'}))
+                               widget=forms.Select())
     item_type = forms.ChoiceField(choices=ITEM_TYPE_CHOICES, required=False,
-                                  widget=forms.Select(attrs={'class': 'form-control'}))
+                                  widget=forms.Select())
     item = forms.ModelChoiceField(
         queryset=Item.objects.all().order_by('name'),
         required=False,
         empty_label='All Items',
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select()
     )
     date_from = forms.DateField(required=False,
-                                widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+                                widget=forms.DateInput(attrs={'type': 'date'}))
     date_to = forms.DateField(required=False,
-                              widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+                              widget=forms.DateInput(attrs={'type': 'date'}))
     serial_number = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Search by serial number...'})
+        widget=forms.TextInput(attrs={'placeholder': 'Search by serial number...'})
     )
     user_search = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Search by username...'})
+        widget=forms.TextInput(attrs={'placeholder': 'Search by username...'})
     )
     search = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Search in details...'})
+        widget=forms.TextInput(attrs={'placeholder': 'Search in details...'})
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if not field.widget.attrs.get('class'):
+                field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 
 
 class ReturnForm(forms.Form):
@@ -111,11 +117,16 @@ class ReturnForm(forms.Form):
     return_notes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={
-            'rows': 3, 'class': 'form-control',
+            'rows': 3,
             'placeholder': 'Describe any damage or issues (required if not returned in good condition)...'
         }),
         label="Notes"
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.fields['return_notes'].widget.attrs.get('class'):
+            self.fields['return_notes'].widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 
     def clean(self):
         cleaned_data = super().clean()
@@ -131,9 +142,9 @@ class ReservationForm(forms.ModelForm):
         model = Reservation
         fields = ['item', 'reserved_for', 'start_date', 'end_date', 'notes']
         widgets = {
-            'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'What is this tool needed for?'}),
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+            'notes': forms.Textarea(attrs={'rows': 3, 'placeholder': 'What is this tool needed for?'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -187,26 +198,26 @@ class AssignForm(forms.Form):
     item = forms.ModelChoiceField(
         queryset=Item.objects.filter(item_type='TOOL', status__in=['AVAILABLE', 'ASSIGNED']).order_by('name'),
         label="Tool",
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        widget=forms.Select(),
     )
     assigned_to = forms.ModelChoiceField(
         queryset=User.objects.filter(is_active=True).order_by('username'),
         label="Assign To",
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        widget=forms.Select(),
     )
     assignment_date = forms.DateField(
         initial=date.today,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date'}),
         label="Date"
     )
     expected_return_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date'}),
         label="Expected Return Date"
     )
     notes = forms.CharField(
         required=False,
-        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Notes...'})
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Notes...'})
     )
 
     def __init__(self, *args, **kwargs):
@@ -258,40 +269,46 @@ class DispatchForm(forms.Form):
     item = forms.ModelChoiceField(
         queryset=Item.objects.filter(status__in=['AVAILABLE', 'ASSIGNED']).order_by('name'),
         label="Item",
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        widget=forms.Select(),
     )
     project = forms.CharField(
         max_length=100,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Project name'}),
+        widget=forms.TextInput(attrs={'placeholder': 'Project name'}),
         label="Project Name"
     )
     site_location = forms.CharField(
         max_length=100,
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Site location'}),
+        widget=forms.TextInput(attrs={'placeholder': 'Site location'}),
         label="Site Location"
+    )
+    responsible_person = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={'placeholder': 'Who at the site is responsible for this item?'}),
+        label="Responsible Person",
+        help_text="Needed to recover the item later - required even for materials."
     )
     quantity = forms.IntegerField(
         required=False,
         initial=1,
         min_value=1,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '1'}),
+        widget=forms.NumberInput(attrs={'placeholder': '1'}),
         label="Quantity",
         help_text="For materials only - how many units to dispatch"
     )
     dispatch_date = forms.DateField(
         initial=date.today,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date'}),
         label="Dispatch Date"
     )
     expected_return_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type': 'date'}),
         help_text="Only for tools - materials won't return"
     )
     notes = forms.CharField(
         required=False,
-        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Notes...'})
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'Notes...'})
     )
 
     def __init__(self, *args, **kwargs):
