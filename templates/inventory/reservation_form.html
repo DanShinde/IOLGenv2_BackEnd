@@ -3,7 +3,7 @@
 {% block title %}Reserve a Tool{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-3xl mx-auto">
     <div class="bg-white shadow rounded-lg p-6">
         <h2 class="text-2xl font-bold mb-6">
             <i class="fas fa-calendar-plus mr-2 text-purple-600"></i>Reserve a Tool
@@ -19,36 +19,47 @@
 
         <form method="post">
             {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
 
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.item.label }}</label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label for="{{ form.item.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.item.label }} <span class="text-red-500">*</span>
+                    </label>
                     {{ form.item }}
                     {% if form.item.errors %}<p class="text-sm text-red-600 mt-1">{{ form.item.errors.0 }}</p>{% endif %}
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.reserved_for.label }}</label>
+                <div class="md:col-span-2">
+                    <label for="{{ form.reserved_for.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.reserved_for.label }} <span class="text-red-500">*</span>
+                    </label>
                     {{ form.reserved_for }}
                     {% if form.reserved_for.errors %}<p class="text-sm text-red-600 mt-1">{{ form.reserved_for.errors.0 }}</p>{% endif %}
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.start_date.label }}</label>
-                        {{ form.start_date }}
-                        {% if form.start_date.errors %}<p class="text-sm text-red-600 mt-1">{{ form.start_date.errors.0 }}</p>{% endif %}
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.end_date.label }}</label>
-                        {{ form.end_date }}
-                        {% if form.end_date.errors %}<p class="text-sm text-red-600 mt-1">{{ form.end_date.errors.0 }}</p>{% endif %}
-                    </div>
+                <div>
+                    <label for="{{ form.start_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.start_date.label }} <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.start_date }}
+                    {% if form.start_date.errors %}<p class="text-sm text-red-600 mt-1">{{ form.start_date.errors.0 }}</p>{% endif %}
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.notes.label }}</label>
+                    <label for="{{ form.end_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.end_date.label }} <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.end_date }}
+                    {% if form.end_date.errors %}<p class="text-sm text-red-600 mt-1">{{ form.end_date.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="{{ form.notes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.notes.label }}
+                    </label>
                     {{ form.notes }}
+                    {% if form.notes.errors %}<p class="text-sm text-red-600 mt-1">{{ form.notes.errors.0 }}</p>{% endif %}
                 </div>
             </div>
 
@@ -59,8 +70,8 @@
             </div>
 
             <div class="mt-6 flex justify-end space-x-4">
-                <a href="{% url 'inventory-reservation-list' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
-                    Cancel
+                <a href="{{ next }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
+                    <i class="fas fa-times mr-2"></i>Cancel
                 </a>
                 <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md">
                     <i class="fas fa-calendar-check mr-2"></i>Reserve

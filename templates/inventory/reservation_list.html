@@ -3,12 +3,13 @@
 {% block title %}Reservations{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto">
+<div class="bg-white shadow rounded-lg p-6">
     <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold">
-            <i class="fas fa-calendar-alt mr-2 text-purple-600"></i>Reservations
-        </h2>
-        <a href="{% url 'inventory-reservation-create' %}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900">Reservations</h2>
+            <p class="text-sm text-gray-500 mt-1">{{ reservations|length }} reservation{{ reservations|length|pluralize }}</p>
+        </div>
+        <a href="{% url 'inventory-reservation-create' %}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md inline-flex items-center">
             <i class="fas fa-plus mr-2"></i>New Reservation
         </a>
     </div>
@@ -24,34 +25,34 @@
         </a>
     </div>
 
-    <div class="bg-white shadow rounded-lg overflow-hidden">
+    <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tool</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reserved For</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tool</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reserved For</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="bg-white divide-y divide-gray-200">
                 {% for reservation in reservations %}
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3">
+                    <td class="px-6 py-4 whitespace-nowrap">
                         <div class="font-medium text-gray-900">{{ reservation.item.name }}</div>
-                        <div class="text-xs text-gray-500">{{ reservation.item.serial_number }}</div>
+                        <div class="text-sm text-gray-500">{{ reservation.item.serial_number }}</div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-700">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {{ reservation.reserved_for.get_full_name|default:reservation.reserved_for.username }}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-700">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {{ reservation.start_date }} &rarr; {{ reservation.end_date }}
                         {% if reservation.is_expired %}
                         <span class="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">Expired</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-2 py-1 text-xs rounded-full
                             {% if reservation.status == 'PENDING' %}bg-yellow-100 text-yellow-800
                             {% elif reservation.status == 'FULFILLED' %}bg-green-100 text-green-800
@@ -59,32 +60,37 @@
                             {{ reservation.get_status_display }}
                         </span>
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {% if reservation.status == 'PENDING' %}
-                        <div class="flex space-x-2">
+                        <div class="flex space-x-3">
                             <form method="post" action="{% url 'inventory-reservation-fulfill' reservation.pk %}">
                                 {% csrf_token %}
-                                <button type="submit" class="text-green-600 hover:text-green-800 text-sm" title="Convert to assignment">
-                                    <i class="fas fa-check mr-1"></i>Fulfill
+                                <button type="submit" class="text-green-600 hover:text-green-900" title="Convert to assignment">
+                                    <i class="fas fa-check"></i> Fulfill
                                 </button>
                             </form>
                             <form method="post" action="{% url 'inventory-reservation-cancel' reservation.pk %}" onsubmit="return confirm('Cancel this reservation?');">
                                 {% csrf_token %}
-                                <button type="submit" class="text-red-600 hover:text-red-800 text-sm">
-                                    <i class="fas fa-times mr-1"></i>Cancel
+                                <button type="submit" class="text-red-600 hover:text-red-900">
+                                    <i class="fas fa-times"></i> Cancel
                                 </button>
                             </form>
                         </div>
                         {% elif reservation.fulfilled_assignment %}
-                        <a href="{% url 'inventory-item-detail' reservation.item.pk %}" class="text-blue-600 hover:text-blue-800 text-sm">View item</a>
+                        <a href="{% url 'inventory-item-detail' reservation.item.pk %}" class="text-blue-600 hover:text-blue-900">
+                            <i class="fas fa-eye"></i> View Item
+                        </a>
                         {% else %}
-                        <span class="text-gray-400 text-sm">-</span>
+                        <span class="text-gray-400">-</span>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="px-4 py-8 text-center text-gray-500">No reservations found</td>
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                        <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+                        <p>No reservations found</p>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -26,11 +26,25 @@ from .utils import send_overdue_digest
 from . import services
 
 
-def _safe_next_url(request, fallback):
-    """Validate a POSTed `next` redirect target against open-redirect abuse."""
-    next_url = request.POST.get('next')
-    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-        return next_url
+def _capture_next(request, fallback):
+    """
+    Figure out where a form should return to after it's saved or cancelled.
+
+    - On GET (opening the form): an explicit ?next= wins, otherwise the page that
+      linked here (HTTP_REFERER), otherwise `fallback`.
+    - On POST (submitting the form): the hidden `next` field carries forward
+      whatever was resolved when the form was opened, so it survives validation
+      errors and re-renders.
+
+    Always validated as a safe same-host redirect target to prevent open redirects.
+    """
+    if request.method == 'POST':
+        candidate = request.POST.get('next')
+    else:
+        candidate = request.GET.get('next') or request.META.get('HTTP_REFERER')
+
+    if candidate and url_has_allowed_host_and_scheme(candidate, allowed_hosts={request.get_host()}):
+        return candidate
     return fallback
 
 
@@ -214,6 +228,9 @@ def item_detail(request, pk):
 
 @login_required
 def item_create(request):
+    fallback = reverse('inventory-item-list')
+    next_url = _capture_next(request, fallback)
+
     if request.method == 'POST':
         form = ItemForm(request.POST, request.FILES)
         if form.is_valid():
@@ -238,7 +255,7 @@ def item_create(request):
                 f'Successfully added {item.name} ({item.serial_number}) to inventory!',
                 extra_tags='bg-green-100 text-green-800'
             )
-            return redirect('inventory-item-detail', pk=item.pk)
+            return redirect(next_url)
         else:
             messages.error(request,
                 'Please correct the errors below',
@@ -249,7 +266,8 @@ def item_create(request):
 
     context = {
         'form': form,
-        'title': 'Add New Inventory Item'
+        'title': 'Add New Inventory Item',
+        'next': next_url,
     }
     return render(request, 'inventory/item_form.html', context)
 
@@ -257,6 +275,9 @@ def item_create(request):
 @login_required
 def item_update(request, pk):
     item = get_object_or_404(Item, pk=pk)
+    fallback = reverse('inventory-item-detail', kwargs={'pk': item.pk})
+    next_url = _capture_next(request, fallback)
+
     if request.method == 'POST':
         form = ItemForm(request.POST, request.FILES, instance=item)
         if form.is_valid():
@@ -278,7 +299,7 @@ def item_update(request, pk):
                 f'Successfully updated {updated_item.name}',
                 extra_tags='bg-green-100 text-green-800'
             )
-            return redirect('inventory-item-detail', pk=updated_item.pk)
+            return redirect(next_url)
         else:
             messages.error(request,
                 'Please correct the errors below',
@@ -290,7 +311,8 @@ def item_update(request, pk):
     context = {
         'form': form,
         'title': f'Edit {item.name}',
-        'item': item
+        'item': item,
+        'next': next_url,
     }
     return render(request, 'inventory/item_form.html', context)
 
@@ -460,6 +482,8 @@ def ajax_search_items(request):
 @login_required
 def return_assignment(request, pk):
     assignment = get_object_or_404(Assignment, pk=pk, return_date__isnull=True)
+    next_url = _capture_next(request, reverse('inventory-transfer-item'))
+
     if request.method == 'POST':
         form = ReturnForm(request.POST)
         if form.is_valid():
@@ -475,7 +499,7 @@ def return_assignment(request, pk):
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')
             messages.success(request, f'Return recorded for {assignment.item.name}.')
-            return redirect('inventory-transfer-item')
+            return redirect(next_url)
     else:
         form = ReturnForm()
 
@@ -483,12 +507,15 @@ def return_assignment(request, pk):
         'assignment': assignment,
         'return_type': 'assignment',
         'form': form,
+        'next': next_url,
     })
 
 
 @login_required
 def return_dispatch(request, pk):
     dispatch = get_object_or_404(Dispatch, pk=pk, return_date__isnull=True, item__item_type='TOOL')
+    next_url = _capture_next(request, reverse('inventory-transfer-item'))
+
     if request.method == 'POST':
         form = ReturnForm(request.POST)
         if form.is_valid():
@@ -503,7 +530,7 @@ def return_dispatch(request, pk):
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')
             messages.success(request, f'Return recorded for {dispatch.item.name}.')
-            return redirect('inventory-transfer-item')
+            return redirect(next_url)
     else:
         form = ReturnForm()
 
@@ -511,6 +538,7 @@ def return_dispatch(request, pk):
         'dispatch': dispatch,
         'return_type': 'dispatch',
         'form': form,
+        'next': next_url,
     })
 
 
@@ -656,6 +684,8 @@ def transfer_item(request):
 
 @login_required
 def assign_item(request):
+    next_url = _capture_next(request, reverse('inventory-transfer-item'))
+
     if request.method == 'POST':
         form = AssignForm(request.POST)
         if form.is_valid():
@@ -711,7 +741,7 @@ def assign_item(request):
 
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')
-            return redirect(_safe_next_url(request, reverse('inventory-transfer-item')))
+            return redirect(next_url)
     else:
         initial = {}
         item_id = request.GET.get('item')
@@ -722,11 +752,13 @@ def assign_item(request):
             initial['assigned_to'] = user_id
         form = AssignForm(initial=initial)
 
-    return render(request, 'inventory/assign_form.html', {'form': form, 'next': request.GET.get('next', '')})
+    return render(request, 'inventory/assign_form.html', {'form': form, 'next': next_url})
 
 
 @login_required
 def dispatch_item(request):
+    next_url = _capture_next(request, reverse('inventory-transfer-item'))
+
     if request.method == 'POST':
         form = DispatchForm(request.POST)
         if form.is_valid():
@@ -792,7 +824,7 @@ def dispatch_item(request):
 
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')
-            return redirect('inventory-transfer-item')
+            return redirect(next_url)
     else:
         initial = {}
         item_id = request.GET.get('item')
@@ -800,7 +832,7 @@ def dispatch_item(request):
             initial['item'] = item_id
         form = DispatchForm(initial=initial)
 
-    return render(request, 'inventory/dispatch_form.html', {'form': form})
+    return render(request, 'inventory/dispatch_form.html', {'form': form, 'next': next_url})
 
 
 # USERS
@@ -863,6 +895,8 @@ def reservation_list(request):
 
 @login_required
 def reservation_create(request):
+    next_url = _capture_next(request, reverse('inventory-reservation-list'))
+
     if request.method == 'POST':
         form = ReservationForm(request.POST)
         if form.is_valid():
@@ -880,7 +914,7 @@ def reservation_create(request):
             )
 
             messages.success(request, f'Reserved {reservation.item.name} for {who} starting {reservation.start_date}.')
-            return redirect('inventory-reservation-list')
+            return redirect(next_url)
     else:
         initial = {}
         item_id = request.GET.get('item')
@@ -888,7 +922,7 @@ def reservation_create(request):
             initial['item'] = item_id
         form = ReservationForm(initial=initial)
 
-    return render(request, 'inventory/reservation_form.html', {'form': form})
+    return render(request, 'inventory/reservation_form.html', {'form': form, 'next': next_url})
 
 
 @login_required

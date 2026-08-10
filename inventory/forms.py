@@ -14,13 +14,14 @@ class ItemForm(forms.ModelForm):
             'quantity', 'min_quantity', 'location', 'category', 'status', 'remarks'
         ]
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-            'remarks': forms.Textarea(attrs={'rows': 3, 'class': 'form-control',
+            'description': forms.Textarea(attrs={'rows': 3,
                                             'placeholder': 'Any notes, updates, or important information...'}),
-            'purchase_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'purchase_cost': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
-            'item_type': forms.Select(attrs={'class': 'form-control'}),
-            'status': forms.Select(attrs={'class': 'form-control'}),
+            'remarks': forms.Textarea(attrs={'rows': 3,
+                                            'placeholder': 'Any notes, updates, or important information...'}),
+            'purchase_date': forms.DateInput(attrs={'type': 'date'}),
+            'purchase_cost': forms.NumberInput(attrs={'step': '0.01'}),
+            'item_type': forms.Select(),
+            'status': forms.Select(),
         }
         help_texts = {
             'serial_number': 'Unique identifier for tracking',
