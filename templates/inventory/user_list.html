@@ -1,0 +1,62 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">
+            <i class="fas fa-users mr-2 text-teal-600"></i>Users
+        </h2>
+        <a href="{% url 'inventory-assign-create' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
+            <i class="fas fa-user-plus mr-2"></i>Assign a Tool
+        </a>
+    </div>
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tools Currently Held</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for user in users %}
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='{% url 'inventory-user-detail' user.pk %}'">
+                    <td class="px-4 py-3">
+                        <div class="flex items-center">
+                            <div class="h-9 w-9 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold mr-3">
+                                {{ user.get_full_name.0|default:user.username.0|upper }}
+                            </div>
+                            <div class="font-medium text-gray-900">{{ user.get_full_name|default:user.username }}</div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500">{{ user.email|default:"-" }}</td>
+                    <td class="px-4 py-3">
+                        {% if user.active_tool_count %}
+                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                            {{ user.active_tool_count }} tool{{ user.active_tool_count|pluralize }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400 text-sm">None</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="{% url 'inventory-user-detail' user.pk %}" class="text-blue-600 hover:text-blue-800 text-sm">
+                            View <i class="fas fa-chevron-right ml-1"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="px-4 py-8 text-center text-gray-500">No users found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

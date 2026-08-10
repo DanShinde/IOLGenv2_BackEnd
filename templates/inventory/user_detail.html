@@ -1,0 +1,148 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}{{ target_user.get_full_name|default:target_user.username }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="bg-white shadow rounded-lg p-6 flex items-center justify-between">
+        <div class="flex items-center">
+            <div class="h-16 w-16 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold text-2xl mr-4">
+                {{ target_user.get_full_name.0|default:target_user.username.0|upper }}
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">{{ target_user.get_full_name|default:target_user.username }}</h2>
+                <p class="text-gray-500">{{ target_user.email|default:"No email on file" }}</p>
+            </div>
+        </div>
+        <a href="{% url 'inventory-user-list' %}" class="text-blue-600 hover:text-blue-800 text-sm">
+            <i class="fas fa-arrow-left mr-1"></i>All Users
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Assign a tool to this user -->
+        <div class="bg-white shadow rounded-lg p-6 lg:col-span-1">
+            <h3 class="text-lg font-semibold mb-4">
+                <i class="fas fa-user-plus mr-2 text-green-600"></i>Assign a Tool
+            </h3>
+
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700">
+                {% for error in form.non_field_errors %}
+                <p>{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'inventory-assign-create' %}">
+                {% csrf_token %}
+                <input type="hidden" name="assigned_to" value="{{ target_user.pk }}">
+                <input type="hidden" name="next" value="{% url 'inventory-user-detail' target_user.pk %}">
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.item.label }}</label>
+                        {{ form.item }}
+                        {% if form.item.errors %}<p class="text-sm text-red-600 mt-1">{{ form.item.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.assignment_date.label }}</label>
+                        {{ form.assignment_date }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.expected_return_date.label }}</label>
+                        {{ form.expected_return_date }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.notes.label }}</label>
+                        {{ form.notes }}
+                    </div>
+                </div>
+
+                <button type="submit" class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
+                    <i class="fas fa-check mr-2"></i>Assign to {{ target_user.get_full_name|default:target_user.username }}
+                </button>
+            </form>
+        </div>
+
+        <!-- Currently has / history -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="fas fa-box mr-2 text-blue-600"></i>Currently Has ({{ active_assignments|length }})
+                </h3>
+                {% if active_assignments %}
+                <div class="space-y-3">
+                    {% for a in active_assignments %}
+                    <div class="border border-gray-200 rounded-lg p-3 flex justify-between items-center">
+                        <div>
+                            <a href="{% url 'inventory-item-detail' a.item.pk %}" class="font-medium text-gray-900 hover:text-blue-600">{{ a.item.name }}</a>
+                            <p class="text-xs text-gray-500">{{ a.item.serial_number }} - since {{ a.assignment_date }}</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            {% if a.is_overdue %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">Overdue {{ a.days_overdue }}d</span>
+                            {% elif a.expected_return_date %}
+                            <span class="text-xs text-gray-500">Due {{ a.expected_return_date }}</span>
+                            {% endif %}
+                            <a href="{% url 'inventory-return-assignment' a.pk %}" class="text-orange-600 hover:text-orange-800 text-sm">
+                                <i class="fas fa-undo mr-1"></i>Return
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-sm text-center py-4">Not holding any tools right now.</p>
+                {% endif %}
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="fas fa-history mr-2 text-indigo-600"></i>History
+                </h3>
+                {% if past_assignments %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase">
+                                <th class="py-2 pr-4">Tool</th>
+                                <th class="py-2 pr-4">Issued</th>
+                                <th class="py-2 pr-4">Returned</th>
+                                <th class="py-2">Condition</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for a in past_assignments %}
+                            <tr>
+                                <td class="py-2 pr-4">
+                                    <a href="{% url 'inventory-item-detail' a.item.pk %}" class="text-gray-900 hover:text-blue-600">{{ a.item.name }}</a>
+                                </td>
+                                <td class="py-2 pr-4 text-gray-500">{{ a.assignment_date }}</td>
+                                <td class="py-2 pr-4 text-gray-500">{{ a.return_date }}</td>
+                                <td class="py-2">
+                                    {% if a.return_condition %}
+                                    <span class="px-2 py-0.5 text-xs rounded-full
+                                        {% if a.return_condition == 'GOOD' %}bg-green-100 text-green-700
+                                        {% elif a.return_condition == 'LOST' %}bg-gray-200 text-gray-700
+                                        {% else %}bg-orange-100 text-orange-700{% endif %}">
+                                        {{ a.get_return_condition_display }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-sm text-center py-4">No past assignments on record.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

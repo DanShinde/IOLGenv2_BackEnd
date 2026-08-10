@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django import forms
 from django.contrib.auth.models import User
-from .models import Item, Assignment, Dispatch, History, Reservation, RETURN_CONDITION_CHOICES
+from .models import Item, History, Reservation, RETURN_CONDITION_CHOICES
 from django.core.exceptions import ValidationError
 
 
@@ -171,86 +171,117 @@ class ReservationForm(forms.ModelForm):
         return cleaned_data
 
 
-class UnifiedTransferForm(forms.Form):
-    """
-    Unified form for:
-    - Assigning tools to users
-    - Transferring tools between users
-    - Dispatching tools/materials to projects
-    """
-    transfer_type = forms.ChoiceField(
-        choices=[
-            ('assign', 'Assign Tool to User'),
-            ('dispatch', 'Dispatch to Project')
-        ],
-        widget=forms.RadioSelect(attrs={'class': 'transfer-type-radio'}),
-        initial='assign',
-        label="Action Type"
-    )
+def _assignable_tool_label(item):
+    label = f"{item.name} ({item.serial_number})"
+    if item.status == 'ASSIGNED':
+        active = item.assignments.filter(return_date__isnull=True).first()
+        if active:
+            who = active.assigned_to.get_full_name() or active.assigned_to.username
+            label += f" - currently with {who}"
+    return label
 
-    # For tool assignments/transfers
-    assignment = forms.ModelChoiceField(
-        queryset=Assignment.objects.filter(return_date__isnull=True),
-        label="Transfer Tool From (current assignment)",
+
+class AssignForm(forms.Form):
+    """Assign an available tool to a user, or transfer an already-assigned tool to someone else"""
+    item = forms.ModelChoiceField(
+        queryset=Item.objects.filter(item_type='TOOL', status__in=['AVAILABLE', 'ASSIGNED']).order_by('name'),
+        label="Tool",
         widget=forms.Select(attrs={'class': 'form-control'}),
-        required=False,
-        help_text="Select to transfer tool to another user"
     )
-
-    available_item = forms.ModelChoiceField(
-        queryset=Item.objects.filter(status='AVAILABLE'),
-        label="Select Available Item",
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        required=False,
-        help_text="Select available tool or material"
-    )
-
     assigned_to = forms.ModelChoiceField(
-        queryset=User.objects.filter(is_active=True),
-        label="Assign To User",
+        queryset=User.objects.filter(is_active=True).order_by('username'),
+        label="Assign To",
         widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+    assignment_date = forms.DateField(
+        initial=date.today,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Date"
+    )
+    expected_return_date = forms.DateField(
         required=False,
-        help_text="Only for tool assignments"
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Expected Return Date"
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Notes...'})
     )
 
-    # For dispatches
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if not field.widget.attrs.get('class'):
+                field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+        self.fields['item'].label_from_instance = _assignable_tool_label
+        self.fields['assigned_to'].label_from_instance = lambda user: (
+            f"{user.get_full_name()} ({user.username})" if user.get_full_name() else user.username
+        )
+
+        if not self.initial.get('expected_return_date'):
+            self.initial['expected_return_date'] = (date.today() + timedelta(days=7)).isoformat()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        item = cleaned_data.get('item')
+        assigned_to = cleaned_data.get('assigned_to')
+        assignment_date = cleaned_data.get('assignment_date')
+        expected_return_date = cleaned_data.get('expected_return_date')
+
+        if expected_return_date and assignment_date and expected_return_date < assignment_date:
+            self.add_error('expected_return_date', 'Return date cannot be before assignment date.')
+
+        if item and item.status == 'ASSIGNED' and assigned_to:
+            active_assignment = item.assignments.filter(return_date__isnull=True).first()
+            if active_assignment and active_assignment.assigned_to == assigned_to:
+                raise ValidationError('This tool is already assigned to that user.')
+
+        # Don't let a direct assignment silently override someone else's pending reservation
+        if item and assigned_to and assignment_date:
+            conflict_end = expected_return_date or assignment_date
+            conflicting = Reservation.objects.filter(item=item, status='PENDING').exclude(reserved_for=assigned_to)
+            for reservation in conflicting:
+                if reservation.overlaps(assignment_date, conflict_end):
+                    who = reservation.reserved_for.get_full_name() or reservation.reserved_for.username
+                    raise ValidationError(
+                        f'{item.name} is reserved for {who} from {reservation.start_date} to {reservation.end_date}. '
+                        f'Fulfill or cancel that reservation first.'
+                    )
+
+        return cleaned_data
+
+
+class DispatchForm(forms.Form):
+    """Dispatch a tool or material to a project"""
+    item = forms.ModelChoiceField(
+        queryset=Item.objects.filter(status__in=['AVAILABLE', 'ASSIGNED']).order_by('name'),
+        label="Item",
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
     project = forms.CharField(
         max_length=100,
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Project name'
-        }),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Project name'}),
         label="Project Name"
     )
-
     site_location = forms.CharField(
         max_length=100,
         required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Site location'
-        }),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Site location'}),
         label="Site Location"
     )
-
     quantity = forms.IntegerField(
         required=False,
         initial=1,
         min_value=1,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': '1'
-        }),
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '1'}),
         label="Quantity",
         help_text="For materials only - how many units to dispatch"
     )
-
-    # Common fields
-    transfer_date = forms.DateField(
+    dispatch_date = forms.DateField(
         initial=date.today,
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Date"
+        label="Dispatch Date"
     )
     expected_return_date = forms.DateField(
         required=False,
@@ -264,91 +295,25 @@ class UnifiedTransferForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if not field.widget.attrs.get('class'):
+                field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 
-        # Format assignment display
-        self.fields['assignment'].label_from_instance = lambda assignment: (
-            f"{assignment.item.name} ({assignment.item.serial_number}) - "
-            f"Currently with {assignment.assigned_to.get_full_name() or assignment.assigned_to.username}"
-        )
-
-        # Format available item display
-        self.fields['available_item'].label_from_instance = lambda item: (
+        self.fields['item'].label_from_instance = lambda item: (
             f"{item.name} ({item.serial_number}) - {item.get_item_type_display()}"
         )
 
-        # Format user display
-        self.fields['assigned_to'].label_from_instance = lambda user: (
-            f"{user.get_full_name()} ({user.username})"
-            if user.get_full_name()
-            else user.username
-        )
-
-        # Set default expected return date (7 days from now)
-        if not self.initial.get('expected_return_date'):
-            self.initial['expected_return_date'] = (date.today() + timedelta(days=7)).isoformat()
-
     def clean(self):
         cleaned_data = super().clean()
-        transfer_type = cleaned_data.get('transfer_type')
-        assignment = cleaned_data.get('assignment')
-        available_item = cleaned_data.get('available_item')
-        assigned_to = cleaned_data.get('assigned_to')
-        project = cleaned_data.get('project')
+        item = cleaned_data.get('item')
         quantity = cleaned_data.get('quantity') or 1
-        transfer_date = cleaned_data.get('transfer_date')
+        dispatch_date = cleaned_data.get('dispatch_date')
         expected_return_date = cleaned_data.get('expected_return_date')
 
-        # Validate based on transfer type
-        if transfer_type == 'assign':
-            # Must select either an assigned item or available item
-            if not assignment and not available_item:
-                raise ValidationError('Please select either an assigned tool to transfer or an available item.')
+        if item and item.item_type == 'MATERIAL' and quantity > item.quantity:
+            raise ValidationError(f'Cannot dispatch {quantity} units. Only {item.quantity} available.')
 
-            # Cannot select both
-            if assignment and available_item:
-                raise ValidationError('Please select either an assigned tool OR an available item, not both.')
-
-            # Can only assign TOOLS to users
-            item = assignment.item if assignment else available_item
-            if item and item.item_type != 'TOOL':
-                raise ValidationError('You can only assign TOOLS to users. Materials must be dispatched to projects.')
-
-            # Must have a user to assign to
-            if not assigned_to:
-                raise ValidationError({'assigned_to': 'Please select a user to assign the tool to.'})
-
-            # Cannot transfer to same user
-            if assignment and assigned_to and assignment.assigned_to == assigned_to:
-                raise ValidationError("Cannot transfer to the same user who currently has the tool.")
-
-            # Don't let a direct assignment silently override someone else's pending reservation
-            if item and assigned_to and transfer_date:
-                conflict_end = expected_return_date or transfer_date
-                conflicting = Reservation.objects.filter(item=item, status='PENDING').exclude(reserved_for=assigned_to)
-                for reservation in conflicting:
-                    if reservation.overlaps(transfer_date, conflict_end):
-                        who = reservation.reserved_for.get_full_name() or reservation.reserved_for.username
-                        raise ValidationError(
-                            f'{item.name} is reserved for {who} from {reservation.start_date} to {reservation.end_date}. '
-                            f'Fulfill or cancel that reservation first.'
-                        )
-
-        elif transfer_type == 'dispatch':
-            # Get the item
-            item = available_item or (assignment.item if assignment else None)
-            if not item:
-                raise ValidationError('Please select an item to dispatch.')
-            if not project:
-                raise ValidationError({'project': 'Please enter a project name for dispatch.'})
-
-            # For materials, check quantity
-            if item.item_type == 'MATERIAL':
-                if quantity > item.quantity:
-                    raise ValidationError(f'Cannot dispatch {quantity} units. Only {item.quantity} available.')
-
-        # Date validation
-        if transfer_date and expected_return_date:
-            if expected_return_date < transfer_date:
-                self.add_error('expected_return_date', 'Return date cannot be before action date')
+        if dispatch_date and expected_return_date and expected_return_date < dispatch_date:
+            self.add_error('expected_return_date', 'Return date cannot be before dispatch date.')
 
         return cleaned_data

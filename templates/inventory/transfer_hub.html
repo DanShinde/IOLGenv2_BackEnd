@@ -1,0 +1,182 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Transfers{% endblock %}
+
+{% block extra_css %}
+<style>
+    .quick-action-card {
+        border-radius: 1rem;
+        padding: 1.5rem;
+        color: white;
+        display: flex;
+        align-items: center;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .quick-action-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+    }
+    .quick-action-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+    .status-tab-panel { display: none; }
+    .status-tab-panel.active { display: block; }
+    .status-tab-btn.active { border-color: #4f46e5; color: #4f46e5; background: #eef2ff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a href="{% url 'inventory-assign-create' %}" class="quick-action-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+            <div class="quick-action-icon"><i class="fas fa-user-plus"></i></div>
+            <div>
+                <div class="font-semibold text-lg">Assign to User</div>
+                <div class="text-sm text-white text-opacity-80">Hand a tool to someone</div>
+            </div>
+        </a>
+        <a href="{% url 'inventory-dispatch-create' %}" class="quick-action-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+            <div class="quick-action-icon"><i class="fas fa-truck"></i></div>
+            <div>
+                <div class="font-semibold text-lg">Dispatch to Project</div>
+                <div class="text-sm text-white text-opacity-80">Send tools or materials out</div>
+            </div>
+        </a>
+        <a href="{% url 'inventory-reservation-create' %}" class="quick-action-card" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+            <div class="quick-action-icon"><i class="fas fa-calendar-plus"></i></div>
+            <div>
+                <div class="font-semibold text-lg">Reserve a Tool</div>
+                <div class="text-sm text-white text-opacity-80">Book ahead for later</div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Item Status Tabs -->
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <div class="flex space-x-2 border-b mb-4">
+            <button class="status-tab-btn active px-4 py-2 border-b-2 border-transparent font-medium text-gray-600" data-tab="available">
+                <i class="fas fa-box mr-1"></i>Available ({{ available_items|length }})
+            </button>
+            <button class="status-tab-btn px-4 py-2 border-b-2 border-transparent font-medium text-gray-600" data-tab="assigned">
+                <i class="fas fa-user-check mr-1"></i>Assigned ({{ active_assignments|length }})
+            </button>
+            <button class="status-tab-btn px-4 py-2 border-b-2 border-transparent font-medium text-gray-600" data-tab="dispatched">
+                <i class="fas fa-truck mr-1"></i>Dispatched ({{ active_dispatches|length }})
+            </button>
+        </div>
+
+        <!-- Available -->
+        <div class="status-tab-panel active" id="tab-available">
+            {% if available_items %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                {% for item in available_items %}
+                <div class="border border-gray-200 rounded-lg p-3 flex justify-between items-center hover:bg-gray-50">
+                    <div>
+                        <a href="{% url 'inventory-item-detail' item.pk %}" class="font-medium text-gray-900 hover:text-blue-600">{{ item.name }}</a>
+                        <p class="text-xs text-gray-500">{{ item.serial_number }} - {{ item.get_item_type_display }}</p>
+                        {% if item.location %}<p class="text-xs text-gray-400"><i class="fas fa-map-marker-alt mr-1"></i>{{ item.location }}</p>{% endif %}
+                    </div>
+                    <div class="flex flex-col items-end space-y-1 text-xs">
+                        {% if item.item_type == 'TOOL' %}
+                        <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-user-plus mr-1"></i>Assign</a>
+                        {% endif %}
+                        <a href="{% url 'inventory-dispatch-create' %}?item={{ item.pk }}" class="text-orange-600 hover:text-orange-800"><i class="fas fa-truck mr-1"></i>Dispatch</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center text-gray-500 py-8">No items available right now</p>
+            {% endif %}
+        </div>
+
+        <!-- Assigned -->
+        <div class="status-tab-panel" id="tab-assigned">
+            {% if active_assignments %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                {% for a in active_assignments %}
+                <div class="border border-gray-200 rounded-lg p-3 flex justify-between items-center hover:bg-gray-50">
+                    <div>
+                        <a href="{% url 'inventory-item-detail' a.item.pk %}" class="font-medium text-gray-900 hover:text-blue-600">{{ a.item.name }}</a>
+                        <p class="text-xs text-gray-500">{{ a.item.serial_number }}</p>
+                        <p class="text-xs text-blue-600">
+                            <i class="fas fa-user mr-1"></i>
+                            <a href="{% url 'inventory-user-detail' a.assigned_to.pk %}" class="hover:underline">{{ a.assigned_to.get_full_name|default:a.assigned_to.username }}</a>
+                        </p>
+                    </div>
+                    <div class="flex flex-col items-end space-y-1 text-xs">
+                        {% if a.is_overdue %}<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Overdue {{ a.days_overdue }}d</span>{% endif %}
+                        <a href="{% url 'inventory-assign-create' %}?item={{ a.item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-random mr-1"></i>Transfer</a>
+                        <a href="{% url 'inventory-return-assignment' a.pk %}" class="text-orange-600 hover:text-orange-800"><i class="fas fa-undo mr-1"></i>Return</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center text-gray-500 py-8">No items currently assigned</p>
+            {% endif %}
+        </div>
+
+        <!-- Dispatched -->
+        <div class="status-tab-panel" id="tab-dispatched">
+            {% if active_dispatches %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                {% for d in active_dispatches %}
+                <div class="border border-gray-200 rounded-lg p-3 flex justify-between items-center hover:bg-gray-50">
+                    <div>
+                        <a href="{% url 'inventory-item-detail' d.item.pk %}" class="font-medium text-gray-900 hover:text-blue-600">{{ d.item.name }}</a>
+                        <p class="text-xs text-gray-500">{{ d.item.serial_number }}</p>
+                        <p class="text-xs text-orange-600">
+                            <i class="fas fa-map-marker-alt mr-1"></i>{{ d.project }}{% if d.site_location %} ({{ d.site_location }}){% endif %}
+                        </p>
+                    </div>
+                    <div class="flex flex-col items-end space-y-1 text-xs">
+                        {% if d.is_overdue %}<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Overdue {{ d.days_overdue }}d</span>{% endif %}
+                        <a href="{% url 'inventory-return-dispatch' d.pk %}" class="text-orange-600 hover:text-orange-800"><i class="fas fa-undo mr-1"></i>Return</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center text-gray-500 py-8">No tools currently dispatched</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="flex justify-center space-x-4">
+        <a href="{% url 'inventory-reservation-list' %}" class="text-purple-600 hover:text-purple-800">
+            <i class="fas fa-calendar-alt mr-1"></i>View Reservations
+        </a>
+        <a href="{% url 'inventory-history-list' %}" class="text-purple-600 hover:text-purple-800">
+            <i class="fas fa-history mr-1"></i>View History
+        </a>
+        <a href="{% url 'inventory-user-list' %}" class="text-purple-600 hover:text-purple-800">
+            <i class="fas fa-users mr-1"></i>View Users
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.status-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.status-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.status-tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+});
+</script>
+{% endblock %}

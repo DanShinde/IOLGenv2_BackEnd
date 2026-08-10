@@ -130,6 +130,34 @@
 {% endblock %}
 
 {% block content %}
+<!-- Quick Actions -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+    <a href="{% url 'inventory-item-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
+        <i class="fas fa-plus-circle text-xl mb-1"></i>
+        <span class="font-semibold text-sm">Add New Item</span>
+    </a>
+    <a href="{% url 'inventory-assign-create' %}" class="bg-green-600 hover:bg-green-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
+        <i class="fas fa-user-plus text-xl mb-1"></i>
+        <span class="font-semibold text-sm">Assign to User</span>
+    </a>
+    <a href="{% url 'inventory-dispatch-create' %}" class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
+        <i class="fas fa-truck text-xl mb-1"></i>
+        <span class="font-semibold text-sm">Dispatch to Project</span>
+    </a>
+    <a href="{% url 'inventory-reservation-create' %}" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
+        <i class="fas fa-calendar-plus text-xl mb-1"></i>
+        <span class="font-semibold text-sm">Reserve a Tool</span>
+    </a>
+    <a href="{% url 'inventory-user-list' %}" class="bg-teal-600 hover:bg-teal-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
+        <i class="fas fa-users text-xl mb-1"></i>
+        <span class="font-semibold text-sm">Users</span>
+    </a>
+    <a href="{% url 'inventory-reports' %}" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
+        <i class="fas fa-chart-bar text-xl mb-1"></i>
+        <span class="font-semibold text-sm">View Reports</span>
+    </a>
+</div>
+
 <!-- Summary Statistics -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     <!-- Tools Card -->
@@ -294,21 +322,5 @@
         </div>
         {% endfor %}
     </div>
-</div>
-
-<!-- Quick Actions -->
-<div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-    <a href="{% url 'inventory-item-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 flex items-center justify-center transition-colors">
-        <i class="fas fa-plus-circle mr-2"></i>
-        <span class="font-semibold">Add New Item</span>
-    </a>
-    <a href="{% url 'inventory-transfer-item' %}" class="bg-green-600 hover:bg-green-700 text-white rounded-lg p-4 flex items-center justify-center transition-colors">
-        <i class="fas fa-exchange-alt mr-2"></i>
-        <span class="font-semibold">Assign/Dispatch</span>
-    </a>
-    <a href="{% url 'inventory-reports' %}" class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-4 flex items-center justify-center transition-colors">
-        <i class="fas fa-chart-bar mr-2"></i>
-        <span class="font-semibold">View Reports</span>
-    </a>
 </div>
 {% endblock %}

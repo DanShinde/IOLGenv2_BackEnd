@@ -28,8 +28,14 @@ urlpatterns = [
     path('assignments/<int:pk>/return/', views.return_assignment, name='inventory-return-assignment'),
     path('dispatches/<int:pk>/return/', views.return_dispatch, name='inventory-return-dispatch'),
 
-    # Unified Transfers
+    # Transfers
     path('transfer/', views.transfer_item, name='inventory-transfer-item'),
+    path('assign/', views.assign_item, name='inventory-assign-create'),
+    path('dispatch/', views.dispatch_item, name='inventory-dispatch-create'),
+
+    # Users
+    path('users/', views.user_list, name='inventory-user-list'),
+    path('users/<int:pk>/', views.user_detail, name='inventory-user-detail'),
 
     # Reservations
     path('reservations/', views.reservation_list, name='inventory-reservation-list'),

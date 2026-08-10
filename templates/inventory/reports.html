@@ -168,9 +168,9 @@
 
     <!-- User Assignments -->
     <div class="report-card">
-        <h3 class="text-xl font-semibold mb-6 flex items-center">
-            <i class="fas fa-users text-teal-600 mr-2"></i>
-            Active User Assignments
+        <h3 class="text-xl font-semibold mb-6 flex items-center justify-between">
+            <span class="flex items-center"><i class="fas fa-users text-teal-600 mr-2"></i>Active User Assignments</span>
+            <a href="{% url 'inventory-user-list' %}" class="text-sm text-blue-600 hover:text-blue-800 font-normal">View All Users <i class="fas fa-chevron-right ml-1"></i></a>
         </h3>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -184,7 +184,7 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for user in user_assignments %}
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='{% url 'inventory-user-detail' user.pk %}'">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
                                 <div class="flex-shrink-0 h-10 w-10">

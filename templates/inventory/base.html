@@ -505,9 +505,16 @@
                     </li>
 
                     <li class="stagger-item">
-                        <a href="{% url 'inventory-transfer-item' %}" class="nav-link flex items-center p-3 rounded-xl {% if 'transfer' in request.resolver_match.url_name %}active{% endif %}">
+                        <a href="{% url 'inventory-transfer-item' %}" class="nav-link flex items-center p-3 rounded-xl {% if request.resolver_match.url_name == 'inventory-transfer-item' or request.resolver_match.url_name == 'inventory-assign-create' or request.resolver_match.url_name == 'inventory-dispatch-create' %}active{% endif %}">
                             <i class="fas fa-exchange-alt mr-3"></i>
                             <span class="font-medium">Transfers</span>
+                        </a>
+                    </li>
+
+                    <li class="stagger-item">
+                        <a href="{% url 'inventory-user-list' %}" class="nav-link flex items-center p-3 rounded-xl {% if request.resolver_match.url_name == 'inventory-user-list' or request.resolver_match.url_name == 'inventory-user-detail' %}active{% endif %}">
+                            <i class="fas fa-users mr-3"></i>
+                            <span class="font-medium">Users</span>
                         </a>
                     </li>
 
@@ -568,7 +575,8 @@
                             {% block page_title %}
                                 {% if request.resolver_match.url_name == 'inventory-dashboard' %}Dashboard
                                 {% elif request.resolver_match.url_name == 'inventory-item-list' %}Inventory Items
-                                {% elif 'transfer' in request.resolver_match.url_name %}Transfers
+                                {% elif request.resolver_match.url_name == 'inventory-transfer-item' or request.resolver_match.url_name == 'inventory-assign-create' or request.resolver_match.url_name == 'inventory-dispatch-create' %}Transfers
+                                {% elif request.resolver_match.url_name == 'inventory-user-list' or request.resolver_match.url_name == 'inventory-user-detail' %}Users
                                 {% elif 'reservation' in request.resolver_match.url_name %}Reservations
                                 {% elif request.resolver_match.url_name == 'inventory-history-list' %}History
                                 {% elif request.resolver_match.url_name == 'inventory-reports' %}Analytics
