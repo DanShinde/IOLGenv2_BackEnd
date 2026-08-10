@@ -236,7 +236,14 @@
             font-weight: 600;
             box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
         }
-        
+
+        .status-maintenance {
+            background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+            color: #9a3412;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(249, 115, 22, 0.2);
+        }
+
         /* ============================================================================
            CARDS & CONTAINERS - Modern Design
         ============================================================================ */
@@ -505,6 +512,13 @@
                     </li>
 
                     <li class="stagger-item">
+                        <a href="{% url 'inventory-reservation-list' %}" class="nav-link flex items-center p-3 rounded-xl {% if 'reservation' in request.resolver_match.url_name %}active{% endif %}">
+                            <i class="fas fa-calendar-alt mr-3"></i>
+                            <span class="font-medium">Reservations</span>
+                        </a>
+                    </li>
+
+                    <li class="stagger-item">
                         <a href="{% url 'inventory-history-list' %}" class="nav-link flex items-center p-3 rounded-xl {% if request.resolver_match.url_name == 'inventory-history-list' %}active{% endif %}">
                             <i class="fas fa-clock-rotate-left mr-3"></i>
                             <span class="font-medium">History</span>
@@ -555,6 +569,7 @@
                                 {% if request.resolver_match.url_name == 'inventory-dashboard' %}Dashboard
                                 {% elif request.resolver_match.url_name == 'inventory-item-list' %}Inventory Items
                                 {% elif 'transfer' in request.resolver_match.url_name %}Transfers
+                                {% elif 'reservation' in request.resolver_match.url_name %}Reservations
                                 {% elif request.resolver_match.url_name == 'inventory-history-list' %}History
                                 {% elif request.resolver_match.url_name == 'inventory-reports' %}Analytics
                                 {% else %}Inventory System

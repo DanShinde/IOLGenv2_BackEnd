@@ -1,0 +1,94 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Reservations{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">
+            <i class="fas fa-calendar-alt mr-2 text-purple-600"></i>Reservations
+        </h2>
+        <a href="{% url 'inventory-reservation-create' %}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md">
+            <i class="fas fa-plus mr-2"></i>New Reservation
+        </a>
+    </div>
+
+    <div class="flex space-x-2 mb-4">
+        {% for value, label in reservation_status_choices %}
+        <a href="?status={{ value }}" class="px-3 py-1 rounded-full text-sm {% if status_filter == value %}bg-purple-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+            {{ label }}
+        </a>
+        {% endfor %}
+        <a href="?status=" class="px-3 py-1 rounded-full text-sm {% if not status_filter %}bg-purple-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+            All
+        </a>
+    </div>
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tool</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reserved For</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for reservation in reservations %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                        <div class="font-medium text-gray-900">{{ reservation.item.name }}</div>
+                        <div class="text-xs text-gray-500">{{ reservation.item.serial_number }}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-700">
+                        {{ reservation.reserved_for.get_full_name|default:reservation.reserved_for.username }}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-700">
+                        {{ reservation.start_date }} &rarr; {{ reservation.end_date }}
+                        {% if reservation.is_expired %}
+                        <span class="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">Expired</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-1 text-xs rounded-full
+                            {% if reservation.status == 'PENDING' %}bg-yellow-100 text-yellow-800
+                            {% elif reservation.status == 'FULFILLED' %}bg-green-100 text-green-800
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ reservation.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if reservation.status == 'PENDING' %}
+                        <div class="flex space-x-2">
+                            <form method="post" action="{% url 'inventory-reservation-fulfill' reservation.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="text-green-600 hover:text-green-800 text-sm" title="Convert to assignment">
+                                    <i class="fas fa-check mr-1"></i>Fulfill
+                                </button>
+                            </form>
+                            <form method="post" action="{% url 'inventory-reservation-cancel' reservation.pk %}" onsubmit="return confirm('Cancel this reservation?');">
+                                {% csrf_token %}
+                                <button type="submit" class="text-red-600 hover:text-red-800 text-sm">
+                                    <i class="fas fa-times mr-1"></i>Cancel
+                                </button>
+                            </form>
+                        </div>
+                        {% elif reservation.fulfilled_assignment %}
+                        <a href="{% url 'inventory-item-detail' reservation.item.pk %}" class="text-blue-600 hover:text-blue-800 text-sm">View item</a>
+                        {% else %}
+                        <span class="text-gray-400 text-sm">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-4 py-8 text-center text-gray-500">No reservations found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

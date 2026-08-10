@@ -208,19 +208,18 @@
     {% endif %}
 </div>
 
+{% if request.user.is_staff %}
 <!-- Bulk Actions Bar -->
 <div class="bulk-actions-bar" id="bulkActionsBar">
     <span class="text-white font-semibold" id="selectedCount">0 selected</span>
     <button onclick="bulkRetire()" class="bg-white text-purple-600 px-4 py-2 rounded-full hover:bg-gray-100 transition">
         <i class="fas fa-ban mr-1"></i> Retire
     </button>
-    <button onclick="bulkDelete()" class="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition">
-        <i class="fas fa-trash mr-1"></i> Delete
-    </button>
     <button onclick="clearSelection()" class="text-white hover:text-gray-200">
         <i class="fas fa-times"></i>
     </button>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -296,41 +295,6 @@ async function bulkRetire() {
             body: JSON.stringify({
                 item_ids: ids,
                 action: 'retire'
-            })
-        });
-
-        const data = await response.json();
-        Loading.hide();
-
-        if (data.success) {
-            Toast.success(data.message);
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            Toast.error(data.message);
-        }
-    } catch (error) {
-        Loading.hide();
-        Toast.error('An error occurred');
-    }
-}
-
-async function bulkDelete() {
-    const ids = getSelectedIds();
-    if (ids.length === 0) return;
-
-    if (!confirm(`Are you sure you want to DELETE ${ids.length} item(s)? This action cannot be undone!`)) return;
-
-    Loading.show();
-    try {
-        const response = await fetch("{% url 'inventory-bulk-update' %}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken()
-            },
-            body: JSON.stringify({
-                item_ids: ids,
-                action: 'delete'
             })
         });
 

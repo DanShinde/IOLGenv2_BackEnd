@@ -474,13 +474,6 @@ JAZZMIN_UI_TWEAKS = {
     },
 }
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-    }
-}
-
 # Email Configuration
 # Default to console backend for development (prints to terminal instead of sending)
 # This fixes [WinError 10061] if no SMTP server is running locally.

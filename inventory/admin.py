@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Item, Assignment, Dispatch, History
+from .models import Item, Assignment, Dispatch, History, Reservation
 
 
 @admin.register(Item)
@@ -38,6 +38,7 @@ class ItemAdmin(admin.ModelAdmin):
             'ASSIGNED': 'blue',
             'DISPATCHED': 'orange',
             'CONSUMED': 'gray',
+            'MAINTENANCE': 'purple',
             'RETIRED': 'red',
         }
         color = colors.get(obj.status, 'gray')
@@ -64,9 +65,9 @@ class ItemAdmin(admin.ModelAdmin):
 class AssignmentAdmin(admin.ModelAdmin):
     list_display = (
         'item', 'assigned_to', 'assigned_by', 'assignment_date',
-        'expected_return_date', 'return_date', 'status_badge'
+        'expected_return_date', 'return_date', 'return_condition', 'status_badge'
     )
-    list_filter = ('assignment_date', 'return_date')
+    list_filter = ('assignment_date', 'return_date', 'return_condition')
     search_fields = (
         'item__name', 'item__serial_number',
         'assigned_to__username', 'assigned_to__first_name', 'assigned_to__last_name'
@@ -93,9 +94,9 @@ class AssignmentAdmin(admin.ModelAdmin):
 class DispatchAdmin(admin.ModelAdmin):
     list_display = (
         'item', 'quantity', 'project', 'site_location',
-        'dispatch_date', 'expected_return_date', 'status_badge'
+        'dispatch_date', 'expected_return_date', 'return_date', 'return_condition', 'status_badge'
     )
-    list_filter = ('dispatch_date', 'project', 'return_date')
+    list_filter = ('dispatch_date', 'project', 'return_date', 'return_condition')
     search_fields = ('item__name', 'item__serial_number', 'project', 'site_location')
     date_hierarchy = 'dispatch_date'
 
@@ -115,6 +116,28 @@ class DispatchAdmin(admin.ModelAdmin):
             )
         return format_html(
             '<span style="background-color: gray; color: white; padding: 3px 10px; border-radius: 3px;">RETURNED</span>'
+        )
+    status_badge.short_description = 'Status'
+
+
+@admin.register(Reservation)
+class ReservationAdmin(admin.ModelAdmin):
+    list_display = (
+        'item', 'reserved_for', 'reserved_by', 'start_date', 'end_date', 'status_badge'
+    )
+    list_filter = ('status', 'start_date')
+    search_fields = (
+        'item__name', 'item__serial_number',
+        'reserved_for__username', 'reserved_for__first_name', 'reserved_for__last_name'
+    )
+    date_hierarchy = 'start_date'
+
+    def status_badge(self, obj):
+        colors = {'PENDING': 'orange', 'FULFILLED': 'green', 'CANCELLED': 'gray'}
+        color = colors.get(obj.status, 'gray')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>',
+            color, obj.get_status_display()
         )
     status_badge.short_description = 'Status'
 

@@ -4,6 +4,27 @@ from django.urls import reverse
 from django.utils import timezone
 
 
+# Condition of a TOOL at the moment it's returned from an assignment or dispatch
+RETURN_CONDITION_CHOICES = [
+    ('GOOD', 'Good - No Issues'),
+    ('DAMAGED', 'Damaged'),
+    ('NEEDS_REPAIR', 'Needs Repair'),
+    ('LOST', 'Lost / Not Returned'),
+]
+
+
+def resolve_return_status(condition):
+    """
+    Map the condition a tool is returned in to where it ends up.
+    Returns (item_status, location, history_action).
+    """
+    if condition == 'LOST':
+        return 'RETIRED', 'Lost', 'RETIRED'
+    if condition in ('DAMAGED', 'NEEDS_REPAIR'):
+        return 'MAINTENANCE', 'Warehouse - Maintenance', 'MAINTENANCE'
+    return 'AVAILABLE', 'Warehouse', 'RETURNED'
+
+
 class Item(models.Model):
     """
     Main Item model - tracks both Tools and Materials
@@ -18,6 +39,7 @@ class Item(models.Model):
         ('ASSIGNED', 'Assigned'),      # Only for TOOLS
         ('DISPATCHED', 'Dispatched'),  # Only for TOOLS
         ('CONSUMED', 'Consumed'),      # Only for MATERIALS - once dispatched, marked as consumed
+        ('MAINTENANCE', 'Under Maintenance'),  # Only for TOOLS - returned damaged/needing repair
         ('RETIRED', 'Retired'),
     ]
 
@@ -91,6 +113,8 @@ class Item(models.Model):
                 return f"Dispatched to {dispatch.project} ({dispatch.site_location or 'N/A'})"
         elif self.status == 'CONSUMED':
             return "Consumed (No longer in inventory)"
+        elif self.status == 'MAINTENANCE':
+            return f"Under Maintenance - {self.location}" if self.location else "Under Maintenance"
         elif self.status == 'RETIRED':
             return "Retired"
         return self.location or "Unknown"
@@ -108,6 +132,9 @@ class Assignment(models.Model):
     assignment_date = models.DateField()
     expected_return_date = models.DateField(null=True, blank=True)
     return_date = models.DateField(null=True, blank=True)
+    return_condition = models.CharField(max_length=20, choices=RETURN_CONDITION_CHOICES, blank=True,
+                                        help_text="Condition of the tool when it was returned")
+    return_notes = models.TextField(blank=True, help_text="Notes recorded at return time (e.g. damage description)")
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -151,6 +178,9 @@ class Dispatch(models.Model):
     expected_return_date = models.DateField(null=True, blank=True,
                                            help_text="Only for tools - materials won't return")
     return_date = models.DateField(null=True, blank=True, help_text="Only applicable for tools")
+    return_condition = models.CharField(max_length=20, choices=RETURN_CONDITION_CHOICES, blank=True,
+                                        help_text="Condition of the tool when it was returned (tools only)")
+    return_notes = models.TextField(blank=True, help_text="Notes recorded at return time (e.g. damage description)")
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -187,6 +217,46 @@ class Dispatch(models.Model):
         return (timezone.now().date() - self.expected_return_date).days
 
 
+class Reservation(models.Model):
+    """
+    Book a tool ahead of time for a user over a date range.
+    Fulfilling a reservation converts it into a real Assignment.
+    """
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('FULFILLED', 'Fulfilled'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='reservations',
+                             limit_choices_to={'item_type': 'TOOL'})
+    reserved_for = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tool_reservations',
+                                     help_text="Who the tool is being held for")
+    reserved_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_reservations',
+                                    help_text="Who made the booking")
+    start_date = models.DateField(help_text="When the tool is needed from")
+    end_date = models.DateField(help_text="When the tool is expected to be returned")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', db_index=True)
+    notes = models.TextField(blank=True)
+    fulfilled_assignment = models.OneToOneField(Assignment, on_delete=models.SET_NULL, null=True, blank=True,
+                                                 related_name='source_reservation')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['start_date']
+
+    def __str__(self):
+        return f"{self.item.name} reserved for {self.reserved_for.get_full_name() or self.reserved_for.username} ({self.start_date} to {self.end_date})"
+
+    @property
+    def is_expired(self):
+        """A pending reservation whose window has passed without being fulfilled"""
+        return self.status == 'PENDING' and self.end_date < timezone.now().date()
+
+    def overlaps(self, start_date, end_date):
+        return self.start_date <= end_date and self.end_date >= start_date
+
+
 class History(models.Model):
     """
     Complete audit trail - tracks WHERE items have been
@@ -195,11 +265,13 @@ class History(models.Model):
     ACTION_CHOICES = [
         ('ADDED', 'Added to Inventory'),
         ('UPDATED', 'Information Updated'),
+        ('RESERVED', 'Reserved for User'),
         ('ASSIGNED', 'Assigned to User'),
         ('RETURNED', 'Returned to Warehouse'),
         ('TRANSFERRED', 'Transferred to Another User'),
         ('DISPATCHED', 'Dispatched to Project'),
         ('CONSUMED', 'Material Consumed'),
+        ('MAINTENANCE', 'Sent to Maintenance'),
         ('RETIRED', 'Retired from Service'),
         ('LOCATION_CHANGED', 'Location Changed'),
     ]

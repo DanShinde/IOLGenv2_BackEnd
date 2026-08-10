@@ -40,9 +40,19 @@
             <h2 class="text-3xl font-bold text-gray-900">Inventory Reports & Analytics</h2>
             <p class="text-gray-600 mt-1">Comprehensive insights into your inventory</p>
         </div>
-        <a href="?export=pdf" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
-            <i class="fas fa-download mr-2"></i>Export PDF
-        </a>
+        <div class="flex space-x-3">
+            {% if request.user.is_staff %}
+            <form method="post" action="{% url 'inventory-send-notifications' %}" onsubmit="return confirm('Send an overdue/low-stock digest email now?');">
+                {% csrf_token %}
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md inline-flex items-center">
+                    <i class="fas fa-envelope mr-2"></i>Send Notifications Now
+                </button>
+            </form>
+            {% endif %}
+            <a href="?export=pdf" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
+                <i class="fas fa-download mr-2"></i>Export PDF
+            </a>
+        </div>
     </div>
 
     <!-- Summary Cards -->

@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django import forms
 from django.contrib.auth.models import User
-from .models import Item, Assignment, Dispatch, History
+from .models import Item, Assignment, Dispatch, History, Reservation, RETURN_CONDITION_CHOICES
 from django.core.exceptions import ValidationError
 
 
@@ -97,6 +97,78 @@ class HistoryFilterForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Search in details...'})
     )
+
+
+class ReturnForm(forms.Form):
+    """Captures the condition a tool is in when it's returned from an assignment or dispatch"""
+    condition = forms.ChoiceField(
+        choices=RETURN_CONDITION_CHOICES,
+        initial='GOOD',
+        widget=forms.RadioSelect,
+        label="Condition on Return"
+    )
+    return_notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3, 'class': 'form-control',
+            'placeholder': 'Describe any damage or issues (required if not returned in good condition)...'
+        }),
+        label="Notes"
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        condition = cleaned_data.get('condition')
+        return_notes = cleaned_data.get('return_notes')
+        if condition in ('DAMAGED', 'NEEDS_REPAIR', 'LOST') and not return_notes:
+            self.add_error('return_notes', 'Please describe what happened.')
+        return cleaned_data
+
+
+class ReservationForm(forms.ModelForm):
+    class Meta:
+        model = Reservation
+        fields = ['item', 'reserved_for', 'start_date', 'end_date', 'notes']
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'What is this tool needed for?'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['item'].queryset = Item.objects.filter(item_type='TOOL').exclude(status='RETIRED').order_by('name')
+        self.fields['reserved_for'].queryset = User.objects.filter(is_active=True).order_by('username')
+
+        for field_name, field in self.fields.items():
+            if not field.widget.attrs.get('class'):
+                field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+        self.fields['item'].label_from_instance = lambda item: f"{item.name} ({item.serial_number})"
+        self.fields['reserved_for'].label_from_instance = lambda user: (
+            f"{user.get_full_name()} ({user.username})" if user.get_full_name() else user.username
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        item = cleaned_data.get('item')
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+
+        if start_date and end_date and end_date < start_date:
+            raise ValidationError({'end_date': 'End date cannot be before start date.'})
+
+        if item and start_date and end_date:
+            conflicts = Reservation.objects.filter(item=item, status='PENDING')
+            if self.instance.pk:
+                conflicts = conflicts.exclude(pk=self.instance.pk)
+            for existing in conflicts:
+                if existing.overlaps(start_date, end_date):
+                    who = existing.reserved_for.get_full_name() or existing.reserved_for.username
+                    raise ValidationError(
+                        f'{item.name} is already reserved for {who} from {existing.start_date} to {existing.end_date}.'
+                    )
+        return cleaned_data
 
 
 class UnifiedTransferForm(forms.Form):
@@ -248,6 +320,18 @@ class UnifiedTransferForm(forms.Form):
             # Cannot transfer to same user
             if assignment and assigned_to and assignment.assigned_to == assigned_to:
                 raise ValidationError("Cannot transfer to the same user who currently has the tool.")
+
+            # Don't let a direct assignment silently override someone else's pending reservation
+            if item and assigned_to and transfer_date:
+                conflict_end = expected_return_date or transfer_date
+                conflicting = Reservation.objects.filter(item=item, status='PENDING').exclude(reserved_for=assigned_to)
+                for reservation in conflicting:
+                    if reservation.overlaps(transfer_date, conflict_end):
+                        who = reservation.reserved_for.get_full_name() or reservation.reserved_for.username
+                        raise ValidationError(
+                            f'{item.name} is reserved for {who} from {reservation.start_date} to {reservation.end_date}. '
+                            f'Fulfill or cancel that reservation first.'
+                        )
 
         elif transfer_type == 'dispatch':
             # Get the item

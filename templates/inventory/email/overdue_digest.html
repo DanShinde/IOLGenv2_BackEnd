@@ -1,0 +1,92 @@
+<div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto;">
+    <h2 style="color: #1e1b4b;">Inventory Alert - {{ today }}</h2>
+    <p style="color: #4b5563;">The following items need attention:</p>
+
+    {% if overdue_assignments %}
+    <h3 style="color: #b91c1c; border-bottom: 2px solid #fee2e2; padding-bottom: 4px;">
+        Overdue Assignments ({{ overdue_assignments|length }})
+    </h3>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr style="background: #f9fafb; text-align: left;">
+            <th style="padding: 6px 8px; font-size: 13px;">Tool</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Assigned To</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Expected Return</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Days Overdue</th>
+        </tr>
+        {% for a in overdue_assignments %}
+        <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 6px 8px; font-size: 13px;">{{ a.item.name }} ({{ a.item.serial_number }})</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ a.assigned_to.get_full_name|default:a.assigned_to.username }}</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ a.expected_return_date }}</td>
+            <td style="padding: 6px 8px; font-size: 13px; color: #b91c1c;">{{ a.days_overdue }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if overdue_dispatches %}
+    <h3 style="color: #b45309; border-bottom: 2px solid #fef3c7; padding-bottom: 4px;">
+        Overdue Dispatches ({{ overdue_dispatches|length }})
+    </h3>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr style="background: #f9fafb; text-align: left;">
+            <th style="padding: 6px 8px; font-size: 13px;">Tool</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Project</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Expected Return</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Days Overdue</th>
+        </tr>
+        {% for d in overdue_dispatches %}
+        <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 6px 8px; font-size: 13px;">{{ d.item.name }} ({{ d.item.serial_number }})</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ d.project }}</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ d.expected_return_date }}</td>
+            <td style="padding: 6px 8px; font-size: 13px; color: #b45309;">{{ d.days_overdue }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if low_stock_items %}
+    <h3 style="color: #7c2d12; border-bottom: 2px solid #ffedd5; padding-bottom: 4px;">
+        Low Stock Materials ({{ low_stock_items|length }})
+    </h3>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr style="background: #f9fafb; text-align: left;">
+            <th style="padding: 6px 8px; font-size: 13px;">Material</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Current Stock</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Reorder Threshold</th>
+        </tr>
+        {% for item in low_stock_items %}
+        <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 6px 8px; font-size: 13px;">{{ item.name }}</td>
+            <td style="padding: 6px 8px; font-size: 13px; color: #b91c1c;">{{ item.quantity }}</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ item.min_quantity }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if expired_reservations %}
+    <h3 style="color: #6d28d9; border-bottom: 2px solid #ede9fe; padding-bottom: 4px;">
+        Expired Reservations ({{ expired_reservations|length }})
+    </h3>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr style="background: #f9fafb; text-align: left;">
+            <th style="padding: 6px 8px; font-size: 13px;">Tool</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Reserved For</th>
+            <th style="padding: 6px 8px; font-size: 13px;">Window</th>
+        </tr>
+        {% for r in expired_reservations %}
+        <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 6px 8px; font-size: 13px;">{{ r.item.name }}</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ r.reserved_for.get_full_name|default:r.reserved_for.username }}</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ r.start_date }} to {{ r.end_date }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+    <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
+        This is an automated message from the Inventory Management System.
+    </p>
+</div>

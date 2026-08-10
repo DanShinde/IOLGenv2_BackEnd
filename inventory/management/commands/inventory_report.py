@@ -22,86 +22,58 @@ class Command(BaseCommand):
         total_value = calculate_total_inventory_value()
 
         # Inventory Overview
-        self.stdout.write(self.style.HTTP_INFO('\n📦 INVENTORY OVERVIEW'))
+        self.stdout.write(self.style.HTTP_INFO('\nINVENTORY OVERVIEW'))
         self.stdout.write('-' * 70)
         self.stdout.write(f'  Total Items:              {summary["total_items"]}')
         self.stdout.write(f'  Tools:                    {summary["total_tools"]}')
         self.stdout.write(f'  Materials:                {summary["total_materials"]}')
-        self.stdout.write(f'  Total Current Value:      ${total_value:,.2f}')
+        self.stdout.write(f'  Total Purchase Value:     ${total_value:,.2f}')
 
         # Status Breakdown
-        self.stdout.write(self.style.HTTP_INFO('\n📊 STATUS BREAKDOWN'))
+        self.stdout.write(self.style.HTTP_INFO('\nSTATUS BREAKDOWN'))
         self.stdout.write('-' * 70)
         self.stdout.write(f'  Available:                {summary["available_items"]}')
         self.stdout.write(f'  Assigned:                 {summary["assigned_items"]}')
         self.stdout.write(f'  Dispatched:               {summary["dispatched_items"]}')
-        self.stdout.write(f'  Under Maintenance:        {summary["maintenance_items"]}')
+        self.stdout.write(f'  Consumed:                 {summary["consumed_items"]}')
+        self.stdout.write(f'  Retired:                  {summary["retired_items"]}')
 
-        # Stock Alerts
-        self.stdout.write(self.style.HTTP_INFO('\n⚠️  STOCK ALERTS'))
+        # Stock
+        self.stdout.write(self.style.HTTP_INFO('\nSTOCK'))
         self.stdout.write('-' * 70)
         if summary["low_stock_items"] > 0:
             self.stdout.write(
-                self.style.ERROR(f'  Low Stock Items:          {summary["low_stock_items"]} ⚠️')
+                self.style.ERROR(f'  Low Stock Materials:      {summary["low_stock_items"]}')
             )
         else:
             self.stdout.write(
-                self.style.SUCCESS(f'  Low Stock Items:          {summary["low_stock_items"]} ✓')
+                self.style.SUCCESS(f'  Low Stock Materials:      {summary["low_stock_items"]}')
             )
 
-        if summary["critical_items"] > 0:
-            self.stdout.write(f'  Critical Items:           {summary["critical_items"]}')
-
         # Assignments
-        self.stdout.write(self.style.HTTP_INFO('\n👥 ASSIGNMENTS'))
+        self.stdout.write(self.style.HTTP_INFO('\nASSIGNMENTS'))
         self.stdout.write('-' * 70)
         self.stdout.write(f'  Active Assignments:       {summary["active_assignments"]}')
         if summary["overdue_assignments"] > 0:
             self.stdout.write(
-                self.style.ERROR(f'  Overdue Assignments:      {summary["overdue_assignments"]} ⚠️')
+                self.style.ERROR(f'  Overdue Assignments:      {summary["overdue_assignments"]}')
             )
         else:
             self.stdout.write(
-                self.style.SUCCESS(f'  Overdue Assignments:      {summary["overdue_assignments"]} ✓')
+                self.style.SUCCESS(f'  Overdue Assignments:      {summary["overdue_assignments"]}')
             )
 
         # Dispatches
-        self.stdout.write(self.style.HTTP_INFO('\n🚚 DISPATCHES'))
+        self.stdout.write(self.style.HTTP_INFO('\nDISPATCHES'))
         self.stdout.write('-' * 70)
         self.stdout.write(f'  Active Dispatches:        {summary["active_dispatches"]}')
         if summary["overdue_dispatches"] > 0:
             self.stdout.write(
-                self.style.ERROR(f'  Overdue Dispatches:       {summary["overdue_dispatches"]} ⚠️')
+                self.style.ERROR(f'  Overdue Dispatches:       {summary["overdue_dispatches"]}')
             )
         else:
             self.stdout.write(
-                self.style.SUCCESS(f'  Overdue Dispatches:       {summary["overdue_dispatches"]} ✓')
-            )
-
-        # Maintenance
-        self.stdout.write(self.style.HTTP_INFO('\n🔧 MAINTENANCE'))
-        self.stdout.write('-' * 70)
-        self.stdout.write(f'  Pending Maintenance:      {summary["pending_maintenance"]}')
-        if summary["overdue_maintenance"] > 0:
-            self.stdout.write(
-                self.style.ERROR(f'  Overdue Maintenance:      {summary["overdue_maintenance"]} ⚠️')
-            )
-        else:
-            self.stdout.write(
-                self.style.SUCCESS(f'  Overdue Maintenance:      {summary["overdue_maintenance"]} ✓')
-            )
-
-        # Alerts
-        self.stdout.write(self.style.HTTP_INFO('\n🔔 SYSTEM ALERTS'))
-        self.stdout.write('-' * 70)
-        self.stdout.write(f'  Unresolved Alerts:        {summary["unresolved_alerts"]}')
-        if summary["critical_alerts"] > 0:
-            self.stdout.write(
-                self.style.ERROR(f'  Critical Alerts:          {summary["critical_alerts"]} ⚠️')
-            )
-        else:
-            self.stdout.write(
-                self.style.SUCCESS(f'  Critical Alerts:          {summary["critical_alerts"]} ✓')
+                self.style.SUCCESS(f'  Overdue Dispatches:       {summary["overdue_dispatches"]}')
             )
 
         # Summary
@@ -110,18 +82,16 @@ class Command(BaseCommand):
         issues = (
             summary["low_stock_items"] +
             summary["overdue_assignments"] +
-            summary["overdue_dispatches"] +
-            summary["overdue_maintenance"] +
-            summary["critical_alerts"]
+            summary["overdue_dispatches"]
         )
 
         if issues == 0:
             self.stdout.write(
-                self.style.SUCCESS('✓ No critical issues found! Inventory is in good shape.\n')
+                self.style.SUCCESS('No issues found. Inventory is in good shape.\n')
             )
         else:
             self.stdout.write(
-                self.style.ERROR(f'⚠️  {issues} issues require attention!\n')
+                self.style.ERROR(f'{issues} issue(s) require attention.\n')
             )
 
         self.stdout.write(self.style.WARNING(f'{"="*70}\n'))

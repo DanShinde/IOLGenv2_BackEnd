@@ -59,6 +59,19 @@
         <a href="{% url 'inventory-transfer-item' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-plus mr-2"></i>Assign/Dispatch
         </a>
+        {% elif item.status == 'ASSIGNED' and active_assignment %}
+        <a href="{% url 'inventory-return-assignment' active_assignment.pk %}" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md">
+            <i class="fas fa-undo mr-2"></i>Return
+        </a>
+        {% elif item.status == 'DISPATCHED' and active_dispatch %}
+        <a href="{% url 'inventory-return-dispatch' active_dispatch.pk %}" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md">
+            <i class="fas fa-undo mr-2"></i>Return
+        </a>
+        {% endif %}
+        {% if item.item_type == 'TOOL' and item.status != 'RETIRED' %}
+        <a href="{% url 'inventory-reservation-create' %}?item={{ item.pk }}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md">
+            <i class="fas fa-calendar-plus mr-2"></i>Reserve
+        </a>
         {% endif %}
     </div>
 </div>

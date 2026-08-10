@@ -13,12 +13,12 @@ from django.views.decorators.http import require_http_methods
 from django.db import transaction
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.views.decorators.cache import cache_page
-from datetime import date
 import csv
 import json
-from .models import Item, Assignment, Dispatch, History
-from .forms import ItemForm, HistoryFilterForm, UnifiedTransferForm, ItemFilterForm
+from .models import Item, Assignment, Dispatch, History, Reservation
+from .forms import ItemForm, HistoryFilterForm, UnifiedTransferForm, ItemFilterForm, ReturnForm, ReservationForm
+from .utils import send_overdue_digest
+from . import services
 
 
 # ============================================================================
@@ -72,7 +72,6 @@ def invalidate_cache(prefix):
 
 
 @login_required
-@cache_page(60 * 5)  # Cache for 5 minutes
 def dashboard(request):
     """
     Optimized dashboard with caching and query optimization
@@ -182,18 +181,20 @@ def item_detail(request, pk):
 
     # Optimized queries with select_related
     history = History.objects.filter(item=item).select_related('user').order_by('-timestamp')[:10]
-    assignments = Assignment.objects.filter(item=item).select_related(
+    all_assignments = Assignment.objects.filter(item=item).select_related(
         'assigned_to', 'assigned_by'
-    ).order_by('-assignment_date')[:5]
-    dispatches = Dispatch.objects.filter(item=item).select_related(
+    ).order_by('-assignment_date')
+    all_dispatches = Dispatch.objects.filter(item=item).select_related(
         'dispatched_by'
-    ).order_by('-dispatch_date')[:5]
+    ).order_by('-dispatch_date')
 
     context = {
         'item': item,
         'history': history,
-        'assignments': assignments,
-        'dispatches': dispatches,
+        'assignments': all_assignments[:5],
+        'dispatches': all_dispatches[:5],
+        'active_assignment': all_assignments.filter(return_date__isnull=True).first(),
+        'active_dispatch': all_dispatches.filter(return_date__isnull=True).first(),
     }
     return render(request, 'inventory/item_detail.html', context)
 
@@ -383,7 +384,12 @@ def export_history_csv(request):
 @login_required
 @require_http_methods(["POST"])
 def bulk_update_items(request):
-    """Bulk update items status"""
+    """Bulk update items status (staff only - retiring is the only supported bulk action;
+    hard delete is intentionally not exposed here since it cascades and destroys the
+    item's Assignment/Dispatch/History audit trail)"""
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'message': 'You do not have permission to perform this action'}, status=403)
+
     try:
         data = json.loads(request.body)
         item_ids = data.get('item_ids', [])
@@ -399,13 +405,6 @@ def bulk_update_items(request):
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')
             return JsonResponse({'success': True, 'message': f'Successfully retired {len(item_ids)} items'})
-
-        elif action == 'delete':
-            count = items.count()
-            items.delete()
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
-            return JsonResponse({'success': True, 'message': f'Successfully deleted {count} items'})
 
         return JsonResponse({'success': False, 'message': 'Invalid action'})
 
@@ -447,27 +446,59 @@ def ajax_search_items(request):
 
 @login_required
 def return_assignment(request, pk):
-    assignment = get_object_or_404(Assignment, pk=pk)
+    assignment = get_object_or_404(Assignment, pk=pk, return_date__isnull=True)
     if request.method == 'POST':
-        assignment.return_date = date.today()
-        assignment.save()
-        
-        item = assignment.item
-        item.status = 'AVAILABLE'
-        item.location = 'Warehouse'
-        item.save()
+        form = ReturnForm(request.POST)
+        if form.is_valid():
+            returned_by = assignment.assigned_to.get_full_name() or assignment.assigned_to.username
+            services.process_return(
+                assignment,
+                condition=form.cleaned_data['condition'],
+                return_notes=form.cleaned_data['return_notes'],
+                performed_by=request.user,
+                details_prefix=f'Returned by {returned_by}'
+            )
 
-        History.objects.create(
-            item=item,
-            action='RETURNED',
-            user=request.user,
-            details=f'Returned by {assignment.assigned_to.get_full_name() or assignment.assigned_to.username}',
-            location='Warehouse'
-        )
-        
-        return redirect('inventory-transfer-item')
-    
-    return render(request, 'inventory/return_confirm.html', {'assignment': assignment})
+            invalidate_cache('items_list')
+            invalidate_cache('dashboard_stats')
+            messages.success(request, f'Return recorded for {assignment.item.name}.')
+            return redirect('inventory-transfer-item')
+    else:
+        form = ReturnForm()
+
+    return render(request, 'inventory/return_confirm.html', {
+        'assignment': assignment,
+        'return_type': 'assignment',
+        'form': form,
+    })
+
+
+@login_required
+def return_dispatch(request, pk):
+    dispatch = get_object_or_404(Dispatch, pk=pk, return_date__isnull=True, item__item_type='TOOL')
+    if request.method == 'POST':
+        form = ReturnForm(request.POST)
+        if form.is_valid():
+            services.process_return(
+                dispatch,
+                condition=form.cleaned_data['condition'],
+                return_notes=form.cleaned_data['return_notes'],
+                performed_by=request.user,
+                details_prefix=f'Returned from {dispatch.project}'
+            )
+
+            invalidate_cache('items_list')
+            invalidate_cache('dashboard_stats')
+            messages.success(request, f'Return recorded for {dispatch.item.name}.')
+            return redirect('inventory-transfer-item')
+    else:
+        form = ReturnForm()
+
+    return render(request, 'inventory/return_confirm.html', {
+        'dispatch': dispatch,
+        'return_type': 'dispatch',
+        'form': form,
+    })
 
 
 @login_required
@@ -783,17 +814,118 @@ def transfer_item(request):
     active_assignments = Assignment.objects.filter(
         return_date__isnull=True
     ).select_related('item', 'assigned_to').order_by('item__name')
-    
+
+    active_dispatches = Dispatch.objects.filter(
+        return_date__isnull=True, item__item_type='TOOL'
+    ).select_related('item').order_by('item__name')
+
     available_items = Item.objects.filter(
         status='AVAILABLE'
     ).order_by('name')
-    
+
     context = {
         'form': form,
         'active_assignments': active_assignments,
+        'active_dispatches': active_dispatches,
         'available_items': available_items,
     }
     return render(request, 'inventory/unified_transfer_form.html', context)
 
 
+# RESERVATIONS
+
+@login_required
+def reservation_list(request):
+    reservations = Reservation.objects.select_related(
+        'item', 'reserved_for', 'reserved_by'
+    ).order_by('start_date')
+
+    status_filter = request.GET.get('status', 'PENDING')
+    if status_filter:
+        reservations = reservations.filter(status=status_filter)
+
+    context = {
+        'reservations': reservations,
+        'status_filter': status_filter,
+        'reservation_status_choices': Reservation.STATUS_CHOICES,
+    }
+    return render(request, 'inventory/reservation_list.html', context)
+
+
+@login_required
+def reservation_create(request):
+    if request.method == 'POST':
+        form = ReservationForm(request.POST)
+        if form.is_valid():
+            reservation = form.save(commit=False)
+            reservation.reserved_by = request.user
+            reservation.save()
+
+            who = reservation.reserved_for.get_full_name() or reservation.reserved_for.username
+            History.objects.create(
+                item=reservation.item,
+                action='RESERVED',
+                user=request.user,
+                details=f'Reserved for {who} from {reservation.start_date} to {reservation.end_date}',
+                location=reservation.item.location or 'Warehouse'
+            )
+
+            messages.success(request, f'Reserved {reservation.item.name} for {who} starting {reservation.start_date}.')
+            return redirect('inventory-reservation-list')
+    else:
+        initial = {}
+        item_id = request.GET.get('item')
+        if item_id:
+            initial['item'] = item_id
+        form = ReservationForm(initial=initial)
+
+    return render(request, 'inventory/reservation_form.html', {'form': form})
+
+
+@login_required
+@require_http_methods(["POST"])
+def reservation_cancel(request, pk):
+    reservation = get_object_or_404(Reservation, pk=pk, status='PENDING')
+    services.cancel_reservation(reservation)
+    messages.success(request, f'Cancelled reservation for {reservation.item.name}.')
+    return redirect('inventory-reservation-list')
+
+
+@login_required
+@require_http_methods(["POST"])
+def reservation_fulfill(request, pk):
+    reservation = get_object_or_404(Reservation, pk=pk, status='PENDING')
+    try:
+        assignment = services.fulfill_reservation(reservation, performed_by=request.user)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect('inventory-reservation-list')
+
+    invalidate_cache('items_list')
+    invalidate_cache('dashboard_stats')
+    who = assignment.assigned_to.get_full_name() or assignment.assigned_to.username
+    messages.success(request, f'{assignment.item.name} assigned to {who}.')
+    return redirect('inventory-reservation-list')
+
+
+# NOTIFICATIONS
+
+@login_required
+@require_http_methods(["POST"])
+def send_notifications_now(request):
+    """Staff-triggered, on-demand version of the notify_overdue management command"""
+    if not request.user.is_staff:
+        messages.error(request, 'You do not have permission to do this.')
+        return redirect('inventory-reports')
+
+    context, recipients, total_issues = send_overdue_digest()
+
+    if total_issues == 0:
+        messages.success(request, 'No overdue items, low stock, or expired reservations right now - nothing to send.')
+    elif not recipients:
+        messages.error(request, f'{total_issues} issue(s) found but no active staff user has an email address on file.')
+    else:
+        messages.success(request, f'Digest emailed to {len(recipients)} recipient(s) covering {total_issues} issue(s).')
+
+    return redirect('inventory-reports')
 
