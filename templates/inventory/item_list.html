@@ -56,9 +56,11 @@
                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md inline-flex items-center">
                 <i class="fas fa-file-csv mr-2"></i>Export CSV
             </a>
+            {% if perms.inventory.add_item %}
             <a href="{% url 'inventory-item-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
                 <i class="fas fa-plus mr-2"></i>Add Item
             </a>
+            {% endif %}
         </div>
     </div>
 

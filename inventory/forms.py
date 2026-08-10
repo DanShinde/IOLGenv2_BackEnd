@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from django import forms
 from django.contrib.auth.models import User
 from .models import Item, History, Reservation, RETURN_CONDITION_CHOICES
+from .utils import get_active_employee_users
 from django.core.exceptions import ValidationError
 
 
@@ -11,7 +12,7 @@ class ItemForm(forms.ModelForm):
         fields = [
             'item_type', 'name', 'model', 'serial_number', 'make',
             'description', 'image', 'purchase_date', 'purchase_cost',
-            'quantity', 'min_quantity', 'location', 'category', 'status', 'remarks'
+            'quantity', 'min_quantity', 'location', 'status', 'remarks'
         ]
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3,
@@ -150,16 +151,14 @@ class ReservationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['item'].queryset = Item.objects.filter(item_type='TOOL').exclude(status='RETIRED').order_by('name')
-        self.fields['reserved_for'].queryset = User.objects.filter(is_active=True).order_by('username')
+        self.fields['reserved_for'].queryset = get_active_employee_users()
 
         for field_name, field in self.fields.items():
             if not field.widget.attrs.get('class'):
                 field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 
         self.fields['item'].label_from_instance = lambda item: f"{item.name} ({item.serial_number})"
-        self.fields['reserved_for'].label_from_instance = lambda user: (
-            f"{user.get_full_name()} ({user.username})" if user.get_full_name() else user.username
-        )
+        self.fields['reserved_for'].label_from_instance = _user_label
 
     def clean(self):
         cleaned_data = super().clean()
@@ -183,6 +182,10 @@ class ReservationForm(forms.ModelForm):
         return cleaned_data
 
 
+def _user_label(user):
+    return f"{user.get_full_name()} ({user.username})" if user.get_full_name() else user.username
+
+
 def _assignable_tool_label(item):
     label = f"{item.name} ({item.serial_number})"
     if item.status == 'ASSIGNED':
@@ -201,9 +204,10 @@ class AssignForm(forms.Form):
         widget=forms.Select(),
     )
     assigned_to = forms.ModelChoiceField(
-        queryset=User.objects.filter(is_active=True).order_by('username'),
+        queryset=get_active_employee_users(),
         label="Assign To",
         widget=forms.Select(),
+        help_text="Only active employees (per Planner/skill gap analyzer) can be assigned tools.",
     )
     assignment_date = forms.DateField(
         initial=date.today,
@@ -227,9 +231,7 @@ class AssignForm(forms.Form):
                 field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 
         self.fields['item'].label_from_instance = _assignable_tool_label
-        self.fields['assigned_to'].label_from_instance = lambda user: (
-            f"{user.get_full_name()} ({user.username})" if user.get_full_name() else user.username
-        )
+        self.fields['assigned_to'].label_from_instance = _user_label
 
         if not self.initial.get('expected_return_date'):
             self.initial['expected_return_date'] = (date.today() + timedelta(days=7)).isoformat()
@@ -282,11 +284,11 @@ class DispatchForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'Site location'}),
         label="Site Location"
     )
-    responsible_person = forms.CharField(
-        max_length=100,
-        widget=forms.TextInput(attrs={'placeholder': 'Who at the site is responsible for this item?'}),
+    responsible_person = forms.ModelChoiceField(
+        queryset=get_active_employee_users(),
+        widget=forms.Select(),
         label="Responsible Person",
-        help_text="Needed to recover the item later - required even for materials."
+        help_text="Active employee at the site responsible for this item - needed to recover it later, required even for materials."
     )
     quantity = forms.IntegerField(
         required=False,
@@ -320,6 +322,7 @@ class DispatchForm(forms.Form):
         self.fields['item'].label_from_instance = lambda item: (
             f"{item.name} ({item.serial_number}) - {item.get_item_type_display()}"
         )
+        self.fields['responsible_person'].label_from_instance = _user_label
 
     def clean(self):
         cleaned_data = super().clean()

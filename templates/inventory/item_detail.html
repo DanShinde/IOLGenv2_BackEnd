@@ -56,13 +56,13 @@
             <i class="fas fa-edit mr-2"></i>Edit
         </a>
 
-        {% if item.item_type == 'TOOL' and item.status == 'AVAILABLE' or item.item_type == 'TOOL' and item.status == 'ASSIGNED' %}
+        {% if perms.inventory.add_assignment and item.item_type == 'TOOL' and item.status == 'AVAILABLE' or perms.inventory.add_assignment and item.item_type == 'TOOL' and item.status == 'ASSIGNED' %}
         <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-user-plus mr-2"></i>{% if item.status == 'ASSIGNED' %}Transfer{% else %}Assign{% endif %}
         </a>
         {% endif %}
 
-        {% if item.status == 'AVAILABLE' or item.status == 'ASSIGNED' %}
+        {% if perms.inventory.add_dispatch and item.status == 'AVAILABLE' or perms.inventory.add_dispatch and item.status == 'ASSIGNED' %}
         <a href="{% url 'inventory-dispatch-create' %}?item={{ item.pk }}" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-truck mr-2"></i>Dispatch
         </a>

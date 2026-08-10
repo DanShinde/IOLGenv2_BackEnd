@@ -11,6 +11,7 @@ from datetime import date
 from django.db import transaction
 
 from .models import Assignment, History, RETURN_CONDITION_CHOICES, resolve_return_status
+from .utils import get_active_employee_users
 
 RETURN_CONDITION_LABELS = dict(RETURN_CONDITION_CHOICES)
 
@@ -61,6 +62,9 @@ def fulfill_reservation(reservation, performed_by):
         raise ValueError(f'{item.name} is not currently available (status: {item.get_status_display()}).')
 
     who = reservation.reserved_for.get_full_name() or reservation.reserved_for.username
+
+    if not get_active_employee_users().filter(pk=reservation.reserved_for_id).exists():
+        raise ValueError(f'{who} is no longer an active employee, so this reservation cannot be fulfilled.')
 
     with transaction.atomic():
         assignment = Assignment.objects.create(

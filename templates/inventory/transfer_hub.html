@@ -38,6 +38,7 @@
 <div class="max-w-6xl mx-auto space-y-6">
     <!-- Quick Actions -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% if perms.inventory.add_assignment %}
         <a href="{% url 'inventory-assign-create' %}" class="quick-action-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
             <div class="quick-action-icon"><i class="fas fa-user-plus"></i></div>
             <div>
@@ -45,6 +46,8 @@
                 <div class="text-sm text-white text-opacity-80">Hand a tool to someone</div>
             </div>
         </a>
+        {% endif %}
+        {% if perms.inventory.add_dispatch %}
         <a href="{% url 'inventory-dispatch-create' %}" class="quick-action-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
             <div class="quick-action-icon"><i class="fas fa-truck"></i></div>
             <div>
@@ -52,6 +55,7 @@
                 <div class="text-sm text-white text-opacity-80">Send tools or materials out</div>
             </div>
         </a>
+        {% endif %}
         <a href="{% url 'inventory-reservation-create' %}" class="quick-action-card" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
             <div class="quick-action-icon"><i class="fas fa-calendar-plus"></i></div>
             <div>
@@ -87,10 +91,12 @@
                         {% if item.location %}<p class="text-xs text-gray-400"><i class="fas fa-map-marker-alt mr-1"></i>{{ item.location }}</p>{% endif %}
                     </div>
                     <div class="flex flex-col items-end space-y-1 text-xs">
-                        {% if item.item_type == 'TOOL' %}
+                        {% if item.item_type == 'TOOL' and perms.inventory.add_assignment %}
                         <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-user-plus mr-1"></i>Assign</a>
                         {% endif %}
+                        {% if perms.inventory.add_dispatch %}
                         <a href="{% url 'inventory-dispatch-create' %}?item={{ item.pk }}" class="text-yellow-600 hover:text-yellow-800"><i class="fas fa-truck mr-1"></i>Dispatch</a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
@@ -116,7 +122,9 @@
                     </div>
                     <div class="flex flex-col items-end space-y-1 text-xs">
                         {% if a.is_overdue %}<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Overdue {{ a.days_overdue }}d</span>{% endif %}
+                        {% if perms.inventory.add_assignment %}
                         <a href="{% url 'inventory-assign-create' %}?item={{ a.item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-random mr-1"></i>Transfer</a>
+                        {% endif %}
                         <a href="{% url 'inventory-return-assignment' a.pk %}" class="text-yellow-600 hover:text-yellow-800"><i class="fas fa-undo mr-1"></i>Return</a>
                     </div>
                 </div>
@@ -140,7 +148,7 @@
                             <i class="fas fa-map-marker-alt mr-1"></i>{{ d.project }}{% if d.site_location %} ({{ d.site_location }}){% endif %}
                         </p>
                         <p class="text-xs text-gray-500">
-                            <i class="fas fa-user mr-1"></i>{{ d.responsible_person }}
+                            <i class="fas fa-user mr-1"></i>{{ d.responsible_person.get_full_name|default:d.responsible_person.username }}
                         </p>
                     </div>
                     <div class="flex flex-col items-end space-y-1 text-xs">

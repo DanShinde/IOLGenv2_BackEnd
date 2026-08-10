@@ -605,9 +605,11 @@
                             <a href="{% url 'home' %}" class="quick-action-btn p-2 rounded-lg" title="Home">
                                 <i class="fas fa-home text-lg"></i>
                             </a>
+                            {% if perms.inventory.add_item %}
                             <a href="{% url 'inventory-item-create' %}" class="quick-action-btn p-2 rounded-lg" title="Add Item">
                                 <i class="fas fa-plus text-lg"></i>
                             </a>
+                            {% endif %}
                             <a href="{% url 'inventory-transfer-item' %}" class="quick-action-btn p-2 rounded-lg" title="Transfer Items">
                                 <i class="fas fa-exchange-alt text-lg"></i>
                             </a>

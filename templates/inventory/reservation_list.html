@@ -63,12 +63,14 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {% if reservation.status == 'PENDING' %}
                         <div class="flex space-x-3">
+                            {% if perms.inventory.add_assignment %}
                             <form method="post" action="{% url 'inventory-reservation-fulfill' reservation.pk %}">
                                 {% csrf_token %}
                                 <button type="submit" class="text-green-600 hover:text-green-900" title="Convert to assignment">
                                     <i class="fas fa-check"></i> Fulfill
                                 </button>
                             </form>
+                            {% endif %}
                             <form method="post" action="{% url 'inventory-reservation-cancel' reservation.pk %}" onsubmit="return confirm('Cancel this reservation?');">
                                 {% csrf_token %}
                                 <button type="submit" class="text-red-600 hover:text-red-900">

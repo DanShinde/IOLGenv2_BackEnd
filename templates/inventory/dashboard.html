@@ -132,18 +132,24 @@
 {% block content %}
 <!-- Quick Actions -->
 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+    {% if perms.inventory.add_item %}
     <a href="{% url 'inventory-item-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
         <i class="fas fa-plus-circle text-xl mb-1"></i>
         <span class="font-semibold text-sm">Add New Item</span>
     </a>
+    {% endif %}
+    {% if perms.inventory.add_assignment %}
     <a href="{% url 'inventory-assign-create' %}" class="bg-green-600 hover:bg-green-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
         <i class="fas fa-user-plus text-xl mb-1"></i>
         <span class="font-semibold text-sm">Assign to User</span>
     </a>
+    {% endif %}
+    {% if perms.inventory.add_dispatch %}
     <a href="{% url 'inventory-dispatch-create' %}" class="bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
         <i class="fas fa-truck text-xl mb-1"></i>
         <span class="font-semibold text-sm">Dispatch to Project</span>
     </a>
+    {% endif %}
     <a href="{% url 'inventory-reservation-create' %}" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg p-4 flex flex-col items-center justify-center text-center transition-colors">
         <i class="fas fa-calendar-plus text-xl mb-1"></i>
         <span class="font-semibold text-sm">Reserve a Tool</span>

@@ -5,7 +5,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.db.models import Q, Sum, Count, Prefetch
@@ -22,7 +22,11 @@ from .forms import (
     ItemForm, HistoryFilterForm, ItemFilterForm, ReturnForm, ReservationForm,
     AssignForm, DispatchForm,
 )
-from .utils import send_overdue_digest
+from .utils import (
+    send_overdue_digest, get_active_employee_users, get_inventory_summary,
+    calculate_total_inventory_value, get_reservation_summary, get_upcoming_reservations,
+    get_active_dispatches, get_low_stock_items, get_return_condition_breakdown,
+)
 from . import services
 
 
@@ -227,6 +231,7 @@ def item_detail(request, pk):
 
 
 @login_required
+@permission_required('inventory.add_item', raise_exception=True)
 def item_create(request):
     fallback = reverse('inventory-item-list')
     next_url = _capture_next(request, fallback)
@@ -599,12 +604,16 @@ def reports(request):
     cached_data = cache.get(cache_key)
 
     if not cached_data:
-        # Inventory summary
+        # Inventory summary per item type, covering every status (not just the three
+        # main ones) so Maintenance/Retired/Consumed items aren't invisible here
         inventory_summary = list(Item.objects.values('item_type').annotate(
             total=Count('id'),
             available=Count('id', filter=Q(status='AVAILABLE')),
             assigned=Count('id', filter=Q(status='ASSIGNED')),
-            dispatched=Count('id', filter=Q(status='DISPATCHED'))
+            dispatched=Count('id', filter=Q(status='DISPATCHED')),
+            maintenance=Count('id', filter=Q(status='MAINTENANCE')),
+            consumed=Count('id', filter=Q(status='CONSUMED')),
+            retired=Count('id', filter=Q(status='RETIRED')),
         ))
 
         # Category distribution with percentage
@@ -622,39 +631,56 @@ def reports(request):
             tool_assignments__return_date__isnull=True
         ).prefetch_related(
             Prefetch('tool_assignments',
-                    queryset=Assignment.objects.filter(return_date__isnull=True).order_by('-assignment_date'))
+                    queryset=Assignment.objects.filter(return_date__isnull=True).select_related('item').order_by('-assignment_date'))
         ).annotate(
             tool_count=Count('tool_assignments', filter=Q(tool_assignments__return_date__isnull=True))
         ).filter(tool_count__gt=0).order_by('-tool_count')
 
-        # Add last assignment to each user
+        # Add last assignment + overdue flag to each user
         user_list = []
         for user in user_assignments:
-            last_assignment = user.tool_assignments.first()
+            active = list(user.tool_assignments.all())
             user_list.append({
                 'user': user,
                 'tool_count': user.tool_count,
-                'last_assignment': last_assignment
+                'last_assignment': active[0] if active else None,
+                'has_overdue': any(a.is_overdue for a in active),
             })
 
-        cached_data = {
+        # Item-centric view of everything currently assigned/dispatched, for
+        # "assigned items" / "item assigned period" reporting
+        assigned_items = list(
+            Assignment.objects.filter(return_date__isnull=True)
+            .select_related('item', 'assigned_to').order_by('assignment_date')
+        )
+        active_dispatches = list(get_active_dispatches())
+
+        context_data = {
             'inventory_summary': inventory_summary,
             'category_distribution': category_distribution,
             'user_assignments': user_list,
             'total_items': total_items,
+            'total_value': calculate_total_inventory_value(),
+            'summary_counts': get_inventory_summary(),
+            'reservation_summary': get_reservation_summary(),
+            'upcoming_reservations': list(get_upcoming_reservations()),
+            'assigned_items': assigned_items,
+            'active_dispatches': active_dispatches,
+            'low_stock_items': list(get_low_stock_items()),
+            'return_condition_breakdown': get_return_condition_breakdown(),
         }
-        cache.set(cache_key, cached_data, 300)  # Cache for 5 minutes
+        cache.set(cache_key, context_data, 300)  # Cache for 5 minutes
+        cached_data = context_data
 
     context = {
         **cached_data,
-        'inventory_summary': cached_data['inventory_summary'],
-        'category_distribution': cached_data['category_distribution'],
         'user_assignments': [item['user'] for item in cached_data['user_assignments']],
     }
 
-    # Add last_assignment to user objects for template
+    # Add last_assignment/has_overdue back onto the user objects for the template
     for i, user in enumerate(context['user_assignments']):
         user.last_assignment = cached_data['user_assignments'][i]['last_assignment']
+        user.has_overdue = cached_data['user_assignments'][i]['has_overdue']
 
     return render(request, 'inventory/reports.html', context)
 
@@ -683,6 +709,7 @@ def transfer_item(request):
 
 
 @login_required
+@permission_required('inventory.add_assignment', raise_exception=True)
 def assign_item(request):
     next_url = _capture_next(request, reverse('inventory-transfer-item'))
 
@@ -756,6 +783,7 @@ def assign_item(request):
 
 
 @login_required
+@permission_required('inventory.add_dispatch', raise_exception=True)
 def dispatch_item(request):
     next_url = _capture_next(request, reverse('inventory-transfer-item'))
 
@@ -766,6 +794,7 @@ def dispatch_item(request):
             project = form.cleaned_data['project']
             site_location = form.cleaned_data.get('site_location', '')
             responsible_person = form.cleaned_data['responsible_person']
+            responsible_name = responsible_person.get_full_name() or responsible_person.username
             quantity = form.cleaned_data.get('quantity') or 1
             dispatch_date = form.cleaned_data['dispatch_date']
             expected_return_date = form.cleaned_data.get('expected_return_date')
@@ -790,7 +819,7 @@ def dispatch_item(request):
                     History.objects.create(
                         item=item, action='CONSUMED', user=request.user,
                         details=f'{quantity} units dispatched to {project} (Site: {site_location or "N/A"}) - '
-                                f'received by {responsible_person}',
+                                f'received by {responsible_name}',
                         location=f'{project} - {site_location or "N/A"}'
                     )
                     messages.success(
@@ -823,10 +852,10 @@ def dispatch_item(request):
                     History.objects.create(
                         item=item, action='DISPATCHED', user=request.user,
                         details=f'Dispatched to {project} (Site: {site_location or "N/A"}) - '
-                                f'responsible person: {responsible_person}',
+                                f'responsible person: {responsible_name}',
                         location=item.location
                     )
-                    messages.success(request, f'Dispatched {item.name} to {project} (responsible: {responsible_person}).')
+                    messages.success(request, f'Dispatched {item.name} to {project} (responsible: {responsible_name}).')
 
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')
@@ -845,9 +874,21 @@ def dispatch_item(request):
 
 @login_required
 def user_list(request):
-    users = User.objects.filter(is_active=True).annotate(
-        active_tool_count=Count('tool_assignments', filter=Q(tool_assignments__return_date__isnull=True))
-    ).order_by('username')
+    """
+    Every active employee per Planner/skill-gap - this mirrors that shared roster
+    exactly, same as the assign/dispatch/reservation dropdowns (including employees
+    currently holding nothing).
+    """
+    users = get_active_employee_users().annotate(
+        active_tool_count=Count(
+            'tool_assignments', filter=Q(tool_assignments__return_date__isnull=True), distinct=True
+        ),
+        active_dispatch_count=Count(
+            'responsible_dispatches',
+            filter=Q(responsible_dispatches__return_date__isnull=True, responsible_dispatches__item__item_type='TOOL'),
+            distinct=True
+        ),
+    )
 
     context = {'users': users}
     return render(request, 'inventory/user_list.html', context)
@@ -865,6 +906,8 @@ def user_detail(request, pk):
         assigned_to=target_user, return_date__isnull=False
     ).select_related('item').order_by('-return_date')
 
+    is_active_employee = get_active_employee_users().filter(pk=target_user.pk).exists()
+
     if request.method == 'POST':
         return assign_item(request)
 
@@ -872,6 +915,7 @@ def user_detail(request, pk):
 
     context = {
         'target_user': target_user,
+        'is_active_employee': is_active_employee,
         'active_assignments': active_assignments,
         'past_assignments': past_assignments,
         'form': form,
@@ -941,6 +985,7 @@ def reservation_cancel(request, pk):
 
 
 @login_required
+@permission_required('inventory.add_assignment', raise_exception=True)
 @require_http_methods(["POST"])
 def reservation_fulfill(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk, status='PENDING')

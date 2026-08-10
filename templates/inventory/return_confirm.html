@@ -39,7 +39,7 @@
                 </div>
                 <div class="flex justify-between">
                     <dt class="font-medium text-gray-600">Responsible Person:</dt>
-                    <dd class="text-gray-900">{{ dispatch.responsible_person }}</dd>
+                    <dd class="text-gray-900">{{ dispatch.responsible_person.get_full_name|default:dispatch.responsible_person.username }}</dd>
                 </div>
                 <div class="flex justify-between">
                     <dt class="font-medium text-gray-600">Dispatch Date:</dt>

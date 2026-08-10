@@ -25,6 +25,22 @@ def resolve_return_status(condition):
     return 'AVAILABLE', 'Warehouse', 'RETURNED'
 
 
+class ProvisionedUser(models.Model):
+    """
+    Marks a User account inventory itself created (as a login-disabled placeholder
+    for an active employee who had no login yet), as opposed to a real account
+    that already existed via Planner/skill gap analyzer's own user management.
+
+    This is the definitive signal for "safe to offer deleting from inventory" -
+    real employee-managed accounts must never be deletable from here.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='inventory_provisioned')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Provisioned: {self.user.username}"
+
+
 class Item(models.Model):
     """
     Main Item model - tracks both Tools and Materials
@@ -110,8 +126,10 @@ class Item(models.Model):
             # Get current dispatch
             dispatch = self.dispatches.filter(return_date__isnull=True).first()
             if dispatch:
-                return (f"Dispatched to {dispatch.project} ({dispatch.site_location or 'N/A'}) - "
-                        f"with {dispatch.responsible_person}")
+                who = 'unknown'
+                if dispatch.responsible_person:
+                    who = dispatch.responsible_person.get_full_name() or dispatch.responsible_person.username
+                return f"Dispatched to {dispatch.project} ({dispatch.site_location or 'N/A'}) - with {who}"
         elif self.status == 'CONSUMED':
             return "Consumed (No longer in inventory)"
         elif self.status == 'MAINTENANCE':
@@ -174,8 +192,9 @@ class Dispatch(models.Model):
     quantity = models.PositiveIntegerField(default=1, help_text="Quantity dispatched")
     project = models.CharField(max_length=100, db_index=True)
     site_location = models.CharField(max_length=100, null=True, blank=True)
-    responsible_person = models.CharField(max_length=100, default='', db_index=True,
-                                          help_text="Person at the site who is responsible for this item - needed to recover it")
+    responsible_person = models.ForeignKey(User, on_delete=models.PROTECT, related_name='responsible_dispatches',
+                                           null=True, blank=True,
+                                           help_text="Active employee at the site responsible for this item - needed to recover it")
     dispatched_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dispatched_items')
     dispatch_date = models.DateField()
     expected_return_date = models.DateField(null=True, blank=True,
@@ -192,10 +211,13 @@ class Dispatch(models.Model):
         verbose_name_plural = 'Dispatches'
 
     def __str__(self):
+        who = 'unknown'
+        if self.responsible_person:
+            who = self.responsible_person.get_full_name() or self.responsible_person.username
         if self.item.item_type == 'TOOL':
-            return f"{self.item.name} dispatched to {self.project} (with {self.responsible_person})"
+            return f"{self.item.name} dispatched to {self.project} (with {who})"
         else:
-            return f"{self.quantity} x {self.item.name} dispatched to {self.project} (Consumed, received by {self.responsible_person})"
+            return f"{self.quantity} x {self.item.name} dispatched to {self.project} (Consumed, received by {who})"
 
     def is_active(self):
         """Check if this dispatch is currently active (only for tools)"""

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Item, Assignment, Dispatch, History, Reservation
+from .utils import get_active_employee_users
 
 
 class ItemSerializer(serializers.ModelSerializer):
@@ -43,6 +44,7 @@ class DispatchSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.name', read_only=True)
     item_serial_number = serializers.CharField(source='item.serial_number', read_only=True)
     item_type = serializers.CharField(source='item.item_type', read_only=True)
+    responsible_person_username = serializers.CharField(source='responsible_person.username', read_only=True, default=None)
     is_active = serializers.SerializerMethodField()
     is_overdue = serializers.BooleanField(read_only=True)
     days_overdue = serializers.IntegerField(read_only=True)
@@ -67,6 +69,7 @@ class HistorySerializer(serializers.ModelSerializer):
 
 
 class ReservationSerializer(serializers.ModelSerializer):
+    reserved_for = serializers.PrimaryKeyRelatedField(queryset=get_active_employee_users())
     item_name = serializers.CharField(source='item.name', read_only=True)
     reserved_for_username = serializers.CharField(source='reserved_for.username', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
