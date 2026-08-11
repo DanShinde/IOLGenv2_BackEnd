@@ -8,13 +8,24 @@
   </div>
   <form class="kb-search" method="get" action="{% url 'forum-home' %}">
     <i class="fas fa-search"></i>
-    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search articles, support requests, or reports" />
-    <input type="hidden" name="tab" value="{{ active_tab|default:'wiki' }}">
+    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search everything — articles, support requests, reports" />
   </form>
-  <a class="kb-action" href="{% url 'kb-create' %}">
-    <i class="fas fa-plus"></i>
-    Contribute
+  {% if active_tab == 'qa' %}
+  <a class="kb-action" href="{% url 'kb-create' %}?type=qa">
+    <i class="fas fa-hands-helping"></i>
+    Raise Support Request
   </a>
+  {% elif active_tab == 'reports' %}
+  <a class="kb-action" href="{% url 'kb-create' %}?type=report">
+    <i class="fas fa-bug"></i>
+    Report a Bug or Request a Feature
+  </a>
+  {% else %}
+  <a class="kb-action" href="{% url 'kb-create' %}?type=wiki">
+    <i class="fas fa-pen"></i>
+    Write Article
+  </a>
+  {% endif %}
 </div>
 
 <div class="kb-tabs">

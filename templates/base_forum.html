@@ -584,6 +584,97 @@
       border-radius: var(--kb-radius-sm);
     }
 
+    /* ---------- Free-form tag chip input ---------- */
+    .kb-tags-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 8px;
+      border-radius: var(--kb-radius-sm);
+      border: 1px solid var(--kb-border);
+      background: var(--kb-surface-soft);
+      margin-bottom: 12px;
+    }
+    .kb-tags-wrapper:focus-within {
+      border-color: var(--kb-primary);
+      background: var(--kb-surface);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+    }
+    .kb-tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px 4px 10px;
+      border-radius: 999px;
+      background: var(--kb-primary-light);
+      color: var(--kb-primary-dark);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .kb-tag-chip button {
+      border: none;
+      background: transparent;
+      color: inherit;
+      opacity: 0.6;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .kb-tag-chip button:hover { opacity: 1; }
+    .kb-tags-type {
+      flex: 1;
+      min-width: 120px;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--kb-text);
+      padding: 4px 2px;
+    }
+
+    /* ---------- Optional rich-text toggle ---------- */
+    .kb-richtoggle-bar { margin-bottom: 8px; }
+    .kb-richtoggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: var(--kb-radius-sm);
+      border: 1px dashed var(--kb-border-strong);
+      background: var(--kb-surface);
+      color: var(--kb-text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .kb-richtoggle-btn:hover { background: var(--kb-primary-light); color: var(--kb-primary-dark); border-color: rgba(67, 97, 238, 0.3); }
+    .kb-richtoggle-revert {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--kb-text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+    .kb-richtoggle-revert:hover { color: var(--kb-text); }
+    .cke { border-radius: var(--kb-radius-sm) !important; overflow: hidden; }
+
+    /* Rendered rich HTML content (articles, requests, reports, comments) */
+    .kb-rich-content { color: var(--kb-text); line-height: 1.75; }
+    .kb-rich-content img { max-width: 100%; height: auto; border-radius: 8px; }
+    .kb-rich-content table { border-collapse: collapse; max-width: 100%; }
+    .kb-rich-content table td, .kb-rich-content table th { border: 1px solid var(--kb-border); padding: 6px 10px; }
+    .kb-rich-content blockquote { border-left: 3px solid var(--kb-border-strong); margin: 0; padding-left: 14px; color: var(--kb-text-secondary); }
+
     @media (max-width: 900px) {
       .kb-row { grid-template-columns: 1fr; }
     }
@@ -651,5 +742,167 @@
 
   {% block scripts %}{% endblock %}
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  {# Shared across every /forum/ page: free-form tag chips + optional rich-text toggle. #}
+  {# Lives outside {% block scripts %} so per-page script blocks that don't call block.super don't drop it. #}
+  <script>
+    (function () {
+      function enhanceTagInput(input) {
+        if (input.dataset.enhanced) return;
+        input.dataset.enhanced = 'true';
+
+        const suggestions = (input.dataset.suggestions || '').split(',').map(s => s.trim()).filter(Boolean);
+        let tags = (input.value || '').split(',').map(s => s.trim()).filter(Boolean);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'kb-tags-wrapper';
+
+        const typeInput = document.createElement('input');
+        typeInput.type = 'text';
+        typeInput.className = 'kb-tags-type';
+        typeInput.placeholder = tags.length ? 'Add another tag…' : (input.placeholder || 'Type a tag and press Enter');
+        if (input.id) {
+          typeInput.setAttribute('list', input.id + '-suggestions');
+        }
+
+        const datalist = document.createElement('datalist');
+        if (input.id) {
+          datalist.id = input.id + '-suggestions';
+        }
+        suggestions.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          datalist.appendChild(opt);
+        });
+
+        function sync() { input.value = tags.join(','); }
+
+        function renderChips() {
+          wrapper.querySelectorAll('.kb-tag-chip').forEach(el => el.remove());
+          tags.forEach((tag, idx) => {
+            const chip = document.createElement('span');
+            chip.className = 'kb-tag-chip';
+            chip.textContent = tag;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.setAttribute('aria-label', 'Remove tag ' + tag);
+            remove.textContent = '×';
+            remove.addEventListener('click', () => {
+              tags.splice(idx, 1);
+              renderChips();
+              sync();
+            });
+            chip.appendChild(remove);
+            wrapper.insertBefore(chip, typeInput);
+          });
+        }
+
+        function addTag(raw) {
+          const name = raw.trim();
+          if (!name) return;
+          if (!tags.some(t => t.toLowerCase() === name.toLowerCase())) {
+            tags.push(name);
+            renderChips();
+            sync();
+          }
+          typeInput.value = '';
+        }
+
+        typeInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ',') {
+            event.preventDefault();
+            addTag(typeInput.value);
+          } else if (event.key === 'Backspace' && !typeInput.value && tags.length) {
+            tags.pop();
+            renderChips();
+            sync();
+          }
+        });
+        typeInput.addEventListener('blur', () => {
+          if (typeInput.value.trim()) addTag(typeInput.value);
+        });
+
+        renderChips();
+        sync();
+        wrapper.appendChild(typeInput);
+        wrapper.appendChild(datalist);
+        input.style.display = 'none';
+        input.insertAdjacentElement('afterend', wrapper);
+      }
+
+      document.querySelectorAll('.kb-tags-input').forEach(enhanceTagInput);
+    })();
+
+    (function () {
+      const CKEDITOR_SRC = "{% static 'ckeditor/ckeditor/ckeditor.js' %}";
+      const CKEDITOR_TOOLBAR = [
+        { name: 'clipboard', items: ['Undo', 'Redo'] },
+        { name: 'basicstyles', items: ['Bold', 'Italic', 'Underline', 'Strike', 'RemoveFormat'] },
+        { name: 'paragraph', items: ['NumberedList', 'BulletedList', 'Blockquote', 'JustifyLeft', 'JustifyCenter', 'JustifyRight'] },
+        { name: 'links', items: ['Link', 'Unlink'] },
+        { name: 'insert', items: ['Image', 'Table', 'HorizontalRule'] },
+        { name: 'styles', items: ['Format', 'Font', 'FontSize'] },
+        { name: 'colors', items: ['TextColor', 'BGColor'] },
+      ];
+
+      function ensureCKEditor(callback) {
+        if (window.CKEDITOR) {
+          callback();
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = CKEDITOR_SRC;
+        script.onload = callback;
+        document.head.appendChild(script);
+      }
+
+      function activateRichText(button) {
+        const targetId = button.getAttribute('data-richtext-toggle');
+        const textarea = document.getElementById(targetId);
+        const formatField = document.getElementById(targetId + '_format');
+        if (!textarea) return;
+
+        ensureCKEditor(function () {
+          if (CKEDITOR.instances[targetId]) return;
+          CKEDITOR.replace(targetId, {
+            toolbar: CKEDITOR_TOOLBAR,
+            height: 220,
+            removePlugins: 'elementspath',
+            resize_enabled: false,
+            versionCheck: false,
+            filebrowserUploadUrl: '/ckeditor/upload/',
+            filebrowserImageUploadUrl: '/ckeditor/upload/?type=Images',
+          });
+          if (formatField) formatField.value = 'html';
+          button.style.display = 'none';
+
+          const revert = document.createElement('button');
+          revert.type = 'button';
+          revert.className = 'kb-richtoggle-revert';
+          revert.textContent = 'Switch back to plain text';
+          revert.addEventListener('click', function () {
+            const instance = CKEDITOR.instances[targetId];
+            if (instance) {
+              instance.updateElement();
+              // destroy(true) skips CKEditor's own post-destroy DOM re-sync,
+              // which is what's racing against the element removal below.
+              instance.destroy(true);
+            }
+            if (formatField) formatField.value = 'plain';
+            button.style.display = '';
+            revert.remove();
+          });
+          button.insertAdjacentElement('afterend', revert);
+        });
+      }
+
+      document.querySelectorAll('[data-richtext-toggle]').forEach(function (button) {
+        button.addEventListener('click', function () { activateRichText(button); });
+        if (button.getAttribute('data-autostart') === 'true') {
+          activateRichText(button);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

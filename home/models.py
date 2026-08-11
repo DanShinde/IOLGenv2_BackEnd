@@ -136,6 +136,7 @@ class ArticleComment(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='article_comments')
     body = models.TextField()
+    is_html = models.BooleanField(default=False, help_text="Whether body holds sanitized rich-text HTML rather than plain text.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -182,6 +183,7 @@ class ArticleAttachment(models.Model):
 class Question(models.Model):
     title = models.CharField(max_length=300)
     body = models.TextField()
+    is_html = models.BooleanField(default=False, help_text="Whether body holds sanitized rich-text HTML rather than plain text.")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='questions')
     votes = models.IntegerField(default=0)
     is_solved = models.BooleanField(default=False)
@@ -215,6 +217,7 @@ class Question(models.Model):
 class Answer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')
     body = models.TextField()
+    is_html = models.BooleanField(default=False, help_text="Whether body holds sanitized rich-text HTML rather than plain text.")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='answers')
     votes = models.IntegerField(default=0)
     is_accepted = models.BooleanField(default=False)
@@ -290,6 +293,7 @@ class Report(models.Model):
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     title = models.CharField(max_length=300)
     description = models.TextField()
+    description_is_html = models.BooleanField(default=False, help_text="Whether description holds sanitized rich-text HTML rather than plain text.")
     application = models.ForeignKey(Application, on_delete=models.PROTECT, related_name='reports')
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reported_items')
     assignee = models.ForeignKey(
@@ -320,6 +324,7 @@ class ReportComment(models.Model):
     report = models.ForeignKey(Report, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='report_comments')
     body = models.TextField()
+    is_html = models.BooleanField(default=False, help_text="Whether body holds sanitized rich-text HTML rather than plain text.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

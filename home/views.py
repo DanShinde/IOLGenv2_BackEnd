@@ -10,10 +10,12 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import PermissionDenied
 
 KB_PAGE_SIZE = 10
+GLOBAL_SEARCH_LIMIT = 8
 
 from accounts.models import Info
 
@@ -36,8 +38,38 @@ from .models import (
     Report,
     ReportComment,
     ReportAttachment,
+    Tag,
     Vote,
 )
+from .sanitize import sanitize_html
+
+
+def _resolve_tags(names):
+    """Free-typed tag names -> Tag rows, creating any that don't exist yet."""
+    tags = []
+    for name in names:
+        slug = slugify(name, allow_unicode=True)
+        if not slug:
+            continue
+        tag, _ = Tag.objects.get_or_create(slug=slug, defaults={'name': name})
+        tags.append(tag)
+    return tags
+
+
+def _finalize_richtext(instance, form, field_name, format_field_name=None, is_html_attr=None):
+    """
+    Apply the optional rich-text toggle's result to a just-populated (but
+    not yet saved) model instance: sanitize and flag as HTML if the user
+    turned formatting on, otherwise leave the plain text as-is.
+    """
+    format_field_name = format_field_name or f'{field_name}_format'
+    is_html_attr = is_html_attr or ('is_html' if field_name == 'body' else f'{field_name}_is_html')
+    is_html = form.cleaned_data.get(format_field_name) == 'html'
+    value = getattr(instance, field_name)
+    if is_html:
+        value = sanitize_html(value)
+    setattr(instance, field_name, value)
+    setattr(instance, is_html_attr, is_html)
 
 
 @login_required
@@ -231,6 +263,40 @@ def forum_home(request):
     }
     context.update(get_kb_stats_context())
 
+    # Global search: the header search box submits `q` with no `tab`, so a
+    # search from anywhere in the KB looks across every content type at
+    # once, instead of only whichever tab happened to be open. Tab links,
+    # sidebar filters, and "view all" links all pass `tab` explicitly, which
+    # opts back into the single-type, paginated, filterable view below.
+    if query and 'tab' not in request.GET:
+        wiki_matches = Article.objects.select_related('category', 'author').prefetch_related('tags').filter(
+            models.Q(title__icontains=query) | models.Q(content__icontains=query) |
+            models.Q(excerpt__icontains=query) | models.Q(category__name__icontains=query)
+        ).order_by('-updated_at')
+        qa_matches = Question.objects.select_related('author').prefetch_related('tags', 'tagged_users').annotate(
+            answer_count=Count('answers')
+        ).filter(
+            models.Q(title__icontains=query) | models.Q(body__icontains=query)
+        ).order_by('-created_at')
+        report_matches = Report.objects.select_related('application', 'reporter').prefetch_related('tags').annotate(
+            comment_count=Count('comments')
+        ).filter(
+            models.Q(title__icontains=query) | models.Q(description__icontains=query) |
+            models.Q(application__name__icontains=query)
+        ).order_by('-updated_at')
+
+        context.update(get_kb_sidebar_context())
+        context.update({
+            'is_global_search': True,
+            'search_wiki_results': wiki_matches[:GLOBAL_SEARCH_LIMIT],
+            'search_wiki_total': wiki_matches.count(),
+            'search_qa_results': qa_matches[:GLOBAL_SEARCH_LIMIT],
+            'search_qa_total': qa_matches.count(),
+            'search_report_results': report_matches[:GLOBAL_SEARCH_LIMIT],
+            'search_report_total': report_matches.count(),
+        })
+        return render(request, 'home/forum_home.html', context)
+
     if active_tab == 'wiki':
         articles = Article.objects.select_related('category', 'author', 'parent').prefetch_related('tags')
         if query:
@@ -359,6 +425,7 @@ def article_detail(request, slug):
             comment = form.save(commit=False)
             comment.article = article
             comment.author = request.user
+            _finalize_richtext(comment, form, 'body')
             comment.save()
             messages.success(request, 'Comment added.')
             return redirect(article.get_absolute_url())
@@ -443,6 +510,7 @@ def question_detail(request, pk):
             answer = form.save(commit=False)
             answer.question = question
             answer.author = request.user
+            _finalize_richtext(answer, form, 'body')
             answer.save()
             messages.success(request, 'Answer posted.')
             return redirect('kb-question-detail', pk=question.pk)
@@ -537,6 +605,7 @@ def report_detail(request, pk):
             comment = form.save(commit=False)
             comment.report = report
             comment.author = request.user
+            _finalize_richtext(comment, form, 'body')
             comment.save()
             messages.success(request, 'Comment added.')
             return redirect('kb-report-detail', pk=report.pk)
@@ -575,6 +644,7 @@ def kb_create(request):
             article.author = request.user
             article.save()
             form.save_m2m()
+            article.tags.set(_resolve_tags(form.cleaned_data['tags']))
             attachments = form.cleaned_data.get('attachments', [])
             for uploaded_file in attachments:
                 ArticleAttachment.objects.create(
@@ -591,16 +661,23 @@ def kb_create(request):
         if request.method == 'POST' and form.is_valid():
             question = form.save(commit=False)
             question.author = request.user
+            _finalize_richtext(question, form, 'body')
             already_solved = form.cleaned_data.get('already_solved')
             if already_solved:
                 question.is_solved = True
             question.save()
             form.save_m2m()
+            question.tags.set(_resolve_tags(form.cleaned_data['tags']))
 
             solution = form.cleaned_data.get('solution', '').strip()
             if already_solved and solution:
+                solution_is_html = form.cleaned_data.get('solution_format') == 'html'
                 answer = Answer.objects.create(
-                    question=question, body=solution, author=request.user, is_accepted=True
+                    question=question,
+                    body=sanitize_html(solution) if solution_is_html else solution,
+                    is_html=solution_is_html,
+                    author=request.user,
+                    is_accepted=True,
                 )
                 question.accepted_answer = answer
                 question.save(update_fields=['accepted_answer'])
@@ -615,8 +692,10 @@ def kb_create(request):
         if request.method == 'POST' and form.is_valid():
             report = form.save(commit=False)
             report.reporter = request.user
+            _finalize_richtext(report, form, 'description')
             report.save()
             form.save_m2m()
+            report.tags.set(_resolve_tags(form.cleaned_data['tags']))
             attachments = form.cleaned_data.get('attachments', [])
             for uploaded_file in attachments:
                 ReportAttachment.objects.create(
@@ -653,6 +732,7 @@ def article_update(request, slug):
         if set(form.changed_data) & {'title', 'content', 'excerpt'}:
             ArticleRevision.objects.create(article=article, edited_by=request.user, **original)
         form.save()
+        article.tags.set(_resolve_tags(form.cleaned_data['tags']))
         messages.success(request, 'Article updated.')
         return redirect(article.get_absolute_url())
 
@@ -700,7 +780,11 @@ def question_update(request, pk):
 
     form = QuestionForm(request.POST or None, instance=question)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        question = form.save(commit=False)
+        _finalize_richtext(question, form, 'body')
+        question.save()
+        form.save_m2m()
+        question.tags.set(_resolve_tags(form.cleaned_data['tags']))
         newly_tagged = question.tagged_users.exclude(id__in=previously_tagged_ids)
         _notify_tagged_users(request, question, newly_tagged)
         messages.success(request, 'Support request updated.')
@@ -724,12 +808,14 @@ def report_update(request, pk):
     form = ReportForm(request.POST or None, instance=report)
     if request.method == 'POST' and form.is_valid():
         updated_report = form.save(commit=False)
+        _finalize_richtext(updated_report, form, 'description')
         if updated_report.status in [Report.STATUS_RESOLVED, Report.STATUS_CLOSED] and not updated_report.resolved_at:
             updated_report.resolved_at = timezone.now()
         if updated_report.status in [Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]:
             updated_report.resolved_at = None
         updated_report.save()
         form.save_m2m()
+        updated_report.tags.set(_resolve_tags(form.cleaned_data['tags']))
         messages.success(request, 'Report updated.')
         return redirect(report.get_absolute_url())
 

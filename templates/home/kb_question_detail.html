@@ -40,7 +40,11 @@
             {% endif %}
           </div>
           <h1 style="margin: 0 0 16px; font-family: 'Space Grotesk', sans-serif;">{{ question.title }}</h1>
-          <p class="kb-body-copy" style="margin: 0 0 16px;">{{ question.body }}</p>
+          {% if question.is_html %}
+          <div class="kb-rich-content" style="margin: 0 0 16px;">{{ question.body|safe }}</div>
+          {% else %}
+          <p class="kb-body-copy" style="margin: 0 0 16px;">{{ question.body|linebreaksbr }}</p>
+          {% endif %}
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             {% for tag in question.tags.all %}
             <span class="kb-tag">{{ tag.name }}</span>
@@ -83,7 +87,11 @@
               </form>
             </div>
             <div style="flex: 1;">
-              <p style="margin: 0 0 10px;">{{ answer.body }}</p>
+              {% if answer.is_html %}
+              <div class="kb-rich-content" style="margin: 0 0 10px;">{{ answer.body|safe }}</div>
+              {% else %}
+              <p style="margin: 0 0 10px;">{{ answer.body|linebreaksbr }}</p>
+              {% endif %}
               <div class="kb-meta">
                 <span>{{ answer.author.get_full_name|default:answer.author.username }}</span>
                 <span>{{ answer.created_at|timesince }} ago</span>
@@ -110,7 +118,13 @@
         <h2 style="margin: 0 0 16px;">Contribute a solution</h2>
         <form method="post">
           {% csrf_token %}
+          <div class="kb-richtoggle-bar">
+            <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_body">
+              <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+            </button>
+          </div>
           {{ answer_form.body }}
+          {{ answer_form.body_format }}
           <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
             <button class="kb-action" type="submit">Post Contribution</button>
           </div>

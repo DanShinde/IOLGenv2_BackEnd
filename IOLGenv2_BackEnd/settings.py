@@ -350,6 +350,7 @@ CKEDITOR_CONFIGS = {
         'toolbar': 'full',
         'height': 320,
         'width': 'auto',
+        'versionCheck': False,
     },
 }
 

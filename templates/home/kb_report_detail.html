@@ -21,7 +21,11 @@
           <span>{{ report.application.name }}</span>
         </div>
         <h1 style="margin: 0 0 16px; font-family: 'Space Grotesk', sans-serif;">{{ report.title }}</h1>
-        <p class="kb-body-copy" style="margin: 0 0 16px;">{{ report.description }}</p>
+        {% if report.description_is_html %}
+        <div class="kb-rich-content" style="margin: 0 0 16px;">{{ report.description|safe }}</div>
+        {% else %}
+        <p class="kb-body-copy" style="margin: 0 0 16px;">{{ report.description|linebreaksbr }}</p>
+        {% endif %}
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           {% for tag in report.tags.all %}
           <span class="kb-tag">{{ tag.name }}</span>
@@ -48,7 +52,11 @@
         <h2 style="margin: 0 0 16px;">Comments</h2>
         {% for comment in comments %}
           <div class="kb-surface-soft" style="margin-bottom: 12px;">
-            <p style="margin: 0 0 10px;">{{ comment.body }}</p>
+            {% if comment.is_html %}
+            <div class="kb-rich-content" style="margin: 0 0 10px;">{{ comment.body|safe }}</div>
+            {% else %}
+            <p style="margin: 0 0 10px;">{{ comment.body|linebreaksbr }}</p>
+            {% endif %}
             <div class="kb-meta">
               <span>{{ comment.author.get_full_name|default:comment.author.username }}</span>
               <span>{{ comment.created_at|timesince }} ago</span>
@@ -87,7 +95,13 @@
         <h2 style="margin: 0 0 16px;">Add a comment</h2>
         <form method="post">
           {% csrf_token %}
+          <div class="kb-richtoggle-bar">
+            <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_body">
+              <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+            </button>
+          </div>
           {{ comment_form.body }}
+          {{ comment_form.body_format }}
           <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
             <button class="kb-action" type="submit">Post Comment</button>
           </div>

@@ -8,8 +8,18 @@
   <div class="kb-panel">
     <div class="kb-create-header">
       <div>
-        <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Contribute</h1>
-        <p style="margin: 4px 0 0; color: var(--kb-muted);">Write a wiki article, raise a support request, or file a report.</p>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">
+          {% if content_type == 'wiki' %}{% if object %}Edit Wiki Article{% else %}Write a Wiki Article{% endif %}
+          {% elif content_type == 'qa' %}{% if object %}Edit Support Request{% else %}Raise a Support Request{% endif %}
+          {% elif content_type == 'report' %}{% if object %}Edit Report{% else %}Report a Bug or Request a Feature{% endif %}
+          {% else %}Contribute{% endif %}
+        </h1>
+        <p style="margin: 4px 0 0; color: var(--kb-muted);">
+          {% if content_type == 'wiki' %}Document a process, guide, or piece of internal knowledge for others to find later.
+          {% elif content_type == 'qa' %}Describe the problem, tag anyone who might know the answer, and let the team pitch in.
+          {% elif content_type == 'report' %}Tell us what's broken or what you'd like to see, and how urgent it is.
+          {% else %}Write a wiki article, raise a support request, or file a report.{% endif %}
+        </p>
       </div>
       <a class="kb-back" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
     </div>
@@ -25,7 +35,7 @@
           <p style="margin: 0; color: var(--kb-muted);">Stuck on something — technical or not? Ask, tag someone who can help, or share something you've already solved.</p>
         </a>
         <a class="kb-card" href="{% url 'kb-create' %}?type=report">
-          <h3 style="margin: 0 0 8px;">Submit a Report</h3>
+          <h3 style="margin: 0 0 8px;">Report a Bug or Request a Feature</h3>
           <p style="margin: 0; color: var(--kb-muted);">Log bugs or feature requests with priority.</p>
         </a>
       </div>
@@ -94,7 +104,13 @@
           {{ form.title }}
           {{ form.title.errors }}
           <label class="kb-label">Details</label>
+          <div class="kb-richtoggle-bar">
+            <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_body" {% if object and object.is_html %}data-autostart="true"{% endif %}>
+              <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+            </button>
+          </div>
           {{ form.body }}
+          {{ form.body_format }}
           {{ form.body.errors }}
           <div class="kb-row">
             <div>
@@ -115,7 +131,13 @@
           </div>
           <div id="kb-solution-field" style="display: none;">
             <label class="kb-label">{{ form.solution.label }}</label>
+            <div class="kb-richtoggle-bar">
+              <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_solution">
+                <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+              </button>
+            </div>
             {{ form.solution }}
+            {{ form.solution_format }}
             {{ form.solution.errors }}
           </div>
           {% endif %}
@@ -136,7 +158,13 @@
           {{ form.title }}
           {{ form.title.errors }}
           <label class="kb-label">Description</label>
+          <div class="kb-richtoggle-bar">
+            <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_description" {% if object and object.description_is_html %}data-autostart="true"{% endif %}>
+              <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+            </button>
+          </div>
           {{ form.description }}
+          {{ form.description_format }}
           {{ form.description.errors }}
           <div class="kb-row">
             <div>
