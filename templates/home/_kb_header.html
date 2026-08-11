@@ -6,10 +6,11 @@
       <p>Wiki, Q and A, Bug Reports and Feature Requests</p>
     </div>
   </div>
-  <div class="kb-search">
+  <form class="kb-search" method="get" action="{% url 'forum-home' %}">
     <i class="fas fa-search"></i>
-    <input type="text" placeholder="Search articles, questions, or reports" />
-  </div>
+    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search articles, questions, or reports" />
+    <input type="hidden" name="tab" value="{{ active_tab|default:'wiki' }}">
+  </form>
   <a class="kb-action" href="{% url 'kb-create' %}">
     <i class="fas fa-plus"></i>
     Contribute
@@ -17,17 +18,17 @@
 </div>
 
 <div class="kb-tabs">
-  <a class="kb-tab {% if active_tab == 'wiki' %}active{% endif %}" href="{% url 'forum-home' %}?tab=wiki">
+  <a class="kb-tab {% if active_tab == 'wiki' %}active{% endif %}" href="{% url 'forum-home' %}?tab=wiki{% if query %}&q={{ query|urlencode }}{% endif %}">
     <i class="fas fa-book-open"></i>
     Wiki Articles
     <span>{{ total_articles }}</span>
   </a>
-  <a class="kb-tab {% if active_tab == 'qa' %}active{% endif %}" href="{% url 'forum-home' %}?tab=qa">
+  <a class="kb-tab {% if active_tab == 'qa' %}active{% endif %}" href="{% url 'forum-home' %}?tab=qa{% if query %}&q={{ query|urlencode }}{% endif %}">
     <i class="fas fa-comments"></i>
     Q and A
     <span>{{ total_questions }}</span>
   </a>
-  <a class="kb-tab {% if active_tab == 'reports' %}active{% endif %}" href="{% url 'forum-home' %}?tab=reports">
+  <a class="kb-tab {% if active_tab == 'reports' %}active{% endif %}" href="{% url 'forum-home' %}?tab=reports{% if query %}&q={{ query|urlencode }}{% endif %}">
     <i class="fas fa-bug"></i>
     Bug Reports and Features
     <span>{{ open_bugs|add:open_features }}</span>

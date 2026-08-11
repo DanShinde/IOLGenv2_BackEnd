@@ -1,0 +1,15 @@
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="kb-pagination">
+  {% if page_obj.has_previous %}
+    <a class="kb-page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"><i class="fas fa-chevron-left"></i> Prev</a>
+  {% else %}
+    <span class="kb-page-link is-disabled"><i class="fas fa-chevron-left"></i> Prev</span>
+  {% endif %}
+  <span class="kb-page-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+    <a class="kb-page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&amp;{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next <i class="fas fa-chevron-right"></i></a>
+  {% else %}
+    <span class="kb-page-link is-disabled">Next <i class="fas fa-chevron-right"></i></span>
+  {% endif %}
+</div>
+{% endif %}

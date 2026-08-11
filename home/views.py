@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count
 from django.http import JsonResponse
@@ -9,6 +10,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import PermissionDenied
+
+KB_PAGE_SIZE = 10
 
 from accounts.models import Info
 
@@ -210,41 +213,126 @@ def get_kb_sidebar_context():
 
 @login_required
 def forum_home(request):
-    articles = Article.objects.select_related('category', 'author', 'parent').prefetch_related('tags').order_by('-updated_at')
-    hierarchy_articles = build_article_hierarchy(
-        articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
-    )
-    other_articles = articles.filter(parent__isnull=True, is_hierarchy_root=False)
-    questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags').annotate(
-        answer_count=Count('answers')
-    ).order_by('-created_at')
-    reports = Report.objects.select_related('application', 'reporter', 'assignee').prefetch_related('tags').annotate(
-        comment_count=Count('comments')
-    ).order_by('-updated_at')
+    active_tab = request.GET.get('tab', 'wiki')
+    if active_tab not in {'wiki', 'qa', 'reports'}:
+        active_tab = 'wiki'
+    query = request.GET.get('q', '').strip()
 
     context = {
-        'hierarchy_articles': hierarchy_articles,
-        'other_articles': other_articles,
-        'questions': questions,
-        'reports': reports,
+        'active_tab': active_tab,
+        'query': query,
     }
     context.update(get_kb_stats_context())
-    context.update(get_kb_sidebar_context())
+
+    if active_tab == 'wiki':
+        articles = Article.objects.select_related('category', 'author', 'parent').prefetch_related('tags')
+        if query:
+            articles = articles.filter(
+                models.Q(title__icontains=query) |
+                models.Q(content__icontains=query) |
+                models.Q(excerpt__icontains=query) |
+                models.Q(category__name__icontains=query)
+            )
+        articles = articles.order_by('-updated_at')
+
+        if query:
+            # Flat, paginated results read better than a hierarchy built from a partial match set.
+            hierarchy_articles = []
+            other_articles_qs = articles
+        else:
+            hierarchy_articles = build_article_hierarchy(
+                articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
+            )
+            other_articles_qs = articles.filter(parent__isnull=True, is_hierarchy_root=False)
+
+        page_obj = Paginator(other_articles_qs, KB_PAGE_SIZE).get_page(request.GET.get('page'))
+        context.update(get_kb_sidebar_context())
+        context.update({
+            'hierarchy_articles': hierarchy_articles,
+            'other_articles': page_obj,
+            'page_obj': page_obj,
+        })
+    elif active_tab == 'qa':
+        qa_status = request.GET.get('qa_status', 'all')
+        questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags').annotate(
+            answer_count=Count('answers')
+        )
+        if query:
+            questions = questions.filter(models.Q(title__icontains=query) | models.Q(body__icontains=query))
+        if qa_status == 'solved':
+            questions = questions.filter(is_solved=True)
+        elif qa_status == 'unsolved':
+            questions = questions.filter(is_solved=False)
+        questions = questions.order_by('-created_at')
+
+        page_obj = Paginator(questions, KB_PAGE_SIZE).get_page(request.GET.get('page'))
+        context.update({
+            'qa_status': qa_status,
+            'questions': page_obj,
+            'page_obj': page_obj,
+        })
+    else:
+        report_type = request.GET.get('report_type', 'all')
+        report_status = request.GET.get('report_status', 'all')
+        report_priority = request.GET.get('report_priority', 'all')
+        reports = Report.objects.select_related('application', 'reporter', 'assignee').prefetch_related('tags').annotate(
+            comment_count=Count('comments')
+        )
+        if query:
+            reports = reports.filter(
+                models.Q(title__icontains=query) |
+                models.Q(description__icontains=query) |
+                models.Q(application__name__icontains=query)
+            )
+        if report_type != 'all':
+            reports = reports.filter(type=report_type)
+        if report_status != 'all':
+            reports = reports.filter(status=report_status)
+        if report_priority != 'all':
+            reports = reports.filter(priority=report_priority)
+        reports = reports.order_by('-updated_at')
+
+        page_obj = Paginator(reports, KB_PAGE_SIZE).get_page(request.GET.get('page'))
+        context.update({
+            'report_type': report_type,
+            'report_status': report_status,
+            'report_priority': report_priority,
+            'reports': page_obj,
+            'page_obj': page_obj,
+        })
+
     return render(request, 'home/forum_home.html', context)
 
 
 @login_required
 def article_category(request, slug):
     category = get_object_or_404(Category, slug=slug)
-    articles = Article.objects.filter(category=category).select_related('author', 'parent').prefetch_related('tags').order_by('-updated_at')
-    hierarchy_articles = build_article_hierarchy(
-        articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
-    )
-    other_articles = articles.filter(parent__isnull=True, is_hierarchy_root=False)
+    query = request.GET.get('q', '').strip()
+    articles = Article.objects.filter(category=category).select_related('author', 'parent').prefetch_related('tags')
+    if query:
+        articles = articles.filter(
+            models.Q(title__icontains=query) |
+            models.Q(content__icontains=query) |
+            models.Q(excerpt__icontains=query)
+        )
+    articles = articles.order_by('-updated_at')
+
+    if query:
+        hierarchy_articles = []
+        other_articles_qs = articles
+    else:
+        hierarchy_articles = build_article_hierarchy(
+            articles.filter(models.Q(is_hierarchy_root=True) | models.Q(parent__isnull=False))
+        )
+        other_articles_qs = articles.filter(parent__isnull=True, is_hierarchy_root=False)
+
+    page_obj = Paginator(other_articles_qs, KB_PAGE_SIZE).get_page(request.GET.get('page'))
     context = {
         'category': category,
+        'query': query,
         'hierarchy_articles': hierarchy_articles,
-        'other_articles': other_articles,
+        'other_articles': page_obj,
+        'page_obj': page_obj,
     }
     return render(request, 'home/kb_category.html', context)
 

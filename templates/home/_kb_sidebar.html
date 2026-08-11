@@ -21,11 +21,15 @@
     </div>
   {% elif active_tab == 'qa' %}
     <h3>Status</h3>
-    <select class="kb-select">
-      <option value="all">All questions</option>
-      <option value="solved">Solved</option>
-      <option value="unsolved">Unsolved</option>
-    </select>
+    <form method="get" action="{% url 'forum-home' %}">
+      <input type="hidden" name="tab" value="qa">
+      {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+      <select class="kb-select" name="qa_status" onchange="this.form.submit()">
+        <option value="all" {% if not qa_status or qa_status == 'all' %}selected{% endif %}>All questions</option>
+        <option value="solved" {% if qa_status == 'solved' %}selected{% endif %}>Solved</option>
+        <option value="unsolved" {% if qa_status == 'unsolved' %}selected{% endif %}>Unsolved</option>
+      </select>
+    </form>
 
     <h3 style="margin-top: 20px;">Helpful tips</h3>
     <div class="kb-meta">
@@ -33,30 +37,35 @@
       <span class="kb-stat"><i class="fas fa-search"></i>Search first</span>
     </div>
   {% elif active_tab == 'reports' %}
-    <h3>Type</h3>
-    <select class="kb-select">
-      <option value="all">All types</option>
-      <option value="bug">Bug</option>
-      <option value="feature">Feature</option>
-    </select>
+    <form method="get" action="{% url 'forum-home' %}">
+      <input type="hidden" name="tab" value="reports">
+      {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
 
-    <h3 style="margin-top: 20px;">Status</h3>
-    <select class="kb-select">
-      <option value="all">All status</option>
-      <option value="open">Open</option>
-      <option value="in_progress">In progress</option>
-      <option value="resolved">Resolved</option>
-      <option value="closed">Closed</option>
-    </select>
+      <h3>Type</h3>
+      <select class="kb-select" name="report_type" onchange="this.form.submit()">
+        <option value="all" {% if not report_type or report_type == 'all' %}selected{% endif %}>All types</option>
+        <option value="bug" {% if report_type == 'bug' %}selected{% endif %}>Bug</option>
+        <option value="feature" {% if report_type == 'feature' %}selected{% endif %}>Feature</option>
+      </select>
 
-    <h3 style="margin-top: 20px;">Priority</h3>
-    <select class="kb-select">
-      <option value="all">All priority</option>
-      <option value="critical">Critical</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
-    </select>
+      <h3 style="margin-top: 20px;">Status</h3>
+      <select class="kb-select" name="report_status" onchange="this.form.submit()">
+        <option value="all" {% if not report_status or report_status == 'all' %}selected{% endif %}>All status</option>
+        <option value="open" {% if report_status == 'open' %}selected{% endif %}>Open</option>
+        <option value="in_progress" {% if report_status == 'in_progress' %}selected{% endif %}>In progress</option>
+        <option value="resolved" {% if report_status == 'resolved' %}selected{% endif %}>Resolved</option>
+        <option value="closed" {% if report_status == 'closed' %}selected{% endif %}>Closed</option>
+      </select>
+
+      <h3 style="margin-top: 20px;">Priority</h3>
+      <select class="kb-select" name="report_priority" onchange="this.form.submit()">
+        <option value="all" {% if not report_priority or report_priority == 'all' %}selected{% endif %}>All priority</option>
+        <option value="critical" {% if report_priority == 'critical' %}selected{% endif %}>Critical</option>
+        <option value="high" {% if report_priority == 'high' %}selected{% endif %}>High</option>
+        <option value="medium" {% if report_priority == 'medium' %}selected{% endif %}>Medium</option>
+        <option value="low" {% if report_priority == 'low' %}selected{% endif %}>Low</option>
+      </select>
+    </form>
 
     <h3 style="margin-top: 20px;">Open items</h3>
     <div class="kb-meta">

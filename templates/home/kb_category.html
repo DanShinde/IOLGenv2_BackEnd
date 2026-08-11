@@ -39,6 +39,59 @@
     text-decoration: none;
     font-size: 13px;
   }
+  .kb-search-form {
+    position: relative;
+    max-width: 420px;
+    margin: 16px 0 24px;
+  }
+  .kb-search-form input {
+    width: 100%;
+    padding: 12px 16px 12px 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #e8e8ed;
+    font-size: 14px;
+  }
+  .kb-search-form i {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .kb-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 8px;
+    padding: 14px;
+  }
+  .kb-page-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #e8e8ed;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .kb-page-link:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .kb-page-link.is-disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .kb-page-info {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+  }
 </style>
 {% endblock %}
 
@@ -47,6 +100,11 @@
   <a class="kb-link" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
   <h1 style="margin: 16px 0 8px; font-family: 'Space Grotesk', sans-serif;">{{ category.name }}</h1>
   <p style="color: rgba(255, 255, 255, 0.6); margin-bottom: 20px;">{{ category.description }}</p>
+
+  <form class="kb-search-form" method="get">
+    <i class="fas fa-search"></i>
+    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search in {{ category.name }}" />
+  </form>
 
   {% if hierarchy_articles %}
     <div class="kb-meta" style="margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">Hierarchy</div>
@@ -65,7 +123,9 @@
   {% endif %}
 
   {% if other_articles %}
-    <div class="kb-meta" style="margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px;">Other Articles</div>
+    <div class="kb-meta" style="margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px;">
+      {% if query %}Search results{% else %}Other Articles{% endif %}
+    </div>
     {% for article in other_articles %}
       <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}">
         <div class="kb-meta" style="margin-bottom: 8px;">
@@ -76,10 +136,13 @@
         <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
       </a>
     {% endfor %}
+    {% include 'home/_kb_pagination.html' %}
   {% endif %}
 
   {% if not hierarchy_articles and not other_articles %}
-    <p style="color: rgba(255, 255, 255, 0.6);">No articles in this category yet.</p>
+    <p style="color: rgba(255, 255, 255, 0.6);">
+      {% if query %}No articles match "{{ query }}".{% else %}No articles in this category yet.{% endif %}
+    </p>
   {% endif %}
 </div>
 {% endblock %}
