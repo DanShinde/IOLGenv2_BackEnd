@@ -3,103 +3,11 @@
 
 {% block title %}{{ category.name }} Articles{% endblock %}
 
-{% block styles %}
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
-  body {
-    background: linear-gradient(135deg, #0f0f12 0%, #1a1a24 50%, #0f0f12 100%) !important;
-    color: #e8e8ed !important;
-    font-family: 'DM Sans', sans-serif;
-  }
-  .kb-wrap {
-    padding: 32px;
-  }
-  .kb-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 18px;
-    padding: 20px;
-    margin-bottom: 12px;
-    text-decoration: none;
-    color: inherit;
-    display: block;
-  }
-  .kb-card:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-  .kb-meta {
-    display: flex;
-    gap: 12px;
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 12px;
-    flex-wrap: wrap;
-  }
-  .kb-link {
-    color: rgba(255, 255, 255, 0.6);
-    text-decoration: none;
-    font-size: 13px;
-  }
-  .kb-search-form {
-    position: relative;
-    max-width: 420px;
-    margin: 16px 0 24px;
-  }
-  .kb-search-form input {
-    width: 100%;
-    padding: 12px 16px 12px 44px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    color: #e8e8ed;
-    font-size: 14px;
-  }
-  .kb-search-form i {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: rgba(255, 255, 255, 0.55);
-  }
-  .kb-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 18px;
-    margin-top: 8px;
-    padding: 14px;
-  }
-  .kb-page-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
-    color: #e8e8ed;
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .kb-page-link:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-  .kb-page-link.is-disabled {
-    opacity: 0.35;
-    pointer-events: none;
-  }
-  .kb-page-info {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.55);
-  }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="kb-wrap">
   <a class="kb-link" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
   <h1 style="margin: 16px 0 8px; font-family: 'Space Grotesk', sans-serif;">{{ category.name }}</h1>
-  <p style="color: rgba(255, 255, 255, 0.6); margin-bottom: 20px;">{{ category.description }}</p>
+  <p style="color: var(--kb-text-muted); margin-bottom: 20px;">{{ category.description }}</p>
 
   <form class="kb-search-form" method="get">
     <i class="fas fa-search"></i>
@@ -116,7 +24,7 @@
           <span>{{ article.views }} views</span>
         </div>
         <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
-        <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+        <p style="margin: 0; color: var(--kb-text-secondary);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
       </a>
       {% endwith %}
     {% endfor %}
@@ -133,14 +41,14 @@
           <span>{{ article.views }} views</span>
         </div>
         <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
-        <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+        <p style="margin: 0; color: var(--kb-text-secondary);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
       </a>
     {% endfor %}
     {% include 'home/_kb_pagination.html' %}
   {% endif %}
 
   {% if not hierarchy_articles and not other_articles %}
-    <p style="color: rgba(255, 255, 255, 0.6);">
+    <p style="color: var(--kb-text-muted);">
       {% if query %}No articles match "{{ query }}".{% else %}No articles in this category yet.{% endif %}
     </p>
   {% endif %}

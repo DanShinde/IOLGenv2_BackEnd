@@ -3,127 +3,10 @@
 
 {% block title %}Create Knowledge Base Entry{% endblock %}
 
-{% block styles %}
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
-
-  :root {
-    --kb-bg: #0f0f12;
-    --kb-card: rgba(255, 255, 255, 0.04);
-    --kb-card-hover: rgba(255, 255, 255, 0.08);
-    --kb-border: rgba(255, 255, 255, 0.1);
-    --kb-text: #e8e8ed;
-    --kb-muted: rgba(255, 255, 255, 0.55);
-    --kb-accent: #6366f1;
-    --kb-accent-2: #8b5cf6;
-  }
-
-  body {
-    background: linear-gradient(135deg, #0f0f12 0%, #1a1a24 50%, #0f0f12 100%) !important;
-    color: var(--kb-text) !important;
-  }
-
-  .kb-page {
-    min-height: 100vh;
-    padding: 32px;
-    font-family: 'DM Sans', sans-serif;
-  }
-
-  .kb-panel {
-    background: var(--kb-card);
-    border: 1px solid var(--kb-border);
-    border-radius: 18px;
-    padding: 28px;
-  }
-
-  .kb-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
-  }
-
-  .kb-card {
-    padding: 18px;
-    border-radius: 16px;
-    background: var(--kb-card);
-    border: 1px solid var(--kb-border);
-    text-decoration: none;
-    color: inherit;
-    transition: transform 0.2s ease, background 0.2s ease;
-  }
-
-  .kb-card:hover {
-    background: var(--kb-card-hover);
-    transform: translateY(-2px);
-  }
-
-  .kb-input,
-  .kb-textarea,
-  .kb-select {
-    width: 100%;
-    border-radius: 12px;
-    border: 1px solid var(--kb-border);
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--kb-text);
-    padding: 10px 12px;
-    font-size: 14px;
-  }
-
-  .kb-textarea {
-    resize: vertical;
-  }
-
-  .kb-label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: var(--kb-muted);
-  }
-
-  .kb-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 18px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, var(--kb-accent) 0%, var(--kb-accent-2) 100%);
-    color: #fff;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-  }
-
-  .kb-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-
-  .kb-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-  }
-
-  .kb-back {
-    color: var(--kb-muted);
-    text-decoration: none;
-    font-size: 13px;
-  }
-
-  @media (max-width: 900px) {
-    .kb-row {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="kb-page">
   <div class="kb-panel">
-    <div class="kb-header">
+    <div class="kb-create-header">
       <div>
         <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Contribute</h1>
         <p style="margin: 4px 0 0; color: var(--kb-muted);">Create a wiki article, ask a question, or file a report.</p>
@@ -152,7 +35,7 @@
         <input type="hidden" name="content_type" value="{{ content_type }}">
 
         {% if form.errors %}
-          <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); padding: 12px 16px; border-radius: 12px;">
+          <div class="kb-form-error-box">
             <strong style="display: block; margin-bottom: 6px;">Please fix the highlighted fields:</strong>
             <ul style="margin: 0; padding-left: 18px;">
               {% for field, errors in form.errors.items %}
@@ -363,14 +246,14 @@
         item.style.alignItems = 'center';
         item.style.gap = '12px';
         item.style.padding = '10px 12px';
-        item.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+        item.style.border = '1px solid var(--kb-border)';
         item.style.borderRadius = '12px';
-        item.style.background = 'rgba(0, 0, 0, 0.2)';
+        item.style.background = 'var(--kb-surface-soft)';
 
         const name = document.createElement('div');
         name.textContent = file.name;
         name.style.fontSize = '13px';
-        name.style.color = 'rgba(255, 255, 255, 0.8)';
+        name.style.color = 'var(--kb-text-secondary)';
 
         item.appendChild(name);
 
@@ -381,7 +264,7 @@
           img.style.height = '64px';
           img.style.objectFit = 'cover';
           img.style.borderRadius = '10px';
-          img.style.border = '1px solid rgba(255, 255, 255, 0.12)';
+          img.style.border = '1px solid var(--kb-border)';
           item.appendChild(img);
 
           const reader = new FileReader();
