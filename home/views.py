@@ -9,6 +9,7 @@ from django.db.models import Count
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods
@@ -952,6 +953,18 @@ def article_update(request, slug):
 
 @login_required
 @require_http_methods(['POST'])
+def article_delete(request, slug):
+    article = get_object_or_404(Article, slug=slug)
+    if not (request.user.is_staff or article.author == request.user):
+        messages.error(request, 'You do not have permission to delete this article.')
+        return redirect(article.get_absolute_url())
+    article.delete()
+    messages.success(request, 'Article deleted.')
+    return redirect(f"{reverse('forum-home')}?tab=wiki")
+
+
+@login_required
+@require_http_methods(['POST'])
 def article_revision_restore(request, slug, revision_pk):
     article = get_object_or_404(Article, slug=slug)
     if not (request.user.is_staff or article.author == request.user):
@@ -1006,6 +1019,18 @@ def question_update(request, pk):
 
 
 @login_required
+@require_http_methods(['POST'])
+def question_delete(request, pk):
+    question = get_object_or_404(Question, pk=pk)
+    if not (request.user.is_staff or question.author == request.user):
+        messages.error(request, 'You do not have permission to delete this support request.')
+        return redirect(question.get_absolute_url())
+    question.delete()
+    messages.success(request, 'Support request deleted.')
+    return redirect(f"{reverse('forum-home')}?tab=qa")
+
+
+@login_required
 def report_update(request, pk):
     report = get_object_or_404(Report, pk=pk)
     if not (request.user.is_staff or report.reporter == request.user):
@@ -1032,6 +1057,18 @@ def report_update(request, pk):
         'object': report,
     }
     return render(request, 'home/kb_create.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def report_delete(request, pk):
+    report = get_object_or_404(Report, pk=pk)
+    if not (request.user.is_staff or report.reporter == request.user):
+        messages.error(request, 'You do not have permission to delete this report.')
+        return redirect(report.get_absolute_url())
+    report.delete()
+    messages.success(request, 'Report deleted.')
+    return redirect(f"{reverse('forum-home')}?tab=reports")
 
 
 @login_required

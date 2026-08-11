@@ -32,6 +32,10 @@
           <span>Author: <a class="kb-link" href="{% url 'kb-user-profile' article.author.username %}">{{ article.author.get_full_name|default:article.author.username }}</a></span>
           {% if request.user == article.author or request.user.is_staff %}
           <a class="kb-link" href="{% url 'kb-article-edit' article.slug %}">Edit article</a>
+          <form method="post" action="{% url 'kb-article-delete' article.slug %}" style="margin: 0;" onsubmit="return confirm('Delete this article? This cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="kb-link-btn">Delete article</button>
+          </form>
           {% endif %}
         </div>
       </div>

@@ -44,6 +44,10 @@
           <span>Updated {{ report.updated_at|timesince }} ago</span>
           {% if request.user == report.reporter or request.user.is_staff %}
           <a class="kb-link" href="{% url 'kb-report-edit' report.pk %}">Edit report</a>
+          <form method="post" action="{% url 'kb-report-delete' report.pk %}" style="margin: 0;" onsubmit="return confirm('Delete this report? This cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="kb-link-btn">Delete report</button>
+          </form>
           {% endif %}
         </div>
       </div>

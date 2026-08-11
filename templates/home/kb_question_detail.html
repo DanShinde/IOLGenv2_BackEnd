@@ -62,6 +62,10 @@
             <span>Raised by <a class="kb-link" href="{% url 'kb-user-profile' question.author.username %}">{{ question.author.get_full_name|default:question.author.username }}</a></span>
             {% if request.user == question.author or request.user.is_staff %}
             <a class="kb-link" href="{% url 'kb-question-edit' question.pk %}">Edit request</a>
+            <form method="post" action="{% url 'kb-question-delete' question.pk %}" style="margin: 0;" onsubmit="return confirm('Delete this support request? This cannot be undone.');">
+              {% csrf_token %}
+              <button type="submit" class="kb-link-btn">Delete request</button>
+            </form>
             {% endif %}
           </div>
         </div>
