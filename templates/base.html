@@ -8,15 +8,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Home{% endblock %}</title>
   {# 1) Bootstrap first so theme.css can override #}
-  <link 
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" 
-    rel="stylesheet" 
-    integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" 
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7"
     crossorigin="anonymous">
 
   {# Icons (optional) #}
-  <link 
-    rel="stylesheet" 
+  <link
+    rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   {# 2) Your custom CSS #}
@@ -39,117 +39,366 @@
             --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             --transition: all 0.3s ease;
         }
-        
+
         body {
             background: linear-gradient(135deg, #f5f7fb 0%, #e4e9f2 100%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #333;
             min-height: 100vh;
+            margin: 0;
+        }
+
+        body.sidebar-no-scroll {
+            overflow: hidden;
+        }
+
+        /* ===================== App shell (sidebar + content) ===================== */
+        .app-shell {
+            display: flex;
+            align-items: stretch;
+            min-height: 100vh;
+            width: 100%;
+        }
+
+        .app-main {
+            flex: 1 1 auto;
+            min-width: 0;
             display: flex;
             flex-direction: column;
         }
-        
-        /* Navigation: floating toggle button + vertical off-canvas sidebar */
+
+        /* Mobile-only floating toggle; sidebar is persistent from lg upward */
         .sidebar-toggle-btn {
             position: fixed;
             top: 1rem;
             left: 1rem;
             z-index: 1045;
-            width: 46px;
-            height: 46px;
+            width: 44px;
+            height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #0f172a;
-            color: white;
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #0b1220;
+            color: #cbd5e1;
+            border: 1px solid rgba(255,255,255,0.08);
             border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-            font-size: 1.3rem;
-            transition: var(--transition);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            font-size: 1.2rem;
+            transition: background 0.2s ease, color 0.2s ease;
         }
         .sidebar-toggle-btn:hover {
-            background: #1b263b;
+            background: #16233d;
             color: #4cc9f0;
         }
 
+        /* ===================== Sidebar ===================== */
+        /* Defensive reset: static/base/base.css sets bare ul/li/a/button rules
+           (background, overflow, display, align-items) that would otherwise leak
+           into the sidebar's lists. Scope-override them here so this component
+           doesn't depend on load order or on editing that shared legacy file. */
+        .sidebar-offcanvas ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            overflow: visible;
+            background-color: transparent;
+            display: block;
+            align-items: unset;
+        }
+        .sidebar-offcanvas li {
+            text-align: left;
+            float: none;
+            margin: 0;
+            padding: 0;
+        }
+        .sidebar-offcanvas li a,
+        .sidebar-offcanvas li button {
+            margin: 0;
+            padding: 0;
+        }
+
         .sidebar-offcanvas {
-            background: #0f172a !important;
-            width: 270px;
-            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25);
+            background: #ffffff;
+            color: #5b6478;
+            width: 260px;
+            border-right: 1px solid #e7e9f2;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.2s ease, transform 0.25s ease;
+        }
+
+        @media (min-width: 992px) {
+            .sidebar-offcanvas {
+                position: sticky;
+                top: 0;
+                height: 100vh;
+                flex: none;
+            }
+            .sidebar-offcanvas.collapsed {
+                width: 76px;
+            }
+        }
+
+        @media (max-width: 991.98px) {
+            .sidebar-offcanvas {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                width: 280px;
+                z-index: 1046;
+                transform: translateX(-100%);
+                box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+            }
+            .sidebar-offcanvas.mobile-open {
+                transform: translateX(0);
+            }
+        }
+
+        .sidebar-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 18, 0.55);
+            z-index: 1043;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .sidebar-backdrop.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        @media (min-width: 992px) {
+            .sidebar-backdrop { display: none !important; }
         }
 
         .sidebar-offcanvas .offcanvas-header {
-            border-bottom: 1px solid rgba(255,255,255,0.08);
+            border-bottom: 1px solid #eef0f7;
+            padding: 1.15rem 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
         }
 
         .navbar-brand {
             font-weight: 700;
-            font-size: 1.5rem;
-            color: white !important;
+            color: #1f2430 !important;
             display: flex;
             align-items: center;
+            gap: 0.5rem;
+            overflow: hidden;
+            min-width: 0;
         }
 
-        .sidebar-offcanvas .navbar-nav {
-            width: 100%;
+        .navbar-brand .brand-dot {
+            width: 9px;
+            height: 9px;
+            min-width: 9px;
+            border-radius: 3px;
+            background: var(--primary);
+            flex: none;
         }
 
-        .sidebar-offcanvas .nav-item {
-            margin: 2px 0;
-            width: 100%;
+        .navbar-brand-text {
+            font-size: 1.02rem;
+            font-weight: 700;
+            color: #1f2430;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .sidebar-offcanvas .nav-link,
-        .sidebar-offcanvas .btn-nav-admin,
-        .sidebar-offcanvas .btn-nav-logout {
-            width: 100%;
-            text-align: left;
+        .sidebar-collapse-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 8px;
+            background: #f2f4fa;
+            color: #7c8598;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+            transition: background 0.2s ease, color 0.2s ease;
         }
+        .sidebar-collapse-btn:hover {
+            background: #e7eaf5;
+            color: #1f2430;
+        }
+        .sidebar-collapse-btn i {
+            transition: transform 0.2s ease;
+        }
+        .sidebar-offcanvas.collapsed .sidebar-collapse-btn i {
+            transform: rotate(180deg);
+        }
+
+        .sidebar-offcanvas .offcanvas-body {
+            padding: 0.9rem 0.7rem;
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            gap: 2px;
+            overflow-y: auto;
+        }
+
+        .sidebar-offcanvas .navbar-nav { width: 100%; }
+        .sidebar-offcanvas .nav-item { margin: 2px 0; width: 100%; }
+        .sidebar-offcanvas .nav-link { width: 100%; text-align: left; }
 
         .nav-link {
-            color: #94a3b8 !important;
-            font-weight: 600;
-            font-size: 0.9rem;
-            padding: 0.7rem 1rem !important;
+            color: #5b6478 !important;
+            font-weight: 500;
+            font-size: 0.875rem;
+            padding: 0.6rem 0.65rem !important;
             border-radius: 8px;
-            transition: color 0.2s ease-in-out, background 0.2s ease;
+            transition: color 0.15s ease, background 0.15s ease;
             position: relative;
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
         }
 
-        .nav-link:hover, .nav-link.active {
-            color: white !important;
-            background: rgba(255,255,255,0.06) !important;
+        .nav-link:hover {
+            color: #1f2430 !important;
+            background: #f2f4fa !important;
         }
 
         .nav-link.active {
-            color: #4cc9f0 !important;
+            color: var(--primary) !important;
+            background: rgba(67, 97, 238, 0.09) !important;
+            font-weight: 600;
         }
 
         .nav-link.active::before {
             content: '';
             position: absolute;
-            top: 6px;
-            bottom: 6px;
+            top: 8px;
+            bottom: 8px;
             left: 0;
             width: 3px;
-            background-color: #4cc9f0;
-            border-radius: 2px;
+            background-color: var(--primary);
+            border-radius: 3px;
         }
 
         .nav-link i {
-            font-size: 1.1rem;
+            font-size: 1.05rem;
+            width: 20px;
+            flex: none;
+            text-align: center;
+            color: #9aa2b6;
+            transition: color 0.15s ease;
         }
 
-        .nav-link:hover i {
-            transform: scale(1.2);
+        .nav-link:hover i { color: #5b6478; }
+        .nav-link.active i { color: var(--primary); }
+
+        .nav-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .user-dropdown .dropdown-toggle::after {
+        /* Collapsed state: icon-only rail (desktop only) */
+        .sidebar-offcanvas.collapsed .sidebar-text,
+        .sidebar-offcanvas.collapsed .nav-label,
+        .sidebar-offcanvas.collapsed .sidebar-user-meta,
+        .sidebar-offcanvas.collapsed .sidebar-user-caret {
             display: none;
+        }
+        .sidebar-offcanvas.collapsed .nav-link {
+            justify-content: center;
+            padding: 0.6rem !important;
+        }
+        .sidebar-offcanvas.collapsed .offcanvas-header { justify-content: center; }
+        .sidebar-offcanvas.collapsed .navbar-brand { display: none; }
+        .sidebar-offcanvas.collapsed .sidebar-user-trigger { justify-content: center; }
+
+        /* Footer / account menu */
+        .sidebar-footer {
+            border-top: 1px solid #eef0f7;
+            padding: 0.65rem;
+        }
+
+        .sidebar-user-trigger {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.5rem 0.55rem;
+            border-radius: 10px;
+            background: transparent;
+            border: none;
+            color: inherit;
+            text-align: left;
+            transition: background 0.15s ease;
+        }
+        .sidebar-user-trigger:hover { background: #f2f4fa; }
+
+        .sidebar-user-avatar {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.82rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar-user-meta { overflow: hidden; }
+        .sidebar-user-name {
+            color: #1f2430;
+            font-weight: 600;
+            font-size: 0.82rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar-user-role {
+            color: #8a92a6;
+            font-size: 0.71rem;
+            line-height: 1.2;
+        }
+        .sidebar-user-caret {
+            margin-left: auto;
+            color: #b0b7c7;
+            font-size: 0.85rem;
+        }
+
+        .sidebar-user-menu {
+            background: #ffffff;
+            border: 1px solid #e7e9f2;
+            box-shadow: 0 10px 30px rgba(31, 36, 48, 0.12);
+            min-width: 200px;
+            padding: 0.4rem;
+        }
+        .sidebar-user-menu .dropdown-item {
+            color: #414a5e;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 8px;
+            padding: 0.5rem 0.6rem;
+            display: flex;
+            align-items: center;
+        }
+        .sidebar-user-menu .dropdown-item:hover,
+        .sidebar-user-menu .dropdown-item:focus {
+            background: #f2f4fa;
+            color: #1f2430;
+        }
+        .sidebar-user-menu .dropdown-item.text-danger:hover {
+            background: rgba(220, 53, 69, 0.08);
+            color: var(--danger) !important;
+        }
+        .sidebar-user-menu .dropdown-divider {
+            border-color: #eef0f7;
+            margin: 0.3rem 0;
         }
 
         /* Welcome Banner Animation */
@@ -164,7 +413,7 @@
             overflow: hidden;
             animation: slideDown 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-        
+
         .welcome-banner::before {
             content: '';
             position: absolute;
@@ -180,34 +429,19 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Navbar Buttons */
-        .btn-nav-admin {
-            background: transparent !important;
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-        .btn-nav-admin:hover {
-            background: rgba(255, 255, 255, 0.05) !important;
-            border-color: white;
-            color: white;
+        .welcome-banner p {
+            color: rgba(255, 255, 255, 0.94);
         }
 
-        .btn-nav-logout {
-            background: transparent !important;
-            color: #ef4444;
-            border: 1px solid #ef4444;
-            font-size: 0.85rem;
-            font-weight: 600;
-            box-shadow: none;
-            transition: all 0.2s;
+        /* Home page: Armstrong Dematic logo, top center */
+        .home-logo-wrap {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1.75rem;
         }
-        .btn-nav-logout:hover {
-            background: #ef4444 !important;
-            color: white;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        .home-logo {
+            height: 46px;
+            width: auto;
         }
 
         /* Industrial Background Animation */
@@ -220,7 +454,7 @@
             z-index: -1;
             overflow: hidden;
             pointer-events: none;
-            opacity: 0.04; 
+            opacity: 0.04;
         }
         .industrial-background i {
             position: absolute;
@@ -229,24 +463,10 @@
         @keyframes float-1 { 0% { transform: translate(0, 0) rotate(0deg); } 100% { transform: translate(40px, 20px) rotate(5deg); } }
         @keyframes float-2 { 0% { transform: translate(0, 0) rotate(0deg); } 100% { transform: translate(-30px, 50px) rotate(-5deg); } }
         @keyframes float-3 { 0% { transform: translate(0, 0) rotate(0deg); } 100% { transform: translate(20px, -40px) rotate(3deg); } }
-        
-
-        
-
-        
-
-        
-
-        /* Responsive */
-        @media (max-width: 480px) {
-            .sidebar-offcanvas {
-                width: 85vw;
-            }
-        }
     </style>
 </head>
 
-<body 
+<body
   hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
 >
     <!-- Background Graphics -->
@@ -262,141 +482,200 @@
         <!-- Gear (Drives/Mechanics) -->
         <i class="bi bi-gear-wide-connected" style="font-size: 18rem; top: 40%; left: 40%; opacity: 0.5; animation: float-1 30s infinite alternate;"></i>
     </div>
-    
-  {# ========== FLOATING NAV TOGGLE ========== #}
-  <button
-    class="sidebar-toggle-btn"
-    type="button"
-    data-bs-toggle="offcanvas"
-    data-bs-target="#sidebarNav"
-    aria-controls="sidebarNav"
-    aria-label="Toggle navigation"
-  >
-    <i class="bi bi-list"></i>
-  </button>
 
-  {# ========== VERTICAL FLOATING NAVBAR (off-canvas, left) ========== #}
-  <div class="offcanvas offcanvas-start sidebar-offcanvas navbar-dark text-white" tabindex="-1" id="sidebarNav" aria-labelledby="sidebarNavLabel">
-    <div class="offcanvas-header">
-      <a class="navbar-brand" id="sidebarNavLabel" href="{% url 'home' %}">
-        <img
-          src="{% static 'base/ADLogo.png' %}"
-          alt="Logo"
-          style="height: 34px;"
-        >
-      </a>
-      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body d-flex flex-column">
-      <ul class="navbar-nav flex-column mb-auto">
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
-            <i class="bi bi-house-door-fill"></i> Home
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'onedesigner' in request.path %}active{% endif %}" href="/onedesigner/">
-            <i class="bi bi-diagram-3-fill"></i> One Designer
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'tracker' in request.path %}active{% endif %}" href="{% url 'tracker_index' %}">
-            <i class="bi bi-kanban-fill"></i> Tracker
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'inventory' in request.path %}active{% endif %}" href="{% url 'inventory-dashboard' %}">
-            <i class="bi bi-box-seam-fill"></i> Inventory
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'downloads' in request.path %}active{% endif %}" href="{% url 'downloads' %}">
-            <i class="bi bi-cloud-arrow-down-fill"></i> Downloads
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'planner' in request.path %}active{% endif %}" href="{% url 'planner_project_list' %}">
-            <i class="bi bi-calendar-range-fill"></i> Planner
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'skillgap' in request.path %}active{% endif %}" href="{% url 'skillgap_dashboard' %}">
-            <i class="bi bi-bar-chart-steps"></i> Skill Gap
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'testvault' in request.path %}active{% endif %}" href="{% url 'testvault_index' %}">
-            <i class="bi bi-clipboard-check-fill"></i> TestVault
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'forum' in request.path %}active{% endif %}" href="{% url 'forum-home' %}">
-            <i class="bi bi-lightbulb-fill"></i> Knowledge Base
-          </a>
-        </li>
-      </ul>
+  <div class="app-shell">
 
-      <!-- BOTTOM: Admin + Logout -->
-      <ul class="navbar-nav flex-column mt-3 pt-3 border-top border-secondary">
-        {% if user.is_staff %}
-        <li class="nav-item">
-          <a
-            class="btn mb-2 btn-nav-admin"
-            href="{% url 'admin:index' %}"
-          >
-            Admin
-          </a>
-        </li>
+    {# ========== MOBILE FLOATING NAV TOGGLE ========== #}
+    <button
+      class="sidebar-toggle-btn d-lg-none"
+      type="button"
+      id="sidebarOpenBtn"
+      aria-controls="sidebarNav"
+      aria-label="Toggle navigation"
+    >
+      <i class="bi bi-list"></i>
+    </button>
+
+    {# ========== MOBILE BACKDROP ========== #}
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    {# ========== SIDEBAR: persistent rail on desktop, off-canvas drawer on mobile ========== #}
+    <div class="sidebar-offcanvas" id="sidebarNav" aria-label="Primary navigation">
+      <div class="offcanvas-header">
+        <a class="navbar-brand" href="{% url 'home' %}">
+          <span class="brand-dot"></span>
+          <span class="navbar-brand-text sidebar-text">AutoVerse</span>
+        </a>
+        <button type="button" class="sidebar-collapse-btn d-none d-lg-inline-flex" id="sidebarCollapseBtn" aria-label="Collapse sidebar" title="Collapse sidebar">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <button type="button" class="btn-close d-lg-none" id="sidebarCloseBtn" aria-label="Close"></button>
+      </div>
+
+      <div class="offcanvas-body">
+        <ul class="navbar-nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}" title="Home">
+              <i class="bi bi-house-door-fill"></i><span class="nav-label sidebar-text">Home</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'onedesigner' in request.path %}active{% endif %}" href="/onedesigner/" title="One Designer">
+              <i class="bi bi-diagram-3-fill"></i><span class="nav-label sidebar-text">One Designer</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'tracker' in request.path %}active{% endif %}" href="{% url 'tracker_index' %}" title="Tracker">
+              <i class="bi bi-kanban-fill"></i><span class="nav-label sidebar-text">Tracker</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'inventory' in request.path %}active{% endif %}" href="{% url 'inventory-dashboard' %}" title="Inventory">
+              <i class="bi bi-box-seam-fill"></i><span class="nav-label sidebar-text">Inventory</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'planner' in request.path %}active{% endif %}" href="{% url 'planner_project_list' %}" title="Planner">
+              <i class="bi bi-calendar-range-fill"></i><span class="nav-label sidebar-text">Planner</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'downloads' in request.path %}active{% endif %}" href="{% url 'downloads' %}" title="Downloads">
+              <i class="bi bi-cloud-arrow-down-fill"></i><span class="nav-label sidebar-text">Downloads</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'skillgap' in request.path %}active{% endif %}" href="{% url 'skillgap_dashboard' %}" title="Skill Gap">
+              <i class="bi bi-bar-chart-steps"></i><span class="nav-label sidebar-text">Skill Gap</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'testvault' in request.path %}active{% endif %}" href="{% url 'testvault_index' %}" title="TestVault">
+              <i class="bi bi-clipboard-check-fill"></i><span class="nav-label sidebar-text">TestVault</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'forum' in request.path %}active{% endif %}" href="{% url 'forum-home' %}" title="Knowledge Base">
+              <i class="bi bi-lightbulb-fill"></i><span class="nav-label sidebar-text">Knowledge Base</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      {# ========== FOOTER: account menu (avatar + name, opens Admin/Logout popover) ========== #}
+      <div class="sidebar-footer">
+        {% if user.is_authenticated %}
+        <div class="dropdown dropup">
+          <button class="sidebar-user-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ user.first_name|default:user.username }}">
+            <div class="sidebar-user-avatar">{{ user.first_name|default:user.username|first|upper }}</div>
+            <div class="sidebar-user-meta sidebar-text">
+              <div class="sidebar-user-name">{{ user.first_name|default:user.username }}</div>
+              <div class="sidebar-user-role">{% if user.is_staff %}Administrator{% else %}Member{% endif %}</div>
+            </div>
+            <i class="bi bi-chevron-expand sidebar-user-caret sidebar-text"></i>
+          </button>
+          <ul class="dropdown-menu sidebar-user-menu">
+            {% if user.is_staff %}
+            <li><a class="dropdown-item" href="{% url 'admin:index' %}"><i class="bi bi-shield-lock-fill me-2"></i>Admin</a></li>
+            <li><hr class="dropdown-divider"></li>
+            {% endif %}
+            <li>
+              <form method="post" action="{% url 'logoutw' %}">
+                {% csrf_token %}
+                <button type="submit" class="dropdown-item text-danger">
+                  <i class="bi bi-box-arrow-right me-2"></i>Logout
+                </button>
+              </form>
+            </li>
+          </ul>
+        </div>
         {% endif %}
-        <li class="nav-item">
-          <form method="post" action="{% url 'logoutw' %}">
-            {% csrf_token %}
-            <button
-              type="submit"
-              class="btn btn-nav-logout"
-            >
-              Logout
-            </button>
-          </form>
-        </li>
-      </ul>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var sidebar = document.getElementById('sidebarNav');
+        if (!sidebar) return;
+
+        var collapseBtn = document.getElementById('sidebarCollapseBtn');
+        var openBtn = document.getElementById('sidebarOpenBtn');
+        var closeBtn = document.getElementById('sidebarCloseBtn');
+        var backdrop = document.getElementById('sidebarBackdrop');
+
+        function openMobile() {
+          sidebar.classList.add('mobile-open');
+          if (backdrop) backdrop.classList.add('show');
+          document.body.classList.add('sidebar-no-scroll');
+        }
+        function closeMobile() {
+          sidebar.classList.remove('mobile-open');
+          if (backdrop) backdrop.classList.remove('show');
+          document.body.classList.remove('sidebar-no-scroll');
+        }
+        if (openBtn) openBtn.addEventListener('click', openMobile);
+        if (closeBtn) closeBtn.addEventListener('click', closeMobile);
+        if (backdrop) backdrop.addEventListener('click', closeMobile);
+        sidebar.querySelectorAll('a.nav-link').forEach(function (link) {
+          link.addEventListener('click', closeMobile);
+        });
+
+        if (collapseBtn) {
+          try {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+              sidebar.classList.add('collapsed');
+            }
+          } catch (e) {}
+          collapseBtn.addEventListener('click', function () {
+            sidebar.classList.toggle('collapsed');
+            try {
+              localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            } catch (e) {}
+          });
+        }
+      })();
+    </script>
+
+    <div class="app-main">
+      {# ========== HEADER ========== #}
+      <header>
+        {% block header %}{% endblock %}
+      </header>
+
+      {# ========== MAIN CONTENT ========== #}
+      <main class="container py-5">
+        {% if user.is_authenticated and request.resolver_match.url_name == 'home' %}
+        <div class="home-logo-wrap">
+            <img src="{% static 'base/ADLogo_color.png' %}" alt="Armstrong Dematic" class="home-logo">
+        </div>
+        <div class="welcome-banner d-flex align-items-center justify-content-between">
+            <div>
+                <h2 class="fw-bold mb-2" id="dynamic-greeting">Welcome back!</h2>
+                <p class="mb-0 fs-5">
+                    Hello <strong>{{ user.first_name|default:user.username }}</strong>, hope you have a productive day.
+                </p>
+            </div>
+            <div class="d-none d-md-block opacity-50">
+                <i class="bi bi-rocket-takeoff" style="font-size: 4rem;"></i>
+            </div>
+        </div>
+
+        <!-- Daily Quote Separated -->
+        <div class="d-flex justify-content-center mb-5">
+            <div id="daily-quote" class="text-center" style="font-size: 1.35rem; font-weight: 500; color: #334155; max-width: 800px; line-height: 1.5; font-style: italic;">
+                <!-- Quote will be inserted here -->
+            </div>
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+
+      {# ========== FOOTER ========== #}
+      <footer class="text-center py-4 text-secondary">
+        {% block footer %}{% endblock %}
+      </footer>
     </div>
   </div>
-
-  {# ========== HEADER ========== #}
-  <header>
-    {% block header %}{% endblock %}
-  </header>
-
-  {# ========== MAIN CONTENT ========== #}
-  <main class="container py-5">
-    {% if user.is_authenticated and request.resolver_match.url_name == 'home' %}
-    <div class="welcome-banner d-flex align-items-center justify-content-between">
-        <div>
-            <h2 class="fw-bold mb-2" id="dynamic-greeting">Welcome back!</h2>
-            <p class="mb-0 fs-5 opacity-90">
-                Hello <strong>{{ user.first_name|default:user.username }}</strong>, hope you have a productive day.
-            </p>
-        </div>
-        <div class="d-none d-md-block opacity-50">
-            <i class="bi bi-rocket-takeoff" style="font-size: 4rem;"></i>
-        </div>
-    </div>
-
-    <!-- Daily Quote Separated -->
-    <div class="d-flex justify-content-center mb-5">
-        <div id="daily-quote" class="text-center" style="font-size: 1.35rem; font-weight: 500; color: #334155; max-width: 800px; line-height: 1.5; font-style: italic;">
-            <!-- Quote will be inserted here -->
-        </div>
-    </div>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
-
-  {# ========== FOOTER ========== #}
-  <footer class="text-center py-4 text-secondary">
-    {% block footer %}{% endblock %}
-  </footer>
 
   {% block scripts %}{% endblock %}
 
@@ -409,7 +688,7 @@
             if (hour >= 5 && hour < 12) greeting = 'Good Morning';
             else if (hour >= 12 && hour < 18) greeting = 'Good Afternoon';
             else if (hour >= 18 || hour < 5) greeting = 'Good Evening';
-            
+
             greetingElem.innerText = greeting + '!';
         }
 
@@ -430,7 +709,7 @@
                 "Opportunities don't happen, you create them. – Chris Grosser",
                 "Focus on being productive instead of busy. – Tim Ferriss"
             ];
-            
+
             const today = new Date();
             const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
             const quoteIndex = dayOfYear % quotes.length;
@@ -440,19 +719,19 @@
   </script>
 
   {# Bootstrap & HTMX & jQuery #}
-  <script 
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" 
-    integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" 
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq"
     crossorigin="anonymous"
   ></script>
-  <script 
-    src="https://unpkg.com/htmx.org@2.0.4" 
-    integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" 
+  <script
+    src="https://unpkg.com/htmx.org@2.0.4"
+    integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
     crossorigin="anonymous"
   ></script>
-  <script 
-    src="https://code.jquery.com/jquery-3.6.1.min.js" 
-    integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ="  
+  <script
+    src="https://code.jquery.com/jquery-3.6.1.min.js"
+    integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ="
     crossorigin="anonymous"
   ></script>
 </body>
