@@ -15,6 +15,7 @@ from django.db import transaction
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.utils.http import url_has_allowed_host_and_scheme
+from datetime import date
 import csv
 import json
 from .models import Item, Assignment, Dispatch, History, Reservation
@@ -26,6 +27,7 @@ from .utils import (
     send_overdue_digest, get_active_employee_users, get_inventory_summary,
     calculate_total_inventory_value, get_reservation_summary, get_upcoming_reservations,
     get_active_dispatches, get_low_stock_items, get_return_condition_breakdown,
+    build_reports_context_data,
 )
 from . import services
 
@@ -604,71 +606,7 @@ def reports(request):
     cached_data = cache.get(cache_key)
 
     if not cached_data:
-        # Inventory summary per item type, covering every status (not just the three
-        # main ones) so Maintenance/Retired/Consumed items aren't invisible here
-        inventory_summary = list(Item.objects.values('item_type').annotate(
-            total=Count('id'),
-            available=Count('id', filter=Q(status='AVAILABLE')),
-            assigned=Count('id', filter=Q(status='ASSIGNED')),
-            dispatched=Count('id', filter=Q(status='DISPATCHED')),
-            maintenance=Count('id', filter=Q(status='MAINTENANCE')),
-            consumed=Count('id', filter=Q(status='CONSUMED')),
-            retired=Count('id', filter=Q(status='RETIRED')),
-        ))
-
-        # Category distribution with percentage
-        total_items = Item.objects.count()
-        category_distribution = list(Item.objects.values('category').annotate(
-            count=Count('id')
-        ).order_by('-count'))
-
-        # Add percentage to each category
-        for category in category_distribution:
-            category['percentage'] = (category['count'] / total_items * 100) if total_items > 0 else 0
-
-        # User assignments with prefetch
-        user_assignments = User.objects.filter(
-            tool_assignments__return_date__isnull=True
-        ).prefetch_related(
-            Prefetch('tool_assignments',
-                    queryset=Assignment.objects.filter(return_date__isnull=True).select_related('item').order_by('-assignment_date'))
-        ).annotate(
-            tool_count=Count('tool_assignments', filter=Q(tool_assignments__return_date__isnull=True))
-        ).filter(tool_count__gt=0).order_by('-tool_count')
-
-        # Add last assignment + overdue flag to each user
-        user_list = []
-        for user in user_assignments:
-            active = list(user.tool_assignments.all())
-            user_list.append({
-                'user': user,
-                'tool_count': user.tool_count,
-                'last_assignment': active[0] if active else None,
-                'has_overdue': any(a.is_overdue for a in active),
-            })
-
-        # Item-centric view of everything currently assigned/dispatched, for
-        # "assigned items" / "item assigned period" reporting
-        assigned_items = list(
-            Assignment.objects.filter(return_date__isnull=True)
-            .select_related('item', 'assigned_to').order_by('assignment_date')
-        )
-        active_dispatches = list(get_active_dispatches())
-
-        context_data = {
-            'inventory_summary': inventory_summary,
-            'category_distribution': category_distribution,
-            'user_assignments': user_list,
-            'total_items': total_items,
-            'total_value': calculate_total_inventory_value(),
-            'summary_counts': get_inventory_summary(),
-            'reservation_summary': get_reservation_summary(),
-            'upcoming_reservations': list(get_upcoming_reservations()),
-            'assigned_items': assigned_items,
-            'active_dispatches': active_dispatches,
-            'low_stock_items': list(get_low_stock_items()),
-            'return_condition_breakdown': get_return_condition_breakdown(),
-        }
+        context_data = build_reports_context_data()
         cache.set(cache_key, context_data, 300)  # Cache for 5 minutes
         cached_data = context_data
 
@@ -683,6 +621,27 @@ def reports(request):
         user.has_overdue = cached_data['user_assignments'][i]['has_overdue']
 
     return render(request, 'inventory/reports.html', context)
+
+
+@login_required
+def export_reports_excel(request):
+    """
+    Everything on the Reports & Analytics page as one workbook - summary, full item
+    detail, distributions with native charts, reservations, assigned items, active
+    dispatches, low stock, and user assignments. Always built fresh (not from the
+    5-minute reports cache) so an export always reflects the current data.
+    """
+    from .excel_export import build_reports_workbook
+
+    data = build_reports_context_data()
+    items = Item.objects.all().order_by('item_type', 'name')
+    workbook = build_reports_workbook(data, items)
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    filename = f'inventory_report_{date.today().isoformat()}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    workbook.save(response)
+    return response
 
 
 # TRANSFER SYSTEM: assign / dispatch / hub

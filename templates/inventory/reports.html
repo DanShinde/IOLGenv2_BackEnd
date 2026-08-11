@@ -73,8 +73,8 @@
                 </button>
             </form>
             {% endif %}
-            <a href="{% url 'inventory-export-items' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
-                <i class="fas fa-file-csv mr-2"></i>Export Items CSV
+            <a href="{% url 'inventory-export-reports' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md inline-flex items-center">
+                <i class="fas fa-file-excel mr-2"></i>Export Full Report (Excel)
             </a>
         </div>
     </div>
@@ -152,28 +152,14 @@
         {% endfor %}
     </div>
 
-    <!-- Charts Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Status Distribution Chart -->
-        <div class="report-card">
-            <h3 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-chart-pie text-blue-600 mr-2"></i>
-                Status Distribution
-            </h3>
-            <div class="chart-container">
-                <canvas id="statusChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Category Distribution Chart -->
-        <div class="report-card">
-            <h3 class="text-xl font-semibold mb-4 flex items-center">
-                <i class="fas fa-chart-doughnut text-purple-600 mr-2"></i>
-                Category Distribution
-            </h3>
-            <div class="chart-container">
-                <canvas id="categoryChart"></canvas>
-            </div>
+    <!-- Status Distribution Chart -->
+    <div class="report-card">
+        <h3 class="text-xl font-semibold mb-4 flex items-center">
+            <i class="fas fa-chart-pie text-blue-600 mr-2"></i>
+            Status Distribution
+        </h3>
+        <div class="chart-container">
+            <canvas id="statusChart"></canvas>
         </div>
     </div>
 
@@ -415,47 +401,6 @@
         </div>
     </div>
 
-    <!-- Category Distribution Table -->
-    <div class="report-card">
-        <h3 class="text-xl font-semibold mb-6 flex items-center">
-            <i class="fas fa-table text-indigo-600 mr-2"></i>
-            Detailed Category Breakdown
-        </h3>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for category in category_distribution %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="font-medium text-gray-900">
-                                {{ category.category|default:"Uncategorized" }}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full">{{ category.count }}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ category.percentage|floatformat:1 }}%
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-blue-600 h-2 rounded-full" style="width: {{ category.percentage }}%"></div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
 
     <!-- User Assignments -->
     <div class="report-card">
@@ -540,7 +485,6 @@ Chart.defaults.color = '#6b7280';
 
 // Prepare data for charts
 const inventorySummary = {{ inventory_summary|safe }};
-const categoryData = {{ category_distribution|safe }};
 
 // Status Distribution Pie Chart
 const statusCtx = document.getElementById('statusChart').getContext('2d');
@@ -585,51 +529,6 @@ new Chart(statusCtx, {
                     label: function(context) {
                         const total = context.dataset.data.reduce((a, b) => a + b, 0);
                         const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-                        return `${context.label}: ${context.parsed} (${percentage}%)`;
-                    }
-                }
-            }
-        }
-    }
-});
-
-// Category Distribution Doughnut Chart
-const categoryCtx = document.getElementById('categoryChart').getContext('2d');
-const categoryLabels = categoryData.map(c => c.category || 'Uncategorized');
-const categoryValues = categoryData.map(c => c.count);
-const categoryColors = [
-    '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe',
-    '#00f2fe', '#43e97b', '#38f9d7', '#fa709a', '#fee140'
-];
-
-new Chart(categoryCtx, {
-    type: 'doughnut',
-    data: {
-        labels: categoryLabels,
-        datasets: [{
-            data: categoryValues,
-            backgroundColor: categoryColors.slice(0, categoryLabels.length),
-            borderWidth: 2,
-            borderColor: '#fff'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: {
-                    padding: 15,
-                    font: {
-                        size: 12
-                    }
-                }
-            },
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        const percentage = categoryData[context.dataIndex].percentage.toFixed(1);
                         return `${context.label}: ${context.parsed} (${percentage}%)`;
                     }
                 }

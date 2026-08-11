@@ -4,7 +4,7 @@ Utility functions for inventory management
 from datetime import timedelta
 from decimal import Decimal
 from django.contrib.auth.models import User
-from django.db.models import Count, F, Q, Sum, DecimalField
+from django.db.models import Count, F, Prefetch, Q, Sum, DecimalField
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Item, Assignment, Dispatch, Reservation, ProvisionedUser, RETURN_CONDITION_CHOICES
@@ -312,3 +312,57 @@ def calculate_total_inventory_value():
         )
     )['total']
     return total
+
+
+def build_reports_context_data():
+    """
+    Every number shown on the Reports & Analytics page, gathered in one place so the
+    HTML view (cached) and the Excel export (always fresh) can never show different
+    figures - both call this and nothing else for their data.
+    """
+    inventory_summary = list(Item.objects.values('item_type').annotate(
+        total=Count('id'),
+        available=Count('id', filter=Q(status='AVAILABLE')),
+        assigned=Count('id', filter=Q(status='ASSIGNED')),
+        dispatched=Count('id', filter=Q(status='DISPATCHED')),
+        maintenance=Count('id', filter=Q(status='MAINTENANCE')),
+        consumed=Count('id', filter=Q(status='CONSUMED')),
+        retired=Count('id', filter=Q(status='RETIRED')),
+    ))
+
+    user_assignments_qs = User.objects.filter(
+        tool_assignments__return_date__isnull=True
+    ).prefetch_related(
+        Prefetch('tool_assignments',
+                queryset=Assignment.objects.filter(return_date__isnull=True).select_related('item').order_by('-assignment_date'))
+    ).annotate(
+        tool_count=Count('tool_assignments', filter=Q(tool_assignments__return_date__isnull=True))
+    ).filter(tool_count__gt=0).order_by('-tool_count')
+
+    user_assignments = []
+    for user in user_assignments_qs:
+        active = list(user.tool_assignments.all())
+        user_assignments.append({
+            'user': user,
+            'tool_count': user.tool_count,
+            'last_assignment': active[0] if active else None,
+            'has_overdue': any(a.is_overdue for a in active),
+        })
+
+    assigned_items = list(
+        Assignment.objects.filter(return_date__isnull=True)
+        .select_related('item', 'assigned_to').order_by('assignment_date')
+    )
+
+    return {
+        'inventory_summary': inventory_summary,
+        'user_assignments': user_assignments,
+        'total_value': calculate_total_inventory_value(),
+        'summary_counts': get_inventory_summary(),
+        'reservation_summary': get_reservation_summary(),
+        'upcoming_reservations': list(get_upcoming_reservations()),
+        'assigned_items': assigned_items,
+        'active_dispatches': list(get_active_dispatches()),
+        'low_stock_items': list(get_low_stock_items()),
+        'return_condition_breakdown': get_return_condition_breakdown(),
+    }

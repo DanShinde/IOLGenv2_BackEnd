@@ -48,6 +48,7 @@ urlpatterns = [
 
     # Reports & Analytics
     path('reports/', views.reports, name='inventory-reports'),
+    path('reports/export/', views.export_reports_excel, name='inventory-export-reports'),
     path('notifications/send/', views.send_notifications_now, name='inventory-send-notifications'),
 
     # Export Endpoints
