@@ -119,7 +119,7 @@ class AnswerForm(forms.ModelForm):
         model = Answer
         fields = ['body']
         widgets = {
-            'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 6, 'placeholder': 'Write your answer'}),
+            'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 6, 'placeholder': 'Share your solution, workaround, or relevant info'}),
         }
 
 

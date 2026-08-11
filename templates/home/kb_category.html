@@ -24,7 +24,7 @@
           <span>{{ article.views }} views</span>
         </div>
         <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
-        <p style="margin: 0; color: var(--kb-text-secondary);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+        <p style="margin: 0; color: var(--kb-text-secondary);">{{ article.excerpt|default:article.content|striptags|truncatewords:24|default:"No summary available." }}</p>
       </a>
       {% endwith %}
     {% endfor %}
@@ -41,7 +41,7 @@
           <span>{{ article.views }} views</span>
         </div>
         <h3 style="margin: 0 0 8px;">{{ article.title }}</h3>
-        <p style="margin: 0; color: var(--kb-text-secondary);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+        <p style="margin: 0; color: var(--kb-text-secondary);">{{ article.excerpt|default:article.content|striptags|truncatewords:24|default:"No summary available." }}</p>
       </a>
     {% endfor %}
     {% include 'home/_kb_pagination.html' %}

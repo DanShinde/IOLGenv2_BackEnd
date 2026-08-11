@@ -27,7 +27,7 @@
                   <span class="kb-meta">Updated {{ article.updated_at|timesince }} ago</span>
                 </div>
                 <h3 style="margin: 0 0 8px; font-size: 18px;">{{ article.title }}</h3>
-                <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+                <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|striptags|truncatewords:24|default:"No summary available." }}</p>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   {% for tag in article.tags.all %}
                   <span class="kb-tag">{{ tag.name }}</span>
@@ -59,7 +59,7 @@
                   <span class="kb-meta">Updated {{ article.updated_at|timesince }} ago</span>
                 </div>
                 <h3 style="margin: 0 0 8px; font-size: 18px;">{{ article.title }}</h3>
-                <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|truncatewords:24 }}</p>
+                <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|striptags|truncatewords:24|default:"No summary available." }}</p>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   {% for tag in article.tags.all %}
                   <span class="kb-tag">{{ tag.name }}</span>
