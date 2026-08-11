@@ -25,11 +25,11 @@
     </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px;">
           {% for tag in article.tags.all %}
-          <span class="kb-tag">{{ tag.name }}</span>
+          <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
           {% endfor %}
         </div>
         <div class="kb-meta" style="margin-top: 20px;">
-          <span>Author: {{ article.author.get_full_name|default:article.author.username }}</span>
+          <span>Author: <a class="kb-link" href="{% url 'kb-user-profile' article.author.username %}">{{ article.author.get_full_name|default:article.author.username }}</a></span>
           {% if request.user == article.author or request.user.is_staff %}
           <a class="kb-link" href="{% url 'kb-article-edit' article.slug %}">Edit article</a>
           {% endif %}
@@ -99,8 +99,15 @@
             <p style="margin: 0 0 10px;">{{ comment.body|linebreaksbr }}</p>
             {% endif %}
             <div class="kb-meta">
-              <span>{{ comment.author.get_full_name|default:comment.author.username }}</span>
+              <span><a class="kb-link" href="{% url 'kb-user-profile' comment.author.username %}">{{ comment.author.get_full_name|default:comment.author.username }}</a></span>
               <span>{{ comment.created_at|timesince }} ago</span>
+              {% if request.user == comment.author or request.user.is_staff %}
+              <a class="kb-link" href="{% url 'kb-article-comment-edit' comment.pk %}">Edit</a>
+              <form method="post" action="{% url 'kb-article-comment-delete' comment.pk %}" style="margin: 0;" onsubmit="return confirm('Delete this comment? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="kb-link-btn">Delete</button>
+              </form>
+              {% endif %}
             </div>
           </div>
         {% empty %}

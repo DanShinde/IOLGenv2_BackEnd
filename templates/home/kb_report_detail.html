@@ -28,11 +28,11 @@
         {% endif %}
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           {% for tag in report.tags.all %}
-          <span class="kb-tag">{{ tag.name }}</span>
+          <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
           {% endfor %}
         </div>
         <div class="kb-meta" style="margin-top: 16px;">
-          <span>Reporter: {{ report.reporter.get_full_name|default:report.reporter.username }}</span>
+          <span>Reporter: <a class="kb-link" href="{% url 'kb-user-profile' report.reporter.username %}">{{ report.reporter.get_full_name|default:report.reporter.username }}</a></span>
           <span>
             Assignee:
             {% if report.assignee %}
@@ -58,8 +58,15 @@
             <p style="margin: 0 0 10px;">{{ comment.body|linebreaksbr }}</p>
             {% endif %}
             <div class="kb-meta">
-              <span>{{ comment.author.get_full_name|default:comment.author.username }}</span>
+              <span><a class="kb-link" href="{% url 'kb-user-profile' comment.author.username %}">{{ comment.author.get_full_name|default:comment.author.username }}</a></span>
               <span>{{ comment.created_at|timesince }} ago</span>
+              {% if request.user == comment.author or request.user.is_staff %}
+              <a class="kb-link" href="{% url 'kb-report-comment-edit' comment.pk %}">Edit</a>
+              <form method="post" action="{% url 'kb-report-comment-delete' comment.pk %}" style="margin: 0;" onsubmit="return confirm('Delete this comment? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="kb-link-btn">Delete</button>
+              </form>
+              {% endif %}
             </div>
           </div>
         {% empty %}

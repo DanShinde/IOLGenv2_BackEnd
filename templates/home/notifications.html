@@ -1,0 +1,34 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="kb-page">
+  <div class="kb-panel">
+    <div class="kb-create-header">
+      <div>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Notifications</h1>
+      </div>
+      <a class="kb-back" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
+    </div>
+
+    <div class="kb-content">
+      {% for n in notifications %}
+      <a class="kb-card" href="{{ n.get_absolute_url }}" style="{% if not n.is_read %}border-color: var(--kb-primary);{% endif %}">
+        <div style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;">
+          <div>
+            <strong>{{ n.actor.get_full_name|default:n.actor.username }}</strong> {{ n.verb }}
+            {% if n.question %}"{{ n.question.title }}"{% elif n.report %}"{{ n.report.title }}"{% elif n.article %}"{{ n.article.title }}"{% endif %}
+          </div>
+          {% if not n.is_read %}<span class="kb-pill kb-pill-category" style="flex-shrink: 0;">New</span>{% endif %}
+        </div>
+        <div class="kb-meta" style="margin-top: 6px;">{{ n.created_at|timesince }} ago</div>
+      </a>
+      {% empty %}
+      <div class="kb-empty">No notifications yet. You'll see mentions, contributions, and comments here.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

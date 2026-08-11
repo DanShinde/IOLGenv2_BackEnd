@@ -47,7 +47,7 @@
           {% endif %}
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             {% for tag in question.tags.all %}
-            <span class="kb-tag">{{ tag.name }}</span>
+            <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
             {% endfor %}
           </div>
           {% if question.tagged_users.all %}
@@ -59,7 +59,7 @@
           </div>
           {% endif %}
           <div class="kb-meta" style="margin-top: 16px;">
-            <span>Raised by {{ question.author.get_full_name|default:question.author.username }}</span>
+            <span>Raised by <a class="kb-link" href="{% url 'kb-user-profile' question.author.username %}">{{ question.author.get_full_name|default:question.author.username }}</a></span>
             {% if request.user == question.author or request.user.is_staff %}
             <a class="kb-link" href="{% url 'kb-question-edit' question.pk %}">Edit request</a>
             {% endif %}
@@ -93,7 +93,7 @@
               <p style="margin: 0 0 10px;">{{ answer.body|linebreaksbr }}</p>
               {% endif %}
               <div class="kb-meta">
-                <span>{{ answer.author.get_full_name|default:answer.author.username }}</span>
+                <span><a class="kb-link" href="{% url 'kb-user-profile' answer.author.username %}">{{ answer.author.get_full_name|default:answer.author.username }}</a></span>
                 <span>{{ answer.created_at|timesince }} ago</span>
                 {% if answer.is_accepted %}
                 <span style="color: var(--kb-success); font-weight: 600;"><i class="fas fa-check-circle"></i> Accepted</span>
@@ -104,6 +104,13 @@
                   <button type="submit" class="kb-action secondary" style="padding: 4px 12px; font-size: 12px;">
                     {% if answer.is_accepted %}Unaccept{% else %}Accept answer{% endif %}
                   </button>
+                </form>
+                {% endif %}
+                {% if request.user == answer.author or request.user.is_staff %}
+                <a class="kb-link" href="{% url 'kb-answer-edit' answer.pk %}">Edit</a>
+                <form method="post" action="{% url 'kb-answer-delete' answer.pk %}" style="margin: 0;" onsubmit="return confirm('Delete this contribution? This cannot be undone.');">
+                  {% csrf_token %}
+                  <button type="submit" class="kb-link-btn">Delete</button>
                 </form>
                 {% endif %}
               </div>

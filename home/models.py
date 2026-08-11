@@ -354,3 +354,35 @@ class ReportAttachment(models.Model):
 
     def __str__(self):
         return self.file.name
+
+
+class Notification(models.Model):
+    """
+    In-app counterpart to the email-only alerts the KB used to send (tagging
+    was the only one). One nullable FK per possible target, mirroring the
+    Vote model's question/answer pattern already used in this app, rather
+    than pulling in a generic contenttypes dependency for three target types.
+    """
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='kb_notifications')
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    verb = models.CharField(max_length=255)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    report = models.ForeignKey(Report, on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.verb} -> {self.recipient}"
+
+    def get_absolute_url(self):
+        if self.question_id:
+            return reverse('kb-question-detail', kwargs={'pk': self.question_id})
+        if self.report_id:
+            return reverse('kb-report-detail', kwargs={'pk': self.report_id})
+        if self.article_id:
+            return reverse('kb-article-detail', kwargs={'slug': self.article.slug})
+        return reverse('forum-home')

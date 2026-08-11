@@ -12,82 +12,15 @@
 
     <section class="kb-content-wrap">
       {% if is_global_search %}
-        <div class="kb-content" id="global-search-results">
-          <div class="kb-meta" style="margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">
-            {{ search_wiki_total|add:search_qa_total|add:search_report_total }} result{{ search_wiki_total|add:search_qa_total|add:search_report_total|pluralize }} for "{{ query }}"
-          </div>
-
-          {# ---------- Wiki Articles ---------- #}
-          <div class="kb-glass" style="padding: 18px 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-book-open"></i> Wiki Articles <span class="kb-pill">{{ search_wiki_total }}</span></h3>
-              {% if search_wiki_total %}
-              <a class="kb-link" href="{% url 'forum-home' %}?tab=wiki&q={{ query|urlencode }}">View all &rarr;</a>
-              {% endif %}
-            </div>
-            {% for article in search_wiki_results %}
-            <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}" style="display: block; padding: 10px 0; border-top: 1px solid var(--kb-border);">
-              <div style="font-weight: 600; margin-bottom: 4px;">{{ article.title }}</div>
-              <div class="kb-meta">{{ article.category.name }} &middot; Updated {{ article.updated_at|timesince }} ago</div>
-            </a>
-            {% empty %}
-            <div class="kb-meta">No matching articles.</div>
-            {% endfor %}
-          </div>
-
-          {# ---------- Support Requests ---------- #}
-          <div class="kb-glass" style="padding: 18px 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-hands-helping"></i> Support Requests <span class="kb-pill">{{ search_qa_total }}</span></h3>
-              {% if search_qa_total %}
-              <a class="kb-link" href="{% url 'forum-home' %}?tab=qa&q={{ query|urlencode }}">View all &rarr;</a>
-              {% endif %}
-            </div>
-            {% for question in search_qa_results %}
-            <a class="kb-card" href="{% url 'kb-question-detail' question.pk %}" style="display: block; padding: 10px 0; border-top: 1px solid var(--kb-border);">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                <span style="font-weight: 600;">{{ question.title }}</span>
-                {% if question.is_solved %}<span class="kb-pill kb-pill-success">Solved</span>{% endif %}
-              </div>
-              <div class="kb-meta">{{ question.answer_count }} contributions &middot; {{ question.created_at|timesince }} ago</div>
-            </a>
-            {% empty %}
-            <div class="kb-meta">No matching support requests.</div>
-            {% endfor %}
-          </div>
-
-          {# ---------- Bug Reports & Features ---------- #}
-          <div class="kb-glass" style="padding: 18px 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-bug"></i> Bug Reports &amp; Features <span class="kb-pill">{{ search_report_total }}</span></h3>
-              {% if search_report_total %}
-              <a class="kb-link" href="{% url 'forum-home' %}?tab=reports&q={{ query|urlencode }}">View all &rarr;</a>
-              {% endif %}
-            </div>
-            {% for report in search_report_results %}
-            <a class="kb-card" href="{% url 'kb-report-detail' report.pk %}" style="display: block; padding: 10px 0; border-top: 1px solid var(--kb-border);">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                <span class="kb-pill {% if report.type == 'bug' %}type-bug{% else %}type-feature{% endif %}">{{ report.get_type_display }}</span>
-                <span style="font-weight: 600;">{{ report.title }}</span>
-              </div>
-              <div class="kb-meta">{{ report.application.name }} &middot; {{ report.get_status_display }} &middot; {{ report.updated_at|timesince }} ago</div>
-            </a>
-            {% empty %}
-            <div class="kb-meta">No matching reports.</div>
-            {% endfor %}
-          </div>
-
-          {% if not search_wiki_total and not search_qa_total and not search_report_total %}
-          <div class="kb-empty">Nothing matches "{{ query }}" anywhere in the Knowledge Base.</div>
-          {% endif %}
-        </div>
+        {% include 'home/_kb_search_results.html' with view_all_param='q' view_all_value=query %}
       {% elif active_tab == 'wiki' %}
         <div class="kb-content" id="wiki-list">
           {% if hierarchy_articles %}
           <div class="kb-meta" style="margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">Hierarchy</div>
           {% for item in hierarchy_articles %}
           {% with article=item.article %}
-          <a class="kb-glass kb-card" href="{% url 'kb-article-detail' article.slug %}" style="margin-left: {{ item.indent }}px;">
+          <div class="kb-glass kb-card" style="margin-left: {{ item.indent }}px;">
+            <a class="kb-card-hit" href="{% url 'kb-article-detail' article.slug %}" aria-label="{{ article.title }}"></a>
             <div style="display: flex; justify-content: space-between; gap: 16px;">
               <div style="flex: 1;">
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
@@ -100,16 +33,16 @@
                 <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|striptags|truncatewords:24|default:"No summary available." }}</p>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   {% for tag in article.tags.all %}
-                  <span class="kb-tag">{{ tag.name }}</span>
+                  <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
                   {% endfor %}
                 </div>
               </div>
               <div class="kb-meta" style="flex-direction: column; align-items: flex-end;">
                 <span class="kb-stat"><i class="fas fa-eye"></i>{{ article.views }}</span>
-                <span class="kb-stat"><i class="fas fa-user"></i>{{ article.author.get_full_name|default:article.author.username }}</span>
+                <span class="kb-stat"><i class="fas fa-user"></i><a class="kb-link" style="position: relative; z-index: 2;" href="{% url 'kb-user-profile' article.author.username %}">{{ article.author.get_full_name|default:article.author.username }}</a></span>
               </div>
             </div>
-          </a>
+          </div>
           {% endwith %}
           {% endfor %}
           {% endif %}
@@ -119,7 +52,8 @@
             {% if query %}Search results{% else %}Other Articles{% endif %}
           </div>
           {% for article in other_articles %}
-          <a class="kb-glass kb-card" href="{% url 'kb-article-detail' article.slug %}">
+          <div class="kb-glass kb-card">
+            <a class="kb-card-hit" href="{% url 'kb-article-detail' article.slug %}" aria-label="{{ article.title }}"></a>
             <div style="display: flex; justify-content: space-between; gap: 16px;">
               <div style="flex: 1;">
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
@@ -132,16 +66,16 @@
                 <p style="margin: 0 0 12px; color: var(--kb-muted);">{{ article.excerpt|default:article.content|striptags|truncatewords:24|default:"No summary available." }}</p>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   {% for tag in article.tags.all %}
-                  <span class="kb-tag">{{ tag.name }}</span>
+                  <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
                   {% endfor %}
                 </div>
               </div>
               <div class="kb-meta" style="flex-direction: column; align-items: flex-end;">
                 <span class="kb-stat"><i class="fas fa-eye"></i>{{ article.views }}</span>
-                <span class="kb-stat"><i class="fas fa-user"></i>{{ article.author.get_full_name|default:article.author.username }}</span>
+                <span class="kb-stat"><i class="fas fa-user"></i><a class="kb-link" style="position: relative; z-index: 2;" href="{% url 'kb-user-profile' article.author.username %}">{{ article.author.get_full_name|default:article.author.username }}</a></span>
               </div>
             </div>
-          </a>
+          </div>
           {% endfor %}
           {% include 'home/_kb_pagination.html' %}
           {% endif %}
@@ -155,7 +89,8 @@
       {% elif active_tab == 'qa' %}
         <div class="kb-content" id="qa-list">
           {% for question in questions %}
-          <a class="kb-glass kb-card" href="{% url 'kb-question-detail' question.pk %}">
+          <div class="kb-glass kb-card">
+            <a class="kb-card-hit" href="{% url 'kb-question-detail' question.pk %}" aria-label="{{ question.title }}"></a>
             <div style="display: flex; gap: 16px; align-items: flex-start;">
               <div style="display: flex; flex-direction: column; gap: 8px; align-items: center; min-width: 60px;">
                 <span class="kb-meta">{{ question.answer_count }}</span>
@@ -172,7 +107,7 @@
                 <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
                   <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     {% for tag in question.tags.all %}
-                    <span class="kb-tag">{{ tag.name }}</span>
+                    <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
                     {% endfor %}
                     {% for user in question.tagged_users.all %}
                     <span class="kb-pill kb-pill-app"><i class="fas fa-at"></i> {{ user.get_full_name|default:user.username }}</span>
@@ -180,12 +115,12 @@
                   </div>
                   <div class="kb-meta">
                     <span>{{ question.answer_count }} contributions</span>
-                    <span>{{ question.author.get_full_name|default:question.author.username }} - {{ question.created_at|timesince }} ago</span>
+                    <span><a class="kb-link" style="position: relative; z-index: 2;" href="{% url 'kb-user-profile' question.author.username %}">{{ question.author.get_full_name|default:question.author.username }}</a> - {{ question.created_at|timesince }} ago</span>
                   </div>
                 </div>
               </div>
             </div>
-          </a>
+          </div>
           {% empty %}
           <div class="kb-empty">
             {% if query %}No support requests match "{{ query }}".{% else %}No support requests yet. Be the first to raise one, or share something you've already solved.{% endif %}
@@ -196,7 +131,8 @@
       {% elif active_tab == 'reports' %}
         <div class="kb-content" id="report-list">
           {% for report in reports %}
-          <a class="kb-glass kb-card" href="{% url 'kb-report-detail' report.pk %}">
+          <div class="kb-glass kb-card">
+            <a class="kb-card-hit" href="{% url 'kb-report-detail' report.pk %}" aria-label="{{ report.title }}"></a>
             <div style="display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px;">
               <div style="flex: 1;">
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
@@ -223,16 +159,16 @@
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <span class="kb-pill kb-pill-app">{{ report.application.name }}</span>
                 {% for tag in report.tags.all %}
-                <span class="kb-tag">{{ tag.name }}</span>
+                <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
                 {% endfor %}
               </div>
               <div class="kb-meta">
                 <span>{{ report.comment_count }} comments</span>
-                <span>{{ report.reporter.get_full_name|default:report.reporter.username }}</span>
+                <span><a class="kb-link" style="position: relative; z-index: 2;" href="{% url 'kb-user-profile' report.reporter.username %}">{{ report.reporter.get_full_name|default:report.reporter.username }}</a></span>
                 <span>{{ report.updated_at|timesince }} ago</span>
               </div>
             </div>
-          </a>
+          </div>
           {% empty %}
           <div class="kb-empty">
             {% if query %}No reports match "{{ query }}".{% else %}No reports yet.{% endif %}

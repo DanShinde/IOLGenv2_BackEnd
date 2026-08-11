@@ -126,6 +126,34 @@
       border-color: var(--kb-border-strong);
     }
 
+    .kb-bell {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      color: var(--kb-text-secondary);
+      transition: all 0.15s ease;
+    }
+    .kb-bell:hover { background: var(--kb-surface-hover); color: var(--kb-text); }
+    .kb-bell-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background: var(--kb-danger);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 16px;
+      text-align: center;
+    }
+
     main { flex: 1; }
 
     /* ---------- Flash messages ---------- */
@@ -403,9 +431,11 @@
       text-decoration: none;
       color: inherit;
       display: block;
+      position: relative;
     }
 
-    a.kb-card:hover {
+    a.kb-card:hover,
+    div.kb-card:hover {
       box-shadow: var(--kb-shadow-md);
       border-color: var(--kb-border-strong);
       transform: translateY(-2px);
@@ -435,6 +465,33 @@
       padding: 4px 10px;
       border-radius: 999px;
       font-weight: 600;
+      text-decoration: none;
+      display: inline-block;
+    }
+    a.kb-tag:hover {
+      background: var(--kb-primary);
+      color: #fff;
+    }
+
+    /* "Stretched link" card: the whole card is clickable via an invisible
+       overlay anchor, while genuinely separate links inside it (tags) sit
+       above that overlay in z-order and stay independently clickable --
+       avoids nesting an <a> inside another <a>, which is invalid HTML and
+       breaks clicks in every browser. */
+    .kb-card-hit {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+    .kb-card-hit:focus-visible {
+      outline: 2px solid var(--kb-primary);
+      outline-offset: -2px;
+      border-radius: var(--kb-radius);
+    }
+    .kb-card > .kb-tag,
+    .kb-card > * .kb-tag {
+      position: relative;
+      z-index: 2;
     }
 
     .kb-pill-category { background: var(--kb-primary-light); color: var(--kb-primary-dark); }
@@ -480,6 +537,18 @@
       font-weight: 500;
     }
     .kb-link:hover, .kb-back:hover { color: var(--kb-primary); }
+
+    .kb-link-btn {
+      border: none;
+      background: none;
+      padding: 0;
+      font: inherit;
+      color: var(--kb-text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .kb-link-btn:hover { color: var(--kb-danger); }
 
     .kb-label {
       display: block;
@@ -634,6 +703,29 @@
       color: var(--kb-text);
       padding: 4px 2px;
     }
+    .kb-user-suggest-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--kb-surface);
+      border: 1px solid var(--kb-border);
+      border-radius: var(--kb-radius-sm);
+      box-shadow: var(--kb-shadow-md);
+      z-index: 40;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .kb-user-suggest-item {
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--kb-text);
+      cursor: pointer;
+    }
+    .kb-user-suggest-item:hover {
+      background: var(--kb-primary-light);
+      color: var(--kb-primary-dark);
+    }
 
     /* ---------- Optional rich-text toggle ---------- */
     .kb-richtoggle-bar { margin-bottom: 8px; }
@@ -685,6 +777,16 @@
       .kb-main { grid-template-columns: 1fr; }
     }
 
+    @media (max-width: 560px) {
+      .kb-create-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .kb-page { padding: 16px; }
+      .kb-panel { padding: 18px; }
+    }
+
     @media (max-width: 991px) {
       .navbar-nav { margin-top: 12px; }
     }
@@ -712,6 +814,12 @@
       </ul>
 
       <ul class="navbar-nav ms-auto mb-0 d-flex flex-row align-items-center gap-2">
+        <li class="nav-item">
+          <a class="kb-bell" href="{% url 'kb-notifications' %}" aria-label="Notifications" title="Notifications">
+            <i class="fas fa-bell"></i>
+            {% if kb_unread_notifications %}<span class="kb-bell-badge">{{ kb_unread_notifications }}</span>{% endif %}
+          </a>
+        </li>
         {% if user.is_staff %}
         <li class="nav-item">
           <a class="kb-action-btn nav-link" href="{% url 'admin:index' %}">Admin</a>
@@ -751,6 +859,7 @@
         if (input.dataset.enhanced) return;
         input.dataset.enhanced = 'true';
 
+        const maxTagLength = parseInt(input.getAttribute('maxlength'), 10) || 50;
         const suggestions = (input.dataset.suggestions || '').split(',').map(s => s.trim()).filter(Boolean);
         let tags = (input.value || '').split(',').map(s => s.trim()).filter(Boolean);
 
@@ -760,6 +869,7 @@
         const typeInput = document.createElement('input');
         typeInput.type = 'text';
         typeInput.className = 'kb-tags-type';
+        typeInput.maxLength = maxTagLength;
         typeInput.placeholder = tags.length ? 'Add another tag…' : (input.placeholder || 'Type a tag and press Enter');
         if (input.id) {
           typeInput.setAttribute('list', input.id + '-suggestions');
@@ -798,13 +908,17 @@
         }
 
         function addTag(raw) {
-          const name = raw.trim();
-          if (!name) return;
-          if (!tags.some(t => t.toLowerCase() === name.toLowerCase())) {
-            tags.push(name);
-            renderChips();
-            sync();
-          }
+          // A pasted "a, b, c" becomes three chips, not one chip containing
+          // commas -- commas are always the tag delimiter, never tag content.
+          raw.split(',').forEach(part => {
+            const name = part.trim().slice(0, maxTagLength);
+            if (!name) return;
+            if (!tags.some(t => t.toLowerCase() === name.toLowerCase())) {
+              tags.push(name);
+            }
+          });
+          renderChips();
+          sync();
           typeInput.value = '';
         }
 
@@ -831,6 +945,134 @@
       }
 
       document.querySelectorAll('.kb-tags-input').forEach(enhanceTagInput);
+    })();
+
+    (function () {
+      function enhanceUserTagInput(input) {
+        if (input.dataset.enhanced) return;
+        input.dataset.enhanced = 'true';
+
+        let suggestions = [];
+        try {
+          suggestions = JSON.parse(input.dataset.suggestions || '[]');
+        } catch (e) {
+          suggestions = [];
+        }
+
+        let chips = [];
+        (input.value || '').split(',').map(s => s.trim()).filter(Boolean).forEach(idStr => {
+          const id = parseInt(idStr, 10);
+          const match = suggestions.find(s => s.id === id);
+          if (match) chips.push(match);
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'kb-tags-wrapper';
+        wrapper.style.position = 'relative';
+
+        const typeInput = document.createElement('input');
+        typeInput.type = 'text';
+        typeInput.className = 'kb-tags-type';
+        typeInput.placeholder = input.placeholder || 'Type a name…';
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'kb-user-suggest-dropdown';
+        dropdown.style.display = 'none';
+
+        function sync() { input.value = chips.map(c => c.id).join(','); }
+
+        function renderChips() {
+          wrapper.querySelectorAll('.kb-tag-chip').forEach(el => el.remove());
+          chips.forEach((chip, idx) => {
+            const el = document.createElement('span');
+            el.className = 'kb-tag-chip';
+            el.textContent = chip.label;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.setAttribute('aria-label', 'Remove ' + chip.label);
+            remove.textContent = '×';
+            remove.addEventListener('click', () => {
+              chips.splice(idx, 1);
+              renderChips();
+              sync();
+            });
+            el.appendChild(remove);
+            wrapper.insertBefore(el, typeInput);
+          });
+        }
+
+        function closeDropdown() {
+          dropdown.style.display = 'none';
+          dropdown.innerHTML = '';
+        }
+
+        function addChip(match) {
+          if (!chips.some(c => c.id === match.id)) {
+            chips.push(match);
+            renderChips();
+            sync();
+          }
+          typeInput.value = '';
+          closeDropdown();
+        }
+
+        function showSuggestions() {
+          const query = typeInput.value.trim().toLowerCase();
+          const chosenIds = new Set(chips.map(c => c.id));
+          const matches = suggestions.filter(s =>
+            !chosenIds.has(s.id) && (!query || s.label.toLowerCase().includes(query))
+          ).slice(0, 8);
+
+          dropdown.innerHTML = '';
+          if (!matches.length) {
+            closeDropdown();
+            return;
+          }
+          matches.forEach(match => {
+            const item = document.createElement('div');
+            item.className = 'kb-user-suggest-item';
+            item.textContent = match.label;
+            // mousedown (not click) fires before the input's blur, so the
+            // chip commits before showSuggestions/closeDropdown clears it.
+            item.addEventListener('mousedown', (event) => {
+              event.preventDefault();
+              addChip(match);
+            });
+            dropdown.appendChild(item);
+          });
+          dropdown.style.display = 'block';
+        }
+
+        typeInput.addEventListener('input', showSuggestions);
+        typeInput.addEventListener('focus', showSuggestions);
+        typeInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            const query = typeInput.value.trim().toLowerCase();
+            if (!query) return;
+            const exact = suggestions.find(s => s.label.toLowerCase() === query);
+            if (exact) addChip(exact);
+          } else if (event.key === 'Escape') {
+            closeDropdown();
+          } else if (event.key === 'Backspace' && !typeInput.value && chips.length) {
+            chips.pop();
+            renderChips();
+            sync();
+          }
+        });
+        typeInput.addEventListener('blur', () => {
+          setTimeout(closeDropdown, 150);
+        });
+
+        renderChips();
+        sync();
+        wrapper.appendChild(typeInput);
+        wrapper.appendChild(dropdown);
+        input.style.display = 'none';
+        input.insertAdjacentElement('afterend', wrapper);
+      }
+
+      document.querySelectorAll('.kb-user-tags-input').forEach(enhanceUserTagInput);
     })();
 
     (function () {

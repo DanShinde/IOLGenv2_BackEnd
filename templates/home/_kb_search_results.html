@@ -1,0 +1,77 @@
+{# Shared by global search (forum_home.html) and tag browsing (kb_tag_detail.html). #}
+{# Expects: view_all_param, view_all_value, search_wiki_results/_total, search_qa_results/_total, search_report_results/_total #}
+{# Plus, from the parent's own context (inherited -- no `only` on the include): either `query` or `tag`. #}
+<div class="kb-content" id="kb-search-results">
+  <div class="kb-meta" style="margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">
+    {% with result_count=search_wiki_total|add:search_qa_total|add:search_report_total %}
+    {{ result_count }} result{{ result_count|pluralize }}
+    {% if tag %}tagged "{{ tag.name }}"{% else %}for "{{ query }}"{% endif %}
+    {% endwith %}
+  </div>
+
+  {# ---------- Wiki Articles ---------- #}
+  <div class="kb-glass" style="padding: 18px 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-book-open"></i> Wiki Articles <span class="kb-pill">{{ search_wiki_total }}</span></h3>
+      {% if search_wiki_total %}
+      <a class="kb-link" href="{% url 'forum-home' %}?tab=wiki&{{ view_all_param }}={{ view_all_value|urlencode }}">View all &rarr;</a>
+      {% endif %}
+    </div>
+    {% for article in search_wiki_results %}
+    <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}" style="display: block; padding: 10px 0; border-top: 1px solid var(--kb-border);">
+      <div style="font-weight: 600; margin-bottom: 4px;">{{ article.title }}</div>
+      <div class="kb-meta">{{ article.category.name }} &middot; Updated {{ article.updated_at|timesince }} ago</div>
+    </a>
+    {% empty %}
+    <div class="kb-meta">No matching articles.</div>
+    {% endfor %}
+  </div>
+
+  {# ---------- Support Requests ---------- #}
+  <div class="kb-glass" style="padding: 18px 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-hands-helping"></i> Support Requests <span class="kb-pill">{{ search_qa_total }}</span></h3>
+      {% if search_qa_total %}
+      <a class="kb-link" href="{% url 'forum-home' %}?tab=qa&{{ view_all_param }}={{ view_all_value|urlencode }}">View all &rarr;</a>
+      {% endif %}
+    </div>
+    {% for question in search_qa_results %}
+    <a class="kb-card" href="{% url 'kb-question-detail' question.pk %}" style="display: block; padding: 10px 0; border-top: 1px solid var(--kb-border);">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+        <span style="font-weight: 600;">{{ question.title }}</span>
+        {% if question.is_solved %}<span class="kb-pill kb-pill-success">Solved</span>{% endif %}
+      </div>
+      <div class="kb-meta">{{ question.answer_count }} contributions &middot; {{ question.created_at|timesince }} ago</div>
+    </a>
+    {% empty %}
+    <div class="kb-meta">No matching support requests.</div>
+    {% endfor %}
+  </div>
+
+  {# ---------- Bug Reports & Features ---------- #}
+  <div class="kb-glass" style="padding: 18px 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-bug"></i> Bug Reports &amp; Features <span class="kb-pill">{{ search_report_total }}</span></h3>
+      {% if search_report_total %}
+      <a class="kb-link" href="{% url 'forum-home' %}?tab=reports&{{ view_all_param }}={{ view_all_value|urlencode }}">View all &rarr;</a>
+      {% endif %}
+    </div>
+    {% for report in search_report_results %}
+    <a class="kb-card" href="{% url 'kb-report-detail' report.pk %}" style="display: block; padding: 10px 0; border-top: 1px solid var(--kb-border);">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+        <span class="kb-pill {% if report.type == 'bug' %}type-bug{% else %}type-feature{% endif %}">{{ report.get_type_display }}</span>
+        <span style="font-weight: 600;">{{ report.title }}</span>
+      </div>
+      <div class="kb-meta">{{ report.application.name }} &middot; {{ report.get_status_display }} &middot; {{ report.updated_at|timesince }} ago</div>
+    </a>
+    {% empty %}
+    <div class="kb-meta">No matching reports.</div>
+    {% endfor %}
+  </div>
+
+  {% if not search_wiki_total and not search_qa_total and not search_report_total %}
+  <div class="kb-empty">
+    {% if tag %}Nothing is tagged "{{ tag.name }}" yet.{% else %}Nothing matches "{{ query }}" anywhere in the Knowledge Base.{% endif %}
+  </div>
+  {% endif %}
+</div>

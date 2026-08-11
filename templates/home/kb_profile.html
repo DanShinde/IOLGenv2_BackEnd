@@ -1,0 +1,75 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}{{ profile_user.get_full_name|default:profile_user.username }}{% endblock %}
+
+{% block content %}
+<div class="kb-page">
+  <div class="kb-panel">
+    <a class="kb-link" href="{% url 'forum-home' %}" style="display: inline-block; margin-bottom: 16px;">Back to Knowledge Base</a>
+
+    <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 24px;">
+      <div style="width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, var(--kb-primary) 0%, var(--kb-accent) 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px; font-weight: 700;">
+        {% if home_profile.avatar %}
+          <img src="{{ home_profile.avatar.url }}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+        {% else %}
+          {{ profile_user.get_full_name|default:profile_user.username|first|upper }}
+        {% endif %}
+      </div>
+      <div>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">{{ profile_user.get_full_name|default:profile_user.username }}</h1>
+        <div class="kb-meta" style="margin-top: 4px;">
+          {% if home_profile.department %}<span>{{ home_profile.department }}</span>{% endif %}
+          <span>@{{ profile_user.username }}</span>
+        </div>
+        {% if home_profile.bio %}<p class="kb-body-copy" style="margin: 8px 0 0;">{{ home_profile.bio }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="kb-meta" style="gap: 24px; margin-bottom: 28px; font-size: 13px;">
+      <span class="kb-stat"><i class="fas fa-book-open"></i> {{ articles_total }} article{{ articles_total|pluralize }}</span>
+      <span class="kb-stat"><i class="fas fa-hands-helping"></i> {{ questions_total }} request{{ questions_total|pluralize }} raised</span>
+      <span class="kb-stat"><i class="fas fa-comments"></i> {{ answers_total }} contribution{{ answers_total|pluralize }}</span>
+      <span class="kb-stat"><i class="fas fa-bug"></i> {{ reports_total }} report{{ reports_total|pluralize }}</span>
+    </div>
+
+    <div class="kb-content">
+      <h3 style="margin: 0;">Wiki Articles</h3>
+      {% for article in articles %}
+      <a class="kb-card" href="{% url 'kb-article-detail' article.slug %}">
+        <div style="font-weight: 600; margin-bottom: 4px;">{{ article.title }}</div>
+        <div class="kb-meta">{{ article.category.name }} &middot; Updated {{ article.updated_at|timesince }} ago</div>
+      </a>
+      {% empty %}
+      <div class="kb-meta">No articles yet.</div>
+      {% endfor %}
+
+      <h3 style="margin: 16px 0 0;">Support Requests</h3>
+      {% for question in questions %}
+      <a class="kb-card" href="{% url 'kb-question-detail' question.pk %}">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <span style="font-weight: 600;">{{ question.title }}</span>
+          {% if question.is_solved %}<span class="kb-pill kb-pill-success">Solved</span>{% endif %}
+        </div>
+        <div class="kb-meta">{{ question.answer_count }} contributions &middot; {{ question.created_at|timesince }} ago</div>
+      </a>
+      {% empty %}
+      <div class="kb-meta">No support requests yet.</div>
+      {% endfor %}
+
+      <h3 style="margin: 16px 0 0;">Bug Reports &amp; Features</h3>
+      {% for report in reports %}
+      <a class="kb-card" href="{% url 'kb-report-detail' report.pk %}">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <span class="kb-pill {% if report.type == 'bug' %}type-bug{% else %}type-feature{% endif %}">{{ report.get_type_display }}</span>
+          <span style="font-weight: 600;">{{ report.title }}</span>
+        </div>
+        <div class="kb-meta">{{ report.application.name }} &middot; {{ report.get_status_display }} &middot; {{ report.updated_at|timesince }} ago</div>
+      </a>
+      {% empty %}
+      <div class="kb-meta">No reports yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

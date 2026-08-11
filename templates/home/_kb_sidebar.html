@@ -1,4 +1,11 @@
 <aside class="kb-glass kb-sidebar">
+  {% if current_tag %}
+    <h3>Filtering by tag</h3>
+    <div class="kb-filter" style="flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px;">
+      <span class="kb-tag">{{ current_tag.name }}</span>
+      <a class="kb-link" href="{% url 'forum-home' %}?tab={{ active_tab }}{% if query %}&q={{ query|urlencode }}{% endif %}">Clear &times;</a>
+    </div>
+  {% endif %}
   {% if active_tab == 'wiki' %}
     <h3>Hierarchy</h3>
     <div class="kb-filter">
@@ -24,6 +31,7 @@
     <form method="get" action="{% url 'forum-home' %}">
       <input type="hidden" name="tab" value="qa">
       {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+      {% if current_tag %}<input type="hidden" name="tag" value="{{ current_tag.slug }}">{% endif %}
       <select class="kb-select" name="qa_status" onchange="this.form.submit()">
         <option value="all" {% if not qa_status or qa_status == 'all' %}selected{% endif %}>All requests</option>
         <option value="solved" {% if qa_status == 'solved' %}selected{% endif %}>Solved</option>
@@ -42,6 +50,7 @@
     <form method="get" action="{% url 'forum-home' %}">
       <input type="hidden" name="tab" value="reports">
       {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+      {% if current_tag %}<input type="hidden" name="tag" value="{{ current_tag.slug }}">{% endif %}
 
       <h3>Type</h3>
       <select class="kb-select" name="report_type" onchange="this.form.submit()">

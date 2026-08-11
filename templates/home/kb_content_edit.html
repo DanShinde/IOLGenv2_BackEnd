@@ -1,0 +1,49 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}{{ heading }}{% endblock %}
+
+{% block content %}
+<div class="kb-page">
+  <div class="kb-panel">
+    <div class="kb-create-header">
+      <div>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">{{ heading }}</h1>
+      </div>
+      <a class="kb-back" href="{{ back_url }}">Cancel</a>
+    </div>
+
+    <form method="post" style="display: flex; flex-direction: column; gap: 16px;">
+      {% csrf_token %}
+
+      {% if form.errors %}
+      <div class="kb-form-error-box">
+        <strong style="display: block; margin-bottom: 6px;">Please fix the highlighted fields:</strong>
+        <ul style="margin: 0; padding-left: 18px;">
+          {% for field, errors in form.errors.items %}
+            <li>{{ field|capfirst }}: {{ errors|join:", " }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="kb-richtoggle-bar">
+        <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_body" {% if form.instance.is_html %}data-autostart="true"{% endif %}>
+          <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+        </button>
+      </div>
+      {{ form.body }}
+      {{ form.body_format }}
+      {{ form.body.errors }}
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button class="kb-action" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ form.media }}
+{% endblock %}

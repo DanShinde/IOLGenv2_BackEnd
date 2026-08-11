@@ -1,0 +1,19 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}#{{ tag.name }}{% endblock %}
+
+{% block content %}
+<div class="kb-page">
+  {% include 'home/_kb_header.html' %}
+
+  <div class="kb-main">
+    {% include 'home/_kb_sidebar.html' %}
+
+    <section class="kb-content-wrap">
+      <a class="kb-link" href="{% url 'forum-home' %}" style="display: inline-block; margin-bottom: 12px;">Back to Knowledge Base</a>
+      {% include 'home/_kb_search_results.html' with view_all_param='tag' view_all_value=tag.slug %}
+    </section>
+  </div>
+</div>
+{% endblock %}

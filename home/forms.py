@@ -42,33 +42,46 @@ class TagsField(forms.CharField):
         'autocomplete': 'off',
     })
 
+    MAX_TAG_LENGTH = 50
+
     def __init__(self, *args, **kwargs):
         kwargs.setdefault('required', False)
         kwargs.setdefault('label', 'Tags')
-        kwargs.setdefault('help_text', "Add as many as you like — press Enter or comma after each one.")
+        kwargs.setdefault('help_text', "Add as many as you like — press Enter after each one. Commas separate tags, so they can't appear inside a tag name.")
         super().__init__(*args, **kwargs)
         suggestions = ','.join(Tag.objects.order_by('name').values_list('name', flat=True))
         self.widget.attrs['data-suggestions'] = suggestions
+        self.widget.attrs['maxlength'] = self.MAX_TAG_LENGTH
 
-    def to_python(self, value):
+    def clean(self, value):
         if not value:
+            if self.required:
+                raise forms.ValidationError(self.error_messages['required'], code='required')
             return []
+
         seen = set()
         names = []
+        oversized = []
         for raw in value.split(','):
+            # A literal comma can never survive inside one tag -- it's the
+            # delimiter between tags, both here and in the chip-input JS.
             name = raw.strip()
             if not name:
+                continue
+            if len(name) > self.MAX_TAG_LENGTH:
+                oversized.append(name)
                 continue
             key = name.lower()
             if key in seen:
                 continue
             seen.add(key)
-            names.append(name[:50])
-        return names
+            names.append(name)
 
-    def validate(self, value):
-        if self.required and not value:
-            raise forms.ValidationError(self.error_messages['required'], code='required')
+        if oversized:
+            raise forms.ValidationError(
+                f"These tags are too long (max {self.MAX_TAG_LENGTH} characters): " + ', '.join(oversized)
+            )
+        return names
 
     def prepare_value(self, value):
         if not value:
@@ -76,6 +89,52 @@ class TagsField(forms.CharField):
         if hasattr(value, 'all'):
             value = list(value.all())
         return ','.join(item.name if hasattr(item, 'name') else str(item) for item in value)
+
+
+class UserTagField(forms.CharField):
+    """
+    Chip-input for tagging specific *existing* people (unlike TagsField,
+    this can't invent new rows -- there's no such thing as a free-typed
+    user). The widget stores comma-separated user IDs resolved client-side
+    by the enhancer JS matching what was typed against real suggestions;
+    clean() re-validates those IDs against the DB rather than trusting them.
+    """
+    widget = forms.TextInput(attrs={
+        'class': 'kb-user-tags-input',
+        'placeholder': 'Type a name…',
+        'autocomplete': 'off',
+    })
+
+    def __init__(self, *args, queryset=None, **kwargs):
+        kwargs.setdefault('required', False)
+        super().__init__(*args, **kwargs)
+        self.queryset = queryset if queryset is not None else get_user_model().objects.filter(is_active=True)
+        import json
+        suggestions = [
+            {'id': u.pk, 'label': u.get_full_name() or u.username}
+            for u in self.queryset.order_by('first_name', 'username')
+        ]
+        self.widget.attrs['data-suggestions'] = json.dumps(suggestions)
+
+    def clean(self, value):
+        if not value:
+            if self.required:
+                raise forms.ValidationError(self.error_messages['required'], code='required')
+            return []
+        ids = [int(part) for part in value.split(',') if part.strip().isdigit()]
+        if not ids:
+            return []
+        users_by_id = {u.pk: u for u in self.queryset.filter(pk__in=ids)}
+        # Preserve the order the chips were added in, silently drop any id
+        # that no longer resolves (deactivated user, tampered value, etc.).
+        return [users_by_id[i] for i in ids if i in users_by_id]
+
+    def prepare_value(self, value):
+        if not value:
+            return ''
+        if hasattr(value, 'all'):
+            value = list(value.all())
+        return ','.join(str(item.pk) for item in value)
 
 
 class RichTextFormatField(forms.CharField):
@@ -141,12 +200,9 @@ class ArticleForm(forms.ModelForm):
 
 class QuestionForm(forms.ModelForm):
     tags = TagsField()
-    tagged_users = forms.ModelMultipleChoiceField(
-        queryset=get_user_model().objects.filter(is_active=True).order_by('first_name', 'username'),
-        required=False,
+    tagged_users = UserTagField(
         label="Tag specific people",
         help_text="They'll get an email pointing them at this request.",
-        widget=forms.SelectMultiple(attrs={'class': 'kb-select'})
     )
     already_solved = forms.BooleanField(
         required=False,
@@ -163,7 +219,7 @@ class QuestionForm(forms.ModelForm):
 
     class Meta:
         model = Question
-        fields = ['title', 'body', 'tagged_users']
+        fields = ['title', 'body']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'What do you want to know?'}),
             'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 8, 'placeholder': 'Add context, code, or links'}),
@@ -171,10 +227,9 @@ class QuestionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field in ('tagged_users',):
-            self.fields[field].label_from_instance = lambda user: user.get_full_name() or user.username
         if self.instance and self.instance.pk:
             self.fields['tags'].initial = self.instance.tags.all()
+            self.fields['tagged_users'].initial = self.instance.tagged_users.all()
             self.fields['body_format'].initial = 'html' if self.instance.is_html else 'plain'
 
     def clean(self):

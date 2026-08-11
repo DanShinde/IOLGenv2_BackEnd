@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Count
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -33,15 +33,51 @@ from .models import (
     ArticleComment,
     ArticleRevision,
     Category,
+    Notification,
     Question,
     Answer,
     Report,
     ReportComment,
     ReportAttachment,
     Tag,
+    UserProfile,
     Vote,
 )
 from .sanitize import sanitize_html
+
+
+def _notify(recipient, actor, verb, **target):
+    """Create an in-app notification. No-op if the actor is the recipient."""
+    if recipient is None or actor is None or recipient.pk == actor.pk:
+        return
+    Notification.objects.create(recipient=recipient, actor=actor, verb=verb, **target)
+
+
+def _apply_search(queryset, query, high_fields, low_fields=()):
+    """
+    Text search across every given field, with a two-tier relevance:
+    `high_fields` (title, body/description, tags) rank above `low_fields`
+    (e.g. category/application name). Adds a `relevance` annotation --
+    the caller should order by `-relevance` first, then its usual ordering.
+
+    A field path that crosses an M2M (e.g. 'tags__name') can multiply rows
+    when it matches more than one related row per object, so this always
+    ends in .distinct() -- callers with a Count() annotation in the same
+    queryset should pass distinct=True to it to avoid inflated counts.
+    """
+    if not query:
+        return queryset
+
+    q_filter = models.Q()
+    for field in list(high_fields) + list(low_fields):
+        q_filter |= models.Q(**{f'{field}__icontains': query})
+
+    relevance = models.Case(
+        *[models.When(**{f'{field}__icontains': query}, then=models.Value(2)) for field in high_fields],
+        default=models.Value(1),
+        output_field=models.IntegerField(),
+    )
+    return queryset.filter(q_filter).annotate(relevance=relevance).distinct()
 
 
 def _resolve_tags(names):
@@ -51,7 +87,13 @@ def _resolve_tags(names):
         slug = slugify(name, allow_unicode=True)
         if not slug:
             continue
-        tag, _ = Tag.objects.get_or_create(slug=slug, defaults={'name': name})
+        try:
+            with transaction.atomic():
+                tag, _ = Tag.objects.get_or_create(slug=slug, defaults={'name': name})
+        except IntegrityError:
+            # Someone else created the same brand-new tag in the instant
+            # between our lookup and our insert -- just use theirs.
+            tag = Tag.objects.get(slug=slug)
         tags.append(tag)
     return tags
 
@@ -256,10 +298,13 @@ def forum_home(request):
     if active_tab not in {'wiki', 'qa', 'reports'}:
         active_tab = 'wiki'
     query = request.GET.get('q', '').strip()
+    tag_slug = request.GET.get('tag', '').strip()
+    current_tag = Tag.objects.filter(slug=tag_slug).first() if tag_slug else None
 
     context = {
         'active_tab': active_tab,
         'query': query,
+        'current_tag': current_tag,
     }
     context.update(get_kb_stats_context())
 
@@ -269,21 +314,22 @@ def forum_home(request):
     # sidebar filters, and "view all" links all pass `tab` explicitly, which
     # opts back into the single-type, paginated, filterable view below.
     if query and 'tab' not in request.GET:
-        wiki_matches = Article.objects.select_related('category', 'author').prefetch_related('tags').filter(
-            models.Q(title__icontains=query) | models.Q(content__icontains=query) |
-            models.Q(excerpt__icontains=query) | models.Q(category__name__icontains=query)
-        ).order_by('-updated_at')
-        qa_matches = Question.objects.select_related('author').prefetch_related('tags', 'tagged_users').annotate(
-            answer_count=Count('answers')
-        ).filter(
-            models.Q(title__icontains=query) | models.Q(body__icontains=query)
-        ).order_by('-created_at')
-        report_matches = Report.objects.select_related('application', 'reporter').prefetch_related('tags').annotate(
-            comment_count=Count('comments')
-        ).filter(
-            models.Q(title__icontains=query) | models.Q(description__icontains=query) |
-            models.Q(application__name__icontains=query)
-        ).order_by('-updated_at')
+        wiki_matches = _apply_search(
+            Article.objects.select_related('category', 'author').prefetch_related('tags'),
+            query, high_fields=['title', 'content', 'excerpt', 'tags__name'], low_fields=['category__name'],
+        ).order_by('-relevance', '-updated_at')
+        qa_matches = _apply_search(
+            Question.objects.select_related('author').prefetch_related('tags', 'tagged_users').annotate(
+                answer_count=Count('answers', distinct=True)
+            ),
+            query, high_fields=['title', 'body', 'tags__name'],
+        ).order_by('-relevance', '-created_at')
+        report_matches = _apply_search(
+            Report.objects.select_related('application', 'reporter').prefetch_related('tags').annotate(
+                comment_count=Count('comments', distinct=True)
+            ),
+            query, high_fields=['title', 'description', 'tags__name'], low_fields=['application__name'],
+        ).order_by('-relevance', '-updated_at')
 
         context.update(get_kb_sidebar_context())
         context.update({
@@ -299,16 +345,14 @@ def forum_home(request):
 
     if active_tab == 'wiki':
         articles = Article.objects.select_related('category', 'author', 'parent').prefetch_related('tags')
-        if query:
-            articles = articles.filter(
-                models.Q(title__icontains=query) |
-                models.Q(content__icontains=query) |
-                models.Q(excerpt__icontains=query) |
-                models.Q(category__name__icontains=query)
-            )
-        articles = articles.order_by('-updated_at')
+        articles = _apply_search(
+            articles, query, high_fields=['title', 'content', 'excerpt', 'tags__name'], low_fields=['category__name'],
+        )
+        if current_tag:
+            articles = articles.filter(tags=current_tag)
+        articles = articles.order_by('-relevance', '-updated_at') if query else articles.order_by('-updated_at')
 
-        if query:
+        if query or current_tag:
             # Flat, paginated results read better than a hierarchy built from a partial match set.
             hierarchy_articles = []
             other_articles_qs = articles
@@ -328,17 +372,18 @@ def forum_home(request):
     elif active_tab == 'qa':
         qa_status = request.GET.get('qa_status', 'all')
         questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags', 'tagged_users').annotate(
-            answer_count=Count('answers')
+            answer_count=Count('answers', distinct=True)
         )
-        if query:
-            questions = questions.filter(models.Q(title__icontains=query) | models.Q(body__icontains=query))
+        questions = _apply_search(questions, query, high_fields=['title', 'body', 'tags__name'])
+        if current_tag:
+            questions = questions.filter(tags=current_tag)
         if qa_status == 'solved':
             questions = questions.filter(is_solved=True)
         elif qa_status == 'unsolved':
             questions = questions.filter(is_solved=False)
         elif qa_status == 'tagged_to_me':
             questions = questions.filter(tagged_users=request.user)
-        questions = questions.order_by('-created_at')
+        questions = questions.order_by('-relevance', '-created_at') if query else questions.order_by('-created_at')
 
         page_obj = Paginator(questions, KB_PAGE_SIZE).get_page(request.GET.get('page'))
         context.update({
@@ -351,21 +396,20 @@ def forum_home(request):
         report_status = request.GET.get('report_status', 'all')
         report_priority = request.GET.get('report_priority', 'all')
         reports = Report.objects.select_related('application', 'reporter', 'assignee').prefetch_related('tags').annotate(
-            comment_count=Count('comments')
+            comment_count=Count('comments', distinct=True)
         )
-        if query:
-            reports = reports.filter(
-                models.Q(title__icontains=query) |
-                models.Q(description__icontains=query) |
-                models.Q(application__name__icontains=query)
-            )
+        reports = _apply_search(
+            reports, query, high_fields=['title', 'description', 'tags__name'], low_fields=['application__name'],
+        )
+        if current_tag:
+            reports = reports.filter(tags=current_tag)
         if report_type != 'all':
             reports = reports.filter(type=report_type)
         if report_status != 'all':
             reports = reports.filter(status=report_status)
         if report_priority != 'all':
             reports = reports.filter(priority=report_priority)
-        reports = reports.order_by('-updated_at')
+        reports = reports.order_by('-relevance', '-updated_at') if query else reports.order_by('-updated_at')
 
         page_obj = Paginator(reports, KB_PAGE_SIZE).get_page(request.GET.get('page'))
         context.update({
@@ -380,17 +424,38 @@ def forum_home(request):
 
 
 @login_required
+def tag_detail(request, slug):
+    tag = get_object_or_404(Tag, slug=slug)
+    wiki_matches = Article.objects.filter(tags=tag).select_related('category', 'author').prefetch_related('tags').order_by('-updated_at')
+    qa_matches = Question.objects.filter(tags=tag).select_related('author').prefetch_related('tags', 'tagged_users').annotate(
+        answer_count=Count('answers')
+    ).order_by('-created_at')
+    report_matches = Report.objects.filter(tags=tag).select_related('application', 'reporter').prefetch_related('tags').annotate(
+        comment_count=Count('comments')
+    ).order_by('-updated_at')
+
+    context = {
+        'tag': tag,
+        'active_tab': 'wiki',
+        'search_wiki_results': wiki_matches[:GLOBAL_SEARCH_LIMIT],
+        'search_wiki_total': wiki_matches.count(),
+        'search_qa_results': qa_matches[:GLOBAL_SEARCH_LIMIT],
+        'search_qa_total': qa_matches.count(),
+        'search_report_results': report_matches[:GLOBAL_SEARCH_LIMIT],
+        'search_report_total': report_matches.count(),
+    }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
+    return render(request, 'home/kb_tag_detail.html', context)
+
+
+@login_required
 def article_category(request, slug):
     category = get_object_or_404(Category, slug=slug)
     query = request.GET.get('q', '').strip()
     articles = Article.objects.filter(category=category).select_related('author', 'parent').prefetch_related('tags')
-    if query:
-        articles = articles.filter(
-            models.Q(title__icontains=query) |
-            models.Q(content__icontains=query) |
-            models.Q(excerpt__icontains=query)
-        )
-    articles = articles.order_by('-updated_at')
+    articles = _apply_search(articles, query, high_fields=['title', 'content', 'excerpt', 'tags__name'])
+    articles = articles.order_by('-relevance', '-updated_at') if query else articles.order_by('-updated_at')
 
     if query:
         hierarchy_articles = []
@@ -413,6 +478,36 @@ def article_category(request, slug):
 
 
 @login_required
+def user_profile(request, username):
+    profile_user = get_object_or_404(get_user_model(), username=username, is_active=True)
+    articles = Article.objects.filter(author=profile_user).select_related('category').order_by('-updated_at')
+    questions = Question.objects.filter(author=profile_user).annotate(
+        answer_count=Count('answers', distinct=True)
+    ).order_by('-created_at')
+    answers = Answer.objects.filter(author=profile_user).select_related('question').order_by('-created_at')
+    reports = Report.objects.filter(reporter=profile_user).select_related('application').order_by('-updated_at')
+
+    try:
+        home_profile = profile_user.home_profile
+    except UserProfile.DoesNotExist:
+        home_profile = None
+
+    context = {
+        'profile_user': profile_user,
+        'home_profile': home_profile,
+        'articles': articles[:GLOBAL_SEARCH_LIMIT],
+        'articles_total': articles.count(),
+        'questions': questions[:GLOBAL_SEARCH_LIMIT],
+        'questions_total': questions.count(),
+        'answers': answers[:GLOBAL_SEARCH_LIMIT],
+        'answers_total': answers.count(),
+        'reports': reports[:GLOBAL_SEARCH_LIMIT],
+        'reports_total': reports.count(),
+    }
+    return render(request, 'home/kb_profile.html', context)
+
+
+@login_required
 def article_detail(request, slug):
     article = get_object_or_404(
         Article.objects.select_related('category', 'author').prefetch_related('tags', 'comments__author', 'attachments'),
@@ -427,6 +522,7 @@ def article_detail(request, slug):
             comment.author = request.user
             _finalize_richtext(comment, form, 'body')
             comment.save()
+            _notify(article.author, request.user, 'commented on', article=article)
             messages.success(request, 'Comment added.')
             return redirect(article.get_absolute_url())
         messages.error(request, 'Please correct the errors below.')
@@ -448,8 +544,44 @@ def article_detail(request, slug):
     return render(request, 'home/kb_article_detail.html', context)
 
 
+@login_required
+def article_comment_update(request, pk):
+    comment = get_object_or_404(ArticleComment.objects.select_related('article'), pk=pk)
+    if not (request.user.is_staff or comment.author == request.user):
+        messages.error(request, 'You do not have permission to edit this comment.')
+        return redirect(comment.article.get_absolute_url())
+
+    form = ArticleCommentForm(request.POST or None, instance=comment)
+    if request.method == 'POST' and form.is_valid():
+        comment = form.save(commit=False)
+        _finalize_richtext(comment, form, 'body')
+        comment.save()
+        messages.success(request, 'Comment updated.')
+        return redirect(comment.article.get_absolute_url())
+
+    context = {'form': form, 'heading': 'Edit comment', 'back_url': comment.article.get_absolute_url()}
+    return render(request, 'home/kb_content_edit.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def article_comment_delete(request, pk):
+    comment = get_object_or_404(ArticleComment.objects.select_related('article'), pk=pk)
+    if not (request.user.is_staff or comment.author == request.user):
+        messages.error(request, 'You do not have permission to delete this comment.')
+        return redirect(comment.article.get_absolute_url())
+    article = comment.article
+    comment.delete()
+    messages.success(request, 'Comment deleted.')
+    return redirect(article.get_absolute_url())
+
+
 def _notify_tagged_users(request, question, users):
-    """Best-effort email to people newly tagged on a support request. Never raises."""
+    """In-app notification + best-effort email for people newly tagged on a support request."""
+    users = list(users)
+    for user in users:
+        _notify(user, question.author, 'tagged you on', question=question)
+
     recipients = [u.email for u in users if u.email and u.id != question.author_id]
     if not recipients:
         return
@@ -512,6 +644,7 @@ def question_detail(request, pk):
             answer.author = request.user
             _finalize_richtext(answer, form, 'body')
             answer.save()
+            _notify(question.author, request.user, 'contributed to', question=question)
             messages.success(request, 'Answer posted.')
             return redirect('kb-question-detail', pk=question.pk)
         messages.error(request, 'Please correct the errors below.')
@@ -588,8 +721,47 @@ def answer_accept(request, pk):
         question.accepted_answer = answer
         question.is_solved = True
         question.save(update_fields=['accepted_answer', 'is_solved'])
+        _notify(answer.author, request.user, 'accepted your answer to', question=question)
         messages.success(request, 'Answer marked as accepted.')
     return redirect('kb-question-detail', pk=question.pk)
+
+
+@login_required
+def answer_update(request, pk):
+    answer = get_object_or_404(Answer.objects.select_related('question'), pk=pk)
+    if not (request.user.is_staff or answer.author == request.user):
+        messages.error(request, 'You do not have permission to edit this contribution.')
+        return redirect(answer.question.get_absolute_url())
+
+    form = AnswerForm(request.POST or None, instance=answer)
+    if request.method == 'POST' and form.is_valid():
+        answer = form.save(commit=False)
+        _finalize_richtext(answer, form, 'body')
+        answer.save()
+        messages.success(request, 'Contribution updated.')
+        return redirect(answer.question.get_absolute_url())
+
+    context = {'form': form, 'heading': 'Edit contribution', 'back_url': answer.question.get_absolute_url()}
+    return render(request, 'home/kb_content_edit.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def answer_delete(request, pk):
+    answer = get_object_or_404(Answer.objects.select_related('question'), pk=pk)
+    if not (request.user.is_staff or answer.author == request.user):
+        messages.error(request, 'You do not have permission to delete this contribution.')
+        return redirect(answer.question.get_absolute_url())
+
+    question = answer.question
+    was_accepted = question.accepted_answer_id == answer.pk
+    answer.delete()
+    if was_accepted:
+        question.accepted_answer = None
+        question.is_solved = False
+        question.save(update_fields=['accepted_answer', 'is_solved'])
+    messages.success(request, 'Contribution deleted.')
+    return redirect(question.get_absolute_url())
 
 
 @login_required
@@ -607,6 +779,7 @@ def report_detail(request, pk):
             comment.author = request.user
             _finalize_richtext(comment, form, 'body')
             comment.save()
+            _notify(report.reporter, request.user, 'commented on', report=report)
             messages.success(request, 'Comment added.')
             return redirect('kb-report-detail', pk=report.pk)
         messages.error(request, 'Please correct the errors below.')
@@ -623,6 +796,38 @@ def report_detail(request, pk):
     context.update(get_kb_stats_context())
     context.update(get_kb_sidebar_context())
     return render(request, 'home/kb_report_detail.html', context)
+
+
+@login_required
+def report_comment_update(request, pk):
+    comment = get_object_or_404(ReportComment.objects.select_related('report'), pk=pk)
+    if not (request.user.is_staff or comment.author == request.user):
+        messages.error(request, 'You do not have permission to edit this comment.')
+        return redirect(comment.report.get_absolute_url())
+
+    form = ReportCommentForm(request.POST or None, instance=comment)
+    if request.method == 'POST' and form.is_valid():
+        comment = form.save(commit=False)
+        _finalize_richtext(comment, form, 'body')
+        comment.save()
+        messages.success(request, 'Comment updated.')
+        return redirect(comment.report.get_absolute_url())
+
+    context = {'form': form, 'heading': 'Edit comment', 'back_url': comment.report.get_absolute_url()}
+    return render(request, 'home/kb_content_edit.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def report_comment_delete(request, pk):
+    comment = get_object_or_404(ReportComment.objects.select_related('report'), pk=pk)
+    if not (request.user.is_staff or comment.author == request.user):
+        messages.error(request, 'You do not have permission to delete this comment.')
+        return redirect(comment.report.get_absolute_url())
+    report = comment.report
+    comment.delete()
+    messages.success(request, 'Comment deleted.')
+    return redirect(report.get_absolute_url())
 
 
 @login_required
@@ -668,6 +873,7 @@ def kb_create(request):
             question.save()
             form.save_m2m()
             question.tags.set(_resolve_tags(form.cleaned_data['tags']))
+            question.tagged_users.set(form.cleaned_data['tagged_users'])
 
             solution = form.cleaned_data.get('solution', '').strip()
             if already_solved and solution:
@@ -785,6 +991,7 @@ def question_update(request, pk):
         question.save()
         form.save_m2m()
         question.tags.set(_resolve_tags(form.cleaned_data['tags']))
+        question.tagged_users.set(form.cleaned_data['tagged_users'])
         newly_tagged = question.tagged_users.exclude(id__in=previously_tagged_ids)
         _notify_tagged_users(request, question, newly_tagged)
         messages.success(request, 'Support request updated.')
@@ -825,3 +1032,13 @@ def report_update(request, pk):
         'object': report,
     }
     return render(request, 'home/kb_create.html', context)
+
+
+@login_required
+def notifications_list(request):
+    notifications = list(
+        Notification.objects.filter(recipient=request.user)
+        .select_related('actor', 'question', 'report', 'article')[:50]
+    )
+    Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    return render(request, 'home/notifications.html', {'notifications': notifications})
