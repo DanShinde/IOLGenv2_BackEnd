@@ -3,12 +3,12 @@
     <div class="kb-logo"><i class="fas fa-book"></i></div>
     <div>
       <h1>Knowledge Base</h1>
-      <p>Wiki, Q and A, Bug Reports and Feature Requests</p>
+      <p>Articles, Support Requests, and Bug Reports &amp; Features</p>
     </div>
   </div>
   <form class="kb-search" method="get" action="{% url 'forum-home' %}">
     <i class="fas fa-search"></i>
-    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search articles, questions, or reports" />
+    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search articles, support requests, or reports" />
     <input type="hidden" name="tab" value="{{ active_tab|default:'wiki' }}">
   </form>
   <a class="kb-action" href="{% url 'kb-create' %}">
@@ -24,8 +24,8 @@
     <span>{{ total_articles }}</span>
   </a>
   <a class="kb-tab {% if active_tab == 'qa' %}active{% endif %}" href="{% url 'forum-home' %}?tab=qa{% if query %}&q={{ query|urlencode }}{% endif %}">
-    <i class="fas fa-comments"></i>
-    Q and A
+    <i class="fas fa-hands-helping"></i>
+    Support Requests
     <span>{{ total_questions }}</span>
   </a>
   <a class="kb-tab {% if active_tab == 'reports' %}active{% endif %}" href="{% url 'forum-home' %}?tab=reports{% if query %}&q={{ query|urlencode }}{% endif %}">

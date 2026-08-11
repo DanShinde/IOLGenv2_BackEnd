@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth import get_user_model
 from django.db import models
 
 from .models import Article, ArticleComment, Question, Answer, Report, ReportComment, Tag
@@ -75,14 +76,42 @@ class QuestionForm(forms.ModelForm):
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'kb-select'})
     )
+    tagged_users = forms.ModelMultipleChoiceField(
+        queryset=get_user_model().objects.filter(is_active=True).order_by('first_name', 'username'),
+        required=False,
+        label="Tag specific people",
+        help_text="They'll get an email pointing them at this request.",
+        widget=forms.SelectMultiple(attrs={'class': 'kb-select'})
+    )
+    already_solved = forms.BooleanField(
+        required=False,
+        label="I already solved this — share it as a learning post",
+        help_text="Skip the open request stage and publish your problem + solution together."
+    )
+    solution = forms.CharField(
+        required=False,
+        label="Solution",
+        widget=forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 6, 'placeholder': 'How did you solve it? Include the steps or fix so others can reuse it.'})
+    )
 
     class Meta:
         model = Question
-        fields = ['title', 'body', 'tags']
+        fields = ['title', 'body', 'tags', 'tagged_users']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'What do you want to know?'}),
             'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 8, 'placeholder': 'Add context, code, or links'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in ('tagged_users',):
+            self.fields[field].label_from_instance = lambda user: user.get_full_name() or user.username
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('already_solved') and not cleaned_data.get('solution', '').strip():
+            self.add_error('solution', 'Describe the solution, or uncheck "I already solved this".')
+        return cleaned_data
 
 
 class AnswerForm(forms.ModelForm):

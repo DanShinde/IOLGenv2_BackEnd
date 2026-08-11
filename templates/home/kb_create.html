@@ -9,7 +9,7 @@
     <div class="kb-create-header">
       <div>
         <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Contribute</h1>
-        <p style="margin: 4px 0 0; color: var(--kb-muted);">Create a wiki article, ask a question, or file a report.</p>
+        <p style="margin: 4px 0 0; color: var(--kb-muted);">Write a wiki article, raise a support request, or file a report.</p>
       </div>
       <a class="kb-back" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
     </div>
@@ -21,8 +21,8 @@
           <p style="margin: 0; color: var(--kb-muted);">Document processes, guides, and internal knowledge.</p>
         </a>
         <a class="kb-card" href="{% url 'kb-create' %}?type=qa">
-          <h3 style="margin: 0 0 8px;">Ask a Question</h3>
-          <p style="margin: 0; color: var(--kb-muted);">Get help from peers and share solutions.</p>
+          <h3 style="margin: 0 0 8px;">Raise a Support Request</h3>
+          <p style="margin: 0; color: var(--kb-muted);">Stuck on something — technical or not? Ask, tag someone who can help, or share something you've already solved.</p>
         </a>
         <a class="kb-card" href="{% url 'kb-create' %}?type=report">
           <h3 style="margin: 0 0 8px;">Submit a Report</h3>
@@ -90,15 +90,35 @@
           </div>
           {% endif %}
         {% elif content_type == 'qa' %}
-          <label class="kb-label">Question</label>
+          <label class="kb-label">What's the issue?</label>
           {{ form.title }}
           {{ form.title.errors }}
           <label class="kb-label">Details</label>
           {{ form.body }}
           {{ form.body.errors }}
-          <label class="kb-label">Tags</label>
-          {{ form.tags }}
-          {{ form.tags.errors }}
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Tags</label>
+              {{ form.tags }}
+              {{ form.tags.errors }}
+            </div>
+            <div>
+              <label class="kb-label">{{ form.tagged_users.label }}</label>
+              {{ form.tagged_users }}
+              {{ form.tagged_users.errors }}
+            </div>
+          </div>
+          {% if not object %}
+          <div id="kb-already-solved-toggle" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--kb-border); border-radius: var(--kb-radius-sm); background: var(--kb-surface-soft);">
+            {{ form.already_solved }}
+            <label for="{{ form.already_solved.id_for_label }}" style="margin: 0; font-size: 13px; color: var(--kb-text); cursor: pointer;">{{ form.already_solved.label }}</label>
+          </div>
+          <div id="kb-solution-field" style="display: none;">
+            <label class="kb-label">{{ form.solution.label }}</label>
+            {{ form.solution }}
+            {{ form.solution.errors }}
+          </div>
+          {% endif %}
         {% elif content_type == 'report' %}
           <div class="kb-row">
             <div>
@@ -164,6 +184,18 @@
 {% block scripts %}
 {{ form.media }}
 <script>
+  (function () {
+    const alreadySolved = document.getElementById('id_already_solved');
+    const solutionField = document.getElementById('kb-solution-field');
+    if (alreadySolved && solutionField) {
+      const syncSolutionVisibility = () => {
+        solutionField.style.display = alreadySolved.checked ? 'block' : 'none';
+      };
+      alreadySolved.addEventListener('change', syncSolutionVisibility);
+      syncSolutionVisibility();
+    }
+  })();
+
   (function () {
     const input = document.getElementById('id_attachments');
     const list = document.getElementById('kb-upload-list');

@@ -1,0 +1,21 @@
+<div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto;">
+    <h2 style="color: #1e1b4b;">You were tagged on a support request</h2>
+    <p style="color: #4b5563;">
+        {{ requester_name }} flagged you directly on this request because they think you might be able to help.
+    </p>
+
+    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin: 16px 0;">
+        <div style="font-size: 16px; font-weight: 700; color: #1e1b4b; margin-bottom: 8px;">{{ question.title }}</div>
+        <div style="font-size: 13px; color: #4b5563; white-space: pre-line;">{{ question.body|truncatewords:60 }}</div>
+    </div>
+
+    <p>
+        <a href="{{ url }}" style="display: inline-block; background: #4361ee; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            View and respond
+        </a>
+    </p>
+
+    <p style="color: #8992ab; font-size: 12px;">
+        Sent from the Knowledge Base — Support Requests.
+    </p>
+</div>

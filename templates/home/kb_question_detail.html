@@ -32,9 +32,11 @@
         <div style="flex: 1;">
           <div class="kb-meta" style="margin-bottom: 12px;">
             <span>{{ question.created_at|timesince }} ago</span>
-            <span>{{ question.answers.count }} answers</span>
+            <span>{{ question.answers.count }} contributions</span>
             {% if question.is_solved %}
             <span style="color: var(--kb-success); font-weight: 600;">Solved</span>
+            {% else %}
+            <span style="color: var(--kb-warning); font-weight: 600;">Open</span>
             {% endif %}
           </div>
           <h1 style="margin: 0 0 16px; font-family: 'Space Grotesk', sans-serif;">{{ question.title }}</h1>
@@ -44,17 +46,25 @@
             <span class="kb-tag">{{ tag.name }}</span>
             {% endfor %}
           </div>
+          {% if question.tagged_users.all %}
+          <div class="kb-meta" style="margin-top: 12px;">
+            <span>Tagged:</span>
+            {% for user in question.tagged_users.all %}
+            <span class="kb-pill kb-pill-app"><i class="fas fa-at"></i> {{ user.get_full_name|default:user.username }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
           <div class="kb-meta" style="margin-top: 16px;">
-            <span>Asked by {{ question.author.get_full_name|default:question.author.username }}</span>
+            <span>Raised by {{ question.author.get_full_name|default:question.author.username }}</span>
             {% if request.user == question.author or request.user.is_staff %}
-            <a class="kb-link" href="{% url 'kb-question-edit' question.pk %}">Edit question</a>
+            <a class="kb-link" href="{% url 'kb-question-edit' question.pk %}">Edit request</a>
             {% endif %}
           </div>
         </div>
       </div>
 
       <div class="kb-card">
-        <h2 style="margin: 0 0 16px;">Answers</h2>
+        <h2 style="margin: 0 0 16px;">Contributions</h2>
         {% for answer in answers %}
           <div class="kb-surface-soft {% if answer.is_accepted %}kb-answer-accepted{% endif %}" style="display: flex; gap: 16px; margin-bottom: 12px;">
             <div class="kb-vote">
@@ -92,17 +102,17 @@
             </div>
           </div>
         {% empty %}
-          <p style="color: var(--kb-text-muted);">No answers yet.</p>
+          <p style="color: var(--kb-text-muted);">No contributions yet — be the first to help.</p>
         {% endfor %}
       </div>
 
       <div class="kb-card">
-        <h2 style="margin: 0 0 16px;">Your Answer</h2>
+        <h2 style="margin: 0 0 16px;">Contribute a solution</h2>
         <form method="post">
           {% csrf_token %}
           {{ answer_form.body }}
           <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
-            <button class="kb-action" type="submit">Post Answer</button>
+            <button class="kb-action" type="submit">Post Contribution</button>
           </div>
         </form>
       </div>

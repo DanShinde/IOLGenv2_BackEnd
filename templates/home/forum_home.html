@@ -89,7 +89,7 @@
             <div style="display: flex; gap: 16px; align-items: flex-start;">
               <div style="display: flex; flex-direction: column; gap: 8px; align-items: center; min-width: 60px;">
                 <span class="kb-meta">{{ question.answer_count }}</span>
-                <span class="kb-meta">answers</span>
+                <span class="kb-meta">contributions</span>
               </div>
               <div style="flex: 1;">
                 <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
@@ -104,9 +104,12 @@
                     {% for tag in question.tags.all %}
                     <span class="kb-tag">{{ tag.name }}</span>
                     {% endfor %}
+                    {% for user in question.tagged_users.all %}
+                    <span class="kb-pill kb-pill-app"><i class="fas fa-at"></i> {{ user.get_full_name|default:user.username }}</span>
+                    {% endfor %}
                   </div>
                   <div class="kb-meta">
-                    <span>{{ question.answer_count }} answers</span>
+                    <span>{{ question.answer_count }} contributions</span>
                     <span>{{ question.author.get_full_name|default:question.author.username }} - {{ question.created_at|timesince }} ago</span>
                   </div>
                 </div>
@@ -115,7 +118,7 @@
           </a>
           {% empty %}
           <div class="kb-empty">
-            {% if query %}No questions match "{{ query }}".{% else %}No questions available yet.{% endif %}
+            {% if query %}No support requests match "{{ query }}".{% else %}No support requests yet. Be the first to raise one, or share something you've already solved.{% endif %}
           </div>
           {% endfor %}
           {% include 'home/_kb_pagination.html' %}

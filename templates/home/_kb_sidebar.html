@@ -25,15 +25,17 @@
       <input type="hidden" name="tab" value="qa">
       {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
       <select class="kb-select" name="qa_status" onchange="this.form.submit()">
-        <option value="all" {% if not qa_status or qa_status == 'all' %}selected{% endif %}>All questions</option>
+        <option value="all" {% if not qa_status or qa_status == 'all' %}selected{% endif %}>All requests</option>
         <option value="solved" {% if qa_status == 'solved' %}selected{% endif %}>Solved</option>
-        <option value="unsolved" {% if qa_status == 'unsolved' %}selected{% endif %}>Unsolved</option>
+        <option value="unsolved" {% if qa_status == 'unsolved' %}selected{% endif %}>Open</option>
+        <option value="tagged_to_me" {% if qa_status == 'tagged_to_me' %}selected{% endif %}>Tagged to me</option>
       </select>
     </form>
 
     <h3 style="margin-top: 20px;">Helpful tips</h3>
     <div class="kb-meta">
-      <span class="kb-stat"><i class="fas fa-check-circle"></i>Mark solutions</span>
+      <span class="kb-stat"><i class="fas fa-at"></i>Tag people directly</span>
+      <span class="kb-stat"><i class="fas fa-check-circle"></i>Mark the final solution</span>
       <span class="kb-stat"><i class="fas fa-search"></i>Search first</span>
     </div>
   {% elif active_tab == 'reports' %}

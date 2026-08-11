@@ -193,6 +193,12 @@ class Question(models.Model):
         related_name='accepted_for'
     )
     tags = models.ManyToManyField(Tag, blank=True, related_name='questions')
+    tagged_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='tagged_questions',
+        help_text="People specifically flagged to help with this request."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

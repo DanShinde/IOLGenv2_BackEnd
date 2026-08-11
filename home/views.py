@@ -2,11 +2,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import PermissionDenied
@@ -259,7 +261,7 @@ def forum_home(request):
         })
     elif active_tab == 'qa':
         qa_status = request.GET.get('qa_status', 'all')
-        questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags').annotate(
+        questions = Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags', 'tagged_users').annotate(
             answer_count=Count('answers')
         )
         if query:
@@ -268,6 +270,8 @@ def forum_home(request):
             questions = questions.filter(is_solved=True)
         elif qa_status == 'unsolved':
             questions = questions.filter(is_solved=False)
+        elif qa_status == 'tagged_to_me':
+            questions = questions.filter(tagged_users=request.user)
         questions = questions.order_by('-created_at')
 
         page_obj = Paginator(questions, KB_PAGE_SIZE).get_page(request.GET.get('page'))
@@ -377,6 +381,28 @@ def article_detail(request, slug):
     return render(request, 'home/kb_article_detail.html', context)
 
 
+def _notify_tagged_users(request, question, users):
+    """Best-effort email to people newly tagged on a support request. Never raises."""
+    recipients = [u.email for u in users if u.email and u.id != question.author_id]
+    if not recipients:
+        return
+    url = request.build_absolute_uri(question.get_absolute_url())
+    requester_name = question.author.get_full_name() or question.author.username
+    html_message = render_to_string('home/email/question_tagged.html', {
+        'question': question,
+        'requester_name': requester_name,
+        'url': url,
+    })
+    send_mail(
+        subject=f"You were tagged on a support request: {question.title}",
+        message=f"{requester_name} tagged you on a support request: {question.title}\n\n{url}",
+        from_email=None,
+        recipient_list=recipients,
+        html_message=html_message,
+        fail_silently=True,
+    )
+
+
 def _cast_vote(user, target, direction):
     """Toggle/switch a user's vote on a Question or Answer, keeping its `votes` counter in sync."""
     value = Vote.UP if direction == 'up' else Vote.DOWN
@@ -407,7 +433,7 @@ def _cast_vote(user, target, direction):
 @login_required
 def question_detail(request, pk):
     question = get_object_or_404(
-        Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags', 'answers__author'),
+        Question.objects.select_related('author', 'accepted_answer').prefetch_related('tags', 'tagged_users', 'answers__author'),
         pk=pk
     )
 
@@ -565,9 +591,22 @@ def kb_create(request):
         if request.method == 'POST' and form.is_valid():
             question = form.save(commit=False)
             question.author = request.user
+            already_solved = form.cleaned_data.get('already_solved')
+            if already_solved:
+                question.is_solved = True
             question.save()
             form.save_m2m()
-            messages.success(request, 'Question posted.')
+
+            solution = form.cleaned_data.get('solution', '').strip()
+            if already_solved and solution:
+                answer = Answer.objects.create(
+                    question=question, body=solution, author=request.user, is_accepted=True
+                )
+                question.accepted_answer = answer
+                question.save(update_fields=['accepted_answer'])
+
+            _notify_tagged_users(request, question, question.tagged_users.all())
+            messages.success(request, 'Support request posted.')
             return redirect(question.get_absolute_url())
         if request.method == 'POST' and form.errors:
             messages.error(request, 'Please correct the errors below.')
@@ -657,10 +696,14 @@ def question_update(request, pk):
         messages.error(request, 'You do not have permission to edit this question.')
         return redirect(question.get_absolute_url())
 
+    previously_tagged_ids = set(question.tagged_users.values_list('id', flat=True))
+
     form = QuestionForm(request.POST or None, instance=question)
     if request.method == 'POST' and form.is_valid():
         form.save()
-        messages.success(request, 'Question updated.')
+        newly_tagged = question.tagged_users.exclude(id__in=previously_tagged_ids)
+        _notify_tagged_users(request, question, newly_tagged)
+        messages.success(request, 'Support request updated.')
         return redirect(question.get_absolute_url())
 
     context = {
