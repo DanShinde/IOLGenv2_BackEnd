@@ -198,6 +198,14 @@
             </div>
             {% endif %}
           </div>
+          {% if not object %}
+          <div>
+            <label class="kb-label">Attachments</label>
+            {{ form.attachments }}
+            {{ form.attachments.errors }}
+            <div id="kb-upload-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+          {% endif %}
         {% elif content_type == 'qa' %}
           <label class="kb-label">Question</label>
           {{ form.title }}
@@ -251,12 +259,14 @@
               {{ form.tags.errors }}
             </div>
           </div>
+          {% if not object %}
           <div>
             <label class="kb-label">Screenshots</label>
             {{ form.attachments }}
             {{ form.attachments.errors }}
             <div id="kb-upload-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
           </div>
+          {% endif %}
         {% endif %}
 
         <div style="display: flex; justify-content: flex-end;">

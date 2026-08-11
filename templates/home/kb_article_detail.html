@@ -251,6 +251,42 @@
     text-decoration: none;
     font-size: 13px;
   }
+  .kb-attachment {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.2);
+    color: #e8e8ed;
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .kb-attachment:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .kb-textarea {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #e8e8ed;
+    padding: 12px;
+    font-size: 14px;
+  }
+  .kb-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: #fff;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+  }
 
   @media (max-width: 960px) {
     .kb-header {
@@ -299,8 +335,137 @@
           {% endif %}
         </div>
       </div>
+
+      {% if attachments %}
+      <div class="kb-card">
+        <h2 style="margin: 0 0 16px;">Attachments</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+          {% for attachment in attachments %}
+            {% if attachment.is_image %}
+            <button
+              type="button"
+              class="kb-thumb"
+              data-full="{{ attachment.file.url }}"
+              aria-label="Open attachment"
+              style="display: block; background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer;">
+              <img src="{{ attachment.file.url }}" alt="{{ attachment.filename }}" style="width: 100%; height: auto; border-radius: 10px;">
+            </button>
+            {% else %}
+            <a class="kb-attachment" href="{{ attachment.file.url }}" target="_blank" rel="noopener">
+              <i class="fas fa-file"></i>
+              {{ attachment.filename }}
+            </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <div id="kb-lightbox" style="position: fixed; inset: 0; background: rgba(6, 6, 12, 0.9); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 5vh 5vw;">
+        <button type="button" id="kb-lightbox-close" aria-label="Close preview" style="position: absolute; top: 20px; right: 24px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 20px; line-height: 1;">
+          &times;
+        </button>
+        <img id="kb-lightbox-image" alt="Attachment preview" style="width: 80vw; height: 80vh; object-fit: contain; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);">
+      </div>
+      {% endif %}
+
+      {% if revisions %}
+      <div class="kb-card">
+        <h2 style="margin: 0 0 16px;">Version history</h2>
+        {% for revision in revisions %}
+        <details style="margin-bottom: 10px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px;">
+          <summary style="cursor: pointer; color: rgba(255, 255, 255, 0.8); font-size: 13px;">
+            {{ revision.title }} &mdash; {{ revision.edited_by.get_full_name|default:revision.edited_by.username }} &middot; {{ revision.created_at|timesince }} ago
+          </summary>
+          <div style="margin-top: 12px;">
+            {% if request.user == article.author or request.user.is_staff %}
+            <form method="post" action="{% url 'kb-article-revision-restore' article.slug revision.pk %}" style="margin-bottom: 12px;" onsubmit="return confirm('Restore this version? The current version will be saved to history first.');">
+              {% csrf_token %}
+              <button type="submit" class="kb-action" style="padding: 4px 12px; font-size: 12px;">Restore this version</button>
+            </form>
+            {% endif %}
+            <div style="line-height: 1.7; color: rgba(255, 255, 255, 0.7);">{{ revision.content|safe }}</div>
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="kb-card">
+        <h2 style="margin: 0 0 16px;">Comments</h2>
+        {% for comment in comments %}
+          <div style="padding: 16px; border-radius: 12px; background: rgba(0, 0, 0, 0.25); margin-bottom: 12px;">
+            <p style="margin: 0 0 10px;">{{ comment.body }}</p>
+            <div class="kb-meta">
+              <span>{{ comment.author.get_full_name|default:comment.author.username }}</span>
+              <span>{{ comment.created_at|timesince }} ago</span>
+            </div>
+          </div>
+        {% empty %}
+          <p style="color: rgba(255, 255, 255, 0.6);">No comments yet.</p>
+        {% endfor %}
+      </div>
+
+      <div class="kb-card">
+        <h2 style="margin: 0 0 16px;">Add a comment</h2>
+        <form method="post">
+          {% csrf_token %}
+          {{ comment_form.body }}
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+            <button class="kb-action" type="submit">Post Comment</button>
+          </div>
+        </form>
+      </div>
     </div>
 
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const lightbox = document.getElementById('kb-lightbox');
+    const lightboxImg = document.getElementById('kb-lightbox-image');
+    const closeBtn = document.getElementById('kb-lightbox-close');
+    const thumbs = document.querySelectorAll('.kb-thumb');
+
+    if (!lightbox || !lightboxImg || !closeBtn || thumbs.length === 0) {
+      return;
+    }
+
+    function openLightbox(src) {
+      lightboxImg.src = src;
+      lightbox.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.style.display = 'none';
+      lightboxImg.src = '';
+      document.body.style.overflow = '';
+    }
+
+    thumbs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const src = btn.getAttribute('data-full');
+        if (src) {
+          openLightbox(src);
+        }
+      });
+    });
+
+    closeBtn.addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeLightbox();
+      }
+    });
+  })();
+</script>
 {% endblock %}

@@ -78,6 +78,23 @@ class TestVaultAuthRequiredMiddleware:
                 return redirect('loginw')
         return self.get_response(request)
 
+class KnowledgeBaseGroupRequiredMiddleware:
+    """
+    Blocks any URL under /forum/ (the Knowledge Base) unless the user is
+    authenticated and either staff or a member of the 'Knowledge Base' group.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path_info.startswith('/forum/'):
+            if not request.user.is_authenticated:
+                return redirect('loginw')
+            if not (request.user.is_staff or request.user.groups.filter(name='Knowledge Base').exists()):
+                return HttpResponseForbidden("Access denied. User not in Knowledge Base group.")
+        return self.get_response(request)
+
 class SkillGapGroupRequiredMiddleware:
     """
     Blocks any URL under /skillgap/ unless the user is authenticated

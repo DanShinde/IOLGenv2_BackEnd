@@ -27,10 +27,14 @@ class Command(BaseCommand):
         ]
 
         applications_data = [
-            {'name': 'Auth Service', 'slug': 'auth-service', 'description': 'Authentication and access control'},
-            {'name': 'Analytics Dashboard', 'slug': 'analytics-dashboard', 'description': 'Analytics and reporting'},
-            {'name': 'Notification Service', 'slug': 'notification-service', 'description': 'Email and notification delivery'},
-            {'name': 'Admin Portal', 'slug': 'admin-portal', 'description': 'Internal admin tooling'},
+            {'name': 'ACG', 'slug': 'acg', 'description': 'Automation cluster generator (ACGen)'},
+            {'name': 'One Designer', 'slug': 'one-designer', 'description': 'Segment and layout design tool'},
+            {'name': 'Tracker', 'slug': 'tracker', 'description': 'Project push/pull tracker'},
+            {'name': 'Inventory', 'slug': 'inventory', 'description': 'Tools and materials inventory, dispatch, and reservations'},
+            {'name': 'Planner', 'slug': 'planner', 'description': 'Project planning module'},
+            {'name': 'Skill Gap Analyzer', 'slug': 'skill-gap', 'description': 'Employee skill recording and gap analysis'},
+            {'name': 'TestVault', 'slug': 'testvault', 'description': 'Test case and equipment reference data'},
+            {'name': 'Knowledge Base', 'slug': 'knowledge-base', 'description': 'Wiki, Q&A, and bug/feature tracker'},
         ]
 
         created_categories = 0

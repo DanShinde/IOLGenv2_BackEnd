@@ -273,6 +273,53 @@
     border: none;
     cursor: pointer;
   }
+  .kb-action.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  .kb-vote {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 52px;
+  }
+  .kb-vote form {
+    margin: 0;
+  }
+  .kb-vote-btn {
+    width: 34px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .kb-vote-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e8e8ed;
+  }
+  .kb-vote-btn.active.up {
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.5);
+  }
+  .kb-vote-btn.active.down {
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.5);
+  }
+  .kb-vote-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .kb-vote-count {
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .kb-answer-accepted {
+    border: 1px solid rgba(34, 197, 94, 0.4) !important;
+  }
 
   @media (max-width: 960px) {
     .kb-header {
@@ -299,40 +346,82 @@
     <div class="kb-content-panel">
       <a class="kb-link" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
 
-      <div class="kb-card">
-        <div class="kb-meta" style="margin-bottom: 12px;">
-          <span>{{ question.created_at|timesince }} ago</span>
-          <span>{{ question.answers.count }} answers</span>
-          {% if question.is_solved %}
-          <span style="color: #86efac;">Solved</span>
-          {% endif %}
+      <div class="kb-card" style="display: flex; gap: 20px;">
+        <div class="kb-vote">
+          <form method="post" action="{% url 'kb-question-vote' question.pk 'up' %}">
+            {% csrf_token %}
+            <button type="submit" class="kb-vote-btn up {% if user_question_vote == 1 %}active up{% endif %}" title="Upvote" {% if question.author_id == request.user.id %}disabled{% endif %}>
+              <i class="fas fa-caret-up"></i>
+            </button>
+          </form>
+          <span class="kb-vote-count">{{ question.votes }}</span>
+          <form method="post" action="{% url 'kb-question-vote' question.pk 'down' %}">
+            {% csrf_token %}
+            <button type="submit" class="kb-vote-btn down {% if user_question_vote == -1 %}active down{% endif %}" title="Downvote" {% if question.author_id == request.user.id %}disabled{% endif %}>
+              <i class="fas fa-caret-down"></i>
+            </button>
+          </form>
         </div>
-        <h1 style="margin: 0 0 16px; font-family: 'Space Grotesk', sans-serif;">{{ question.title }}</h1>
-        <p style="color: rgba(255, 255, 255, 0.8); margin: 0 0 16px;">{{ question.body }}</p>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          {% for tag in question.tags.all %}
-          <span class="kb-tag">{{ tag.name }}</span>
-          {% endfor %}
-        </div>
-        <div class="kb-meta" style="margin-top: 16px;">
-          <span>Asked by {{ question.author.get_full_name|default:question.author.username }}</span>
-          {% if request.user == question.author or request.user.is_staff %}
-          <a class="kb-link" href="{% url 'kb-question-edit' question.pk %}">Edit question</a>
-          {% endif %}
+        <div style="flex: 1;">
+          <div class="kb-meta" style="margin-bottom: 12px;">
+            <span>{{ question.created_at|timesince }} ago</span>
+            <span>{{ question.answers.count }} answers</span>
+            {% if question.is_solved %}
+            <span style="color: #86efac;">Solved</span>
+            {% endif %}
+          </div>
+          <h1 style="margin: 0 0 16px; font-family: 'Space Grotesk', sans-serif;">{{ question.title }}</h1>
+          <p style="color: rgba(255, 255, 255, 0.8); margin: 0 0 16px;">{{ question.body }}</p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            {% for tag in question.tags.all %}
+            <span class="kb-tag">{{ tag.name }}</span>
+            {% endfor %}
+          </div>
+          <div class="kb-meta" style="margin-top: 16px;">
+            <span>Asked by {{ question.author.get_full_name|default:question.author.username }}</span>
+            {% if request.user == question.author or request.user.is_staff %}
+            <a class="kb-link" href="{% url 'kb-question-edit' question.pk %}">Edit question</a>
+            {% endif %}
+          </div>
         </div>
       </div>
 
       <div class="kb-card">
         <h2 style="margin: 0 0 16px;">Answers</h2>
         {% for answer in answers %}
-          <div style="padding: 16px; border-radius: 12px; background: rgba(0, 0, 0, 0.25); margin-bottom: 12px;">
-            <p style="margin: 0 0 10px;">{{ answer.body }}</p>
-            <div class="kb-meta">
-              <span>{{ answer.author.get_full_name|default:answer.author.username }}</span>
-              <span>{{ answer.created_at|timesince }} ago</span>
-              {% if answer.is_accepted %}
-              <span style="color: #86efac;">Accepted</span>
-              {% endif %}
+          <div style="display: flex; gap: 16px; padding: 16px; border-radius: 12px; background: rgba(0, 0, 0, 0.25); margin-bottom: 12px;" class="{% if answer.is_accepted %}kb-answer-accepted{% endif %}">
+            <div class="kb-vote">
+              <form method="post" action="{% url 'kb-answer-vote' answer.pk 'up' %}">
+                {% csrf_token %}
+                <button type="submit" class="kb-vote-btn up {% if answer.user_vote == 1 %}active up{% endif %}" title="Upvote" {% if answer.author_id == request.user.id %}disabled{% endif %}>
+                  <i class="fas fa-caret-up"></i>
+                </button>
+              </form>
+              <span class="kb-vote-count">{{ answer.votes }}</span>
+              <form method="post" action="{% url 'kb-answer-vote' answer.pk 'down' %}">
+                {% csrf_token %}
+                <button type="submit" class="kb-vote-btn down {% if answer.user_vote == -1 %}active down{% endif %}" title="Downvote" {% if answer.author_id == request.user.id %}disabled{% endif %}>
+                  <i class="fas fa-caret-down"></i>
+                </button>
+              </form>
+            </div>
+            <div style="flex: 1;">
+              <p style="margin: 0 0 10px;">{{ answer.body }}</p>
+              <div class="kb-meta">
+                <span>{{ answer.author.get_full_name|default:answer.author.username }}</span>
+                <span>{{ answer.created_at|timesince }} ago</span>
+                {% if answer.is_accepted %}
+                <span style="color: #86efac;"><i class="fas fa-check-circle"></i> Accepted</span>
+                {% endif %}
+                {% if can_accept_answer %}
+                <form method="post" action="{% url 'kb-answer-accept' answer.pk %}" style="margin: 0;">
+                  {% csrf_token %}
+                  <button type="submit" class="kb-action secondary" style="padding: 4px 12px; font-size: 12px;">
+                    {% if answer.is_accepted %}Unaccept{% else %}Accept answer{% endif %}
+                  </button>
+                </form>
+                {% endif %}
+              </div>
             </div>
           </div>
         {% empty %}

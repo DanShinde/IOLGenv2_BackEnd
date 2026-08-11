@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -17,6 +17,7 @@ from accounts.models import Info
 
 from .forms import (
     ArticleForm,
+    ArticleCommentForm,
     QuestionForm,
     AnswerForm,
     ReportForm,
@@ -24,12 +25,16 @@ from .forms import (
 )
 from .models import (
     Article,
+    ArticleAttachment,
+    ArticleComment,
+    ArticleRevision,
     Category,
     Question,
     Answer,
     Report,
     ReportComment,
     ReportAttachment,
+    Vote,
 )
 
 
@@ -339,16 +344,64 @@ def article_category(request, slug):
 
 @login_required
 def article_detail(request, slug):
-    article = get_object_or_404(Article.objects.select_related('category', 'author').prefetch_related('tags'), slug=slug)
+    article = get_object_or_404(
+        Article.objects.select_related('category', 'author').prefetch_related('tags', 'comments__author', 'attachments'),
+        slug=slug
+    )
+
+    if request.method == 'POST':
+        form = ArticleCommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.article = article
+            comment.author = request.user
+            comment.save()
+            messages.success(request, 'Comment added.')
+            return redirect(article.get_absolute_url())
+        messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ArticleCommentForm()
+
     Article.objects.filter(pk=article.pk).update(views=models.F('views') + 1)
     article.refresh_from_db(fields=['views'])
     context = {
         'article': article,
+        'comments': article.comments.all(),
+        'attachments': article.attachments.all(),
+        'revisions': article.revisions.select_related('edited_by')[:20],
+        'comment_form': form,
         'active_tab': 'wiki',
     }
     context.update(get_kb_stats_context())
     context.update(get_kb_sidebar_context())
     return render(request, 'home/kb_article_detail.html', context)
+
+
+def _cast_vote(user, target, direction):
+    """Toggle/switch a user's vote on a Question or Answer, keeping its `votes` counter in sync."""
+    value = Vote.UP if direction == 'up' else Vote.DOWN
+    lookup = {'user': user}
+    if isinstance(target, Question):
+        lookup['question'] = target
+    else:
+        lookup['answer'] = target
+
+    existing = Vote.objects.filter(**lookup).first()
+    if existing is None:
+        Vote.objects.create(value=value, **lookup)
+        delta = value
+    elif existing.value == value:
+        existing.delete()
+        delta = -value
+    else:
+        delta = value - existing.value
+        existing.value = value
+        existing.save(update_fields=['value'])
+
+    if delta:
+        type(target).objects.filter(pk=target.pk).update(votes=models.F('votes') + delta)
+        target.refresh_from_db(fields=['votes'])
+    return target.votes
 
 
 @login_required
@@ -371,15 +424,78 @@ def question_detail(request, pk):
     else:
         form = AnswerForm()
 
+    user_votes = {
+        vote.answer_id: vote.value
+        for vote in Vote.objects.filter(user=request.user, answer__question=question)
+    }
+    question_vote = Vote.objects.filter(user=request.user, question=question).first()
+
+    answers = list(question.answers.all())
+    for answer in answers:
+        answer.user_vote = user_votes.get(answer.id, 0)
+
     context = {
         'question': question,
-        'answers': question.answers.all(),
+        'answers': answers,
         'answer_form': form,
         'active_tab': 'qa',
+        'user_question_vote': question_vote.value if question_vote else 0,
+        'can_accept_answer': request.user.is_staff or question.author_id == request.user.id,
     }
     context.update(get_kb_stats_context())
     context.update(get_kb_sidebar_context())
     return render(request, 'home/kb_question_detail.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def question_vote(request, pk, direction):
+    if direction not in ('up', 'down'):
+        raise Http404
+    question = get_object_or_404(Question, pk=pk)
+    if question.author_id == request.user.id:
+        messages.error(request, "You can't vote on your own question.")
+    else:
+        _cast_vote(request.user, question, direction)
+    return redirect('kb-question-detail', pk=question.pk)
+
+
+@login_required
+@require_http_methods(['POST'])
+def answer_vote(request, pk, direction):
+    if direction not in ('up', 'down'):
+        raise Http404
+    answer = get_object_or_404(Answer.objects.select_related('question'), pk=pk)
+    if answer.author_id == request.user.id:
+        messages.error(request, "You can't vote on your own answer.")
+    else:
+        _cast_vote(request.user, answer, direction)
+    return redirect('kb-question-detail', pk=answer.question_id)
+
+
+@login_required
+@require_http_methods(['POST'])
+def answer_accept(request, pk):
+    answer = get_object_or_404(Answer.objects.select_related('question'), pk=pk)
+    question = answer.question
+    if not (request.user.is_staff or question.author_id == request.user.id):
+        messages.error(request, 'Only the question author can accept an answer.')
+        return redirect('kb-question-detail', pk=question.pk)
+
+    if question.accepted_answer_id == answer.pk:
+        Answer.objects.filter(pk=answer.pk).update(is_accepted=False)
+        question.accepted_answer = None
+        question.is_solved = False
+        question.save(update_fields=['accepted_answer', 'is_solved'])
+        messages.success(request, 'Answer unmarked as accepted.')
+    else:
+        Answer.objects.filter(question=question).update(is_accepted=False)
+        Answer.objects.filter(pk=answer.pk).update(is_accepted=True)
+        question.accepted_answer = answer
+        question.is_solved = True
+        question.save(update_fields=['accepted_answer', 'is_solved'])
+        messages.success(request, 'Answer marked as accepted.')
+    return redirect('kb-question-detail', pk=question.pk)
 
 
 @login_required
@@ -427,12 +543,19 @@ def kb_create(request):
         content_type = ''
 
     if content_type == 'wiki':
-        form = ArticleForm(request.POST or None, user=request.user)
+        form = ArticleForm(request.POST or None, request.FILES or None, user=request.user)
         if request.method == 'POST' and form.is_valid():
             article = form.save(commit=False)
             article.author = request.user
             article.save()
             form.save_m2m()
+            attachments = form.cleaned_data.get('attachments', [])
+            for uploaded_file in attachments:
+                ArticleAttachment.objects.create(
+                    article=article,
+                    file=uploaded_file,
+                    uploaded_by=request.user
+                )
             messages.success(request, 'Article created.')
             return redirect(article.get_absolute_url())
         if request.method == 'POST' and form.errors:
@@ -481,8 +604,15 @@ def article_update(request, slug):
         messages.error(request, 'You do not have permission to edit this article.')
         return redirect(article.get_absolute_url())
 
+    # Captured before the form binds, since Django's ModelForm mutates the
+    # instance in place during is_valid() -- reading article.* afterwards
+    # would already reflect the *new* values, not what's being replaced.
+    original = {'title': article.title, 'content': article.content, 'excerpt': article.excerpt}
+
     form = ArticleForm(request.POST or None, instance=article, user=request.user)
     if request.method == 'POST' and form.is_valid():
+        if set(form.changed_data) & {'title', 'content', 'excerpt'}:
+            ArticleRevision.objects.create(article=article, edited_by=request.user, **original)
         form.save()
         messages.success(request, 'Article updated.')
         return redirect(article.get_absolute_url())
@@ -493,6 +623,31 @@ def article_update(request, slug):
         'object': article,
     }
     return render(request, 'home/kb_create.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def article_revision_restore(request, slug, revision_pk):
+    article = get_object_or_404(Article, slug=slug)
+    if not (request.user.is_staff or article.author == request.user):
+        messages.error(request, 'You do not have permission to edit this article.')
+        return redirect(article.get_absolute_url())
+
+    revision = get_object_or_404(ArticleRevision, pk=revision_pk, article=article)
+
+    ArticleRevision.objects.create(
+        article=article,
+        title=article.title,
+        content=article.content,
+        excerpt=article.excerpt,
+        edited_by=request.user,
+    )
+    article.title = revision.title
+    article.content = revision.content
+    article.excerpt = revision.excerpt
+    article.save(update_fields=['title', 'content', 'excerpt', 'updated_at'])
+    messages.success(request, f'Restored the version from {revision.created_at:%Y-%m-%d %H:%M}.')
+    return redirect(article.get_absolute_url())
 
 
 @login_required

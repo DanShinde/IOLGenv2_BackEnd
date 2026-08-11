@@ -80,6 +80,7 @@ MIDDLEWARE = [
     'IOLGenv2_BackEnd.middleware.PlannerAuthRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.SkillGapGroupRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.TestVaultAuthRequiredMiddleware',
+    'IOLGenv2_BackEnd.middleware.KnowledgeBaseGroupRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

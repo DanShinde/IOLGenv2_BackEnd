@@ -111,6 +111,74 @@ class Article(models.Model):
         return reverse('kb-article-detail', kwargs={'slug': self.slug})
 
 
+class ArticleRevision(models.Model):
+    """Snapshot of an Article's content taken immediately before an edit overwrites it."""
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='revisions')
+    title = models.CharField(max_length=200)
+    content = RichTextUploadingField()
+    excerpt = models.CharField(max_length=500, blank=True)
+    edited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='article_revisions'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Revision of '{self.title}' at {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class ArticleComment(models.Model):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='article_comments')
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Comment by {self.author}"
+
+
+def article_attachment_upload_to(instance, filename):
+    return f"articles/{instance.article_id}/{filename}"
+
+
+ARTICLE_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
+
+
+class ArticleAttachment(models.Model):
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to=article_attachment_upload_to)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='article_uploads'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return self.file.name
+
+    @property
+    def is_image(self):
+        name = self.file.name.lower()
+        return any(name.endswith(ext) for ext in ARTICLE_IMAGE_EXTENSIONS)
+
+    @property
+    def filename(self):
+        return self.file.name.rsplit('/', 1)[-1]
+
+
 class Question(models.Model):
     title = models.CharField(max_length=300)
     body = models.TextField()
@@ -152,6 +220,35 @@ class Answer(models.Model):
 
     def __str__(self):
         return f"Answer by {self.author}"
+
+
+class Vote(models.Model):
+    UP = 1
+    DOWN = -1
+    VALUE_CHOICES = [(UP, 'Up'), (DOWN, 'Down')]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='kb_votes')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, null=True, blank=True, related_name='user_votes')
+    answer = models.ForeignKey(Answer, on_delete=models.CASCADE, null=True, blank=True, related_name='user_votes')
+    value = models.SmallIntegerField(choices=VALUE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'question'],
+                condition=models.Q(question__isnull=False),
+                name='unique_user_question_vote',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'answer'],
+                condition=models.Q(answer__isnull=False),
+                name='unique_user_answer_vote',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} voted {self.value} on {self.question_id or self.answer_id}"
 
 
 class Report(models.Model):

@@ -1,7 +1,7 @@
 from django import forms
 from django.db import models
 
-from .models import Article, Question, Answer, Report, ReportComment, Tag
+from .models import Article, ArticleComment, Question, Answer, Report, ReportComment, Tag
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -33,6 +33,11 @@ class ArticleForm(forms.ModelForm):
         queryset=Tag.objects.all(),
         required=False,
         widget=forms.SelectMultiple(attrs={'class': 'kb-select'})
+    )
+    attachments = MultipleFileField(
+        required=False,
+        label="Attachments",
+        help_text="Upload supporting files (images, PDFs, docs)"
     )
 
     class Meta:
@@ -132,6 +137,15 @@ class ReportForm(forms.ModelForm):
 class ReportCommentForm(forms.ModelForm):
     class Meta:
         model = ReportComment
+        fields = ['body']
+        widgets = {
+            'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 4, 'placeholder': 'Add a comment'}),
+        }
+
+
+class ArticleCommentForm(forms.ModelForm):
+    class Meta:
+        model = ArticleComment
         fields = ['body']
         widgets = {
             'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 4, 'placeholder': 'Add a comment'}),
