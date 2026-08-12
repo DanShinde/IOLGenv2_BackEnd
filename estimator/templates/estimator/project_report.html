@@ -2,6 +2,36 @@
 
 {% block title %}{{ project.name }} Report - Estimator{% endblock %}
 
+{% block extra_css %}
+<style>
+    .headline-days-card {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        border-radius: 16px;
+        padding: 1.75rem 2rem;
+        box-shadow: var(--card-shadow);
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .headline-days-value {
+        font-size: 3rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+    .headline-days-label {
+        font-size: 1.1rem;
+        font-weight: 600;
+        opacity: 0.9;
+    }
+    .headline-days-sublabel {
+        font-size: 0.85rem;
+        opacity: 0.75;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="animate-fade-in">
     <div class="page-header no-print">
@@ -33,26 +63,39 @@
     </div>
     {% endif %}
 
+    <div class="headline-days-card mb-3">
+        <div class="headline-days-value">{{ estimate.grand_total_days|floatformat:2 }}</div>
+        <div>
+            <div class="headline-days-label">Man-days</div>
+            <div class="headline-days-sublabel">@ {{ project.minutes_per_working_day }} min/working day</div>
+        </div>
+    </div>
+
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
+        {% for group in estimate.category_groups %}
+        <div class="col-md-6">
+            <div class="kpi-card {% if group.category == 'onsite_commissioning' %}warning{% else %}success{% endif %}">
+                <div class="kpi-value">{{ group.total_days|floatformat:2 }}</div>
+                <div class="kpi-label">{{ group.label }} &mdash; man-days</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-4">
             <div class="kpi-card">
                 <div class="kpi-value">{{ estimate.grand_total_minutes|floatformat:1 }}</div>
                 <div class="kpi-label">Total Minutes</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-4">
             <div class="kpi-card success">
                 <div class="kpi-value">{{ estimate.grand_total_hours|floatformat:2 }}</div>
                 <div class="kpi-label">Total Hours</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="kpi-card warning">
-                <div class="kpi-value">{{ estimate.grand_total_days|floatformat:2 }}</div>
-                <div class="kpi-label">Man-days</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
+        <div class="col-4">
             <div class="kpi-card">
                 <div class="kpi-value">{{ estimate.rows|length }}</div>
                 <div class="kpi-label">Module Rows</div>
@@ -92,8 +135,12 @@
         </div>
     </div>
 
+    {% for group in estimate.category_groups %}
     <div class="card mb-3">
-        <div class="card-header"><i class="bi bi-grid-3x3-gap me-2"></i>Activity-wise Breakdown</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-grid-3x3-gap me-2"></i>{{ group.label }} &mdash; Activity-wise Breakdown</span>
+            <span class="badge bg-primary bg-opacity-10 text-primary">{{ group.total_days|floatformat:2 }} man-days</span>
+        </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
@@ -102,28 +149,34 @@
                             <th>Segment</th>
                             <th>Module Type</th>
                             <th>Count</th>
-                            {% for a in estimate.activities %}<th class="text-end">{{ a.name }}</th>{% endfor %}
+                            {% for a in group.activities %}<th class="text-end">{{ a.name }}</th>{% endfor %}
+                            <th class="text-end">Row Total (min)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for row in estimate.rows %}
+                        {% for row in group.rows %}
                         <tr>
                             <td>{{ row.segment.name }}</td>
                             <td class="fw-semibold">{{ row.module_type.name }}</td>
                             <td>{{ row.count }}</td>
                             {% for act_data in row.activities %}<td class="text-end">{{ act_data.minutes|floatformat:1 }}</td>{% endfor %}
+                            <td class="text-end fw-semibold">{{ row.row_total_minutes|floatformat:1 }}</td>
                         </tr>
+                        {% empty %}
+                        <tr><td colspan="{{ group.activities|length|add:4 }}" class="text-muted text-center py-3">No module rows.</td></tr>
                         {% endfor %}
                         <tr class="fw-bold" style="background:#eef2ff;">
                             <td>Activity Total</td>
                             <td></td>
                             <td></td>
-                            {% for at in estimate.activity_totals %}<td class="text-end">{{ at.total_minutes|floatformat:1 }}</td>{% endfor %}
+                            {% for at in group.activity_totals %}<td class="text-end">{{ at.total_minutes|floatformat:1 }}</td>{% endfor %}
+                            <td class="text-end">{{ group.total_minutes|floatformat:1 }}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
+    {% endfor %}
 </div>
 {% endblock %}

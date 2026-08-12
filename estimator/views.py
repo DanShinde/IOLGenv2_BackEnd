@@ -12,7 +12,7 @@ from .calculations import build_project_estimate
 from .exports import render_project_report_excel, render_project_report_pdf
 from .forms import ActivityForm, ComplexityLevelForm, ModuleTypeForm, ProjectForm, SegmentForm
 from .mixins import CancelUrlMixin, ProtectedDeleteMixin, StaffRequiredMixin
-from .models import Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule, Segment
+from .models import Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule, Segment, TimeUnit
 
 
 def safe_json(data):
@@ -136,10 +136,10 @@ class ModuleTypeSegmentsView(LoginRequiredMixin, StaffRequiredMixin, TemplateVie
 
 class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
     """The Module Configuration grid for one (Module Type, Segment) combination: every
-    Activity as a row with an editable 'minutes per module' field, saved in one bulk
-    POST. Each row also accepts an alternate batch entry ('minutes for N modules'),
+    Activity as a row with an editable time value and a unit (seconds/minutes/hours/
+    days). Each row also accepts an alternate batch entry ('N modules take X total'),
     mutually exclusive with the single-module field -- whichever is filled in is used;
-    the other must be left blank."""
+    the other must be left blank. Saved in one bulk POST."""
 
     template_name = 'estimator/module_type_matrix.html'
 
@@ -156,26 +156,32 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
         existing = {t.activity_id: t for t in ModuleActivityTime.objects.filter(module_type=module_type, segment=segment)}
         context['module_type'] = module_type
         context['segment'] = segment
+        context['time_units'] = TimeUnit.choices
         context['rows'] = [
             {
                 'activity': a,
-                'minutes': existing[a.id].minutes if a.id in existing and not existing[a.id].batch_count else '',
+                'unit': existing[a.id].unit if a.id in existing else TimeUnit.MINUTES,
+                'value': existing[a.id].value if a.id in existing else '',
                 'batch_count': existing[a.id].batch_count if a.id in existing else '',
-                'batch_minutes': existing[a.id].batch_minutes if a.id in existing else '',
+                'batch_value': existing[a.id].batch_value if a.id in existing else '',
             }
-            for a in Activity.objects.order_by('display_order', 'name')
+            for a in Activity.objects.order_by('category', 'display_order', 'name')
         ]
         return context
 
     def post(self, request, *args, **kwargs):
         module_type = self.get_module_type()
         segment = self.get_segment()
+        valid_units = {choice for choice, _ in TimeUnit.choices}
 
         for activity in Activity.objects.all():
-            single_raw = request.POST.get(f'minutes_{activity.id}', '').strip()
+            unit = request.POST.get(f'unit_{activity.id}', TimeUnit.MINUTES).strip()
+            if unit not in valid_units:
+                unit = TimeUnit.MINUTES
+            single_raw = request.POST.get(f'value_{activity.id}', '').strip()
             batch_count_raw = request.POST.get(f'batch_count_{activity.id}', '').strip()
-            batch_minutes_raw = request.POST.get(f'batch_minutes_{activity.id}', '').strip()
-            batch_raw = batch_count_raw or batch_minutes_raw
+            batch_value_raw = request.POST.get(f'batch_value_{activity.id}', '').strip()
+            batch_raw = batch_count_raw or batch_value_raw
 
             if single_raw and batch_raw:
                 messages.error(request, f"'{activity.name}': fill in either a single-module time OR a batch time, not both -- row skipped.")
@@ -185,33 +191,33 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
 
             if single_raw:
                 try:
-                    minutes = float(single_raw)
+                    value = float(single_raw)
                 except ValueError:
                     messages.error(request, f"Ignored invalid value for '{activity.name}'.")
                     continue
-                if minutes < 0:
+                if value < 0:
                     messages.error(request, f"Ignored negative value for '{activity.name}'.")
                     continue
                 ModuleActivityTime.objects.update_or_create(
                     module_type=module_type, segment=segment, activity=activity,
-                    defaults={'minutes': minutes, 'batch_count': None, 'batch_minutes': None},
+                    defaults={'unit': unit, 'value': value, 'batch_count': None, 'batch_value': None},
                 )
             else:
-                if not batch_count_raw or not batch_minutes_raw:
+                if not batch_count_raw or not batch_value_raw:
                     messages.error(request, f"'{activity.name}': batch entry needs both a module count and a total time -- row skipped.")
                     continue
                 try:
                     batch_count = int(batch_count_raw)
-                    batch_minutes = float(batch_minutes_raw)
+                    batch_value = float(batch_value_raw)
                 except ValueError:
                     messages.error(request, f"Ignored invalid batch value for '{activity.name}'.")
                     continue
-                if batch_count < 1 or batch_minutes < 0:
+                if batch_count < 1 or batch_value < 0:
                     messages.error(request, f"Ignored invalid batch value for '{activity.name}'.")
                     continue
                 ModuleActivityTime.objects.update_or_create(
                     module_type=module_type, segment=segment, activity=activity,
-                    defaults={'batch_count': batch_count, 'batch_minutes': batch_minutes},
+                    defaults={'unit': unit, 'value': None, 'batch_count': batch_count, 'batch_value': batch_value},
                 )
 
         messages.success(request, f'Time matrix for "{module_type.name}" / "{segment.name}" saved.')
@@ -395,8 +401,11 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         module_types = list(ModuleType.objects.order_by('name'))
         complexity_levels = list(ComplexityLevel.objects.order_by('display_order', 'multiplier'))
         activities = estimate['activities']
+        # Resolved for *this* project's own minutes_per_working_day, so a 'day'-unit
+        # matrix cell contributes the right number of minutes here even though it isn't
+        # a fixed conversion across projects.
         matrix = {
-            (t.segment_id, t.module_type_id, t.activity_id): float(t.minutes)
+            (t.segment_id, t.module_type_id, t.activity_id): float(t.effective_minutes(project.minutes_per_working_day))
             for t in ModuleActivityTime.objects.all()
         }
 
@@ -405,7 +414,7 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         context['complexity_levels_json'] = safe_json([
             {'id': c.id, 'name': c.name, 'multiplier': float(c.multiplier)} for c in complexity_levels
         ])
-        context['activities_json'] = safe_json([{'id': a.id, 'name': a.name} for a in activities])
+        context['activities_json'] = safe_json([{'id': a.id, 'name': a.name, 'category': a.category} for a in activities])
         context['matrix_json'] = safe_json({
             f"{seg_id}_{mt_id}_{act_id}": mins for (seg_id, mt_id, act_id), mins in matrix.items()
         })

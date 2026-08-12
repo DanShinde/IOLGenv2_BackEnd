@@ -32,7 +32,8 @@ def _filename(project, ext):
 def render_project_report_excel(estimate):
     wb = Workbook()
     _write_summary_sheet(wb.active, estimate)
-    _write_breakdown_sheet(wb.create_sheet('Activity Breakdown'), estimate)
+    for group in estimate['category_groups']:
+        _write_breakdown_sheet(wb.create_sheet(group['label'][:31]), group)
 
     buffer = BytesIO()
     wb.save(buffer)
@@ -53,13 +54,27 @@ def _write_summary_sheet(ws, estimate):
 
     ws['A1'] = f"Estimate: {project.name}"
     ws['A1'].font = Font(size=16, bold=True, color='1E293B')
-    ws.merge_cells('A1:D1')
+    ws.merge_cells('A1:E1')
 
-    ws['A2'] = f"Customer: {project.customer or '-'}   |   Complexity: {project.complexity.name} (x{project.complexity.multiplier})"
-    ws['A2'].font = Font(italic=True, color='64748B')
-    ws.merge_cells('A2:D2')
+    # Headline figure: the final report is about man-days above all else.
+    ws['A2'] = f"{float(estimate['grand_total_days']):.2f} man-days"
+    ws['A2'].font = Font(size=22, bold=True, color='4F46E5')
+    ws.merge_cells('A2:E2')
+    ws['A3'] = f"@ {project.minutes_per_working_day} min/working day"
+    ws['A3'].font = Font(italic=True, color='64748B')
+    ws.merge_cells('A3:E3')
 
-    row = 4
+    ws['A4'] = f"Customer: {project.customer or '-'}   |   Complexity: {project.complexity.name} (x{project.complexity.multiplier})"
+    ws['A4'].font = Font(italic=True, color='64748B')
+    ws.merge_cells('A4:E4')
+
+    row = 5
+    for group in estimate['category_groups']:
+        row += 1
+        ws.cell(row=row, column=1, value=f"{group['label']}:").font = Font(bold=True, color='64748B')
+        ws.cell(row=row, column=2, value=f"{float(group['total_days']):.2f} man-days").font = Font(bold=True, color='4F46E5')
+
+    row += 2
     headers = ['Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)']
     for col, header in enumerate(headers, start=1):
         cell = ws.cell(row=row, column=col, value=header)
@@ -89,10 +104,10 @@ def _write_summary_sheet(ws, estimate):
     ws.column_dimensions['E'].width = 16
 
 
-def _write_breakdown_sheet(ws, estimate):
+def _write_breakdown_sheet(ws, group):
     ws.sheet_view.showGridLines = False
-    activities = estimate['activities']
-    rows = estimate['rows']
+    activities = group['activities']
+    rows = group['rows']
 
     ws.cell(row=1, column=1, value='Segment').font = HEADER_FONT
     ws.cell(row=1, column=1).fill = HEADER_FILL
@@ -123,11 +138,15 @@ def _write_breakdown_sheet(ws, estimate):
     ws.cell(row=total_row, column=1).fill = TOTAL_FILL
     ws.cell(row=total_row, column=2).fill = TOTAL_FILL
     ws.cell(row=total_row, column=3).fill = TOTAL_FILL
-    for col, at in enumerate(estimate['activity_totals'], start=4):
+    for col, at in enumerate(group['activity_totals'], start=4):
         cell = ws.cell(row=total_row, column=col, value=float(at['total_minutes']))
         cell.font = Font(bold=True)
         cell.fill = TOTAL_FILL
         cell.alignment = Alignment(horizontal='center')
+
+    days_row = total_row + 2
+    ws.cell(row=days_row, column=1, value=f"{group['label']} total").font = Font(bold=True, color='4F46E5')
+    ws.cell(row=days_row, column=2, value=f"{float(group['total_days']):.2f} man-days").font = Font(bold=True, size=13, color='4F46E5')
 
     ws.column_dimensions['A'].width = 18
     ws.column_dimensions['B'].width = 22
@@ -146,16 +165,21 @@ def render_project_report_pdf(estimate):
     )
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('ReportTitle', parent=styles['Title'], textColor=colors.HexColor('#1E293B'))
+    headline_style = ParagraphStyle('Headline', parent=styles['Title'], fontSize=32, leading=36,
+                                     textColor=colors.HexColor('#4F46E5'), spaceBefore=4, spaceAfter=0)
     heading_style = ParagraphStyle('SectionHeading', parent=styles['Heading2'], textColor=colors.HexColor('#1E293B'),
                                     spaceBefore=14, spaceAfter=6)
     meta_style = ParagraphStyle('Meta', parent=styles['Normal'], textColor=colors.HexColor('#64748B'))
 
     story = [
         Paragraph(f"Estimate: {project.name}", title_style),
+        # The final report is about man-days above all else -- lead with it.
+        Paragraph(f"{estimate['grand_total_days']:.2f} man-days", headline_style),
+        Paragraph(f"@ {estimate['minutes_per_day']} min/working day", meta_style),
+        Spacer(1, 0.3 * cm),
         Paragraph(
             f"Customer: {project.customer or '-'} &nbsp;|&nbsp; "
-            f"Complexity: {project.complexity.name} (x{project.complexity.multiplier}) &nbsp;|&nbsp; "
-            f"Minutes/day: {estimate['minutes_per_day']}",
+            f"Complexity: {project.complexity.name} (x{project.complexity.multiplier})",
             meta_style,
         ),
         Spacer(1, 0.4 * cm),
@@ -169,8 +193,13 @@ def render_project_report_pdf(estimate):
     story.append(Paragraph('Module Summary', heading_style))
     story.append(_module_summary_table(estimate))
 
-    story.append(Paragraph('Activity-wise Breakdown', heading_style))
-    story.extend(_activity_breakdown_tables(estimate))
+    for group in estimate['category_groups']:
+        story.append(Paragraph(
+            f"{group['label']} &mdash; Activity-wise Breakdown "
+            f"<font color='#4F46E5'>({group['total_days']:.2f} man-days)</font>",
+            heading_style,
+        ))
+        story.extend(_activity_breakdown_tables(group))
 
     story.append(Spacer(1, 0.3 * cm))
     story.append(_grand_total_table(estimate))
@@ -209,9 +238,9 @@ def _module_summary_table(estimate):
 EMPLOYEES_PER_CHUNK = 6  # activity columns per PDF table chunk, so wide matrices still fit the page
 
 
-def _activity_breakdown_tables(estimate):
-    activities = estimate['activities']
-    rows = estimate['rows']
+def _activity_breakdown_tables(group):
+    activities = group['activities']
+    rows = group['rows']
     flowables = []
 
     for chunk_start in range(0, len(activities), EMPLOYEES_PER_CHUNK):
@@ -225,7 +254,7 @@ def _activity_breakdown_tables(estimate):
                 row_vals.append(f"{act_by_id[a.id]['minutes']:.1f}")
             data.append(row_vals)
 
-        totals_by_id = {at['activity'].id: at for at in estimate['activity_totals']}
+        totals_by_id = {at['activity'].id: at for at in group['activity_totals']}
         total_row = ['Activity Total', '', '']
         for a in chunk:
             total_row.append(f"{totals_by_id[a.id]['total_minutes']:.1f}")
@@ -251,11 +280,11 @@ def _activity_breakdown_tables(estimate):
 
 def _grand_total_table(estimate):
     data = [
-        ['Grand Total (minutes)', 'Hours', 'Man-days'],
+        ['Man-days', 'Hours', 'Minutes'],
         [
-            f"{estimate['grand_total_minutes']:.1f}",
-            f"{estimate['grand_total_hours']:.2f}",
             f"{estimate['grand_total_days']:.2f}",
+            f"{estimate['grand_total_hours']:.2f}",
+            f"{estimate['grand_total_minutes']:.1f}",
         ],
     ]
     table = Table(data, colWidths=[7 * cm] * 3)

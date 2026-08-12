@@ -23,6 +23,13 @@
                         <th>Updated</th>
                         <th class="text-end">Actions</th>
                     </tr>
+                    <tr class="table-filter-row">
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Name..." onkeyup="filterTable(this)"></th>
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterTable(this)"></th>
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Complexity..." onkeyup="filterTable(this)"></th>
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Updated..." onkeyup="filterTable(this)"></th>
+                        <th></th> {# No filter for Actions #}
+                    </tr>
                 </thead>
                 <tbody>
                     {% for project in projects %}
@@ -52,4 +59,40 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filterTable(inputEl) {
+        const table = inputEl.closest('table');
+        const filterRow = table.querySelector('.table-filter-row');
+        const tableBody = table.querySelector('tbody');
+        const dataRows = tableBody.querySelectorAll('tr');
+
+        const filterInputs = Array.from(filterRow.querySelectorAll('th'));
+        const filters = {};
+        filterInputs.forEach((th, index) => {
+            const input = th.querySelector('input');
+            if (input && input.value !== '') {
+                filters[index] = input.value.toUpperCase();
+            }
+        });
+
+        dataRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length === 0) return;
+
+            let rowVisible = true;
+            for (const colIndex in filters) {
+                const filterText = filters[colIndex];
+                const cellText = cells[colIndex] ? cells[colIndex].textContent.toUpperCase() : '';
+                if (!cellText.includes(filterText)) {
+                    rowVisible = false;
+                    break;
+                }
+            }
+            row.style.display = rowVisible ? "" : "none";
+        });
+    }
+</script>
 {% endblock %}

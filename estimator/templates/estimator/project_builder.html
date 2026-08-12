@@ -119,9 +119,13 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header"><i class="bi bi-bar-chart-steps me-2"></i>Activity-wise Totals</div>
-        <div class="card-body">
+    {% if estimate.category_groups %}
+        {% for group in estimate.category_groups %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bar-chart-steps me-2"></i>{{ group.label }} &mdash; Activity-wise Totals</span>
+                <span class="badge bg-primary bg-opacity-10 text-primary category-days-badge" data-category="{{ group.category }}">{{ group.total_days|floatformat:2 }} man-days</span>
+            </div>
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <thead>
@@ -131,19 +135,29 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for at in estimate.activity_totals %}
+                        {% for at in group.activity_totals %}
                         <tr>
                             <td>{{ at.activity.name }}</td>
                             <td class="text-end activity-total-cell" data-activity-id="{{ at.activity.id }}">{{ at.total_minutes|floatformat:1 }}</td>
                         </tr>
-                        {% empty %}
-                        <tr><td colspan="2" class="text-muted text-center py-3">No activities configured yet.</td></tr>
                         {% endfor %}
+                        <tr class="fw-bold" style="background:#eef2ff;">
+                            <td>{{ group.label }} Total</td>
+                            <td class="text-end category-total-cell" data-category="{{ group.category }}">{{ group.total_minutes|floatformat:1 }}</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
+        {% endfor %}
+    {% else %}
+    <div class="card">
+        <div class="empty-state">
+            <i class="bi bi-bar-chart-steps"></i>
+            <p>No activities configured yet.</p>
+        </div>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -218,6 +232,8 @@
         const rows = document.querySelectorAll('#moduleRowsBody .module-row');
         const activityTotals = {};
         ACTIVITIES.forEach(a => activityTotals[a.id] = 0);
+        const categoryTotals = {};
+        ACTIVITIES.forEach(a => categoryTotals[a.category] = 0);
         let grandTotal = 0;
         const warningTypes = new Set();
 
@@ -236,6 +252,7 @@
                     const base = MATRIX[key] || 0;
                     const minutes = base * count * factor;
                     activityTotals[a.id] += minutes;
+                    categoryTotals[a.category] += minutes;
                     rowTotal += minutes;
                 });
                 if (!hasAny && moduleTypeById[mtId] && segmentById[segId]) {
@@ -249,6 +266,13 @@
         ACTIVITIES.forEach(a => {
             const cell = document.querySelector(`.activity-total-cell[data-activity-id="${a.id}"]`);
             if (cell) cell.textContent = activityTotals[a.id].toFixed(1);
+        });
+
+        Object.keys(categoryTotals).forEach(category => {
+            const totalCell = document.querySelector(`.category-total-cell[data-category="${category}"]`);
+            if (totalCell) totalCell.textContent = categoryTotals[category].toFixed(1);
+            const daysBadge = document.querySelector(`.category-days-badge[data-category="${category}"]`);
+            if (daysBadge) daysBadge.textContent = (categoryTotals[category] / MINUTES_PER_DAY).toFixed(2) + ' man-days';
         });
 
         document.getElementById('kpiGrandMinutes').textContent = grandTotal.toFixed(1);

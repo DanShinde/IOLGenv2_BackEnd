@@ -18,7 +18,7 @@ class BootstrapFormMixin:
 class ActivityForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Activity
-        fields = ['name', 'description', 'display_order']
+        fields = ['name', 'category', 'description', 'display_order']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Programming'}),
             'description': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional description'}),

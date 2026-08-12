@@ -15,7 +15,10 @@
         <div class="card-body">
             <p class="text-muted">
                 For each activity, fill in <strong>either</strong> a single-module time <strong>or</strong> a batch time
-                (e.g. "10 modules take 20 min total") &mdash; not both. Leave both blank if this activity doesn't apply.
+                (e.g. "10 modules take 20 min total") &mdash; not both. Pick whichever unit is most convenient
+                (seconds, minutes, hours, or days). "Days" always means that <em>project's own</em> working-day
+                length, resolved when the estimate is calculated &mdash; not a fixed 24 hours. Leave both blank if
+                this activity doesn't apply.
             </p>
             {% if rows %}
             <form method="POST">
@@ -25,18 +28,24 @@
                         <thead>
                             <tr>
                                 <th>Activity</th>
-                                <th style="width: 200px;">Minutes per module</th>
-                                <th class="text-center" style="width: 40px;">or</th>
-                                <th style="width: 320px;">Batch: modules &amp; total minutes</th>
+                                <th style="width: 150px;">Per module</th>
+                                <th class="text-center" style="width: 30px;">or</th>
+                                <th style="width: 260px;">Batch: modules &amp; total</th>
+                                <th style="width: 130px;">Unit</th>
                             </tr>
                         </thead>
                         <tbody id="matrixRowsBody">
-                            {% for row in rows %}
+                            {% regroup rows by activity.get_category_display as category_rows %}
+                            {% for category in category_rows %}
+                            <tr class="table-light">
+                                <td colspan="5" class="fw-bold text-primary"><i class="bi bi-tag me-1"></i>{{ category.grouper }}</td>
+                            </tr>
+                            {% for row in category.list %}
                             <tr class="matrix-row" data-activity-id="{{ row.activity.id }}">
                                 <td class="fw-semibold">{{ row.activity.name }}</td>
                                 <td>
-                                    <input type="number" min="0" step="0.1" class="form-control single-input"
-                                           name="minutes_{{ row.activity.id }}" value="{{ row.minutes }}" placeholder="0">
+                                    <input type="number" min="0" step="0.01" class="form-control single-input"
+                                           name="value_{{ row.activity.id }}" value="{{ row.value }}" placeholder="0">
                                 </td>
                                 <td class="text-center text-muted">or</td>
                                 <td>
@@ -44,11 +53,19 @@
                                         <input type="number" min="1" step="1" class="form-control batch-count-input"
                                                name="batch_count_{{ row.activity.id }}" value="{{ row.batch_count }}" placeholder="modules">
                                         <span class="input-group-text">=</span>
-                                        <input type="number" min="0" step="0.1" class="form-control batch-minutes-input"
-                                               name="batch_minutes_{{ row.activity.id }}" value="{{ row.batch_minutes }}" placeholder="total min">
+                                        <input type="number" min="0" step="0.01" class="form-control batch-value-input"
+                                               name="batch_value_{{ row.activity.id }}" value="{{ row.batch_value }}" placeholder="total">
                                     </div>
                                 </td>
+                                <td>
+                                    <select name="unit_{{ row.activity.id }}" class="form-select">
+                                        {% for value, label in time_units %}
+                                        <option value="{{ value }}" {% if value == row.unit %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
                             </tr>
+                            {% endfor %}
                             {% endfor %}
                         </tbody>
                     </table>
@@ -81,9 +98,9 @@
         if (e.target.classList.contains('single-input')) {
             if (e.target.value !== '') {
                 row.querySelector('.batch-count-input').value = '';
-                row.querySelector('.batch-minutes-input').value = '';
+                row.querySelector('.batch-value-input').value = '';
             }
-        } else if (e.target.classList.contains('batch-count-input') || e.target.classList.contains('batch-minutes-input')) {
+        } else if (e.target.classList.contains('batch-count-input') || e.target.classList.contains('batch-value-input')) {
             if (e.target.value !== '') {
                 row.querySelector('.single-input').value = '';
             }
