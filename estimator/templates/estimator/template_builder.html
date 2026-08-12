@@ -26,6 +26,11 @@
             <button type="button" id="addRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
         </div>
         <div class="card-body">
+            <p class="text-muted small">
+                Count can be <strong>0</strong> &mdash; a template mainly records which module types typically go
+                together; the actual quantity usually varies project to project and gets filled in once a project
+                is started from this template.
+            </p>
             <form method="POST" action="{% url 'estimator_template_modules_sync' template.pk %}" id="modulesForm">
                 {% csrf_token %}
                 <div class="table-responsive">
@@ -53,7 +58,7 @@
                                         <option value="">-- select --</option>
                                     </select>
                                 </td>
-                                <td><input type="number" name="count[]" class="form-control count-input" min="1" value="{{ row.count }}" required></td>
+                                <td><input type="number" name="count[]" class="form-control count-input" min="0" value="{{ row.count }}" required></td>
                                 <td>
                                     <select name="complexity_override[]" class="form-select complexity-select">
                                         <option value="">Inherit ({{ template.complexity.name }})</option>
@@ -143,7 +148,7 @@
             <td>
                 <select name="module_type[]" class="form-select module-type-select" required>${moduleTypeOptionsHtml('')}</select>
             </td>
-            <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
+            <td><input type="number" name="count[]" class="form-control count-input" min="0" value="1" required></td>
             <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
             <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
         `;

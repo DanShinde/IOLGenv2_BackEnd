@@ -741,11 +741,15 @@ def template_modules_sync(request, pk):
 
             count_raw = counts[index].strip() if index < len(counts) else ''
             try:
+                # 0 is a valid template quantity -- a template mainly records which
+                # module type/segment combinations go together; the actual count is
+                # filled in per project. Only reject non-numeric or negative input.
                 count = int(count_raw)
             except ValueError:
-                count = 0
-            if count < 1:
-                errors.append(f"Row {index + 1}: count must be at least 1 -- skipped.")
+                errors.append(f"Row {index + 1}: count must be a whole number -- skipped.")
+                continue
+            if count < 0:
+                errors.append(f"Row {index + 1}: count can't be negative -- skipped.")
                 continue
 
             complexity_override_id = complexity_override_ids[index].strip() if index < len(complexity_override_ids) else ''

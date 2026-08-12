@@ -227,12 +227,18 @@ class ProjectTemplate(models.Model):
 
 class ProjectTemplateModule(models.Model):
     """One module line item on a template: a module type (used within a segment) and
-    how many of it -- the template's counterpart to ProjectModule."""
+    how many of it -- the template's counterpart to ProjectModule.
+
+    Unlike a real Project's module rows, `count` may be 0 here: a template mainly
+    captures *which* module type/segment combinations typically go together, since the
+    actual quantity varies project to project. A 0-count row is a placeholder the user
+    fills in with the real quantity once a project is started from this template --
+    ProjectModule (the project side) still requires count >= 1."""
 
     template = models.ForeignKey(ProjectTemplate, on_delete=models.CASCADE, related_name='modules')
     segment = models.ForeignKey(Segment, on_delete=models.PROTECT, related_name='template_modules')
     module_type = models.ForeignKey(ModuleType, on_delete=models.PROTECT, related_name='template_modules')
-    count = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    count = models.PositiveIntegerField(default=1, validators=[MinValueValidator(0)])
     complexity_override = models.ForeignKey(
         ComplexityLevel, on_delete=models.PROTECT, null=True, blank=True, related_name='+',
         help_text="Optional. Overrides the template's complexity for this module line only.",
