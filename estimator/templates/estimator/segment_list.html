@@ -1,0 +1,47 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Segments - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-diagram-3 me-2 text-primary"></i>Segments</h1>
+        <a href="{% url 'estimator_segment_new' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Add Segment
+        </a>
+    </div>
+
+    <div class="card">
+        {% if segments %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for segment in segments %}
+                    <tr>
+                        <td class="fw-semibold">{{ segment.name }}</td>
+                        <td class="text-muted">{{ segment.description|default:'-' }}</td>
+                        <td class="text-end">
+                            <a href="{% url 'estimator_segment_edit' segment.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'estimator_segment_delete' segment.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-diagram-3"></i>
+            <p>No segments yet. Add the application areas modules are used in (e.g. Case Handling, Pallet Conveying) &mdash; the same module type can have a different time matrix in each.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

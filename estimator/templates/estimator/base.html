@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Estimator{% endblock %}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --light: #f8fafc;
+            --dark: #1e293b;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --card-hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #f8fafc 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+        .nav-link { font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 8px; transition: var(--transition); margin: 0 4px; }
+        .nav-link:hover, .nav-link.active { background: rgba(255, 255, 255, 0.15); transform: translateY(-2px); }
+
+        .card { border: none; border-radius: 16px; box-shadow: var(--card-shadow); background: white; overflow: hidden; }
+        .card-header { background: white; border-bottom: 2px solid #f1f5f9; padding: 1.25rem 1.5rem; font-weight: 600; color: var(--dark); }
+        .card-body { padding: 1.5rem; }
+
+        .kpi-card { background: white; border-radius: 16px; padding: 1.5rem; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
+        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
+        .kpi-card.success::before { background: var(--success); }
+        .kpi-card.warning::before { background: var(--warning); }
+        .kpi-value { font-size: 1.85rem; font-weight: 700; color: var(--dark); line-height: 1; }
+        .kpi-label { color: var(--secondary); font-size: 0.8rem; margin-top: 0.5rem; }
+
+        .btn { border-radius: 10px; font-weight: 500; padding: 0.5rem 1.25rem; transition: var(--transition); }
+        .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); border: none; }
+        .btn-success { background: linear-gradient(135deg, var(--success) 0%, #059669 100%); border: none; }
+
+        .table { margin-bottom: 0; }
+        .table thead th { background: #f8fafc; color: var(--secondary); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; padding: 0.85rem; vertical-align: middle; }
+        .table tbody td { padding: 0.85rem; vertical-align: middle; border-color: #f1f5f9; }
+
+        .form-control, .form-select { border-radius: 10px; border: 2px solid #e2e8f0; padding: 0.6rem 0.9rem; transition: var(--transition); }
+        .form-control:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .page-title { font-size: 1.6rem; font-weight: 700; color: #1e293b; }
+
+        .empty-state { text-align: center; padding: 3rem; color: var(--secondary); }
+        .empty-state i { font-size: 3.5rem; margin-bottom: 1rem; opacity: 0.5; }
+
+        .warning-banner { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeInUp 0.4s ease forwards; }
+
+        @media print {
+            .navbar, .no-print { display: none !important; }
+            body { background: white; }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4 no-print">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'estimator_project_list' %}">
+                <i class="bi bi-calculator-fill me-2"></i>
+                <span>Estimator</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if user.is_authenticated %}
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'home' %}" title="Back to the main portal">
+                            <i class="bi bi-house-door-fill me-1"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'estimator_project_list' %}active{% endif %}" href="{% url 'estimator_project_list' %}">
+                            <i class="bi bi-clipboard2-data me-1"></i> Projects
+                        </a>
+                    </li>
+                    {% if user.is_staff %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill me-1"></i> Configuration
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'estimator_activity_list' %}"><i class="bi bi-list-check me-2"></i>Activities</a></li>
+                            <li><a class="dropdown-item" href="{% url 'estimator_segment_list' %}"><i class="bi bi-diagram-3 me-2"></i>Segments</a></li>
+                            <li><a class="dropdown-item" href="{% url 'estimator_module_type_list' %}"><i class="bi bi-boxes me-2"></i>Module Types &amp; Matrix</a></li>
+                            <li><a class="dropdown-item" href="{% url 'estimator_complexity_list' %}"><i class="bi bi-sliders me-2"></i>Complexity Levels</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item d-flex align-items-center ms-lg-2">
+                        <span class="text-white-50 small me-2">
+                            <i class="bi bi-person-circle me-1"></i>{{ user.get_username }}{% if user.is_staff %} <span class="badge bg-light text-dark ms-1">staff</span>{% endif %}
+                        </span>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid px-4">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show mt-3 no-print" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

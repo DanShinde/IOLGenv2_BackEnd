@@ -1,0 +1,303 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}{{ project.name }} - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title mb-1"><i class="bi bi-clipboard2-data me-2 text-primary"></i>{{ project.name }}</h1>
+            <div class="text-muted">
+                {{ project.customer|default:'No customer set' }} &middot;
+                Complexity: <strong>{{ project.complexity.name }} (x{{ project.complexity.multiplier }})</strong> &middot;
+                {{ project.minutes_per_working_day }} min/day
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'estimator_project_edit' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit Details</a>
+            <a href="{% url 'estimator_project_report' project.pk %}" class="btn btn-outline-primary"><i class="bi bi-file-earmark-text me-1"></i>Report</a>
+            <a href="{% url 'estimator_project_export_pdf' project.pk %}" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+            <a href="{% url 'estimator_project_export_excel' project.pk %}" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+            <form method="POST" action="{% url 'estimator_project_duplicate' project.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-files me-1"></i>Duplicate</button>
+            </form>
+            <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Projects</a>
+        </div>
+    </div>
+
+    {% if project.notes %}
+    <div class="alert alert-light border mb-3">{{ project.notes }}</div>
+    {% endif %}
+
+    <div id="liveWarningBanner" class="warning-banner" style="display:none;"></div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-value" id="kpiGrandMinutes">0</div>
+                <div class="kpi-label">Total Minutes</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card success">
+                <div class="kpi-value" id="kpiGrandHours">0</div>
+                <div class="kpi-label">Total Hours</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card warning">
+                <div class="kpi-value" id="kpiGrandDays">0</div>
+                <div class="kpi-label">Man-days (@ {{ project.minutes_per_working_day }} min/day)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-value" id="kpiModuleCount">0</div>
+                <div class="kpi-label">Module Rows</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-boxes me-2"></i>Module Rows</span>
+            <button type="button" id="addRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{% url 'estimator_project_modules_sync' project.pk %}" id="modulesForm">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">Segment</th>
+                                <th style="width: 24%;">Module Type</th>
+                                <th style="width: 10%;">Count</th>
+                                <th style="width: 20%;">Complexity Override</th>
+                                <th class="text-end" style="width: 18%;">Row Total</th>
+                                <th style="width: 8%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="moduleRowsBody">
+                            {% for row in estimate.rows %}
+                            <tr class="module-row">
+                                <td>
+                                    <input type="hidden" name="row_id[]" value="{{ row.module.id }}">
+                                    <select name="segment[]" class="form-select segment-select" required>
+                                        <option value="">-- select --</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="module_type[]" class="form-select module-type-select" required>
+                                        <option value="">-- select --</option>
+                                    </select>
+                                </td>
+                                <td><input type="number" name="count[]" class="form-control count-input" min="1" value="{{ row.count }}" required></td>
+                                <td>
+                                    <select name="complexity_override[]" class="form-select complexity-select">
+                                        <option value="">Inherit ({{ project.complexity.name }})</option>
+                                    </select>
+                                </td>
+                                <td class="text-end row-total fw-semibold">{{ row.row_total_minutes|floatformat:1 }} min</td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if not estimate.rows %}
+                <div class="empty-state">
+                    <i class="bi bi-boxes"></i>
+                    <p>No module rows yet. Click "Add Module Row" to start building the estimate.</p>
+                </div>
+                {% endif %}
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>Save Modules</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><i class="bi bi-bar-chart-steps me-2"></i>Activity-wise Totals</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Activity</th>
+                            <th class="text-end">Total Minutes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for at in estimate.activity_totals %}
+                        <tr>
+                            <td>{{ at.activity.name }}</td>
+                            <td class="text-end activity-total-cell" data-activity-id="{{ at.activity.id }}">{{ at.total_minutes|floatformat:1 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="2" class="text-muted text-center py-3">No activities configured yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const SEGMENTS = {{ segments_json|safe }};
+    const MODULE_TYPES = {{ module_types_json|safe }};
+    const COMPLEXITY_LEVELS = {{ complexity_levels_json|safe }};
+    const ACTIVITIES = {{ activities_json|safe }};
+    const MATRIX = {{ matrix_json|safe }};
+    const EXISTING_MODULES = {{ modules_json|safe }};
+    const PROJECT_COMPLEXITY_ID = {{ project_complexity_id }};
+    const MINUTES_PER_DAY = {{ minutes_per_day }};
+
+    const complexityById = {};
+    COMPLEXITY_LEVELS.forEach(c => complexityById[c.id] = c);
+    const moduleTypeById = {};
+    MODULE_TYPES.forEach(m => moduleTypeById[m.id] = m);
+    const segmentById = {};
+    SEGMENTS.forEach(s => segmentById[s.id] = s);
+
+    function segmentOptionsHtml(selectedId) {
+        let html = '<option value="">-- select --</option>';
+        SEGMENTS.forEach(s => {
+            const sel = (String(s.id) === String(selectedId)) ? 'selected' : '';
+            html += `<option value="${s.id}" ${sel}>${s.name}</option>`;
+        });
+        return html;
+    }
+
+    function moduleTypeOptionsHtml(selectedId) {
+        let html = '<option value="">-- select --</option>';
+        MODULE_TYPES.forEach(m => {
+            const sel = (String(m.id) === String(selectedId)) ? 'selected' : '';
+            html += `<option value="${m.id}" ${sel}>${m.name}</option>`;
+        });
+        return html;
+    }
+
+    function complexityOptionsHtml(selectedId) {
+        let html = `<option value="">Inherit (${complexityById[PROJECT_COMPLEXITY_ID] ? complexityById[PROJECT_COMPLEXITY_ID].name : ''})</option>`;
+        COMPLEXITY_LEVELS.forEach(c => {
+            const sel = (String(c.id) === String(selectedId)) ? 'selected' : '';
+            html += `<option value="${c.id}" ${sel}>${c.name} (x${c.multiplier})</option>`;
+        });
+        return html;
+    }
+
+    function hydrateExistingRows() {
+        const rows = document.querySelectorAll('#moduleRowsBody .module-row');
+        rows.forEach((tr, i) => {
+            const data = EXISTING_MODULES[i];
+            const segSelect = tr.querySelector('.segment-select');
+            const mtSelect = tr.querySelector('.module-type-select');
+            const cxSelect = tr.querySelector('.complexity-select');
+            segSelect.innerHTML = segmentOptionsHtml(data ? data.segment_id : '');
+            mtSelect.innerHTML = moduleTypeOptionsHtml(data ? data.module_type_id : '');
+            cxSelect.innerHTML = complexityOptionsHtml(data ? data.complexity_override_id : '');
+        });
+    }
+
+    function factorForRow(row) {
+        const overrideId = row.querySelector('.complexity-select').value;
+        if (overrideId && complexityById[overrideId]) {
+            return complexityById[overrideId].multiplier;
+        }
+        const proj = complexityById[PROJECT_COMPLEXITY_ID];
+        return proj ? proj.multiplier : 1;
+    }
+
+    function recalc() {
+        const rows = document.querySelectorAll('#moduleRowsBody .module-row');
+        const activityTotals = {};
+        ACTIVITIES.forEach(a => activityTotals[a.id] = 0);
+        let grandTotal = 0;
+        const warningTypes = new Set();
+
+        rows.forEach(row => {
+            const segId = row.querySelector('.segment-select').value;
+            const mtId = row.querySelector('.module-type-select').value;
+            const count = parseFloat(row.querySelector('.count-input').value) || 0;
+            const factor = factorForRow(row);
+            let rowTotal = 0;
+
+            if (segId && mtId) {
+                let hasAny = false;
+                ACTIVITIES.forEach(a => {
+                    const key = segId + '_' + mtId + '_' + a.id;
+                    if (Object.prototype.hasOwnProperty.call(MATRIX, key)) hasAny = true;
+                    const base = MATRIX[key] || 0;
+                    const minutes = base * count * factor;
+                    activityTotals[a.id] += minutes;
+                    rowTotal += minutes;
+                });
+                if (!hasAny && moduleTypeById[mtId] && segmentById[segId]) {
+                    warningTypes.add(`${moduleTypeById[mtId].name} / ${segmentById[segId].name}`);
+                }
+            }
+            row.querySelector('.row-total').textContent = rowTotal.toFixed(1) + ' min';
+            grandTotal += rowTotal;
+        });
+
+        ACTIVITIES.forEach(a => {
+            const cell = document.querySelector(`.activity-total-cell[data-activity-id="${a.id}"]`);
+            if (cell) cell.textContent = activityTotals[a.id].toFixed(1);
+        });
+
+        document.getElementById('kpiGrandMinutes').textContent = grandTotal.toFixed(1);
+        document.getElementById('kpiGrandHours').textContent = (grandTotal / 60).toFixed(2);
+        document.getElementById('kpiGrandDays').textContent = (grandTotal / MINUTES_PER_DAY).toFixed(2);
+        document.getElementById('kpiModuleCount').textContent = rows.length;
+
+        const banner = document.getElementById('liveWarningBanner');
+        if (warningTypes.size > 0) {
+            banner.style.display = '';
+            banner.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>No configured times for: ' + Array.from(warningTypes).join(', ');
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    function addRow() {
+        const tbody = document.getElementById('moduleRowsBody');
+        const tr = document.createElement('tr');
+        tr.className = 'module-row';
+        tr.innerHTML = `
+            <td>
+                <input type="hidden" name="row_id[]" value="">
+                <select name="segment[]" class="form-select segment-select" required>${segmentOptionsHtml('')}</select>
+            </td>
+            <td>
+                <select name="module_type[]" class="form-select module-type-select" required>${moduleTypeOptionsHtml('')}</select>
+            </td>
+            <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
+            <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
+            <td class="text-end row-total fw-semibold">0 min</td>
+            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+        recalc();
+    }
+
+    document.getElementById('addRowBtn').addEventListener('click', addRow);
+    document.getElementById('moduleRowsBody').addEventListener('input', recalc);
+    document.getElementById('moduleRowsBody').addEventListener('change', recalc);
+    document.getElementById('moduleRowsBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-row-btn');
+        if (btn) {
+            btn.closest('tr').remove();
+            recalc();
+        }
+    });
+
+    hydrateExistingRows();
+    recalc();
+</script>
+{% endblock %}

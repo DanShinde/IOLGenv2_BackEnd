@@ -6,9 +6,10 @@ from import_export.admin import ImportExportModelAdmin
 class UserProfileAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     list_display = (
         'id', 'user', 'usertype',  'is_ac_approved', 'is_ac_cluster_create_allowed',
-        'is_ac_cluster_edit_allowed', 'is_ac_cluster_delete_allowed'
+        'is_ac_cluster_edit_allowed', 'is_ac_cluster_delete_allowed',
+        'is_tracker', 'is_skillgap', 'is_estimator',
     )  # Display all fields
-    list_filter = ('usertype', 'is_ac_approved')
+    list_filter = ('usertype', 'is_ac_approved', 'is_tracker', 'is_skillgap', 'is_estimator')
     search_fields = ('user',)
 
 admin.site.register(UserProfile, UserProfileAdmin)

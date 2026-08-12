@@ -1,0 +1,58 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Module Types - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-boxes me-2 text-primary"></i>Module Types</h1>
+        <a href="{% url 'estimator_module_type_new' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Add Module Type
+        </a>
+    </div>
+
+    <div class="card">
+        {% if module_types %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Segments Configured</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for module_type in module_types %}
+                    <tr>
+                        <td class="fw-semibold">{{ module_type.name }}</td>
+                        <td class="text-muted">{{ module_type.description|default:'-' }}</td>
+                        <td>
+                            {% with count=module_type.configured_segments.count %}
+                                {% if count %}
+                                    <span class="badge bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle me-1"></i>{{ count }} segment{{ count|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge bg-warning bg-opacity-10 text-warning"><i class="bi bi-exclamation-circle me-1"></i>Not configured</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'estimator_module_type_segments' module_type.pk %}" class="btn btn-sm btn-outline-success"><i class="bi bi-grid-3x3-gap me-1"></i>Segments &amp; Matrix</a>
+                            <a href="{% url 'estimator_module_type_edit' module_type.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'estimator_module_type_delete' module_type.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-boxes"></i>
+            <p>No module types yet. Add one (e.g. Transfer Conveyor, Merge, Divert, Shuttle) then configure its time matrix.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

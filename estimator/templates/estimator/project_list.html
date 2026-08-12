@@ -1,0 +1,55 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Projects - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-clipboard2-data me-2 text-primary"></i>Projects</h1>
+        <a href="{% url 'estimator_project_new' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>New Project
+        </a>
+    </div>
+
+    <div class="card">
+        {% if projects %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Customer</th>
+                        <th>Complexity</th>
+                        <th>Updated</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects %}
+                    <tr>
+                        <td><a href="{% url 'estimator_project_builder' project.pk %}" class="fw-semibold text-decoration-none">{{ project.name }}</a></td>
+                        <td class="text-muted">{{ project.customer|default:'-' }}</td>
+                        <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ project.complexity.name }} (x{{ project.complexity.multiplier }})</span></td>
+                        <td class="text-muted">{{ project.updated_at|date:'d M Y H:i' }}</td>
+                        <td class="text-end">
+                            <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Open</a>
+                            <form method="POST" action="{% url 'estimator_project_duplicate' project.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-files"></i> Duplicate</button>
+                            </form>
+                            <a href="{% url 'estimator_project_delete' project.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-clipboard2-data"></i>
+            <p>No projects yet. Create one to start building an estimate.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

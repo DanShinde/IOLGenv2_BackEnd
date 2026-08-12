@@ -1,0 +1,49 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Activities - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-list-check me-2 text-primary"></i>Activity Master</h1>
+        <a href="{% url 'estimator_activity_new' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Add Activity
+        </a>
+    </div>
+
+    <div class="card">
+        {% if activities %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for activity in activities %}
+                    <tr>
+                        <td>{{ activity.display_order }}</td>
+                        <td class="fw-semibold">{{ activity.name }}</td>
+                        <td class="text-muted">{{ activity.description|default:'-' }}</td>
+                        <td class="text-end">
+                            <a href="{% url 'estimator_activity_edit' activity.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'estimator_activity_delete' activity.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-list-check"></i>
+            <p>No activities yet. Add the standard engineering activities performed on every project.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

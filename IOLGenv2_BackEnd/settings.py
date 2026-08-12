@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'employees',
     'gap_analysis',
     'testvault',
+    'estimator',
 ]
 
 MIDDLEWARE = [
@@ -79,6 +80,7 @@ MIDDLEWARE = [
     'IOLGenv2_BackEnd.middleware.TrackerGroupRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.PlannerAuthRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.SkillGapGroupRequiredMiddleware',
+    'IOLGenv2_BackEnd.middleware.EstimatorGroupRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.TestVaultAuthRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.KnowledgeBaseGroupRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',

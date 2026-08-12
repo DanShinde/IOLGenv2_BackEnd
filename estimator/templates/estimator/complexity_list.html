@@ -1,0 +1,49 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Complexity Levels - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-sliders me-2 text-primary"></i>Complexity Levels</h1>
+        <a href="{% url 'estimator_complexity_new' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Add Complexity Level
+        </a>
+    </div>
+
+    <div class="card">
+        {% if complexity_levels %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Name</th>
+                        <th>Multiplier</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for level in complexity_levels %}
+                    <tr>
+                        <td>{{ level.display_order }}</td>
+                        <td class="fw-semibold">{{ level.name }}</td>
+                        <td><span class="badge bg-primary bg-opacity-10 text-primary">x{{ level.multiplier }}</span></td>
+                        <td class="text-end">
+                            <a href="{% url 'estimator_complexity_edit' level.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'estimator_complexity_delete' level.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-sliders"></i>
+            <p>No complexity levels yet. Add presets like Low (x1.0), Medium (x1.25), High (x1.5).</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

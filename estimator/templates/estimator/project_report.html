@@ -1,0 +1,129 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}{{ project.name }} Report - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header no-print">
+        <h1 class="page-title"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Estimate Report</h1>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Builder</a>
+            <a href="{% url 'estimator_project_export_pdf' project.pk %}" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+            <a href="{% url 'estimator_project_export_excel' project.pk %}" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+            <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h3 class="mb-1">{{ project.name }}</h3>
+            <div class="text-muted mb-2">Customer: {{ project.customer|default:'-' }}</div>
+            <div class="d-flex gap-4 flex-wrap">
+                <div><strong>Complexity:</strong> {{ project.complexity.name }} (x{{ project.complexity.multiplier }})</div>
+                <div><strong>Minutes / working day:</strong> {{ project.minutes_per_working_day }}</div>
+                <div><strong>Generated:</strong> {{ project.updated_at|date:'d M Y H:i' }}</div>
+            </div>
+            {% if project.notes %}<div class="mt-2 text-muted">{{ project.notes }}</div>{% endif %}
+        </div>
+    </div>
+
+    {% if estimate.warnings %}
+    <div class="warning-banner">
+        {% for w in estimate.warnings %}<div><i class="bi bi-exclamation-triangle me-1"></i>{{ w }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-value">{{ estimate.grand_total_minutes|floatformat:1 }}</div>
+                <div class="kpi-label">Total Minutes</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card success">
+                <div class="kpi-value">{{ estimate.grand_total_hours|floatformat:2 }}</div>
+                <div class="kpi-label">Total Hours</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card warning">
+                <div class="kpi-value">{{ estimate.grand_total_days|floatformat:2 }}</div>
+                <div class="kpi-label">Man-days</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-value">{{ estimate.rows|length }}</div>
+                <div class="kpi-label">Module Rows</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-boxes me-2"></i>Module Summary</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Segment</th>
+                            <th>Module Type</th>
+                            <th>Count</th>
+                            <th>Complexity</th>
+                            <th class="text-end">Row Total (min)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in estimate.rows %}
+                        <tr>
+                            <td>{{ row.segment.name }}</td>
+                            <td class="fw-semibold">{{ row.module_type.name }}</td>
+                            <td>{{ row.count }}</td>
+                            <td>{{ row.complexity.name }} (x{{ row.complexity.multiplier }})</td>
+                            <td class="text-end">{{ row.row_total_minutes|floatformat:1 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted text-center py-3">No module rows.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-grid-3x3-gap me-2"></i>Activity-wise Breakdown</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Segment</th>
+                            <th>Module Type</th>
+                            <th>Count</th>
+                            {% for a in estimate.activities %}<th class="text-end">{{ a.name }}</th>{% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in estimate.rows %}
+                        <tr>
+                            <td>{{ row.segment.name }}</td>
+                            <td class="fw-semibold">{{ row.module_type.name }}</td>
+                            <td>{{ row.count }}</td>
+                            {% for act_data in row.activities %}<td class="text-end">{{ act_data.minutes|floatformat:1 }}</td>{% endfor %}
+                        </tr>
+                        {% endfor %}
+                        <tr class="fw-bold" style="background:#eef2ff;">
+                            <td>Activity Total</td>
+                            <td></td>
+                            <td></td>
+                            {% for at in estimate.activity_totals %}<td class="text-end">{{ at.total_minutes|floatformat:1 }}</td>{% endfor %}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

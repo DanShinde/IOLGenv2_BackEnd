@@ -1,0 +1,93 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}{{ module_type.name }} / {{ segment.name }} Matrix - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in" style="max-width: 940px; margin: 0 auto;">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-grid-3x3-gap me-2 text-primary"></i>{{ module_type.name }} / {{ segment.name }} &mdash; Time Matrix</h1>
+        <a href="{% url 'estimator_module_type_segments' module_type.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Back to Segments
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <p class="text-muted">
+                For each activity, fill in <strong>either</strong> a single-module time <strong>or</strong> a batch time
+                (e.g. "10 modules take 20 min total") &mdash; not both. Leave both blank if this activity doesn't apply.
+            </p>
+            {% if rows %}
+            <form method="POST">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Activity</th>
+                                <th style="width: 200px;">Minutes per module</th>
+                                <th class="text-center" style="width: 40px;">or</th>
+                                <th style="width: 320px;">Batch: modules &amp; total minutes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matrixRowsBody">
+                            {% for row in rows %}
+                            <tr class="matrix-row" data-activity-id="{{ row.activity.id }}">
+                                <td class="fw-semibold">{{ row.activity.name }}</td>
+                                <td>
+                                    <input type="number" min="0" step="0.1" class="form-control single-input"
+                                           name="minutes_{{ row.activity.id }}" value="{{ row.minutes }}" placeholder="0">
+                                </td>
+                                <td class="text-center text-muted">or</td>
+                                <td>
+                                    <div class="input-group">
+                                        <input type="number" min="1" step="1" class="form-control batch-count-input"
+                                               name="batch_count_{{ row.activity.id }}" value="{{ row.batch_count }}" placeholder="modules">
+                                        <span class="input-group-text">=</span>
+                                        <input type="number" min="0" step="0.1" class="form-control batch-minutes-input"
+                                               name="batch_minutes_{{ row.activity.id }}" value="{{ row.batch_minutes }}" placeholder="total min">
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-2"></i>Save Matrix
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="empty-state">
+                <i class="bi bi-list-check"></i>
+                <p>No activities defined yet. <a href="{% url 'estimator_activity_new' %}">Add an activity</a> first.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Enforces "single time" and "batch time" as mutually exclusive per row: typing in
+    // one clears the other, so the two entry modes can never both be submitted filled in.
+    document.getElementById('matrixRowsBody')?.addEventListener('input', (e) => {
+        const row = e.target.closest('.matrix-row');
+        if (!row) return;
+
+        if (e.target.classList.contains('single-input')) {
+            if (e.target.value !== '') {
+                row.querySelector('.batch-count-input').value = '';
+                row.querySelector('.batch-minutes-input').value = '';
+            }
+        } else if (e.target.classList.contains('batch-count-input') || e.target.classList.contains('batch-minutes-input')) {
+            if (e.target.value !== '') {
+                row.querySelector('.single-input').value = '';
+            }
+        }
+    });
+</script>
+{% endblock %}

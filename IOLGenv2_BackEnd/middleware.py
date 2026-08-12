@@ -78,6 +78,27 @@ class TestVaultAuthRequiredMiddleware:
                 return redirect('loginw')
         return self.get_response(request)
 
+class EstimatorGroupRequiredMiddleware:
+    """
+    Blocks any URL under /estimator/ unless the user is authenticated
+    and their profile is flagged for Estimator access.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path_info.startswith('/estimator/'):
+            if not request.user.is_authenticated:
+                return redirect('loginw')
+            userprofile = UserProfile.objects.filter(user=request.user).first()
+            try:
+                if userprofile and not userprofile.is_estimator:
+                    return HttpResponseForbidden("Access denied. User not allowed to access Estimator.")
+            except UserProfile.DoesNotExist:
+                return HttpResponseForbidden("Access denied. User Profile Not Found.")
+        return self.get_response(request)
+
 class KnowledgeBaseGroupRequiredMiddleware:
     """
     Blocks any URL under /forum/ (the Knowledge Base) unless the user is
