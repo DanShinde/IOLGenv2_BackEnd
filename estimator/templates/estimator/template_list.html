@@ -1,55 +1,61 @@
 {% extends 'estimator/base.html' %}
 
-{% block title %}Projects - Estimator{% endblock %}
+{% block title %}Templates - Estimator{% endblock %}
 
 {% block content %}
 <div class="animate-fade-in">
     <div class="page-header">
-        <h1 class="page-title"><i class="bi bi-clipboard2-data me-2 text-primary"></i>Projects</h1>
+        <div>
+            <h1 class="page-title mb-1"><i class="bi bi-file-earmark-ruled me-2 text-primary"></i>Templates</h1>
+            <div class="text-muted">Reusable module combinations, shared by everyone with Estimator access. Start a new project from one, or save any project as a new template.</div>
+        </div>
         <div class="d-flex gap-2">
-            <a href="{% url 'estimator_template_list' %}" class="btn btn-outline-primary">
-                <i class="bi bi-file-earmark-ruled me-2"></i>Templates
+            <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Projects
             </a>
-            <a href="{% url 'estimator_project_new' %}" class="btn btn-primary">
-                <i class="bi bi-plus-circle me-2"></i>New Project
+            <a href="{% url 'estimator_template_new' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>New Template
             </a>
         </div>
     </div>
 
     <div class="card">
-        {% if projects %}
+        {% if templates %}
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Customer</th>
+                        <th>Description</th>
                         <th>Complexity</th>
+                        <th>Modules</th>
+                        <th>Created By</th>
                         <th>Updated</th>
                         <th class="text-end">Actions</th>
                     </tr>
                     <tr class="table-filter-row">
                         <th><input type="text" class="form-control form-control-sm" placeholder="Filter Name..." onkeyup="filterTable(this)"></th>
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterTable(this)"></th>
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Description..." onkeyup="filterTable(this)"></th>
                         <th><input type="text" class="form-control form-control-sm" placeholder="Filter Complexity..." onkeyup="filterTable(this)"></th>
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Updated..." onkeyup="filterTable(this)"></th>
+                        <th></th>
+                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Creator..." onkeyup="filterTable(this)"></th>
+                        <th></th>
                         <th></th> {# No filter for Actions #}
                     </tr>
                 </thead>
                 <tbody>
-                    {% for project in projects %}
+                    {% for template in templates %}
                     <tr>
-                        <td><a href="{% url 'estimator_project_builder' project.pk %}" class="fw-semibold text-decoration-none">{{ project.name }}</a></td>
-                        <td class="text-muted">{{ project.customer|default:'-' }}</td>
-                        <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ project.complexity.name }} (x{{ project.complexity.multiplier }})</span></td>
-                        <td class="text-muted">{{ project.updated_at|date:'d M Y H:i' }}</td>
+                        <td><a href="{% url 'estimator_template_builder' template.pk %}" class="fw-semibold text-decoration-none">{{ template.name }}</a></td>
+                        <td class="text-muted">{{ template.description|default:'-'|truncatechars:60 }}</td>
+                        <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ template.complexity.name }} (x{{ template.complexity.multiplier }})</span></td>
+                        <td>{{ template.modules.count }}</td>
+                        <td class="text-muted">{{ template.created_by.get_username|default:'-' }}</td>
+                        <td class="text-muted">{{ template.updated_at|date:'d M Y H:i' }}</td>
                         <td class="text-end">
-                            <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Open</a>
-                            <form method="POST" action="{% url 'estimator_project_duplicate' project.pk %}" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-files"></i> Duplicate</button>
-                            </form>
-                            <a href="{% url 'estimator_project_delete' project.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <a href="{% url 'estimator_template_builder' template.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Open</a>
+                            <a href="{% url 'estimator_project_new' %}?template={{ template.pk }}" class="btn btn-sm btn-outline-success"><i class="bi bi-plus-circle"></i> Use</a>
+                            <a href="{% url 'estimator_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -58,8 +64,8 @@
         </div>
         {% else %}
         <div class="empty-state">
-            <i class="bi bi-clipboard2-data"></i>
-            <p>No projects yet. Create one to start building an estimate.</p>
+            <i class="bi bi-file-earmark-ruled"></i>
+            <p>No templates yet. Create one, or open any project and use "Save as Template".</p>
         </div>
         {% endif %}
     </div>

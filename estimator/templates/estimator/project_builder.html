@@ -22,6 +22,7 @@
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-files me-1"></i>Duplicate</button>
             </form>
+            <a href="{% url 'estimator_project_save_as_template' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-ruled me-1"></i>Save as Template</a>
             <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Projects</a>
         </div>
     </div>

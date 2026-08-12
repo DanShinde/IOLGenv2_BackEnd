@@ -160,7 +160,7 @@ class ComplexityLevel(models.Model):
 class Project(models.Model):
     """A named pre-sales project/quote made up of module line items."""
 
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, unique=True)
     customer = models.CharField(max_length=200, blank=True, null=True)
     complexity = models.ForeignKey(ComplexityLevel, on_delete=models.PROTECT, related_name='projects')
     notes = models.TextField(blank=True, null=True)
@@ -202,3 +202,45 @@ class ProjectModule(models.Model):
     @property
     def effective_complexity(self):
         return self.complexity_override or self.project.complexity
+
+
+class ProjectTemplate(models.Model):
+    """A reusable, named combination of module lines (segment + module type + count +
+    complexity override) that a new Project can be started from, or that an existing
+    Project's current module list can be saved as. Independent of any specific Project
+    -- editing or deleting a Project later never touches templates made from it."""
+
+    name = models.CharField(max_length=200, unique=True)
+    description = models.TextField(blank=True, null=True)
+    complexity = models.ForeignKey(ComplexityLevel, on_delete=models.PROTECT, related_name='templates')
+    minutes_per_working_day = models.PositiveIntegerField(default=480, validators=[MinValueValidator(1)])
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='estimator_templates')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class ProjectTemplateModule(models.Model):
+    """One module line item on a template: a module type (used within a segment) and
+    how many of it -- the template's counterpart to ProjectModule."""
+
+    template = models.ForeignKey(ProjectTemplate, on_delete=models.CASCADE, related_name='modules')
+    segment = models.ForeignKey(Segment, on_delete=models.PROTECT, related_name='template_modules')
+    module_type = models.ForeignKey(ModuleType, on_delete=models.PROTECT, related_name='template_modules')
+    count = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    complexity_override = models.ForeignKey(
+        ComplexityLevel, on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+        help_text="Optional. Overrides the template's complexity for this module line only.",
+    )
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.template.name} - {self.segment.name} / {self.module_type.name} x{self.count}"

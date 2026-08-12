@@ -10,9 +10,34 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, T
 
 from .calculations import build_project_estimate
 from .exports import render_project_report_excel, render_project_report_pdf
-from .forms import ActivityForm, ComplexityLevelForm, ModuleTypeForm, ProjectForm, SegmentForm
+from .forms import (
+    ActivityForm, ComplexityLevelForm, ModuleTypeForm, ProjectForm, ProjectTemplateForm,
+    SaveProjectAsTemplateForm, SegmentForm,
+)
 from .mixins import CancelUrlMixin, ProtectedDeleteMixin, StaffRequiredMixin
-from .models import Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule, Segment, TimeUnit
+from .models import (
+    Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule,
+    ProjectTemplate, ProjectTemplateModule, Segment, TimeUnit,
+)
+
+
+def unique_name(model, base_name, exclude_pk=None):
+    """Returns `base_name` if it's free, otherwise `base_name (2)`, `base_name (3)`, ...
+    -- used wherever a name is generated rather than typed (duplicate, save-as-template),
+    since those flows can't rely on form validation to catch a collision."""
+
+    def _taken(candidate):
+        qs = model.objects.filter(name__iexact=candidate)
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        return qs.exists()
+
+    if not _taken(base_name):
+        return base_name
+    counter = 2
+    while _taken(f'{base_name} ({counter})'):
+        counter += 1
+    return f'{base_name} ({counter})'
 
 
 def safe_json(data):
@@ -346,6 +371,13 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
     form_class = ProjectForm
     template_name = 'estimator/add_form.html'
 
+    def get_initial(self):
+        initial = super().get_initial()
+        template_id = self.request.GET.get('template')
+        if template_id:
+            initial['start_from_template'] = template_id
+        return initial
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'New Project'
@@ -354,8 +386,25 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        messages.success(self.request, f'Project "{form.instance.name}" created. Now add its modules below.')
-        return super().form_valid(form)
+        with transaction.atomic():
+            response = super().form_valid(form)
+            template = form.cleaned_data.get('start_from_template')
+            if template:
+                ProjectModule.objects.bulk_create([
+                    ProjectModule(
+                        project=self.object,
+                        segment=tm.segment,
+                        module_type=tm.module_type,
+                        count=tm.count,
+                        complexity_override=tm.complexity_override,
+                        order=tm.order,
+                    )
+                    for tm in template.modules.all()
+                ])
+                messages.success(self.request, f'Project "{form.instance.name}" created from template "{template.name}".')
+            else:
+                messages.success(self.request, f'Project "{form.instance.name}" created. Now add its modules below.')
+        return response
 
     def get_success_url(self):
         return reverse('estimator_project_builder', args=[self.object.pk])
@@ -537,7 +586,7 @@ def project_duplicate(request, pk):
     original = get_object_or_404(Project, pk=pk)
     with transaction.atomic():
         copy = Project.objects.create(
-            name=f'{original.name} (Copy)',
+            name=unique_name(Project, f'{original.name} (Copy)'),
             customer=original.customer,
             complexity=original.complexity,
             notes=original.notes,
@@ -557,3 +606,217 @@ def project_duplicate(request, pk):
         ])
     messages.success(request, f'Duplicated as "{copy.name}".')
     return redirect('estimator_project_builder', pk=copy.pk)
+
+
+# --------------------------------------------------------------------------- Project Templates
+#
+# A shared team library: every is_estimator user (not just staff) can see and use every
+# template, since these are reusable presets rather than personal data. A template is a
+# standalone snapshot (its own ProjectTemplateModule rows) -- editing or deleting the
+# Project it might have been saved from never touches it, and vice versa.
+
+class ProjectTemplateListView(LoginRequiredMixin, ListView):
+    model = ProjectTemplate
+    template_name = 'estimator/template_list.html'
+    context_object_name = 'templates'
+
+    def get_queryset(self):
+        return ProjectTemplate.objects.select_related('complexity', 'created_by')
+
+
+class ProjectTemplateCreateView(LoginRequiredMixin, CreateView):
+    model = ProjectTemplate
+    form_class = ProjectTemplateForm
+    template_name = 'estimator/add_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'New Template'
+        context['cancel_url'] = reverse('estimator_template_list')
+        return context
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        messages.success(self.request, f'Template "{form.instance.name}" created. Now add its modules below.')
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('estimator_template_builder', args=[self.object.pk])
+
+
+class ProjectTemplateUpdateView(LoginRequiredMixin, UpdateView):
+    model = ProjectTemplate
+    form_class = ProjectTemplateForm
+    template_name = 'estimator/add_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Edit Template'
+        context['cancel_url'] = reverse('estimator_template_builder', args=[self.object.pk])
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, f'Template "{form.instance.name}" updated.')
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('estimator_template_builder', args=[self.object.pk])
+
+
+class ProjectTemplateDeleteView(LoginRequiredMixin, DeleteView):
+    model = ProjectTemplate
+    template_name = 'estimator/confirm_delete.html'
+    success_url = reverse_lazy('estimator_template_list')
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        label = self.object.name
+        self.object.delete()
+        messages.success(request, f'Template "{label}" deleted.')
+        return redirect(self.success_url)
+
+
+class ProjectTemplateDetailView(LoginRequiredMixin, DetailView):
+    """The Template Builder: the same module-rows editor as the Project Builder, minus
+    the live matrix-based calculation -- a template is a reusable preset of module lines,
+    not an estimate in its own right."""
+
+    model = ProjectTemplate
+    template_name = 'estimator/template_builder.html'
+    context_object_name = 'template'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        template = self.object
+
+        segments = list(Segment.objects.order_by('name'))
+        module_types = list(ModuleType.objects.order_by('name'))
+        complexity_levels = list(ComplexityLevel.objects.order_by('display_order', 'multiplier'))
+
+        context['rows'] = list(template.modules.select_related('segment', 'module_type', 'complexity_override').order_by('order', 'id'))
+        context['segments_json'] = safe_json([{'id': s.id, 'name': s.name} for s in segments])
+        context['module_types_json'] = safe_json([{'id': mt.id, 'name': mt.name} for mt in module_types])
+        context['complexity_levels_json'] = safe_json([
+            {'id': c.id, 'name': c.name, 'multiplier': float(c.multiplier)} for c in complexity_levels
+        ])
+        context['modules_json'] = safe_json([
+            {
+                'id': tm.id,
+                'segment_id': tm.segment_id,
+                'module_type_id': tm.module_type_id,
+                'count': tm.count,
+                'complexity_override_id': tm.complexity_override_id,
+            }
+            for tm in context['rows']
+        ])
+        return context
+
+
+@require_POST
+def template_modules_sync(request, pk):
+    """Persists the Template Builder's module rows in one shot -- the template's
+    counterpart to project_modules_sync(), same raw-POST-array convention."""
+
+    template = get_object_or_404(ProjectTemplate, pk=pk)
+
+    row_ids = request.POST.getlist('row_id[]')
+    segment_ids = request.POST.getlist('segment[]')
+    module_type_ids = request.POST.getlist('module_type[]')
+    counts = request.POST.getlist('count[]')
+    complexity_override_ids = request.POST.getlist('complexity_override[]')
+
+    kept_ids = set()
+    errors = []
+
+    with transaction.atomic():
+        for index, module_type_id in enumerate(module_type_ids):
+            module_type_id = module_type_id.strip()
+            if not module_type_id:
+                continue
+
+            segment_id = segment_ids[index].strip() if index < len(segment_ids) else ''
+            if not segment_id:
+                errors.append(f"Row {index + 1}: segment is required -- skipped.")
+                continue
+
+            count_raw = counts[index].strip() if index < len(counts) else ''
+            try:
+                count = int(count_raw)
+            except ValueError:
+                count = 0
+            if count < 1:
+                errors.append(f"Row {index + 1}: count must be at least 1 -- skipped.")
+                continue
+
+            complexity_override_id = complexity_override_ids[index].strip() if index < len(complexity_override_ids) else ''
+            row_id = row_ids[index].strip() if index < len(row_ids) else ''
+
+            defaults = {
+                'segment_id': segment_id,
+                'module_type_id': module_type_id,
+                'count': count,
+                'complexity_override_id': complexity_override_id or None,
+                'order': index,
+            }
+
+            if row_id:
+                ProjectTemplateModule.objects.filter(pk=row_id, template=template).update(**defaults)
+                kept_ids.add(int(row_id))
+            else:
+                tm = ProjectTemplateModule.objects.create(template=template, **defaults)
+                kept_ids.add(tm.id)
+
+        template.modules.exclude(id__in=kept_ids).delete()
+
+    if errors:
+        for e in errors:
+            messages.error(request, e)
+    else:
+        messages.success(request, 'Template modules saved.')
+    return redirect('estimator_template_builder', pk=template.pk)
+
+
+class ProjectSaveAsTemplateView(LoginRequiredMixin, CreateView):
+    """Snapshots a Project's current module rows into a brand-new ProjectTemplate, named
+    by the user on this form. The template is fully independent afterward -- later
+    changes to the project (or its deletion) never affect it."""
+
+    model = ProjectTemplate
+    form_class = SaveProjectAsTemplateForm
+    template_name = 'estimator/add_form.html'
+
+    def get_project(self):
+        return get_object_or_404(Project, pk=self.kwargs['pk'])
+
+    def get_initial(self):
+        return {'name': unique_name(ProjectTemplate, f'{self.get_project().name} Template')}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = f'Save "{self.get_project().name}" as Template'
+        context['cancel_url'] = reverse('estimator_project_builder', args=[self.get_project().pk])
+        return context
+
+    def form_valid(self, form):
+        project = self.get_project()
+        form.instance.created_by = self.request.user
+        form.instance.complexity = project.complexity
+        form.instance.minutes_per_working_day = project.minutes_per_working_day
+        with transaction.atomic():
+            response = super().form_valid(form)
+            ProjectTemplateModule.objects.bulk_create([
+                ProjectTemplateModule(
+                    template=self.object,
+                    segment=pm.segment,
+                    module_type=pm.module_type,
+                    count=pm.count,
+                    complexity_override=pm.complexity_override,
+                    order=pm.order,
+                )
+                for pm in project.modules.all()
+            ])
+        messages.success(self.request, f'Saved "{project.name}" as template "{self.object.name}".')
+        return response
+
+    def get_success_url(self):
+        return reverse('estimator_template_builder', args=[self.object.pk])

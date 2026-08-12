@@ -1,0 +1,163 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}{{ template.name }} - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title mb-1"><i class="bi bi-file-earmark-ruled me-2 text-primary"></i>{{ template.name }}</h1>
+            <div class="text-muted">
+                {{ template.description|default:'No description' }} &middot;
+                Complexity: <strong>{{ template.complexity.name }} (x{{ template.complexity.multiplier }})</strong> &middot;
+                {{ template.minutes_per_working_day }} min/day
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'estimator_template_edit' template.pk %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit Details</a>
+            <a href="{% url 'estimator_project_new' %}?template={{ template.pk }}" class="btn btn-outline-success"><i class="bi bi-plus-circle me-1"></i>Use for New Project</a>
+            <a href="{% url 'estimator_template_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Templates</a>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-boxes me-2"></i>Module Rows</span>
+            <button type="button" id="addRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{% url 'estimator_template_modules_sync' template.pk %}" id="modulesForm">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 26%;">Segment</th>
+                                <th style="width: 30%;">Module Type</th>
+                                <th style="width: 14%;">Count</th>
+                                <th style="width: 26%;">Complexity Override</th>
+                                <th style="width: 4%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="moduleRowsBody">
+                            {% for row in rows %}
+                            <tr class="module-row">
+                                <td>
+                                    <input type="hidden" name="row_id[]" value="{{ row.id }}">
+                                    <select name="segment[]" class="form-select segment-select" required>
+                                        <option value="">-- select --</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="module_type[]" class="form-select module-type-select" required>
+                                        <option value="">-- select --</option>
+                                    </select>
+                                </td>
+                                <td><input type="number" name="count[]" class="form-control count-input" min="1" value="{{ row.count }}" required></td>
+                                <td>
+                                    <select name="complexity_override[]" class="form-select complexity-select">
+                                        <option value="">Inherit ({{ template.complexity.name }})</option>
+                                    </select>
+                                </td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if not rows %}
+                <div class="empty-state">
+                    <i class="bi bi-boxes"></i>
+                    <p>No module rows yet. Click "Add Module Row" to build this template.</p>
+                </div>
+                {% endif %}
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>Save Modules</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const SEGMENTS = {{ segments_json|safe }};
+    const MODULE_TYPES = {{ module_types_json|safe }};
+    const COMPLEXITY_LEVELS = {{ complexity_levels_json|safe }};
+    const EXISTING_MODULES = {{ modules_json|safe }};
+    const TEMPLATE_COMPLEXITY_ID = {{ template.complexity_id }};
+
+    const complexityById = {};
+    COMPLEXITY_LEVELS.forEach(c => complexityById[c.id] = c);
+
+    function segmentOptionsHtml(selectedId) {
+        let html = '<option value="">-- select --</option>';
+        SEGMENTS.forEach(s => {
+            const sel = (String(s.id) === String(selectedId)) ? 'selected' : '';
+            html += `<option value="${s.id}" ${sel}>${s.name}</option>`;
+        });
+        return html;
+    }
+
+    function moduleTypeOptionsHtml(selectedId) {
+        let html = '<option value="">-- select --</option>';
+        MODULE_TYPES.forEach(m => {
+            const sel = (String(m.id) === String(selectedId)) ? 'selected' : '';
+            html += `<option value="${m.id}" ${sel}>${m.name}</option>`;
+        });
+        return html;
+    }
+
+    function complexityOptionsHtml(selectedId) {
+        let html = `<option value="">Inherit (${complexityById[TEMPLATE_COMPLEXITY_ID] ? complexityById[TEMPLATE_COMPLEXITY_ID].name : ''})</option>`;
+        COMPLEXITY_LEVELS.forEach(c => {
+            const sel = (String(c.id) === String(selectedId)) ? 'selected' : '';
+            html += `<option value="${c.id}" ${sel}>${c.name} (x${c.multiplier})</option>`;
+        });
+        return html;
+    }
+
+    function hydrateExistingRows() {
+        const rows = document.querySelectorAll('#moduleRowsBody .module-row');
+        rows.forEach((tr, i) => {
+            const data = EXISTING_MODULES[i];
+            const segSelect = tr.querySelector('.segment-select');
+            const mtSelect = tr.querySelector('.module-type-select');
+            const cxSelect = tr.querySelector('.complexity-select');
+            segSelect.innerHTML = segmentOptionsHtml(data ? data.segment_id : '');
+            mtSelect.innerHTML = moduleTypeOptionsHtml(data ? data.module_type_id : '');
+            cxSelect.innerHTML = complexityOptionsHtml(data ? data.complexity_override_id : '');
+        });
+    }
+
+    function addRow() {
+        const tbody = document.getElementById('moduleRowsBody');
+        const tr = document.createElement('tr');
+        tr.className = 'module-row';
+        tr.innerHTML = `
+            <td>
+                <input type="hidden" name="row_id[]" value="">
+                <select name="segment[]" class="form-select segment-select" required>${segmentOptionsHtml('')}</select>
+            </td>
+            <td>
+                <select name="module_type[]" class="form-select module-type-select" required>${moduleTypeOptionsHtml('')}</select>
+            </td>
+            <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
+            <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
+            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    document.getElementById('addRowBtn').addEventListener('click', addRow);
+    document.getElementById('moduleRowsBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-row-btn');
+        if (btn) {
+            btn.closest('tr').remove();
+        }
+    });
+
+    hydrateExistingRows();
+</script>
+{% endblock %}

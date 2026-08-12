@@ -14,6 +14,15 @@ urlpatterns = [
     path('projects/<int:pk>/report/', views.ProjectReportView.as_view(), name='estimator_project_report'),
     path('projects/<int:pk>/report/pdf/', views.project_export_pdf, name='estimator_project_export_pdf'),
     path('projects/<int:pk>/report/excel/', views.project_export_excel, name='estimator_project_export_excel'),
+    path('projects/<int:pk>/save-as-template/', views.ProjectSaveAsTemplateView.as_view(), name='estimator_project_save_as_template'),
+
+    # Templates (reusable module-row presets, shared across all estimator users)
+    path('templates/', views.ProjectTemplateListView.as_view(), name='estimator_template_list'),
+    path('templates/new/', views.ProjectTemplateCreateView.as_view(), name='estimator_template_new'),
+    path('templates/<int:pk>/', views.ProjectTemplateDetailView.as_view(), name='estimator_template_builder'),
+    path('templates/<int:pk>/edit/', views.ProjectTemplateUpdateView.as_view(), name='estimator_template_edit'),
+    path('templates/<int:pk>/delete/', views.ProjectTemplateDeleteView.as_view(), name='estimator_template_delete'),
+    path('templates/<int:pk>/modules/sync/', views.template_modules_sync, name='estimator_template_modules_sync'),
 
     # Activity Master
     path('activities/', views.ActivityListView.as_view(), name='estimator_activity_list'),

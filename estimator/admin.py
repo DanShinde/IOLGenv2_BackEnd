@@ -1,6 +1,9 @@
 from django.contrib import admin
 
-from .models import Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule, Segment
+from .models import (
+    Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule,
+    ProjectTemplate, ProjectTemplateModule, Segment,
+)
 
 
 @admin.register(Activity)
@@ -48,3 +51,16 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ('complexity',)
     search_fields = ('name', 'customer')
     inlines = [ProjectModuleInline]
+
+
+class ProjectTemplateModuleInline(admin.TabularInline):
+    model = ProjectTemplateModule
+    extra = 0
+
+
+@admin.register(ProjectTemplate)
+class ProjectTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'complexity', 'created_by', 'updated_at')
+    list_filter = ('complexity',)
+    search_fields = ('name', 'description')
+    inlines = [ProjectTemplateModuleInline]
