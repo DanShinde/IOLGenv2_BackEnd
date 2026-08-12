@@ -299,9 +299,9 @@
             if (contributions.length === 0) return '0.0 min';
             if (contributions.length === 1) {
                 const c = contributions[0];
-                return `${c.base.toFixed(1)} min x${c.count} x${c.factor.toFixed(2)} = ${c.minutes.toFixed(1)} min`;
+                return `${c.count} (no. of modules) x ${c.base.toFixed(1)} (min per module) x ${c.factor.toFixed(2)} (complexity) = ${c.minutes.toFixed(1)} min`;
             }
-            return contributions.map(c => c.minutes.toFixed(1)).join(' + ') + ` = ${total.toFixed(1)} min`;
+            return contributions.map(c => `${c.minutes.toFixed(1)} (${c.label})`).join(' + ') + ` = ${total.toFixed(1)} min`;
         }
 
         ACTIVITIES.forEach(a => {

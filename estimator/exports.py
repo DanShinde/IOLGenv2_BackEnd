@@ -126,8 +126,10 @@ def _write_breakdown_sheet(ws, group):
         cell.alignment = Alignment(horizontal='center', wrap_text=True)
         ws.column_dimensions[get_column_letter(col)].width = 16
 
-    days_col = len(activities) + 4
-    row_total_col = days_col - 1
+    # Activities occupy columns 4..(4+len(activities)-1), so the next two free columns
+    # start at 4+len(activities).
+    row_total_col = len(activities) + 4
+    days_col = row_total_col + 1
     ws.cell(row=1, column=row_total_col, value='Row Total (min)').font = HEADER_FONT
     ws.cell(row=1, column=row_total_col).fill = HEADER_FILL
     ws.cell(row=1, column=row_total_col).alignment = Alignment(horizontal='center', wrap_text=True)

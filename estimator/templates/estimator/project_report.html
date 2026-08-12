@@ -167,7 +167,7 @@
                             <td>{{ row.count }}</td>
                             {% for act_data in row.activities %}
                             <td class="text-end calc-cell" data-days="{{ act_data.days|floatformat:3 }}"
-                                data-formula="{{ act_data.base_minutes|floatformat:1 }} min x{{ row.count }} x{{ act_data.complexity_multiplier|floatformat:2 }} = {{ act_data.minutes|floatformat:1 }} min">{{ act_data.days|floatformat:3 }}</td>
+                                data-formula="{{ row.count }} (no. of modules) x {{ act_data.base_minutes|floatformat:1 }} (min per module) x {{ act_data.complexity_multiplier|floatformat:2 }} (complexity) = {{ act_data.minutes|floatformat:1 }} min">{{ act_data.days|floatformat:3 }}</td>
                             {% endfor %}
                             <td class="text-end fw-semibold">{{ row.row_total_minutes|floatformat:1 }}</td>
                             <td class="text-end fw-semibold text-primary">{{ row.row_total_days|floatformat:2 }}</td>
@@ -181,7 +181,7 @@
                             <td></td>
                             {% for at in group.activity_totals %}
                             <td class="text-end calc-cell" data-days="{{ at.total_days|floatformat:3 }}"
-                                data-formula="{% for c in at.contributions %}{% if not forloop.first %} + {% endif %}{{ c.minutes|floatformat:1 }}{% empty %}0.0{% endfor %} = {{ at.total_minutes|floatformat:1 }} min">{{ at.total_days|floatformat:3 }}</td>
+                                data-formula="{% for c in at.contributions %}{% if not forloop.first %} + {% endif %}{{ c.minutes|floatformat:1 }} ({{ c.label }}){% empty %}0.0{% endfor %} = {{ at.total_minutes|floatformat:1 }} min">{{ at.total_days|floatformat:3 }}</td>
                             {% endfor %}
                             <td class="text-end">{{ group.total_minutes|floatformat:1 }}</td>
                             <td class="text-end">{{ group.total_days|floatformat:2 }}</td>
