@@ -99,7 +99,10 @@
                                         <option value="">Inherit ({{ project.complexity.name }})</option>
                                     </select>
                                 </td>
-                                <td class="text-end row-total fw-semibold">{{ row.row_total_minutes|floatformat:1 }} min</td>
+                                <td class="text-end">
+                                    <div class="row-total fw-semibold">{{ row.row_total_minutes|floatformat:1 }} min</div>
+                                    <div class="row-total-days small text-primary">{{ row.row_total_days|floatformat:2 }} man-days</div>
+                                </td>
                                 <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
                             </tr>
                             {% endfor %}
@@ -260,6 +263,7 @@
                 }
             }
             row.querySelector('.row-total').textContent = rowTotal.toFixed(1) + ' min';
+            row.querySelector('.row-total-days').textContent = (rowTotal / MINUTES_PER_DAY).toFixed(2) + ' man-days';
             grandTotal += rowTotal;
         });
 
@@ -303,7 +307,10 @@
             </td>
             <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
             <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
-            <td class="text-end row-total fw-semibold">0 min</td>
+            <td class="text-end">
+                <div class="row-total fw-semibold">0 min</div>
+                <div class="row-total-days small text-primary">0.00 man-days</div>
+            </td>
             <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
         `;
         tbody.appendChild(tr);

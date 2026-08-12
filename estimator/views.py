@@ -164,6 +164,7 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
                 'value': existing[a.id].value if a.id in existing else '',
                 'batch_count': existing[a.id].batch_count if a.id in existing else '',
                 'batch_value': existing[a.id].batch_value if a.id in existing else '',
+                'remark': existing[a.id].remark if a.id in existing else '',
             }
             for a in Activity.objects.order_by('category', 'display_order', 'name')
         ]
@@ -181,12 +182,20 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
             single_raw = request.POST.get(f'value_{activity.id}', '').strip()
             batch_count_raw = request.POST.get(f'batch_count_{activity.id}', '').strip()
             batch_value_raw = request.POST.get(f'batch_value_{activity.id}', '').strip()
+            remark = request.POST.get(f'remark_{activity.id}', '').strip()
             batch_raw = batch_count_raw or batch_value_raw
 
             if single_raw and batch_raw:
                 messages.error(request, f"'{activity.name}': fill in either a single-module time OR a batch time, not both -- row skipped.")
                 continue
             if not single_raw and not batch_raw:
+                # No time entered -- still worth saving if there's a remark to keep
+                # (e.g. a reference note on a cell that isn't configured yet).
+                if remark:
+                    ModuleActivityTime.objects.update_or_create(
+                        module_type=module_type, segment=segment, activity=activity,
+                        defaults={'remark': remark},
+                    )
                 continue
 
             if single_raw:
@@ -200,7 +209,7 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
                     continue
                 ModuleActivityTime.objects.update_or_create(
                     module_type=module_type, segment=segment, activity=activity,
-                    defaults={'unit': unit, 'value': value, 'batch_count': None, 'batch_value': None},
+                    defaults={'unit': unit, 'value': value, 'batch_count': None, 'batch_value': None, 'remark': remark},
                 )
             else:
                 if not batch_count_raw or not batch_value_raw:
@@ -217,7 +226,7 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
                     continue
                 ModuleActivityTime.objects.update_or_create(
                     module_type=module_type, segment=segment, activity=activity,
-                    defaults={'unit': unit, 'value': None, 'batch_count': batch_count, 'batch_value': batch_value},
+                    defaults={'unit': unit, 'value': None, 'batch_count': batch_count, 'batch_value': batch_value, 'remark': remark},
                 )
 
         messages.success(request, f'Time matrix for "{module_type.name}" / "{segment.name}" saved.')

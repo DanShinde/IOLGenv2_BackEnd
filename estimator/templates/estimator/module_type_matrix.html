@@ -3,7 +3,7 @@
 {% block title %}{{ module_type.name }} / {{ segment.name }} Matrix - Estimator{% endblock %}
 
 {% block content %}
-<div class="animate-fade-in" style="max-width: 940px; margin: 0 auto;">
+<div class="animate-fade-in" style="max-width: 1200px; margin: 0 auto;">
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-grid-3x3-gap me-2 text-primary"></i>{{ module_type.name }} / {{ segment.name }} &mdash; Time Matrix</h1>
         <a href="{% url 'estimator_module_type_segments' module_type.pk %}" class="btn btn-outline-secondary">
@@ -18,7 +18,8 @@
                 (e.g. "10 modules take 20 min total") &mdash; not both. Pick whichever unit is most convenient
                 (seconds, minutes, hours, or days). "Days" always means that <em>project's own</em> working-day
                 length, resolved when the estimate is calculated &mdash; not a fixed 24 hours. Leave both blank if
-                this activity doesn't apply.
+                this activity doesn't apply. The <strong>Remark</strong> column is for your own reference (e.g. the
+                basis for the figure) &mdash; it never appears on the project report, PDF, or Excel export.
             </p>
             {% if rows %}
             <form method="POST">
@@ -28,17 +29,18 @@
                         <thead>
                             <tr>
                                 <th>Activity</th>
-                                <th style="width: 150px;">Per module</th>
+                                <th style="width: 130px;">Per module</th>
                                 <th class="text-center" style="width: 30px;">or</th>
-                                <th style="width: 260px;">Batch: modules &amp; total</th>
-                                <th style="width: 130px;">Unit</th>
+                                <th style="width: 230px;">Batch: modules &amp; total</th>
+                                <th style="width: 110px;">Unit</th>
+                                <th style="width: 240px;"><i class="bi bi-sticky me-1"></i>Remark <span class="text-muted fw-normal">(not on report)</span></th>
                             </tr>
                         </thead>
                         <tbody id="matrixRowsBody">
                             {% regroup rows by activity.get_category_display as category_rows %}
                             {% for category in category_rows %}
                             <tr class="table-light">
-                                <td colspan="5" class="fw-bold text-primary"><i class="bi bi-tag me-1"></i>{{ category.grouper }}</td>
+                                <td colspan="6" class="fw-bold text-primary"><i class="bi bi-tag me-1"></i>{{ category.grouper }}</td>
                             </tr>
                             {% for row in category.list %}
                             <tr class="matrix-row" data-activity-id="{{ row.activity.id }}">
@@ -63,6 +65,10 @@
                                         <option value="{{ value }}" {% if value == row.unit %}selected{% endif %}>{{ label }}</option>
                                         {% endfor %}
                                     </select>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm" name="remark_{{ row.activity.id }}"
+                                           value="{{ row.remark|default:'' }}" placeholder="e.g. per vendor spec sheet">
                                 </td>
                             </tr>
                             {% endfor %}

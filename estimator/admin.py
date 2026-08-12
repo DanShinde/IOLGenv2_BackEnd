@@ -23,8 +23,9 @@ class ModuleTypeAdmin(admin.ModelAdmin):
 
 @admin.register(ModuleActivityTime)
 class ModuleActivityTimeAdmin(admin.ModelAdmin):
-    list_display = ('segment', 'module_type', 'activity', 'unit', 'value', 'batch_count', 'batch_value', 'effective_minutes_default')
+    list_display = ('segment', 'module_type', 'activity', 'unit', 'value', 'batch_count', 'batch_value', 'effective_minutes_default', 'remark')
     list_filter = ('segment', 'module_type', 'activity', 'unit')
+    search_fields = ('remark',)
 
     @admin.display(description='min @ 480/day')
     def effective_minutes_default(self, obj):

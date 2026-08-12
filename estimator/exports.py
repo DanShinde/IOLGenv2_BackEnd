@@ -75,7 +75,7 @@ def _write_summary_sheet(ws, estimate):
         ws.cell(row=row, column=2, value=f"{float(group['total_days']):.2f} man-days").font = Font(bold=True, color='4F46E5')
 
     row += 2
-    headers = ['Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)']
+    headers = ['Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)', 'Row Total (man-days)']
     for col, header in enumerate(headers, start=1):
         cell = ws.cell(row=row, column=col, value=header)
         cell.font = HEADER_FONT
@@ -88,6 +88,8 @@ def _write_summary_sheet(ws, estimate):
         ws.cell(row=row, column=3, value=r['count'])
         ws.cell(row=row, column=4, value=f"{r['complexity'].name} (x{r['complexity'].multiplier})" if r['complexity'] else '-')
         ws.cell(row=row, column=5, value=float(r['row_total_minutes']))
+        days_cell = ws.cell(row=row, column=6, value=round(float(r['row_total_days']), 2))
+        days_cell.font = Font(bold=True, color='4F46E5')
         row += 1
 
     row += 1
@@ -102,6 +104,7 @@ def _write_summary_sheet(ws, estimate):
     ws.column_dimensions['C'].width = 10
     ws.column_dimensions['D'].width = 20
     ws.column_dimensions['E'].width = 16
+    ws.column_dimensions['F'].width = 18
 
 
 def _write_breakdown_sheet(ws, group):
@@ -123,6 +126,17 @@ def _write_breakdown_sheet(ws, group):
         cell.alignment = Alignment(horizontal='center', wrap_text=True)
         ws.column_dimensions[get_column_letter(col)].width = 16
 
+    days_col = len(activities) + 4
+    row_total_col = days_col - 1
+    ws.cell(row=1, column=row_total_col, value='Row Total (min)').font = HEADER_FONT
+    ws.cell(row=1, column=row_total_col).fill = HEADER_FILL
+    ws.cell(row=1, column=row_total_col).alignment = Alignment(horizontal='center', wrap_text=True)
+    ws.cell(row=1, column=days_col, value='Row Total (man-days)').font = HEADER_FONT
+    ws.cell(row=1, column=days_col).fill = HEADER_FILL
+    ws.cell(row=1, column=days_col).alignment = Alignment(horizontal='center', wrap_text=True)
+    ws.column_dimensions[get_column_letter(row_total_col)].width = 16
+    ws.column_dimensions[get_column_letter(days_col)].width = 18
+
     for row_offset, r in enumerate(rows):
         row = row_offset + 2
         ws.cell(row=row, column=1, value=r['segment'].name)
@@ -132,6 +146,12 @@ def _write_breakdown_sheet(ws, group):
             cell = ws.cell(row=row, column=col, value=float(act_data['minutes']))
             cell.alignment = Alignment(horizontal='center')
             cell.border = THIN_BORDER
+        row_total_cell = ws.cell(row=row, column=row_total_col, value=round(float(r['row_total_minutes']), 1))
+        row_total_cell.alignment = Alignment(horizontal='center')
+        row_total_cell.font = Font(bold=True)
+        days_cell = ws.cell(row=row, column=days_col, value=round(float(r['row_total_days']), 2))
+        days_cell.alignment = Alignment(horizontal='center')
+        days_cell.font = Font(bold=True, color='4F46E5')
 
     total_row = len(rows) + 2
     ws.cell(row=total_row, column=1, value='Activity Total').font = Font(bold=True)
@@ -143,6 +163,10 @@ def _write_breakdown_sheet(ws, group):
         cell.font = Font(bold=True)
         cell.fill = TOTAL_FILL
         cell.alignment = Alignment(horizontal='center')
+    ws.cell(row=total_row, column=row_total_col, value=round(float(group['total_minutes']), 1)).font = Font(bold=True)
+    ws.cell(row=total_row, column=row_total_col).fill = TOTAL_FILL
+    ws.cell(row=total_row, column=days_col, value=round(float(group['total_days']), 2)).font = Font(bold=True, color='4F46E5')
+    ws.cell(row=total_row, column=days_col).fill = TOTAL_FILL
 
     days_row = total_row + 2
     ws.cell(row=days_row, column=1, value=f"{group['label']} total").font = Font(bold=True, color='4F46E5')
@@ -213,7 +237,7 @@ def render_project_report_pdf(estimate):
 
 
 def _module_summary_table(estimate):
-    data = [['Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)']]
+    data = [['Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)', 'Row Total (man-days)']]
     for r in estimate['rows']:
         data.append([
             r['segment'].name,
@@ -221,8 +245,9 @@ def _module_summary_table(estimate):
             str(r['count']),
             f"{r['complexity'].name} (x{r['complexity'].multiplier})" if r['complexity'] else '-',
             f"{r['row_total_minutes']:.1f}",
+            f"{r['row_total_days']:.2f}",
         ])
-    table = Table(data, colWidths=[5 * cm, 6 * cm, 2.5 * cm, 5 * cm, 5 * cm])
+    table = Table(data, colWidths=[4 * cm, 5 * cm, 2 * cm, 4.5 * cm, 4 * cm, 4.5 * cm])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -231,6 +256,8 @@ def _module_summary_table(estimate):
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('FONTNAME', (5, 1), (5, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (5, 1), (5, -1), colors.HexColor('#4F46E5')),
     ]))
     return table
 
@@ -243,26 +270,38 @@ def _activity_breakdown_tables(group):
     rows = group['rows']
     flowables = []
 
-    for chunk_start in range(0, len(activities), EMPLOYEES_PER_CHUNK):
+    last_chunk_start = max(0, ((len(activities) - 1) // EMPLOYEES_PER_CHUNK) * EMPLOYEES_PER_CHUNK) if activities else 0
+
+    for chunk_start in range(0, len(activities) or 1, EMPLOYEES_PER_CHUNK):
         chunk = activities[chunk_start:chunk_start + EMPLOYEES_PER_CHUNK]
+        is_last_chunk = chunk_start == last_chunk_start
         header = ['Segment', 'Module Type', 'Count'] + [a.name for a in chunk]
+        if is_last_chunk:
+            header += ['Row Total (min)', 'Row Total (man-days)']
         data = [header]
         for r in rows:
             act_by_id = {ad['activity'].id: ad for ad in r['activities']}
             row_vals = [r['segment'].name, r['module_type'].name, str(r['count'])]
             for a in chunk:
                 row_vals.append(f"{act_by_id[a.id]['minutes']:.1f}")
+            if is_last_chunk:
+                row_vals += [f"{r['row_total_minutes']:.1f}", f"{r['row_total_days']:.2f}"]
             data.append(row_vals)
 
         totals_by_id = {at['activity'].id: at for at in group['activity_totals']}
         total_row = ['Activity Total', '', '']
         for a in chunk:
             total_row.append(f"{totals_by_id[a.id]['total_minutes']:.1f}")
+        if is_last_chunk:
+            total_row += [f"{group['total_minutes']:.1f}", f"{group['total_days']:.2f}"]
         data.append(total_row)
 
-        col_widths = [3.5 * cm, 4.5 * cm, 2 * cm] + [((24 * cm) - 10 * cm) / len(chunk)] * len(chunk)
+        extra_cols = 2 if is_last_chunk else 0
+        col_widths = [3.5 * cm, 4.5 * cm, 2 * cm] + [((24 * cm) - 10 * cm - extra_cols * 3 * cm) / max(len(chunk), 1)] * len(chunk)
+        if is_last_chunk:
+            col_widths += [3 * cm, 3 * cm]
         table = Table(data, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
+        style_commands = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -271,7 +310,13 @@ def _activity_breakdown_tables(group):
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
             ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#EEF2FF')),
-        ]))
+        ]
+        if is_last_chunk:
+            style_commands += [
+                ('FONTNAME', (-1, 1), (-1, -1), 'Helvetica-Bold'),
+                ('TEXTCOLOR', (-1, 1), (-1, -1), colors.HexColor('#4F46E5')),
+            ]
+        table.setStyle(TableStyle(style_commands))
         flowables.append(table)
         flowables.append(Spacer(1, 0.4 * cm))
 

@@ -118,6 +118,11 @@ class ModuleActivityTime(models.Model):
         max_digits=9, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal('0'))],
         help_text="Batch entry mode: total time for batch_count modules, in `unit`.",
     )
+    remark = models.TextField(
+        blank=True, null=True,
+        help_text="Reference note on how this time was arrived at (e.g. a vendor spec sheet or past project). "
+                   "Internal use only -- never shown on the project report, PDF, or Excel export.",
+    )
 
     class Meta:
         unique_together = ('segment', 'module_type', 'activity')

@@ -63,6 +63,7 @@ def build_project_estimate(project):
             'complexity': complexity,
             'activities': row_activities,
             'row_total_minutes': row_total,
+            'row_total_days': row_total / Decimal(per_day),
         })
         grand_total += row_total
 
@@ -83,7 +84,12 @@ def build_project_estimate(project):
         for r in rows:
             cat_row_activities = [ad for ad in r['activities'] if ad['activity'].id in cat_activity_ids]
             cat_row_total = sum((ad['minutes'] for ad in cat_row_activities), Decimal('0'))
-            cat_rows.append({**r, 'activities': cat_row_activities, 'row_total_minutes': cat_row_total})
+            cat_rows.append({
+                **r,
+                'activities': cat_row_activities,
+                'row_total_minutes': cat_row_total,
+                'row_total_days': cat_row_total / Decimal(per_day),
+            })
             cat_total += cat_row_total
 
         category_groups.append({

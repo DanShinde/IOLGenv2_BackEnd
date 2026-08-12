@@ -115,6 +115,7 @@
                             <th>Count</th>
                             <th>Complexity</th>
                             <th class="text-end">Row Total (min)</th>
+                            <th class="text-end">Row Total (man-days)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -125,9 +126,10 @@
                             <td>{{ row.count }}</td>
                             <td>{{ row.complexity.name }} (x{{ row.complexity.multiplier }})</td>
                             <td class="text-end">{{ row.row_total_minutes|floatformat:1 }}</td>
+                            <td class="text-end fw-semibold text-primary">{{ row.row_total_days|floatformat:2 }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="5" class="text-muted text-center py-3">No module rows.</td></tr>
+                        <tr><td colspan="6" class="text-muted text-center py-3">No module rows.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -151,6 +153,7 @@
                             <th>Count</th>
                             {% for a in group.activities %}<th class="text-end">{{ a.name }}</th>{% endfor %}
                             <th class="text-end">Row Total (min)</th>
+                            <th class="text-end">Row Total (man-days)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -161,9 +164,10 @@
                             <td>{{ row.count }}</td>
                             {% for act_data in row.activities %}<td class="text-end">{{ act_data.minutes|floatformat:1 }}</td>{% endfor %}
                             <td class="text-end fw-semibold">{{ row.row_total_minutes|floatformat:1 }}</td>
+                            <td class="text-end fw-semibold text-primary">{{ row.row_total_days|floatformat:2 }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="{{ group.activities|length|add:4 }}" class="text-muted text-center py-3">No module rows.</td></tr>
+                        <tr><td colspan="{{ group.activities|length|add:5 }}" class="text-muted text-center py-3">No module rows.</td></tr>
                         {% endfor %}
                         <tr class="fw-bold" style="background:#eef2ff;">
                             <td>Activity Total</td>
@@ -171,6 +175,7 @@
                             <td></td>
                             {% for at in group.activity_totals %}<td class="text-end">{{ at.total_minutes|floatformat:1 }}</td>{% endfor %}
                             <td class="text-end">{{ group.total_minutes|floatformat:1 }}</td>
+                            <td class="text-end">{{ group.total_days|floatformat:2 }}</td>
                         </tr>
                     </tbody>
                 </table>
