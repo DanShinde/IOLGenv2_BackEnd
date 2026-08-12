@@ -26,6 +26,10 @@ def build_project_estimate(project):
     }
 
     activity_totals = {a.id: Decimal('0') for a in activities}
+    # Per activity, every module row that actually contributes minutes to it, with enough
+    # detail (rate, count, complexity) to show the full "rate x count x complexity"
+    # arithmetic on demand -- not just the resulting number.
+    activity_contributions = {a.id: [] for a in activities}
     rows = []
     grand_total = Decimal('0')
     warnings = []
@@ -50,10 +54,20 @@ def build_project_estimate(project):
             row_activities.append({
                 'activity': a,
                 'base_minutes': base_minutes,
+                'complexity_multiplier': factor,
                 'minutes': minutes,
+                'days': minutes / Decimal(per_day),
             })
             activity_totals[a.id] += minutes
             row_total += minutes
+            if minutes > 0:
+                activity_contributions[a.id].append({
+                    'label': f'{mt.name} / {segment.name}',
+                    'base_minutes': base_minutes,
+                    'count': pm.count,
+                    'complexity_multiplier': factor,
+                    'minutes': minutes,
+                })
 
         rows.append({
             'module': pm,
@@ -67,7 +81,15 @@ def build_project_estimate(project):
         })
         grand_total += row_total
 
-    activity_totals_list = [{'activity': a, 'total_minutes': activity_totals[a.id]} for a in activities]
+    activity_totals_list = [
+        {
+            'activity': a,
+            'total_minutes': activity_totals[a.id],
+            'total_days': activity_totals[a.id] / Decimal(per_day),
+            'contributions': activity_contributions[a.id],
+        }
+        for a in activities
+    ]
 
     # Every activity belongs to exactly one of the two fixed categories, so the same
     # rows/totals above can be re-sliced per category for category-grouped reporting

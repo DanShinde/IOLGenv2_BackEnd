@@ -23,6 +23,9 @@
                 <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-files me-1"></i>Duplicate</button>
             </form>
             <a href="{% url 'estimator_project_save_as_template' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-ruled me-1"></i>Save as Template</a>
+            <button type="button" class="btn btn-outline-secondary" id="calcToggleBtn" onclick="toggleCalculation()">
+                <i class="bi bi-calculator me-1"></i>Show Calculation
+            </button>
             <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Projects</a>
         </div>
     </div>
@@ -135,19 +138,19 @@
                     <thead>
                         <tr>
                             <th>Activity</th>
-                            <th class="text-end">Total Minutes</th>
+                            <th class="text-end activity-total-header">Total (man-days)</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for at in group.activity_totals %}
                         <tr>
                             <td>{{ at.activity.name }}</td>
-                            <td class="text-end activity-total-cell" data-activity-id="{{ at.activity.id }}">{{ at.total_minutes|floatformat:1 }}</td>
+                            <td class="text-end activity-total-cell" data-activity-id="{{ at.activity.id }}">{{ at.total_days|floatformat:3 }}</td>
                         </tr>
                         {% endfor %}
                         <tr class="fw-bold" style="background:#eef2ff;">
                             <td>{{ group.label }} Total</td>
-                            <td class="text-end category-total-cell" data-category="{{ group.category }}">{{ group.total_minutes|floatformat:1 }}</td>
+                            <td class="text-end category-total-cell" data-category="{{ group.category }}">{{ group.total_days|floatformat:3 }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -182,6 +185,21 @@
     MODULE_TYPES.forEach(m => moduleTypeById[m.id] = m);
     const segmentById = {};
     SEGMENTS.forEach(s => segmentById[s.id] = s);
+
+    // Activity-wise totals default to man-days (matching the KPI headline); "Show
+    // Calculation" reveals the underlying minutes they were derived from.
+    let showingCalculation = false;
+
+    function toggleCalculation() {
+        showingCalculation = !showingCalculation;
+        document.querySelectorAll('.activity-total-header').forEach(th => {
+            th.textContent = showingCalculation ? 'Total Minutes' : 'Total (man-days)';
+        });
+        document.getElementById('calcToggleBtn').innerHTML = showingCalculation
+            ? '<i class="bi bi-eye-slash me-1"></i>Hide Calculation'
+            : '<i class="bi bi-calculator me-1"></i>Show Calculation';
+        recalc();
+    }
 
     function segmentOptionsHtml(selectedId) {
         let html = '<option value="">-- select --</option>';
@@ -235,7 +253,8 @@
     function recalc() {
         const rows = document.querySelectorAll('#moduleRowsBody .module-row');
         const activityTotals = {};
-        ACTIVITIES.forEach(a => activityTotals[a.id] = 0);
+        const activityContributions = {};
+        ACTIVITIES.forEach(a => { activityTotals[a.id] = 0; activityContributions[a.id] = []; });
         const categoryTotals = {};
         ACTIVITIES.forEach(a => categoryTotals[a.category] = 0);
         let grandTotal = 0;
@@ -258,6 +277,10 @@
                     activityTotals[a.id] += minutes;
                     categoryTotals[a.category] += minutes;
                     rowTotal += minutes;
+                    if (minutes > 0) {
+                        const label = moduleTypeById[mtId] && segmentById[segId] ? `${moduleTypeById[mtId].name} / ${segmentById[segId].name}` : 'row';
+                        activityContributions[a.id].push({ label, base, count, factor, minutes });
+                    }
                 });
                 if (!hasAny && moduleTypeById[mtId] && segmentById[segId]) {
                     warningTypes.add(`${moduleTypeById[mtId].name} / ${segmentById[segId].name}`);
@@ -268,14 +291,38 @@
             grandTotal += rowTotal;
         });
 
+        // "Show Calculation" reveals the full arithmetic behind each total: for a single
+        // contributing row that's "rate x count x complexity = minutes"; for several rows
+        // it's each row's minutes summed, so the reader can see exactly where the number
+        // came from rather than just the same figure in a different unit.
+        function formulaFor(contributions, total) {
+            if (contributions.length === 0) return '0.0 min';
+            if (contributions.length === 1) {
+                const c = contributions[0];
+                return `${c.base.toFixed(1)} min x${c.count} x${c.factor.toFixed(2)} = ${c.minutes.toFixed(1)} min`;
+            }
+            return contributions.map(c => c.minutes.toFixed(1)).join(' + ') + ` = ${total.toFixed(1)} min`;
+        }
+
         ACTIVITIES.forEach(a => {
             const cell = document.querySelector(`.activity-total-cell[data-activity-id="${a.id}"]`);
-            if (cell) cell.textContent = activityTotals[a.id].toFixed(1);
+            if (cell) {
+                cell.textContent = showingCalculation
+                    ? formulaFor(activityContributions[a.id], activityTotals[a.id])
+                    : (activityTotals[a.id] / MINUTES_PER_DAY).toFixed(3);
+            }
         });
 
         Object.keys(categoryTotals).forEach(category => {
             const totalCell = document.querySelector(`.category-total-cell[data-category="${category}"]`);
-            if (totalCell) totalCell.textContent = categoryTotals[category].toFixed(1);
+            if (totalCell) {
+                const categoryContributions = ACTIVITIES
+                    .filter(a => a.category === category)
+                    .flatMap(a => activityContributions[a.id]);
+                totalCell.textContent = showingCalculation
+                    ? formulaFor(categoryContributions, categoryTotals[category])
+                    : (categoryTotals[category] / MINUTES_PER_DAY).toFixed(3);
+            }
             const daysBadge = document.querySelector(`.category-days-badge[data-category="${category}"]`);
             if (daysBadge) daysBadge.textContent = (categoryTotals[category] / MINUTES_PER_DAY).toFixed(2) + ' man-days';
         });

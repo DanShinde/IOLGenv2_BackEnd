@@ -41,6 +41,9 @@
             <a href="{% url 'estimator_project_export_pdf' project.pk %}" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
             <a href="{% url 'estimator_project_export_excel' project.pk %}" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
             <button type="button" class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+            <button type="button" class="btn btn-outline-secondary" id="calcToggleBtn" onclick="toggleCalculation()">
+                <i class="bi bi-calculator me-1"></i>Show Calculation
+            </button>
         </div>
     </div>
 
@@ -140,7 +143,7 @@
     {% for group in estimate.category_groups %}
     <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-grid-3x3-gap me-2"></i>{{ group.label }} &mdash; Activity-wise Breakdown</span>
+            <span><i class="bi bi-grid-3x3-gap me-2"></i>{{ group.label }} &mdash; Activity-wise Breakdown (man-days)</span>
             <span class="badge bg-primary bg-opacity-10 text-primary">{{ group.total_days|floatformat:2 }} man-days</span>
         </div>
         <div class="card-body">
@@ -162,7 +165,10 @@
                             <td>{{ row.segment.name }}</td>
                             <td class="fw-semibold">{{ row.module_type.name }}</td>
                             <td>{{ row.count }}</td>
-                            {% for act_data in row.activities %}<td class="text-end">{{ act_data.minutes|floatformat:1 }}</td>{% endfor %}
+                            {% for act_data in row.activities %}
+                            <td class="text-end calc-cell" data-days="{{ act_data.days|floatformat:3 }}"
+                                data-formula="{{ act_data.base_minutes|floatformat:1 }} min x{{ row.count }} x{{ act_data.complexity_multiplier|floatformat:2 }} = {{ act_data.minutes|floatformat:1 }} min">{{ act_data.days|floatformat:3 }}</td>
+                            {% endfor %}
                             <td class="text-end fw-semibold">{{ row.row_total_minutes|floatformat:1 }}</td>
                             <td class="text-end fw-semibold text-primary">{{ row.row_total_days|floatformat:2 }}</td>
                         </tr>
@@ -173,7 +179,10 @@
                             <td>Activity Total</td>
                             <td></td>
                             <td></td>
-                            {% for at in group.activity_totals %}<td class="text-end">{{ at.total_minutes|floatformat:1 }}</td>{% endfor %}
+                            {% for at in group.activity_totals %}
+                            <td class="text-end calc-cell" data-days="{{ at.total_days|floatformat:3 }}"
+                                data-formula="{% for c in at.contributions %}{% if not forloop.first %} + {% endif %}{{ c.minutes|floatformat:1 }}{% empty %}0.0{% endfor %} = {{ at.total_minutes|floatformat:1 }} min">{{ at.total_days|floatformat:3 }}</td>
+                            {% endfor %}
                             <td class="text-end">{{ group.total_minutes|floatformat:1 }}</td>
                             <td class="text-end">{{ group.total_days|floatformat:2 }}</td>
                         </tr>
@@ -184,4 +193,25 @@
     </div>
     {% endfor %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Activity-wise figures default to man-days (matching the report's own headline
+    // figure); "Show Calculation" reveals the full arithmetic each figure was derived
+    // from -- rate x count x complexity = minutes for a single module row, or the sum
+    // of each contributing row's minutes for an Activity Total -- not just the same
+    // number in a different unit.
+    let showingCalculation = false;
+
+    function toggleCalculation() {
+        showingCalculation = !showingCalculation;
+        document.querySelectorAll('.calc-cell').forEach(cell => {
+            cell.textContent = showingCalculation ? cell.dataset.formula : cell.dataset.days;
+        });
+        document.getElementById('calcToggleBtn').innerHTML = showingCalculation
+            ? '<i class="bi bi-eye-slash me-1"></i>Hide Calculation'
+            : '<i class="bi bi-calculator me-1"></i>Show Calculation';
+    }
+</script>
 {% endblock %}

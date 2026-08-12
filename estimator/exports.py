@@ -120,7 +120,7 @@ def _write_breakdown_sheet(ws, group):
     ws.cell(row=1, column=3).fill = HEADER_FILL
 
     for col, activity in enumerate(activities, start=4):
-        cell = ws.cell(row=1, column=col, value=activity.name)
+        cell = ws.cell(row=1, column=col, value=f"{activity.name} (man-days)")
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
         cell.alignment = Alignment(horizontal='center', wrap_text=True)
@@ -143,7 +143,7 @@ def _write_breakdown_sheet(ws, group):
         ws.cell(row=row, column=2, value=r['module_type'].name)
         ws.cell(row=row, column=3, value=r['count'])
         for col, act_data in enumerate(r['activities'], start=4):
-            cell = ws.cell(row=row, column=col, value=float(act_data['minutes']))
+            cell = ws.cell(row=row, column=col, value=round(float(act_data['days']), 3))
             cell.alignment = Alignment(horizontal='center')
             cell.border = THIN_BORDER
         row_total_cell = ws.cell(row=row, column=row_total_col, value=round(float(r['row_total_minutes']), 1))
@@ -159,7 +159,7 @@ def _write_breakdown_sheet(ws, group):
     ws.cell(row=total_row, column=2).fill = TOTAL_FILL
     ws.cell(row=total_row, column=3).fill = TOTAL_FILL
     for col, at in enumerate(group['activity_totals'], start=4):
-        cell = ws.cell(row=total_row, column=col, value=float(at['total_minutes']))
+        cell = ws.cell(row=total_row, column=col, value=round(float(at['total_days']), 3))
         cell.font = Font(bold=True)
         cell.fill = TOTAL_FILL
         cell.alignment = Alignment(horizontal='center')
@@ -219,8 +219,8 @@ def render_project_report_pdf(estimate):
 
     for group in estimate['category_groups']:
         story.append(Paragraph(
-            f"{group['label']} &mdash; Activity-wise Breakdown "
-            f"<font color='#4F46E5'>({group['total_days']:.2f} man-days)</font>",
+            f"{group['label']} &mdash; Activity-wise Breakdown (man-days) "
+            f"<font color='#4F46E5'>({group['total_days']:.2f} man-days total)</font>",
             heading_style,
         ))
         story.extend(_activity_breakdown_tables(group))
@@ -275,7 +275,7 @@ def _activity_breakdown_tables(group):
     for chunk_start in range(0, len(activities) or 1, EMPLOYEES_PER_CHUNK):
         chunk = activities[chunk_start:chunk_start + EMPLOYEES_PER_CHUNK]
         is_last_chunk = chunk_start == last_chunk_start
-        header = ['Segment', 'Module Type', 'Count'] + [a.name for a in chunk]
+        header = ['Segment', 'Module Type', 'Count'] + [f'{a.name} (days)' for a in chunk]
         if is_last_chunk:
             header += ['Row Total (min)', 'Row Total (man-days)']
         data = [header]
@@ -283,7 +283,7 @@ def _activity_breakdown_tables(group):
             act_by_id = {ad['activity'].id: ad for ad in r['activities']}
             row_vals = [r['segment'].name, r['module_type'].name, str(r['count'])]
             for a in chunk:
-                row_vals.append(f"{act_by_id[a.id]['minutes']:.1f}")
+                row_vals.append(f"{act_by_id[a.id]['days']:.3f}")
             if is_last_chunk:
                 row_vals += [f"{r['row_total_minutes']:.1f}", f"{r['row_total_days']:.2f}"]
             data.append(row_vals)
@@ -291,7 +291,7 @@ def _activity_breakdown_tables(group):
         totals_by_id = {at['activity'].id: at for at in group['activity_totals']}
         total_row = ['Activity Total', '', '']
         for a in chunk:
-            total_row.append(f"{totals_by_id[a.id]['total_minutes']:.1f}")
+            total_row.append(f"{totals_by_id[a.id]['total_days']:.3f}")
         if is_last_chunk:
             total_row += [f"{group['total_minutes']:.1f}", f"{group['total_days']:.2f}"]
         data.append(total_row)
