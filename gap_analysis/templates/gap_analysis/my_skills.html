@@ -84,11 +84,16 @@
 </div>
 
 <script>
+    // Base path this app is mounted under (e.g. "/skillgap/") -- fetch() URLs below must be
+    // built from this rather than hardcoded from root, since Django mounts this app under a
+    // prefix (see IOLGenv2_BackEnd/urls.py).
+    const SKILLGAP_BASE = '{% url "skillgap_dashboard" %}';
+
     function updateSelfRating(employeeId, skillId, newLevel) {
         const input = document.getElementById(`self-skill-${skillId}`);
         input.disabled = true;
 
-        fetch(`/employee/${employeeId}/self-rating-update/`, {
+        fetch(`${SKILLGAP_BASE}employee/${employeeId}/self-rating-update/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
