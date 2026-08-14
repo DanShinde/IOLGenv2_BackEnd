@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Item, Assignment, Dispatch, History, Reservation
@@ -69,7 +70,7 @@ class HistorySerializer(serializers.ModelSerializer):
 
 
 class ReservationSerializer(serializers.ModelSerializer):
-    reserved_for = serializers.PrimaryKeyRelatedField(queryset=get_active_employee_users())
+    reserved_for = serializers.PrimaryKeyRelatedField(queryset=User.objects.none())
     item_name = serializers.CharField(source='item.name', read_only=True)
     reserved_for_username = serializers.CharField(source='reserved_for.username', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -79,6 +80,10 @@ class ReservationSerializer(serializers.ModelSerializer):
         model = Reservation
         fields = '__all__'
         read_only_fields = ['reserved_by', 'status', 'fulfilled_assignment', 'created_at']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['reserved_for'].queryset = get_active_employee_users()
 
     def validate(self, attrs):
         item = attrs.get('item') or getattr(self.instance, 'item', None)

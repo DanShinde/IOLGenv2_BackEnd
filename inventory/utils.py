@@ -134,8 +134,9 @@ def sync_employee_users():
     Full sync: link every active employee to a login (creating a placeholder if
     truly none exists), then align is_active for every user in the project with
     the current employee roster. Safe to call repeatedly (idempotent) - this is
-    what the `sync_employee_users` management command runs, and what
-    get_active_employee_users() runs automatically on every read.
+    what the `sync_employee_users` management command runs, and what the
+    assign/dispatch/reservation views call explicitly before reading
+    get_active_employee_users() (see that function's docstring).
     """
     _sync_missing_employee_logins()
     _sync_user_active_status()
@@ -150,11 +151,15 @@ def get_active_employee_users():
     "Active employee" here means employees.Employee.is_active=True - the same signal
     Planner treats as canonical for "currently employed" (as opposed to
     gap_analysis.SkillMatrix.status, which tracks a separate skill-review state like
-    "on_leave" that doesn't mean someone has left). See sync_employee_users for how
-    every active employee ends up with a usable, active login and everyone else's
-    login gets deactivated.
+    "on_leave" that doesn't mean someone has left).
+
+    Deliberately read-only - does NOT call sync_employee_users() itself, so a request that
+    just reads this (a form/serializer binding its dropdown queryset, a DRF list/retrieve)
+    never silently writes to auth.User as a side effect. Callers that need the roster
+    freshly synced before reading it (the assign/dispatch/reservation views, on GET) call
+    sync_employee_users() explicitly first; otherwise the roster reflects whatever the last
+    sync (management command / scheduled job) left it as.
     """
-    sync_employee_users()
     return User.objects.filter(
         is_active=True,
         skillmatrix__isnull=False,
