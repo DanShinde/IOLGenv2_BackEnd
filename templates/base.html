@@ -540,11 +540,6 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link {% if 'downloads' in request.path %}active{% endif %}" href="{% url 'downloads' %}" title="Downloads">
-              <i class="bi bi-cloud-arrow-down-fill"></i><span class="nav-label sidebar-text">Downloads</span>
-            </a>
-          </li>
-          <li class="nav-item">
             <a class="nav-link {% if 'skillgap' in request.path %}active{% endif %}" href="{% url 'skillgap_dashboard' %}" title="Skill Gap">
               <i class="bi bi-bar-chart-steps"></i><span class="nav-label sidebar-text">Skill Gap</span>
             </a>
@@ -562,6 +557,11 @@
           <li class="nav-item">
             <a class="nav-link {% if 'forum' in request.path %}active{% endif %}" href="{% url 'forum-home' %}" title="Knowledge Base">
               <i class="bi bi-lightbulb-fill"></i><span class="nav-label sidebar-text">Knowledge Base</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'downloads' in request.path %}active{% endif %}" href="{% url 'downloads' %}" title="Downloads">
+              <i class="bi bi-cloud-arrow-down-fill"></i><span class="nav-label sidebar-text">Downloads</span>
             </a>
           </li>
         </ul>
