@@ -568,7 +568,7 @@ class BulkSkillUpdateView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
             actual_level = int(request.POST.get('actual_level', 0))
         except (TypeError, ValueError):
             messages.error(request, "Skill level must be a number between 0 and 5.")
-            return redirect('bulk_skill_update')
+            return redirect('skillgap_bulk_skill_update')
 
         if employee_ids and skill_id:
             skill = get_object_or_404(Skill, id=skill_id)
@@ -582,8 +582,8 @@ class BulkSkillUpdateView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
                 )
             
             messages.success(request, f"Updated {len(employee_ids)} employee's skill level for {skill.name}")
-        
-        return redirect('bulk_skill_update')
+
+        return redirect('skillgap_bulk_skill_update')
 
 class SkillMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
     model = SkillMatrix
