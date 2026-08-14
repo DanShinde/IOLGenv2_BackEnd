@@ -36,6 +36,13 @@
     .summary-bar-start { border-left: 3px solid #3b82f6; border-radius: 4px 0 0 4px; }
     .summary-bar-end { border-right: 3px solid #3b82f6; border-radius: 0 4px 4px 0; }
 
+    /* Headings get their own accent (vs. the blue used by engineer/project groups) so they
+       read as a distinct kind of grouping at a glance, both in the breakdown table and here
+       in the Gantt summary bar. */
+    .heading-group-header .project-timeline-bar { background: #e9d5ff; }
+    .heading-group-header .summary-bar-start { border-left-color: #9333ea; }
+    .heading-group-header .summary-bar-end { border-right-color: #9333ea; }
+
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     .weekend-cell { background-color: #f8fafc; }
     .holiday-cell { background-color: #fef9c3; }
@@ -127,7 +134,7 @@
         --w-end: 60px;
         --w-completion: 70px;
         --w-completed: 50px;
-        --w-actions: 84px;
+        --w-actions: 108px;
     }
 
     /* Column widths are set authoritatively by the frozen table's <colgroup> (table-fixed),
@@ -139,6 +146,8 @@
     .remark-btn.has-remark svg { fill: currentColor; }
     .link-btn.has-link { color: #4338ca; }
     .link-btn.has-link svg { fill: currentColor; opacity: 0.15; }
+    .heading-btn.has-heading { color: #7e22ce; }
+    .heading-btn.has-heading svg { fill: currentColor; opacity: 0.15; }
 
     tr.row-completed .frozen-cell { background-color: #f0fdf4; }
     tr.row-completed:hover .frozen-cell { background-color: #dcfce7; }
@@ -411,6 +420,17 @@
                         <svg class="w-3 h-3 mr-1.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         Export PDF
                     </button>
+                    {% if project %}
+                    <form method="POST" action="{% url 'planner_add_heading' project.pk %}" class="flex items-center">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <input type="text" name="name" placeholder="New heading name..." required maxlength="200"
+                               class="text-xs border border-gray-300 rounded-l-md px-2 py-1.5 w-36 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400">
+                        <button type="submit" class="bg-white text-gray-700 border border-l-0 border-gray-300 py-1.5 px-2 rounded-r-md font-semibold text-xs hover:bg-gray-50 transition-colors" title="Group activities under a named heading">
+                            + Heading
+                        </button>
+                    </form>
+                    {% endif %}
                     <button id="openModalBtn" class="btn-success text-white py-1 px-4 rounded-md font-semibold text-xs flex items-center">
                         <svg class="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                         Add Activity
@@ -503,7 +523,36 @@
                         </thead>
                         <tbody>
                             {% if project %}
-                                {% include 'planner/_activity_rows.html' with activities=activities pane='frozen' %}
+                                {% if grouping_method == 'heading' %}
+                                    {% for group_key, group in display_data.items %}
+                                        {% if group.pk %}
+                                        <tr class="group-header heading-group-header h-8 bg-purple-50" data-group-id="{{ group_key }}" data-group-name="{{ group.label }}" data-quick-update-url="{% url 'planner_heading_quick_update' group.pk %}">
+                                            <td colspan="9" class="frozen-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-purple-500">
+                                                <div class="flex items-center justify-between">
+                                                    <div class="flex items-center space-x-3 min-w-0">
+                                                        <svg class="group-icon w-4 h-4 text-purple-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                        <svg class="w-3.5 h-3.5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                                                        <input type="text" class="inline-edit-input font-bold text-sm text-gray-800 bg-transparent border border-transparent rounded px-1 hover:border-gray-300 focus:border-purple-400 focus:bg-white focus:outline-none w-40"
+                                                               value="{{ group.label }}" data-field="name" onclick="event.stopPropagation()">
+                                                        {% if group.start and group.end %}<span class="text-gray-400 text-xs font-normal whitespace-nowrap">{{ group.start|date:'d M' }} &rarr; {{ group.end|date:'d M Y' }}</span>{% endif %}
+                                                        <span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">{{ group.activities|length }} Activities</span>
+                                                    </div>
+                                                    <form method="POST" action="{% url 'planner_delete_heading' group.pk %}" class="inline flex-shrink-0" onsubmit="return confirm('Delete heading &quot;{{ group.label }}&quot;? Its activities will not be deleted, just unassigned from this heading.');" onclick="event.stopPropagation()">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="next" value="{{ request.path }}">
+                                                        <button type="submit" class="p-1 rounded hover:bg-red-100 text-red-500" title="Delete Heading">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+                                        {% include 'planner/_activity_rows.html' with activities=group.activities group_name=group_key grouping_method='none' pane='frozen' %}
+                                    {% endfor %}
+                                {% else %}
+                                    {% include 'planner/_activity_rows.html' with activities=activities pane='frozen' %}
+                                {% endif %}
                                 {% include 'planner/_add_activity_row.html' with target_project=project pane='frozen' %}
                             {% else %}
                                 {% for group_name, activities_in_group in display_data.items %}
@@ -516,7 +565,37 @@
                                     </tr>
                                     {% endwith %}
                                     {% endif %}
-                                    {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' pane='frozen' %}
+                                    {% if grouping_method == 'project' and project_heading_data|get_item:group_name %}
+                                        {% with sub_data=project_heading_data|get_item:group_name %}
+                                        {% for sub_key, sub_group in sub_data.items %}
+                                            {% if sub_group.pk %}
+                                            <tr class="heading-subgroup-header h-7 bg-purple-50" data-group-id="{{ group_name|slugify }}" data-heading-group-id="{{ group_name|slugify }}-{{ sub_key }}" data-quick-update-url="{% url 'planner_heading_quick_update' sub_group.pk %}">
+                                                <td colspan="9" class="frozen-cell px-3 py-1 pl-10 border-r border-l-4 border-purple-300">
+                                                    <div class="flex items-center justify-between">
+                                                        <div class="flex items-center space-x-2 min-w-0">
+                                                            <svg class="w-3.5 h-3.5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                                                            <input type="text" class="inline-edit-input font-semibold text-xs text-gray-700 bg-transparent border border-transparent rounded px-1 hover:border-gray-300 focus:border-purple-400 focus:bg-white focus:outline-none w-36"
+                                                                   value="{{ sub_group.label }}" data-field="name">
+                                                            {% if sub_group.start and sub_group.end %}<span class="text-gray-400 text-[11px] font-normal whitespace-nowrap">{{ sub_group.start|date:'d M' }} &rarr; {{ sub_group.end|date:'d M Y' }}</span>{% endif %}
+                                                            <span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">{{ sub_group.activities|length }} Activities</span>
+                                                        </div>
+                                                        <form method="POST" action="{% url 'planner_delete_heading' sub_group.pk %}" class="inline flex-shrink-0" onsubmit="return confirm('Delete heading &quot;{{ sub_group.label }}&quot;? Its activities will not be deleted, just unassigned from this heading.');">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="next" value="{{ request.path }}">
+                                                            <button type="submit" class="p-1 rounded hover:bg-red-100 text-red-500" title="Delete Heading">
+                                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                            {% include 'planner/_activity_rows.html' with activities=sub_group.activities group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key grouping_method='none' pane='frozen' %}
+                                        {% endfor %}
+                                        {% endwith %}
+                                    {% else %}
+                                        {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' pane='frozen' %}
+                                    {% endif %}
                                     {% if grouping_method == 'project' %}
                                         {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify pane='frozen' %}
                                     {% endif %}
@@ -555,7 +634,20 @@
                         </thead>
                         <tbody>
                             {% if project %}
-                                {% include 'planner/_activity_rows.html' with activities=activities pane='timeline' %}
+                                {% if grouping_method == 'heading' %}
+                                    {% for group_key, group in display_data.items %}
+                                        {% if group.pk %}
+                                        <tr class="group-header heading-group-header h-8 bg-purple-50" data-group-id="{{ group_key }}" data-group-name="{{ group.label }}">
+                                            <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
+                                                <div class="timeline-row-container h-full w-full relative"></div>
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+                                        {% include 'planner/_activity_rows.html' with activities=group.activities group_name=group_key grouping_method='none' pane='timeline' %}
+                                    {% endfor %}
+                                {% else %}
+                                    {% include 'planner/_activity_rows.html' with activities=activities pane='timeline' %}
+                                {% endif %}
                                 {% include 'planner/_add_activity_row.html' with target_project=project pane='timeline' %}
                             {% else %}
                                 {% for group_name, activities_in_group in display_data.items %}
@@ -568,7 +660,22 @@
                                     </tr>
                                     {% endwith %}
                                     {% endif %}
-                                    {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' pane='timeline' %}
+                                    {% if grouping_method == 'project' and project_heading_data|get_item:group_name %}
+                                        {% with sub_data=project_heading_data|get_item:group_name %}
+                                        {% for sub_key, sub_group in sub_data.items %}
+                                            {% if sub_group.pk %}
+                                            <tr class="heading-subgroup-header h-7 bg-purple-50" data-group-id="{{ group_name|slugify }}" data-heading-group-id="{{ group_name|slugify }}-{{ sub_key }}">
+                                                <td colspan="{{ gantt_data.header_dates|length }}" class="p-0 relative timeline-cell">
+                                                    <div class="timeline-row-container h-full w-full relative"></div>
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                            {% include 'planner/_activity_rows.html' with activities=sub_group.activities group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key grouping_method='none' pane='timeline' %}
+                                        {% endfor %}
+                                        {% endwith %}
+                                    {% else %}
+                                        {% include 'planner/_activity_rows.html' with activities=activities_in_group group_name=group_name|slugify grouping_method='none' pane='timeline' %}
+                                    {% endif %}
                                     {% if grouping_method == 'project' %}
                                         {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify pane='timeline' %}
                                     {% endif %}
@@ -711,6 +818,22 @@
         </div>
     </div>
 </div>
+
+<div id="headingPopover" class="hidden fixed z-[100000] bg-white border border-gray-200 rounded-lg shadow-2xl p-3 w-64 text-xs">
+    <div class="flex items-center justify-between mb-2">
+        <span class="font-semibold text-gray-700">Heading</span>
+        <button type="button" id="headingPopoverClose" class="text-gray-400 hover:text-gray-600" title="Close">&times;</button>
+    </div>
+    <select id="headingPopoverSelect" class="w-full text-xs border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400">
+        <option value="">— No Heading —</option>
+    </select>
+    <div id="headingPopoverError" class="hidden text-red-600 mt-1"></div>
+    <div class="flex justify-end space-x-2 mt-2">
+        <button type="button" id="headingPopoverCancel" class="px-2 py-1 text-xs rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50">Cancel</button>
+        <button type="button" id="headingPopoverSave" class="px-2 py-1 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Save</button>
+    </div>
+</div>
+{% if headings_json %}<script type="application/json" id="headingOptionsData">{{ headings_json|safe }}</script>{% endif %}
 
 <script>
 function toggleFilterMenu(menuId) {
@@ -1546,6 +1669,96 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     })();
 
+    // --- Heading: assign/clear which heading an activity belongs to. Reassigning moves the
+    // row into a different section of the table (or out of any section), which -- same as
+    // reassigning an activity's assignee while grouped by engineer -- is a bigger change than
+    // an in-place patch, so this falls back to a full reload on success rather than trying to
+    // move the row client-side. ---
+    (function setupHeadingPopover() {
+        const popover = document.getElementById('headingPopover');
+        const select = document.getElementById('headingPopoverSelect');
+        const errorEl = document.getElementById('headingPopoverError');
+        const closeBtn = document.getElementById('headingPopoverClose');
+        const cancelBtn = document.getElementById('headingPopoverCancel');
+        const saveBtn = document.getElementById('headingPopoverSave');
+        if (!popover || !select || !saveBtn) return;
+
+        const optionsDataEl = document.getElementById('headingOptionsData');
+        const headingOptions = optionsDataEl ? JSON.parse(optionsDataEl.textContent) : [];
+
+        let activeBtn = null;
+        let activeRow = null;
+
+        function closePopover() {
+            popover.classList.add('hidden');
+            activeBtn = null;
+            activeRow = null;
+            document.removeEventListener('mousedown', outsideClickHandler, true);
+        }
+
+        function outsideClickHandler(e) {
+            if (!popover.contains(e.target) && !(activeBtn && activeBtn.contains(e.target)) && e.target !== activeBtn) {
+                closePopover();
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.heading-btn');
+            if (!btn) return;
+            e.stopPropagation();
+
+            activeBtn = btn;
+            activeRow = btn.closest('tr');
+            if (!activeRow) return;
+
+            errorEl.classList.add('hidden');
+            select.innerHTML = '';
+            const noneOpt = document.createElement('option');
+            noneOpt.value = '';
+            noneOpt.textContent = '— No Heading —';
+            select.appendChild(noneOpt);
+            headingOptions.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h.pk;
+                opt.textContent = h.name;
+                select.appendChild(opt);
+            });
+            select.value = btn.dataset.headingId || '';
+
+            popover.classList.remove('hidden');
+            const rect = btn.getBoundingClientRect();
+            const popRect = popover.getBoundingClientRect();
+            let left = rect.right - popRect.width;
+            if (left < 8) left = 8;
+            popover.style.left = `${left}px`;
+            popover.style.top = `${rect.bottom + 4}px`;
+
+            document.addEventListener('mousedown', outsideClickHandler, true);
+        });
+
+        function closeAndCancel() { closePopover(); }
+        if (closeBtn) closeBtn.addEventListener('click', closeAndCancel);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeAndCancel);
+
+        saveBtn.addEventListener('click', () => {
+            if (!activeRow) return;
+            errorEl.classList.add('hidden');
+            saveBtn.disabled = true;
+
+            quickSaveActivityField(activeRow.dataset.quickUpdateUrl, 'heading', select.value, () => {
+                location.reload();
+            }, (err) => {
+                saveBtn.disabled = false;
+                errorEl.textContent = err;
+                errorEl.classList.remove('hidden');
+            });
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !popover.classList.contains('hidden')) closePopover();
+        });
+    })();
+
     // --- Modal Management ---
     const modal = document.getElementById('addActivityModal');
     const openBtn = document.getElementById('openModalBtn');
@@ -1966,15 +2179,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2-Pass Filtering Logic to handle Group Visibility correctly
         const matchingGroupIds = new Set();
+        // Separate from matchingGroupIds: a nested heading sub-row (consolidated "by project"
+        // view) shares its project's groupId (for collapse), but needs its OWN identity here
+        // so it shows/hides based on whether *its own* activities match, not the whole project's.
+        const matchingHeadingGroupIds = new Set();
 
-        // Pass 1: Check content filters for all activity rows (the add-row is a control,
-        // not data, so it never participates in filter matching itself).
+        // Pass 1: Check content filters for all activity rows (the add-row and heading
+        // sub-headers are controls/labels, not data, so they never participate in filter
+        // matching themselves).
         vsRowsData.forEach(row => {
-            if (!row.isGroup && !row.isAddRow) {
+            if (!row.isGroup && !row.isAddRow && !row.isHeadingSubgroup) {
                 const matches = checkRowFilters(row, globalSearch, colFilters, selectedSegments, selectedLeaders, selectedAssignees);
                 row.matchesFilters = matches;
-                if (matches && row.groupId) {
-                    matchingGroupIds.add(row.groupId);
+                if (matches) {
+                    if (row.groupId) matchingGroupIds.add(row.groupId);
+                    if (row.headingGroupId) matchingHeadingGroupIds.add(row.headingGroupId);
                 }
             }
         });
@@ -1985,6 +2204,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // reachable, since they'd otherwise have no matching child row to trigger this.
             vsRowsData.forEach(row => {
                 if (row.groupId) matchingGroupIds.add(row.groupId);
+                if (row.headingGroupId) matchingHeadingGroupIds.add(row.headingGroupId);
             });
         }
 
@@ -2005,6 +2225,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // 3. Add-row: follows its group's visibility, ignores filter matching.
             if (row.isAddRow) {
                 return row.groupId ? matchingGroupIds.has(row.groupId) : true;
+            }
+
+            // 4. Heading sub-header (consolidated "by project" view): show if any of its own
+            // activities match, same "surface the label for a matching child" rule as group
+            // headers get, just keyed by heading rather than by group.
+            if (row.isHeadingSubgroup) {
+                return matchingHeadingGroupIds.has(row.headingGroupId);
             }
 
             return row.matchesFilters;
@@ -2538,6 +2765,13 @@ function initVirtualScroll() {
         const isAddRow = frozenEl.classList.contains('add-activity-row');
         const isCompleted = frozenEl.classList.contains('row-completed');
         const groupId = frozenEl.dataset.groupId;
+        // Nested heading rows in the consolidated "by project" view (see
+        // planner-activity-headings): deliberately NOT `.group-header` -- activities can only
+        // carry one data-group-id (already the *project's*, so project-level collapse/summary
+        // keep working unmodified), so headings get this separate, lighter identity used only
+        // for filter visibility (see applyFilters below), not collapse or a Gantt summary bar.
+        const isHeadingSubgroup = frozenEl.classList.contains('heading-subgroup-header');
+        const headingGroupId = frozenEl.dataset.headingGroupId || null;
 
         // Capture height before modifying DOM (avoid layout thrashing). Measure BOTH sides
         // and force them to match: each pane is now a fully separate table, so its rows
@@ -2573,6 +2807,8 @@ function initVirtualScroll() {
             isAddRow: isAddRow,
             isCompleted: isCompleted,
             groupId: groupId,
+            isHeadingSubgroup: isHeadingSubgroup,
+            headingGroupId: headingGroupId,
             searchData: searchData
         };
     });

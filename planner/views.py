@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
 from employees.models import Employee
 from .models import (ProjectType, Segment, Category, Holiday,
-                     Project, Activity, GeneralSettings, CapacitySettings,
+                     Project, Activity, ActivityHeading, GeneralSettings, CapacitySettings,
                      SalesForecast, EffortBracket, Leave, Site, SiteAllocation)
 from datetime import date, timedelta, datetime
 from collections import OrderedDict, defaultdict
@@ -101,6 +101,38 @@ def _prepare_gantt_context(activities_qs):
         'today': today,
         'holidays_map': holidays_map,
     }
+
+def _build_heading_groups(headings, activities):
+    """Groups `activities` by their ActivityHeading (keyed 'h<pk>', plus '' for unheaded),
+    each with a start/end computed as min/max over just that group's own activities --
+    headings never store dates themselves, see ActivityHeading. Returns None if `headings`
+    is empty, so callers can use it directly as a truthy "does this need heading rows" check.
+    Shared by activity_planner_view (single project) and consolidated_planner_view (nested
+    under each project when grouped 'by project').
+    """
+    if not headings:
+        return None
+
+    display_data = {}
+    for h in headings:
+        display_data[f'h{h.pk}'] = {'label': h.name, 'pk': h.pk, 'activities': [], 'start': None, 'end': None}
+    display_data[''] = {'label': '', 'pk': None, 'activities': [], 'start': None, 'end': None}
+
+    for act in activities:
+        key = f'h{act.heading_id}' if act.heading_id else ''
+        # .get() fallback, not a plain lookup: a heading_id that doesn't match any heading in
+        # `headings` shouldn't happen via the UI (quick-update validates same-project), but
+        # falling into the unheaded bucket is safer than a KeyError if it ever does (e.g. data
+        # edited directly via the admin).
+        display_data.get(key, display_data[''])['activities'].append(act)
+
+    for group in display_data.values():
+        starts = [a.start_date for a in group['activities'] if a.start_date]
+        ends = [a.end_date for a in group['activities'] if a.end_date]
+        group['start'] = min(starts) if starts else None
+        group['end'] = max(ends) if ends else None
+
+    return display_data
 
 def sales_forecast_view(request):
     if request.method == 'POST':
@@ -429,6 +461,7 @@ def consolidated_planner_view(request):
 
     display_data = defaultdict(list)
     project_lookup = {}  # project_id (code) -> Project instance; only populated for grouping_method == 'project'
+    project_heading_data = {}  # project_id (code) -> heading display_data; only populated for grouping_method == 'project'
     if grouping_method == 'engineer':
         sorted_activities = sorted(context['activities'], key=lambda a: (a.assignee.name if a.assignee else "Unassigned", a.start_date))
         for act in sorted_activities:
@@ -451,9 +484,23 @@ def consolidated_planner_view(request):
         activities_by_project = defaultdict(list)
         for act in context['activities']:
             activities_by_project[act.project_id].append(act)
+
+        # One query for every project's headings, grouped in Python, rather than a
+        # project.headings.all() query per project in the loop below.
+        headings_by_project = defaultdict(list)
+        for h in ActivityHeading.objects.select_related('project').order_by('order', 'pk'):
+            headings_by_project[h.project_id].append(h)
+
+        # Nested heading sub-groups, per project -- only populated for projects that actually
+        # have headings; project_heading_data.get(code) is None/falsy for the rest, and the
+        # template falls back to the flat (pre-existing) rendering for those.
         for project in Project.objects.order_by('project_id'):
-            display_data[project.project_id] = sorted(activities_by_project.get(project.id, []), key=lambda a: a.start_date)
+            proj_activities = sorted(activities_by_project.get(project.id, []), key=lambda a: a.start_date)
+            display_data[project.project_id] = proj_activities
             project_lookup[project.project_id] = project
+            sub_data = _build_heading_groups(headings_by_project.get(project.id, []), proj_activities)
+            if sub_data:
+                project_heading_data[project.project_id] = sub_data
 
     gantt_init_data = {
         'activities': [
@@ -483,7 +530,8 @@ def consolidated_planner_view(request):
         'segments': segments,
         'team_leads': team_leads,
         'assignees': assignees,
-        'project_lookup': project_lookup
+        'project_lookup': project_lookup,
+        'project_heading_data': project_heading_data,
     })
     return render(request, 'planner/activity_planner.html', context)
 
@@ -512,11 +560,16 @@ def activity_planner_view(request, project_pk):
             return redirect('planner_activity_planner', project_pk=project.pk)
 
     activities_qs = Activity.objects.filter(project=project).select_related(
-        'project', 'project_type__category', 'assignee'
+        'project', 'project_type__category', 'assignee', 'heading'
     ).order_by('start_date')
 
     context = _prepare_gantt_context(activities_qs)
-    
+
+    # Optional WBS-style grouping: only kicks in once the project has at least one heading.
+    headings = list(project.headings.all())
+    display_data = _build_heading_groups(headings, context['activities'])
+    grouping_method = 'heading' if display_data else 'none'
+
     gantt_init_data = {
         'activities': [
             {
@@ -540,7 +593,11 @@ def activity_planner_view(request, project_pk):
         'form': form,
         'active_nav': 'projects',
         'gantt_init_data': gantt_init_data,
-        'assignees': Employee.objects.filter(is_active=True).order_by('name')
+        'assignees': Employee.objects.filter(is_active=True).order_by('name'),
+        'headings': headings,
+        'headings_json': json.dumps([{'pk': h.pk, 'name': h.name} for h in headings]),
+        'display_data': display_data,
+        'grouping_method': grouping_method,
     })
     return render(request, 'planner/activity_planner.html', context)
 
@@ -1273,6 +1330,15 @@ def activity_quick_update_view(request, pk):
             return JsonResponse({'success': False, 'error': 'Activity name cannot be empty.'}, status=400)
         activity.activity_name = value
 
+    elif field == 'heading':
+        if value:
+            heading = ActivityHeading.objects.filter(pk=value, project_id=activity.project_id).first()
+            if not heading:
+                return JsonResponse({'success': False, 'error': 'Selected heading not found.'}, status=400)
+            activity.heading = heading
+        else:
+            activity.heading = None
+
     elif field == 'assignee':
         if value:
             employee = Employee.objects.filter(pk=value).first()
@@ -1502,6 +1568,9 @@ def activity_quick_create_view(request):
         'pane': 'frozen',
         'group_name': request.POST.get('group_name') or None,
         'grouping_method': 'none',
+        # Only affects whether the row's Actions column shows the heading-assignment
+        # button -- the new activity always lands unheaded regardless (see below).
+        'headings': ActivityHeading.objects.filter(project=project).exists(),
     }
     if request.POST.get('is_single_project'):
         render_context['project'] = activity.project  # any truthy value suppresses the Project column
@@ -2012,3 +2081,41 @@ def add_effort_bracket_for_project_type(request, pk):
 def delete_effort_bracket_view(request, pk):
     get_object_or_404(EffortBracket, pk=pk).delete()
     return JsonResponse({'status': 'success'})
+
+@require_POST
+def add_heading_view(request, project_pk):
+    project = get_object_or_404(Project, pk=project_pk)
+    name = request.POST.get('name', '').strip()
+    next_url = request.POST.get('next') or reverse('planner_activity_planner', kwargs={'project_pk': project.pk})
+    if name:
+        last_order = project.headings.aggregate(m=Max('order'))['m'] or 0
+        ActivityHeading.objects.create(project=project, name=name, order=last_order + 1)
+    return redirect(next_url)
+
+@require_POST
+def delete_heading_view(request, pk):
+    heading = get_object_or_404(ActivityHeading, pk=pk)
+    project_pk = heading.project_id
+    next_url = request.POST.get('next') or reverse('planner_activity_planner', kwargs={'project_pk': project_pk})
+    heading.delete()  # Activity.heading is SET_NULL -- member activities are kept, just unheaded
+    return redirect(next_url)
+
+@require_POST
+def heading_quick_update_view(request, pk):
+    """Inline rename for a heading's name cell. Reuses the same '.inline-edit-input' /
+    commitInlineEdit() JS path as activity fields (see activity_planner.html) -- the response
+    shape below only needs to satisfy that generic patch logic, not mirror activity fields."""
+    heading = get_object_or_404(ActivityHeading, pk=pk)
+    field = request.POST.get('field', '')
+    value = request.POST.get('value', '')
+
+    if field != 'name':
+        return JsonResponse({'success': False, 'error': 'Unknown field.'}, status=400)
+
+    value = value.strip()
+    if not value:
+        return JsonResponse({'success': False, 'error': 'Heading name cannot be empty.'}, status=400)
+
+    heading.name = value
+    heading.save()
+    return JsonResponse({'success': True, 'name': heading.name})

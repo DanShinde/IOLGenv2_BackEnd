@@ -57,11 +57,26 @@ class Project(models.Model):
     def __str__(self):
         return self.project_id
 
+class ActivityHeading(models.Model):
+    """A named grouping of a project's activities (e.g. 'Offline Development'), purely
+    organizational -- start/end dates are derived from member activities at render time
+    (see activity_planner_view), never stored, so there's nothing to keep in sync here."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='headings')
+    name = models.CharField(max_length=200)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'pk']
+
+    def __str__(self):
+        return f"{self.project.project_id} - {self.name}"
+
 class Activity(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='activities')
     activity_name = models.CharField(max_length=200)
     project_type = models.ForeignKey(ProjectType, on_delete=models.SET_NULL, null=True, blank=True)
     assignee = models.ForeignKey('employees.Employee', on_delete=models.SET_NULL, null=True, blank=True)
+    heading = models.ForeignKey(ActivityHeading, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
     remark = models.TextField(blank=True)
     start_date = models.DateField(default=timezone.now)
     duration = models.PositiveIntegerField(default=1, help_text="Duration in working days")
