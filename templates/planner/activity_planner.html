@@ -127,7 +127,7 @@
         --w-end: 60px;
         --w-completion: 70px;
         --w-completed: 50px;
-        --w-actions: 60px;
+        --w-actions: 84px;
     }
 
     /* Column widths are set authoritatively by the frozen table's <colgroup> (table-fixed),
@@ -137,6 +137,8 @@
 
     .remark-btn.has-remark { color: #b45309; }
     .remark-btn.has-remark svg { fill: currentColor; }
+    .link-btn.has-link { color: #4338ca; }
+    .link-btn.has-link svg { fill: currentColor; opacity: 0.15; }
 
     tr.row-completed .frozen-cell { background-color: #f0fdf4; }
     tr.row-completed:hover .frozen-cell { background-color: #dcfce7; }
@@ -677,6 +679,39 @@
     </div>
 </div>
 
+<div id="linkPopover" class="hidden fixed z-[100000] bg-white border border-gray-200 rounded-lg shadow-2xl p-3 w-80 text-xs">
+    <div class="flex items-center justify-between mb-2">
+        <span class="font-semibold text-gray-700">Activity Link</span>
+        <button type="button" id="linkPopoverClose" class="text-gray-400 hover:text-gray-600" title="Close">&times;</button>
+    </div>
+
+    <div id="linkPopoverLoading" class="text-gray-400 py-2">Loading…</div>
+
+    <div id="linkPopoverBody" class="hidden space-y-3">
+        <div>
+            <label class="block font-semibold text-gray-600 mb-1">Predecessor (this activity starts right after it finishes)</label>
+            <select id="linkPopoverPredecessorSelect" class="w-full text-xs border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400">
+                <option value="">— None —</option>
+            </select>
+            <div id="linkPopoverPredecessorInfo" class="mt-1 text-gray-500"></div>
+        </div>
+
+        <div>
+            <label class="block font-semibold text-gray-600 mb-1">Successors (activities linked to this one)</label>
+            <ul id="linkPopoverSuccessorsList" class="text-gray-500 space-y-0.5">
+                <li class="text-gray-400">None</li>
+            </ul>
+        </div>
+
+        <div id="linkPopoverError" class="hidden text-red-600"></div>
+
+        <div class="flex justify-end space-x-2 pt-1">
+            <button type="button" id="linkPopoverCancel" class="px-2 py-1 text-xs rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button type="button" id="linkPopoverSave" class="px-2 py-1 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Save</button>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleFilterMenu(menuId) {
     const menu = document.getElementById(menuId);
@@ -1050,6 +1085,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         ganttAct.start_date = data.start_date;
                         ganttAct.end_date = data.end_date || null;
                     }
+
+                    // A start_date/duration/end_date edit on an activity that other rows are
+                    // linked to (predecessor) shifts those rows' dates server-side too -- patch
+                    // each one here so the ripple effect is visible without a reload.
+                    (data.cascaded || []).forEach(c => patchActivityByPk(c.pk, c));
+
                     repaintGanttBars();
                     applyFilters();
                 } catch (e) {
@@ -1294,6 +1335,209 @@ document.addEventListener('DOMContentLoaded', () => {
             }, (err) => {
                 alert(err);
                 saveBtn.disabled = false;
+            });
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !popover.classList.contains('hidden')) closePopover();
+        });
+    })();
+
+    // Applies a {start_date, end_date, duration} update (as returned by the quick-update
+    // and set-predecessor endpoints' `cascaded` lists) to whichever row belongs to that pk.
+    // Looked up via vsRowsData rather than a live DOM query -- rows scrolled out of the
+    // virtual-scroll window aren't attached to the document, so a querySelector would
+    // silently miss them.
+    function patchActivityByPk(pk, fields) {
+        const entry = vsRowsData.find(r => r.frozenEl && r.frozenEl.dataset.activityPk === String(pk));
+        if (!entry) return;
+        const row = entry.frozenEl;
+        const startInput = row.querySelector('[data-field="start_date"]');
+        const endInput = row.querySelector('[data-field="end_date"]');
+        const durationInput = row.querySelector('[data-field="duration"]');
+        if (startInput && fields.start_date) { startInput.value = fields.start_date; setOriginalValueBaseline(startInput); }
+        if (endInput) { endInput.value = fields.end_date || ''; setOriginalValueBaseline(endInput); }
+        if (durationInput && fields.duration != null) { durationInput.value = fields.duration; setOriginalValueBaseline(durationInput); }
+
+        const ganttAct = ganttData.activities.find(a => String(a.pk) === String(pk));
+        if (ganttAct) {
+            if (fields.start_date) ganttAct.start_date = fields.start_date;
+            ganttAct.end_date = fields.end_date || null;
+        }
+    }
+
+    // --- Activity Link: small popup to set/clear a predecessor and see what's linked
+    // to/from this activity (no scheduling math here -- the server derives and cascades
+    // dates in Activity.save(), this just drives the UI around it). ---
+    (function setupLinkPopover() {
+        const popover = document.getElementById('linkPopover');
+        const loadingEl = document.getElementById('linkPopoverLoading');
+        const bodyEl = document.getElementById('linkPopoverBody');
+        const predecessorSelect = document.getElementById('linkPopoverPredecessorSelect');
+        const predecessorInfo = document.getElementById('linkPopoverPredecessorInfo');
+        const successorsList = document.getElementById('linkPopoverSuccessorsList');
+        const errorEl = document.getElementById('linkPopoverError');
+        const closeBtn = document.getElementById('linkPopoverClose');
+        const cancelBtn = document.getElementById('linkPopoverCancel');
+        const saveBtn = document.getElementById('linkPopoverSave');
+        if (!popover || !predecessorSelect || !saveBtn) return;
+
+        const csrfInput = document.querySelector('#addActivityForm [name=csrfmiddlewaretoken]');
+        const csrfToken = csrfInput ? csrfInput.value : '';
+
+        let activeBtn = null;
+        let activeRow = null;
+
+        function closePopover() {
+            popover.classList.add('hidden');
+            activeBtn = null;
+            activeRow = null;
+            document.removeEventListener('mousedown', outsideClickHandler, true);
+        }
+
+        function outsideClickHandler(e) {
+            if (!popover.contains(e.target) && !(activeBtn && activeBtn.contains(e.target)) && e.target !== activeBtn) {
+                closePopover();
+            }
+        }
+
+        function positionNear(btn) {
+            popover.classList.remove('hidden');
+            const rect = btn.getBoundingClientRect();
+            const popRect = popover.getBoundingClientRect();
+            let left = rect.right - popRect.width;
+            if (left < 8) left = 8;
+            popover.style.left = `${left}px`;
+            popover.style.top = `${rect.bottom + 4}px`;
+        }
+
+        function describe(item) {
+            return `${item.name} (${item.start_date} → ${item.end_date || '?'})`;
+        }
+
+        function showError(msg) {
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+        }
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.link-btn');
+            if (!btn) return;
+            e.stopPropagation();
+
+            activeBtn = btn;
+            activeRow = btn.closest('tr');
+            if (!activeRow) return;
+
+            errorEl.classList.add('hidden');
+            errorEl.textContent = '';
+            bodyEl.classList.add('hidden');
+            loadingEl.classList.remove('hidden');
+            positionNear(btn);
+            document.addEventListener('mousedown', outsideClickHandler, true);
+
+            fetch(activeRow.dataset.linkInfoUrl)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'Failed to load link info.');
+
+                    predecessorSelect.innerHTML = '';
+                    const noneOpt = document.createElement('option');
+                    noneOpt.value = '';
+                    noneOpt.textContent = '— None —';
+                    predecessorSelect.appendChild(noneOpt);
+                    data.options.forEach(opt => {
+                        const optionEl = document.createElement('option');
+                        optionEl.value = opt.pk;
+                        optionEl.textContent = describe(opt);
+                        predecessorSelect.appendChild(optionEl);
+                    });
+                    predecessorSelect.value = data.predecessor ? String(data.predecessor.pk) : '';
+                    predecessorInfo.textContent = data.predecessor
+                        ? `Finishes ${data.predecessor.end_date} — this activity starts the next working day after.`
+                        : '';
+
+                    successorsList.innerHTML = '';
+                    if (data.successors.length) {
+                        data.successors.forEach(s => {
+                            const li = document.createElement('li');
+                            li.textContent = describe(s);
+                            successorsList.appendChild(li);
+                        });
+                    } else {
+                        const li = document.createElement('li');
+                        li.className = 'text-gray-400';
+                        li.textContent = 'None';
+                        successorsList.appendChild(li);
+                    }
+
+                    loadingEl.classList.add('hidden');
+                    bodyEl.classList.remove('hidden');
+                    positionNear(btn);
+                })
+                .catch(err => {
+                    loadingEl.classList.add('hidden');
+                    bodyEl.classList.remove('hidden');
+                    showError(err.message || 'Failed to load link info.');
+                });
+        });
+
+        function closeAndCancel() { closePopover(); }
+        if (closeBtn) closeBtn.addEventListener('click', closeAndCancel);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeAndCancel);
+
+        saveBtn.addEventListener('click', () => {
+            if (!activeRow) return;
+            errorEl.classList.add('hidden');
+            saveBtn.disabled = true;
+
+            const body = new URLSearchParams();
+            body.set('predecessor', predecessorSelect.value);
+
+            fetch(activeRow.dataset.setPredecessorUrl, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            })
+            .then(r => r.json().then(data => ({ ok: r.ok, data })).catch(() => ({ ok: false, data: null })))
+            .then(({ ok, data }) => {
+                saveBtn.disabled = false;
+                if (!ok || !data || !data.success) {
+                    showError((data && data.error) || 'Failed to save the link.');
+                    return;
+                }
+
+                const hasPredecessor = !!data.predecessor;
+                activeRow.dataset.predecessorId = hasPredecessor ? data.predecessor.pk : '';
+
+                if (activeBtn) {
+                    activeBtn.classList.toggle('has-link', hasPredecessor);
+                    activeBtn.title = hasPredecessor ? 'Edit Activity Link' : 'Link to Predecessor';
+                    const svg = activeBtn.querySelector('svg');
+                    if (svg) svg.classList.toggle('fill-current', hasPredecessor);
+                }
+
+                const startInput = activeRow.querySelector('[data-field="start_date"]');
+                if (startInput) {
+                    startInput.classList.toggle('bg-gray-100', hasPredecessor);
+                    startInput.classList.toggle('text-gray-400', hasPredecessor);
+                    if (hasPredecessor) {
+                        startInput.title = 'Linked to a predecessor — start date follows it automatically. Unlink via the link icon to edit directly.';
+                    } else {
+                        startInput.removeAttribute('title');
+                    }
+                }
+
+                patchActivityByPk(data.activity.pk, data.activity);
+                (data.cascaded || []).forEach(c => patchActivityByPk(c.pk, c));
+                repaintGanttBars();
+                applyFilters();
+
+                closePopover();
+            })
+            .catch(() => {
+                saveBtn.disabled = false;
+                showError('Network error while saving.');
             });
         });
 

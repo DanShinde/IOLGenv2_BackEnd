@@ -39,6 +39,14 @@ def calculate_end_date(start_date, duration_days, holidays, assignee_leaves=None
             
     return current_date
 
+def next_working_day(from_date, holidays):
+    """Returns the first working day strictly after from_date (skipping weekends/holidays)."""
+    holidays_set = set(holidays) if holidays else set()
+    d = from_date + timedelta(days=1)
+    while d.weekday() >= 5 or d in holidays_set:
+        d += timedelta(days=1)
+    return d
+
 def count_working_days(start_date, end_date, holidays):
     """Counts the number of working days between two dates, inclusive."""
     if start_date > end_date:

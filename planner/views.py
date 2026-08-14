@@ -1283,6 +1283,8 @@ def activity_quick_update_view(request, pk):
             activity.assignee = None
 
     elif field == 'start_date':
+        if activity.predecessor_id:
+            return JsonResponse({'success': False, 'error': 'This activity is linked to a predecessor. Unlink it (via the link icon) to edit the start date directly.'}, status=400)
         dt = parse_date(value)
         if not dt:
             return JsonResponse({'success': False, 'error': 'Invalid start date.'}, status=400)
@@ -1344,6 +1346,98 @@ def activity_quick_update_view(request, pk):
         'remark': activity.remark,
         'completion_percentage': activity.completion_percentage,
         'is_completed': activity.is_completed,
+        # Other activities whose dates shifted as a side effect of this save (linked
+        # successors down the chain) -- the frontend patches their rows too so a single
+        # edit doesn't require a full page reload to see the ripple effect.
+        'cascaded': [_serialize_activity_link(a) for a in getattr(activity, '_cascade_updates', [])],
+    })
+
+
+def _serialize_activity_link(activity):
+    """Small JSON-safe projection of an Activity used by the predecessor-link endpoints
+    and the cascade side-channel above."""
+    return {
+        'pk': activity.pk,
+        'name': activity.activity_name,
+        'start_date': activity.start_date.isoformat(),
+        'end_date': activity.end_date.isoformat() if activity.end_date else None,
+        'duration': activity.duration,
+    }
+
+
+def _activity_precedes(activity, candidate):
+    """True if `candidate` is already (transitively) downstream of `activity` via the
+    successors chain -- i.e. linking activity.predecessor = candidate would create a cycle."""
+    stack = list(activity.successors.all())
+    seen = set()
+    while stack:
+        node = stack.pop()
+        if node.pk in seen:
+            continue
+        seen.add(node.pk)
+        if node.pk == candidate.pk:
+            return True
+        stack.extend(node.successors.all())
+    return False
+
+
+def activity_link_info_view(request, pk):
+    """Powers the small 'link' popup: current predecessor/successors plus a same-project
+    activity list to link against (already excluding choices that would create a cycle)."""
+    activity = get_object_or_404(Activity, pk=pk)
+    successors = list(activity.successors.all().order_by('start_date'))
+
+    downstream_pks = {activity.pk}
+    stack = list(successors)
+    while stack:
+        node = stack.pop()
+        if node.pk in downstream_pks:
+            continue
+        downstream_pks.add(node.pk)
+        stack.extend(node.successors.all())
+
+    options = (Activity.objects
+               .filter(project_id=activity.project_id)
+               .exclude(pk__in=downstream_pks)
+               .order_by('start_date'))
+
+    return JsonResponse({
+        'success': True,
+        'activity': _serialize_activity_link(activity),
+        'predecessor': _serialize_activity_link(activity.predecessor) if activity.predecessor else None,
+        'successors': [_serialize_activity_link(s) for s in successors],
+        'options': [_serialize_activity_link(o) for o in options],
+    })
+
+
+@require_POST
+def activity_set_predecessor_view(request, pk):
+    """Sets or clears an activity's predecessor link from the popup. Rejects self-links,
+    cross-project links, and anything that would create a circular chain."""
+    activity = get_object_or_404(Activity, pk=pk)
+    predecessor_id = request.POST.get('predecessor', '').strip()
+
+    if not predecessor_id:
+        activity.predecessor = None
+    else:
+        predecessor = Activity.objects.filter(pk=predecessor_id).first()
+        if not predecessor:
+            return JsonResponse({'success': False, 'error': 'Selected activity not found.'}, status=400)
+        if predecessor.pk == activity.pk:
+            return JsonResponse({'success': False, 'error': 'An activity cannot be linked to itself.'}, status=400)
+        if predecessor.project_id != activity.project_id:
+            return JsonResponse({'success': False, 'error': 'You can only link activities within the same project.'}, status=400)
+        if _activity_precedes(activity, predecessor):
+            return JsonResponse({'success': False, 'error': 'That link would create a circular dependency.'}, status=400)
+        activity.predecessor = predecessor
+
+    activity.save()
+
+    return JsonResponse({
+        'success': True,
+        'activity': _serialize_activity_link(activity),
+        'predecessor': _serialize_activity_link(activity.predecessor) if activity.predecessor else None,
+        'cascaded': [_serialize_activity_link(a) for a in getattr(activity, '_cascade_updates', [])],
     })
 
 @require_POST

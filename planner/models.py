@@ -3,7 +3,7 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
-from .utils import calculate_end_date, count_working_days
+from .utils import calculate_end_date, count_working_days, next_working_day
 from employees.models import Employee
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
@@ -68,11 +68,23 @@ class Activity(models.Model):
     end_date = models.DateField(blank=True, null=True)
     completion_percentage = models.PositiveSmallIntegerField(default=0, help_text="Percent complete (0-100)")
     is_completed = models.BooleanField(default=False)
+    predecessor = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='successors',
+        help_text="This activity's start date is derived from this predecessor's finish date."
+    )
 
     def __str__(self):
         return f"{self.project.project_id} - {self.activity_name}"
-        
-    def save(self, *args, **kwargs):
+
+    def save(self, *args, _cascade_visited=None, **kwargs):
+        # _cascade_visited is only ever passed by this method's own recursive cascade call
+        # below (never by Django or any external caller), so every normal .save() still
+        # behaves exactly as before -- it just also cascades to any linked successors now.
+        top_level = _cascade_visited is None
+        if top_level:
+            _cascade_visited = set()
+
         # Defensive clamp only — the 100% <-> completed sync itself is handled where the
         # user actually changes one of the two fields (activity_quick_update_view), not
         # here, so that e.g. unchecking "completed" while % is still 100 isn't immediately
@@ -81,7 +93,17 @@ class Activity(models.Model):
 
         # 1. Get Global Holidays
         holidays = list(Holiday.objects.values_list('date', flat=True))
-        
+
+        # While linked, start_date is a derived field (like end_date below) -- it always
+        # follows the next working day after the predecessor's finish date, so manual edits
+        # to start_date on a linked activity have no lasting effect. Unlink first to move it
+        # independently. end_date is cleared here (mirroring how start_date/duration edits
+        # clear it in activity_quick_update_view) so it re-derives from duration below,
+        # instead of the stale stored end_date being mistaken for a manual override.
+        if self.predecessor_id and self.predecessor.end_date:
+            self.start_date = next_working_day(self.predecessor.end_date, holidays)
+            self.end_date = None
+
         # 2. Get Assignee Leaves (if assigned)
         assignee_leaves = []
         if self.assignee:
@@ -118,9 +140,23 @@ class Activity(models.Model):
         else:
             # Standard behavior: Calculate End Date from Duration
             self.end_date = calculate_end_date(self.start_date, self.duration, holidays, assignee_leaves)
-            
+
         super().save(*args, **kwargs)
-        
+
+        # Cascade this activity's (possibly new) end_date forward to anything linked to it.
+        # _cascade_visited guards against a corrupt/circular chain looping forever; it's
+        # shared across the whole recursive walk so each activity is only re-saved once.
+        _cascade_visited.add(self.pk)
+        cascade_updates = []
+        for successor in self.successors.exclude(pk__in=_cascade_visited).select_related('predecessor'):
+            successor.save(_cascade_visited=_cascade_visited)
+            cascade_updates.append(successor)
+            cascade_updates.extend(getattr(successor, '_cascade_updates', []))
+        # Stashed on the instance (not returned) so save() keeps Django's normal signature/
+        # return value -- callers that care (the quick-update / link endpoints) read it off
+        # the instance right after calling save(), everyone else can ignore it.
+        self._cascade_updates = cascade_updates
+
     class Meta:
         ordering = ['start_date']
 

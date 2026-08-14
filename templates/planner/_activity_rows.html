@@ -19,7 +19,10 @@
     data-segment="{{ activity.project.segment.name|lower|default:'' }}"
     data-team-lead="{{ activity.project.team_lead.name|lower|default:'' }}"
     data-assignee="{{ activity.assignee.full_name|title|default:'Unassigned' }}"
-    data-activity-name="{{ activity.activity_name|lower }}">
+    data-activity-name="{{ activity.activity_name|lower }}"
+    data-predecessor-id="{{ activity.predecessor_id|default_if_none:'' }}"
+    data-link-info-url="{% url 'planner_activity_link_info' activity.pk %}"
+    data-set-predecessor-url="{% url 'planner_activity_set_predecessor' activity.pk %}">
 
 {% if pane == 'frozen' %}
     {% comment %} --- FROZEN CELLS WITH DATA ATTRIBUTES FOR FILTERING --- {% endcomment %}
@@ -49,8 +52,9 @@
     </td>
 
     <td class="frozen-cell col-start px-1 py-1 text-xs text-gray-600 border-r whitespace-nowrap" data-filter-column="start">
-        <input type="date" class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-transparent rounded px-0.5 py-0.5 hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none"
-               value="{{ activity.start_date|date:'Y-m-d' }}" data-field="start_date">
+        <input type="date" class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-transparent rounded px-0.5 py-0.5 hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none {% if activity.predecessor_id %}bg-gray-100 text-gray-400{% endif %}"
+               value="{{ activity.start_date|date:'Y-m-d' }}" data-field="start_date"
+               {% if activity.predecessor_id %}title="Linked to a predecessor — start date follows it automatically. Unlink via the link icon to edit directly."{% endif %}>
     </td>
     <td class="frozen-cell col-duration px-1 py-1 text-xs text-gray-600 border-r text-center" data-filter-column="duration">
         <input type="number" min="1" class="inline-edit-input w-full text-xs text-gray-700 text-center bg-transparent border border-transparent rounded px-0.5 py-0.5 hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none"
@@ -75,6 +79,9 @@
 
     <td class="frozen-cell col-actions px-1 py-1 text-xs font-medium border-r">
         <div class="flex items-center justify-center space-x-1">
+            <button type="button" class="link-btn action-btn p-1 rounded hover:bg-indigo-100 text-indigo-600 {% if activity.predecessor_id %}has-link{% endif %}" title="{% if activity.predecessor_id %}Edit Activity Link{% else %}Link to Predecessor{% endif %}">
+                <svg class="w-3.5 h-3.5 {% if activity.predecessor_id %}fill-current{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"></path></svg>
+            </button>
             <button type="button" class="remark-btn action-btn p-1 rounded hover:bg-amber-100 text-amber-600 {% if activity.remark %}has-remark{% endif %}" data-remark="{{ activity.remark|default:'' }}" title="{% if activity.remark %}Edit Remark{% else %}Add Remark{% endif %}">
                 <svg class="w-3.5 h-3.5 {% if activity.remark %}fill-current{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-3 3-3-3z"></path></svg>
             </button>
