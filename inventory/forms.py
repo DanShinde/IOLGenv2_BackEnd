@@ -204,7 +204,7 @@ class AssignForm(forms.Form):
         widget=forms.Select(),
     )
     assigned_to = forms.ModelChoiceField(
-        queryset=get_active_employee_users(),
+        queryset=User.objects.none(),   # lazy placeholder; real qs set per instance in __init__
         label="Assign To",
         widget=forms.Select(),
         help_text="Only active employees (per Planner/skill gap analyzer) can be assigned tools.",
@@ -226,6 +226,8 @@ class AssignForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['assigned_to'].queryset = get_active_employee_users()
+
         for field_name, field in self.fields.items():
             if not field.widget.attrs.get('class'):
                 field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -285,7 +287,7 @@ class DispatchForm(forms.Form):
         label="Site Location"
     )
     responsible_person = forms.ModelChoiceField(
-        queryset=get_active_employee_users(),
+        queryset=User.objects.none(),   # lazy placeholder; real qs set per instance in __init__
         widget=forms.Select(),
         label="Responsible Person",
         help_text="Active employee at the site responsible for this item - needed to recover it later, required even for materials."
@@ -315,6 +317,8 @@ class DispatchForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['responsible_person'].queryset = get_active_employee_users()
+
         for field_name, field in self.fields.items():
             if not field.widget.attrs.get('class'):
                 field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'

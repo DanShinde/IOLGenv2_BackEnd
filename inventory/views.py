@@ -24,7 +24,7 @@ from .forms import (
     AssignForm, DispatchForm,
 )
 from .utils import (
-    send_overdue_digest, get_active_employee_users, get_inventory_summary,
+    send_overdue_digest, get_active_employee_users, sync_employee_users, get_inventory_summary,
     calculate_total_inventory_value, get_reservation_summary, get_upcoming_reservations,
     get_active_dispatches, get_low_stock_items, get_return_condition_breakdown,
     build_reports_context_data,
@@ -671,6 +671,7 @@ def transfer_item(request):
 @permission_required('inventory.add_assignment', raise_exception=True)
 def assign_item(request):
     next_url = _capture_next(request, reverse('inventory-transfer-item'))
+    sync_employee_users()
 
     if request.method == 'POST':
         form = AssignForm(request.POST)
@@ -745,6 +746,7 @@ def assign_item(request):
 @permission_required('inventory.add_dispatch', raise_exception=True)
 def dispatch_item(request):
     next_url = _capture_next(request, reverse('inventory-transfer-item'))
+    sync_employee_users()
 
     if request.method == 'POST':
         form = DispatchForm(request.POST)
@@ -838,6 +840,7 @@ def user_list(request):
     exactly, same as the assign/dispatch/reservation dropdowns (including employees
     currently holding nothing).
     """
+    sync_employee_users()
     users = get_active_employee_users().annotate(
         active_tool_count=Count(
             'tool_assignments', filter=Q(tool_assignments__return_date__isnull=True), distinct=True
@@ -855,6 +858,7 @@ def user_list(request):
 
 @login_required
 def user_detail(request, pk):
+    sync_employee_users()
     target_user = get_object_or_404(User, pk=pk)
 
     active_assignments = Assignment.objects.filter(
@@ -905,6 +909,7 @@ def reservation_list(request):
 @login_required
 def reservation_create(request):
     next_url = _capture_next(request, reverse('inventory-reservation-list'))
+    sync_employee_users()
 
     if request.method == 'POST':
         form = ReservationForm(request.POST)
