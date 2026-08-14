@@ -548,7 +548,10 @@
                                             </td>
                                         </tr>
                                         {% endif %}
-                                        {% include 'planner/_activity_rows.html' with activities=group.activities group_name=group_key grouping_method='none' pane='frozen' %}
+                                        {% include 'planner/_activity_rows.html' with activities=group.activities group_name=group_key in_heading=group.pk grouping_method='none' pane='frozen' %}
+                                        {% if group.pk %}
+                                            {% include 'planner/_add_activity_row.html' with target_project=project group_name=group_key target_heading_pk=group.pk pane='frozen' %}
+                                        {% endif %}
                                     {% endfor %}
                                 {% else %}
                                     {% include 'planner/_activity_rows.html' with activities=activities pane='frozen' %}
@@ -590,7 +593,10 @@
                                                 </td>
                                             </tr>
                                             {% endif %}
-                                            {% include 'planner/_activity_rows.html' with activities=sub_group.activities group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key grouping_method='none' pane='frozen' %}
+                                            {% include 'planner/_activity_rows.html' with activities=sub_group.activities group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key in_heading=sub_group.pk grouping_method='none' pane='frozen' %}
+                                            {% if sub_group.pk %}
+                                                {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key target_heading_pk=sub_group.pk pane='frozen' %}
+                                            {% endif %}
                                         {% endfor %}
                                         {% endwith %}
                                     {% else %}
@@ -643,7 +649,10 @@
                                             </td>
                                         </tr>
                                         {% endif %}
-                                        {% include 'planner/_activity_rows.html' with activities=group.activities group_name=group_key grouping_method='none' pane='timeline' %}
+                                        {% include 'planner/_activity_rows.html' with activities=group.activities group_name=group_key in_heading=group.pk grouping_method='none' pane='timeline' %}
+                                        {% if group.pk %}
+                                            {% include 'planner/_add_activity_row.html' with target_project=project group_name=group_key target_heading_pk=group.pk pane='timeline' %}
+                                        {% endif %}
                                     {% endfor %}
                                 {% else %}
                                     {% include 'planner/_activity_rows.html' with activities=activities pane='timeline' %}
@@ -670,7 +679,10 @@
                                                 </td>
                                             </tr>
                                             {% endif %}
-                                            {% include 'planner/_activity_rows.html' with activities=sub_group.activities group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key grouping_method='none' pane='timeline' %}
+                                            {% include 'planner/_activity_rows.html' with activities=sub_group.activities group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key in_heading=sub_group.pk grouping_method='none' pane='timeline' %}
+                                            {% if sub_group.pk %}
+                                                {% include 'planner/_add_activity_row.html' with target_project=project_lookup|get_item:group_name group_name=group_name|slugify heading_group_id=group_name|slugify|add:'-'|add:sub_key target_heading_pk=sub_group.pk pane='timeline' %}
+                                            {% endif %}
                                         {% endfor %}
                                         {% endwith %}
                                     {% else %}
@@ -1304,6 +1316,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // this land in" ambiguity for the server to resolve here, unlike the assignee-edit
             // case in commitInlineEdit.
             body.set('group_name', row.dataset.groupId || '');
+            // Set only on add-rows scoped to a heading (single-project heading groups, and
+            // nested heading sub-groups in the consolidated "by project" view) -- see
+            // planner-activity-headings. heading assigns the new activity directly;
+            // heading_group_id just tells the server what to stamp on the returned row's
+            // data-heading-group-id so it participates correctly in applyFilters().
+            if (row.dataset.headingPk) body.set('heading', row.dataset.headingPk);
+            if (row.dataset.headingGroupId) body.set('heading_group_id', row.dataset.headingGroupId);
             body.set('grouping_method', PLANNER_GROUPING_METHOD);
             if (PLANNER_IS_SINGLE_PROJECT) body.set('is_single_project', '1');
 
@@ -1348,6 +1367,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         isAddRow: false,
                         isCompleted: false,
                         groupId: row.dataset.groupId,
+                        // Read off the server-rendered row rather than the add-row's own
+                        // dataset: for a heading-scoped add-row, data-group-id stays the
+                        // *project's* id (see activity_quick_create_view), only this newly
+                        // inserted activity row itself carries the heading's own id.
+                        headingGroupId: newFrozenEl.dataset.headingGroupId || null,
                         searchData: buildSearchDataForRow(newFrozenEl),
                     };
                     vsRowsData.splice(addRowIndex, 0, newEntry);

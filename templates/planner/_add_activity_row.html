@@ -1,12 +1,18 @@
 {% load planner_extras %}
 {% comment %}
     Inline "add new activity" row. Included once at the bottom of the single-project
-    table, and once per project group in the consolidated (grouped-by-project) view --
-    and, since the frozen/timeline pane split, once per pane too (pane='frozen'/'timeline').
-    Expects: target_project, assignees, gantt_data, today, and optionally group_name.
+    table, once per project group in the consolidated (grouped-by-project) view, and once
+    per heading (single-project heading groups, and nested heading sub-groups in the
+    consolidated "by project" view) -- and, since the frozen/timeline pane split, once per
+    pane too (pane='frozen'/'timeline').
+    Expects: target_project, assignees, gantt_data, today, and optionally group_name,
+    heading_group_id, target_heading_pk (see activity_quick_create_view for how the latter
+    two are used).
 {% endcomment %}
 <tr class="h-10 add-activity-row hover:bg-emerald-50/60 transition-colors"
     {% if group_name %}data-group-id="{{ group_name }}"{% endif %}
+    {% if heading_group_id %}data-heading-group-id="{{ heading_group_id }}"{% endif %}
+    {% if target_heading_pk %}data-heading-pk="{{ target_heading_pk }}"{% endif %}
     data-project-pk="{{ target_project.pk }}"
     data-create-url="{% url 'planner_activity_quick_create' %}">
 
@@ -17,7 +23,7 @@
     </td>
     {% endif %}
 
-    <td class="frozen-cell col-activity px-1 py-1 border-r">
+    <td class="frozen-cell col-activity px-1 py-1 border-r {% if target_heading_pk %}pl-5{% endif %}">
         <input type="text" class="inline-edit-input w-full text-xs text-gray-700 bg-transparent border border-dashed border-gray-300 rounded px-1 py-0.5 hover:border-emerald-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
                placeholder="+ New activity name" data-field="activity_name">
     </td>

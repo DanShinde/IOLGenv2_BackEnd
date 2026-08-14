@@ -1536,10 +1536,18 @@ def activity_quick_create_view(request):
         if not assignee:
             return JsonResponse({'success': False, 'error': 'Selected assignee not found.'}, status=400)
 
+    heading = None
+    heading_id = request.POST.get('heading')
+    if heading_id:
+        heading = ActivityHeading.objects.filter(pk=heading_id, project=project).first()
+        if not heading:
+            return JsonResponse({'success': False, 'error': 'Selected heading not found.'}, status=400)
+
     activity = Activity(
         project=project,
         activity_name=activity_name,
         assignee=assignee,
+        heading=heading,
         start_date=start_date,
         duration=duration,
     )
@@ -1567,9 +1575,15 @@ def activity_quick_create_view(request):
         'activities': [activity],
         'pane': 'frozen',
         'group_name': request.POST.get('group_name') or None,
+        # Only meaningful in the consolidated "by project" view, where an activity row's
+        # data-group-id is the *project's* id (for project-level collapse) and this separate
+        # attribute is what ties it to its heading sub-group for filter visibility -- see
+        # applyFilters() in activity_planner.html. Unused/absent for the single-project view.
+        'heading_group_id': request.POST.get('heading_group_id') or None,
+        # Indents the activity-name cell to visually nest it under its heading.
+        'in_heading': heading.pk if heading else None,
         'grouping_method': 'none',
-        # Only affects whether the row's Actions column shows the heading-assignment
-        # button -- the new activity always lands unheaded regardless (see below).
+        # Affects whether the row's Actions column shows the heading-assignment button.
         'headings': ActivityHeading.objects.filter(project=project).exists(),
     }
     if request.POST.get('is_single_project'):
