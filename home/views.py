@@ -122,7 +122,11 @@ def home(request):
 
 @login_required
 def downloads(request):
-    infos = Info.objects.all()
+    visible_keys = ['ACG_Qt_UpdateUrl', 'ACG_Qt_Version']
+    infos = sorted(
+        Info.objects.filter(key__in=visible_keys),
+        key=lambda info: visible_keys.index(info.key)
+    )
     context = {
         'infos': infos
     }
