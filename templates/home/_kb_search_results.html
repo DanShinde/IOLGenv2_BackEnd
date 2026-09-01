@@ -3,7 +3,7 @@
 {# Plus, from the parent's own context (inherited -- no `only` on the include): either `query` or `tag`. #}
 <div class="kb-content" id="kb-search-results">
   <div class="kb-meta" style="margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">
-    {% with result_count=search_wiki_total|add:search_qa_total|add:search_report_total %}
+    {% with result_count=search_wiki_total|add:search_qa_total|add:search_report_total|add:search_issue_total %}
     {{ result_count }} result{{ result_count|pluralize }}
     {% if tag %}tagged "{{ tag.name }}"{% else %}for "{{ query }}"{% endif %}
     {% endwith %}
@@ -69,7 +69,28 @@
     {% endfor %}
   </div>
 
-  {% if not search_wiki_total and not search_qa_total and not search_report_total %}
+  {# ---------- Issues & Learnings ---------- #}
+  <div class="kb-glass" style="padding: 18px 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <h3 style="margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-clipboard-list"></i> Issues &amp; Learnings <span class="kb-pill">{{ search_issue_total }}</span></h3>
+      {% if search_issue_total %}
+      <a class="kb-link" href="{% url 'forum-home' %}?tab=issues&{{ view_all_param }}={{ view_all_value|urlencode }}">View all &rarr;</a>
+      {% endif %}
+    </div>
+    {% for issue in search_issue_results %}
+    <a class="kb-card" href="{% url 'kb-issue-detail' issue.pk %}" style="display: block; padding: 10px 0; border-top: 1px solid var(--kb-border);">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+        <span class="kb-pill priority-{{ issue.priority }}">{{ issue.get_priority_display }}</span>
+        <span style="font-weight: 600;">{{ issue.problem_statement }}</span>
+      </div>
+      <div class="kb-meta">{{ issue.project.project_id }} &middot; {{ issue.get_status_display }} &middot; {{ issue.updated_at|timesince }} ago</div>
+    </a>
+    {% empty %}
+    <div class="kb-meta">No matching issues.</div>
+    {% endfor %}
+  </div>
+
+  {% if not search_wiki_total and not search_qa_total and not search_report_total and not search_issue_total %}
   <div class="kb-empty">
     {% if tag %}Nothing is tagged "{{ tag.name }}" yet.{% else %}Nothing matches "{{ query }}" anywhere in the Knowledge Base.{% endif %}
   </div>

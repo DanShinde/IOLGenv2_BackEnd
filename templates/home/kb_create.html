@@ -12,13 +12,15 @@
           {% if content_type == 'wiki' %}{% if object %}Edit Wiki Article{% else %}Write a Wiki Article{% endif %}
           {% elif content_type == 'qa' %}{% if object %}Edit Support Request{% else %}Raise a Support Request{% endif %}
           {% elif content_type == 'report' %}{% if object %}Edit Report{% else %}Report a Bug or Request a Feature{% endif %}
+          {% elif content_type == 'issue' %}{% if object %}Edit Issue & Learning{% else %}Log an Issue & Learning{% endif %}
           {% else %}Contribute{% endif %}
         </h1>
         <p style="margin: 4px 0 0; color: var(--kb-muted);">
           {% if content_type == 'wiki' %}Document a process, guide, or piece of internal knowledge for others to find later.
           {% elif content_type == 'qa' %}Describe the problem, tag anyone who might know the answer, and let the team pitch in.
           {% elif content_type == 'report' %}Tell us what's broken or what you'd like to see, and how urgent it is.
-          {% else %}Write a wiki article, raise a support request, or file a report.{% endif %}
+          {% elif content_type == 'issue' %}Log a site/engineering issue against a project, track its closure, and capture what was learned.
+          {% else %}Write a wiki article, raise a support request, file a report, or log an issue & learning.{% endif %}
         </p>
       </div>
       <a class="kb-back" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
@@ -37,6 +39,10 @@
         <a class="kb-card" href="{% url 'kb-create' %}?type=report">
           <h3 style="margin: 0 0 8px;">Report a Bug or Request a Feature</h3>
           <p style="margin: 0; color: var(--kb-muted);">Log bugs or feature requests with priority.</p>
+        </a>
+        <a class="kb-card" href="{% url 'kb-create' %}?type=issue">
+          <h3 style="margin: 0 0 8px;">Log an Issue &amp; Learning</h3>
+          <p style="margin: 0; color: var(--kb-muted);">Track a project issue through closure and capture the corrective action for future reference.</p>
         </a>
       </div>
     {% else %}
@@ -198,6 +204,129 @@
             <div id="kb-upload-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
           </div>
           {% endif %}
+        {% elif content_type == 'issue' %}
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Project</label>
+              {{ form.project }}
+              {{ form.project.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Priority</label>
+              {{ form.priority }}
+              {{ form.priority.errors }}
+            </div>
+          </div>
+          <label class="kb-label">Problem statement</label>
+          {{ form.problem_statement }}
+          {{ form.problem_statement.errors }}
+          <label class="kb-label">Issue description</label>
+          <div class="kb-richtoggle-bar">
+            <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_issue_description" {% if object and object.issue_description_is_html %}data-autostart="true"{% endif %}>
+              <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+            </button>
+          </div>
+          {{ form.issue_description }}
+          {{ form.issue_description_format }}
+          {{ form.issue_description.errors }}
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Closure accountability</label>
+              {{ form.closure_accountability }}
+              {{ form.closure_accountability.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Accountability department</label>
+              {{ form.closure_accountability_department }}
+              {{ form.closure_accountability_department.errors }}
+            </div>
+          </div>
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Location / area</label>
+              {{ form.location_area }}
+              {{ form.location_area.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Tags</label>
+              {{ form.tags }}
+              {{ form.tags.errors }}
+            </div>
+          </div>
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Issue reported on</label>
+              {{ form.issue_reported_on }}
+              {{ form.issue_reported_on.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Target closure date</label>
+              {{ form.target_closure_date }}
+              {{ form.target_closure_date.errors }}
+            </div>
+          </div>
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">Status</label>
+              {{ form.status }}
+              {{ form.status.errors }}
+            </div>
+            <div>
+              <label class="kb-label">Closed on</label>
+              {{ form.closed_on }}
+              {{ form.closed_on.errors }}
+            </div>
+          </div>
+          <h3 style="margin: 8px 0 0;">CAPA (Corrective &amp; Preventive Action)</h3>
+          <label class="kb-label">Root cause</label>
+          {{ form.root_cause }}
+          {{ form.root_cause.errors }}
+          <label class="kb-label">Corrective action</label>
+          <div class="kb-richtoggle-bar">
+            <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_final_corrective_action" {% if object and object.final_corrective_action_is_html %}data-autostart="true"{% endif %}>
+              <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+            </button>
+          </div>
+          {{ form.final_corrective_action }}
+          {{ form.final_corrective_action_format }}
+          {{ form.final_corrective_action.errors }}
+          <label class="kb-label">Preventive action</label>
+          {{ form.preventive_action }}
+          {{ form.preventive_action.errors }}
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">CAPA owner</label>
+              {{ form.capa_owner }}
+              {{ form.capa_owner.errors }}
+            </div>
+            <div>
+              <label class="kb-label">CAPA target date</label>
+              {{ form.capa_target_date }}
+              {{ form.capa_target_date.errors }}
+            </div>
+          </div>
+          <div class="kb-row">
+            <div>
+              <label class="kb-label">CAPA status</label>
+              {{ form.capa_status }}
+              {{ form.capa_status.errors }}
+            </div>
+            <div>
+              <label class="kb-label">CAPA verified on</label>
+              {{ form.capa_verified_on }}
+              {{ form.capa_verified_on.errors }}
+            </div>
+          </div>
+          <label class="kb-label">Verification notes</label>
+          {{ form.capa_verification_notes }}
+          {{ form.capa_verification_notes.errors }}
+
+          <div>
+            <label class="kb-label">Attachments</label>
+            {{ form.attachments }}
+            {{ form.attachments.errors }}
+            <div id="kb-upload-list" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
         {% endif %}
 
         <div style="display: flex; justify-content: flex-end;">

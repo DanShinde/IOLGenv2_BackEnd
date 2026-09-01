@@ -83,5 +83,59 @@
       <span class="kb-stat" style="color: var(--kb-danger); font-weight: 600;">{{ open_bugs }} bugs</span>
       <span class="kb-stat" style="color: var(--kb-purple); font-weight: 600;">{{ open_features }} features</span>
     </div>
+  {% elif active_tab == 'issues' %}
+    <form method="get" action="{% url 'forum-home' %}">
+      <input type="hidden" name="tab" value="issues">
+      {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+      {% if current_tag %}<input type="hidden" name="tag" value="{{ current_tag.slug }}">{% endif %}
+
+      <h3>Project</h3>
+      <select class="kb-select" name="issue_project" onchange="this.form.submit()">
+        <option value="all" {% if not issue_project or issue_project == 'all' %}selected{% endif %}>All projects</option>
+        {% for project in issue_projects %}
+        <option value="{{ project.id }}" {% if issue_project == project.id|stringformat:"s" %}selected{% endif %}>{{ project.project_id }}</option>
+        {% endfor %}
+      </select>
+
+      <h3 style="margin-top: 20px;">Status</h3>
+      <select class="kb-select" name="issue_status" onchange="this.form.submit()">
+        <option value="all" {% if not issue_status or issue_status == 'all' %}selected{% endif %}>All status</option>
+        <option value="open" {% if issue_status == 'open' %}selected{% endif %}>Open</option>
+        <option value="under_observation" {% if issue_status == 'under_observation' %}selected{% endif %}>Under Observation</option>
+        <option value="closed" {% if issue_status == 'closed' %}selected{% endif %}>Closed</option>
+      </select>
+
+      <h3 style="margin-top: 20px;">Priority</h3>
+      <select class="kb-select" name="issue_priority" onchange="this.form.submit()">
+        <option value="all" {% if not issue_priority or issue_priority == 'all' %}selected{% endif %}>All priority</option>
+        <option value="P1" {% if issue_priority == 'P1' %}selected{% endif %}>P1</option>
+        <option value="P2" {% if issue_priority == 'P2' %}selected{% endif %}>P2</option>
+        <option value="P3" {% if issue_priority == 'P3' %}selected{% endif %}>P3</option>
+      </select>
+
+      <h3 style="margin-top: 20px;">CAPA status</h3>
+      <select class="kb-select" name="issue_capa_status" onchange="this.form.submit()">
+        <option value="all" {% if not issue_capa_status or issue_capa_status == 'all' %}selected{% endif %}>All CAPA status</option>
+        <option value="open" {% if issue_capa_status == 'open' %}selected{% endif %}>Open</option>
+        <option value="in_progress" {% if issue_capa_status == 'in_progress' %}selected{% endif %}>In Progress</option>
+        <option value="completed" {% if issue_capa_status == 'completed' %}selected{% endif %}>Completed</option>
+        <option value="verified" {% if issue_capa_status == 'verified' %}selected{% endif %}>Verified</option>
+      </select>
+
+      <button type="submit" formaction="{% url 'kb-issue-excel-export' %}" class="kb-link" style="margin-top: 20px; background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+        <i class="fas fa-file-export"></i> Export to Excel (current filters)
+      </button>
+    </form>
+
+    <h3 style="margin-top: 20px;">Open items</h3>
+    <div class="kb-meta">
+      <span class="kb-stat" style="color: var(--kb-danger); font-weight: 600;">{{ open_issues }} open / under observation</span>
+    </div>
+
+    <h3 style="margin-top: 20px;">Bulk import</h3>
+    <div class="kb-filter" style="gap: 6px;">
+      <a class="kb-link" href="{% url 'kb-issue-excel-template' %}"><i class="fas fa-download"></i> Download Excel template</a>
+      <a class="kb-link" href="{% url 'kb-issue-excel-upload' %}"><i class="fas fa-file-excel"></i> Upload filled-in Excel</a>
+    </div>
   {% endif %}
 </aside>

@@ -502,14 +502,44 @@
     .status-in_progress { background: var(--kb-warning-light); color: var(--kb-warning); }
     .status-resolved { background: var(--kb-success-light); color: var(--kb-success); }
     .status-closed { background: #eef0f5; color: var(--kb-text-secondary); }
+    .status-under_observation { background: var(--kb-warning-light); color: var(--kb-warning); }
+    .status-completed { background: var(--kb-success-light); color: var(--kb-success); }
+    .status-verified { background: var(--kb-primary-light); color: var(--kb-primary-dark); }
 
     .priority-critical { background: var(--kb-danger-light); color: var(--kb-danger); }
     .priority-high { background: #fff2e8; color: #c2410c; }
     .priority-medium { background: var(--kb-warning-light); color: var(--kb-warning); }
     .priority-low { background: var(--kb-success-light); color: var(--kb-success); }
+    .priority-P1 { background: var(--kb-danger-light); color: var(--kb-danger); }
+    .priority-P2 { background: var(--kb-warning-light); color: var(--kb-warning); }
+    .priority-P3 { background: var(--kb-success-light); color: var(--kb-success); }
 
     .type-bug { background: var(--kb-danger-light); color: var(--kb-danger); }
     .type-feature { background: var(--kb-purple-light); color: var(--kb-purple); }
+
+    /* ---------- Summary stat tiles ---------- */
+    .kb-summary-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kb-summary-tile {
+      padding: 16px 18px;
+    }
+    .kb-summary-value {
+      font-size: 28px;
+      font-weight: 600;
+      line-height: 1.1;
+      color: var(--kb-text);
+    }
+    .kb-summary-tile.accent-success .kb-summary-value { color: var(--kb-success); }
+    .kb-summary-tile.accent-warning .kb-summary-value { color: var(--kb-warning); }
+    .kb-summary-label {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--kb-text-muted);
+    }
 
     .kb-empty {
       text-align: center;
@@ -806,11 +836,6 @@
     <div class="collapse navbar-collapse" id="kbNavbar">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'home' %}">Home</a></li>
-        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'tracker_index' %}">Tracker</a></li>
-        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'inventory-dashboard' %}">Inventory</a></li>
-        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'planner_project_list' %}">Planner</a></li>
-        <li class="nav-item"><a class="kb-nav-link nav-link active" href="{% url 'forum-home' %}">Knowledge Base</a></li>
-        <li class="nav-item"><a class="kb-nav-link nav-link" href="{% url 'downloads' %}">Downloads</a></li>
       </ul>
 
       <ul class="navbar-nav ms-auto mb-0 d-flex flex-row align-items-center gap-2">

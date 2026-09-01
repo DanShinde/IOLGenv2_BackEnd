@@ -3,12 +3,12 @@
     <div class="kb-logo"><i class="fas fa-book"></i></div>
     <div>
       <h1>Knowledge Base</h1>
-      <p>Articles, Support Requests, and Bug Reports &amp; Features</p>
+      <p>Articles, Support Requests, Bug Reports &amp; Features, and Issues &amp; Learnings</p>
     </div>
   </div>
   <form class="kb-search" method="get" action="{% url 'forum-home' %}">
     <i class="fas fa-search"></i>
-    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search everything — articles, support requests, reports" />
+    <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search everything — articles, support requests, reports, issues" />
   </form>
   {% if active_tab == 'qa' %}
   <a class="kb-action" href="{% url 'kb-create' %}?type=qa">
@@ -19,6 +19,15 @@
   <a class="kb-action" href="{% url 'kb-create' %}?type=report">
     <i class="fas fa-bug"></i>
     Report a Bug or Request a Feature
+  </a>
+  {% elif active_tab == 'issues' %}
+  <a class="kb-action" href="{% url 'kb-create' %}?type=issue">
+    <i class="fas fa-clipboard-list"></i>
+    Log Issue &amp; Learning
+  </a>
+  <a class="kb-action secondary" href="{% url 'kb-issue-excel-upload' %}">
+    <i class="fas fa-file-excel"></i>
+    Upload Excel
   </a>
   {% else %}
   <a class="kb-action" href="{% url 'kb-create' %}?type=wiki">
@@ -43,5 +52,10 @@
     <i class="fas fa-bug"></i>
     Bug Reports and Features
     <span>{{ open_bugs|add:open_features }}</span>
+  </a>
+  <a class="kb-tab {% if active_tab == 'issues' %}active{% endif %}" href="{% url 'forum-home' %}?tab=issues{% if query %}&q={{ query|urlencode }}{% endif %}">
+    <i class="fas fa-clipboard-list"></i>
+    Issues &amp; Learnings
+    <span>{{ open_issues }}</span>
   </a>
 </div>

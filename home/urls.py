@@ -34,4 +34,12 @@ urlpatterns = [
     path('forum/reports/<int:pk>/delete/', views.report_delete, name='kb-report-delete'),
     path('forum/reports/comments/<int:pk>/edit/', views.report_comment_update, name='kb-report-comment-edit'),
     path('forum/reports/comments/<int:pk>/delete/', views.report_comment_delete, name='kb-report-comment-delete'),
+    path('forum/issues/<int:pk>/', views.issue_detail, name='kb-issue-detail'),
+    path('forum/issues/<int:pk>/edit/', views.issue_update, name='kb-issue-edit'),
+    path('forum/issues/<int:pk>/delete/', views.issue_delete, name='kb-issue-delete'),
+    path('forum/issues/comments/<int:pk>/edit/', views.issue_comment_update, name='kb-issue-comment-edit'),
+    path('forum/issues/comments/<int:pk>/delete/', views.issue_comment_delete, name='kb-issue-comment-delete'),
+    path('forum/issues/upload/', views.issue_excel_upload, name='kb-issue-excel-upload'),
+    path('forum/issues/template/', views.issue_excel_template_download, name='kb-issue-excel-template'),
+    path('forum/issues/export/', views.issue_excel_export, name='kb-issue-excel-export'),
 ]

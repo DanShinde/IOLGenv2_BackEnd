@@ -11,6 +11,9 @@ from .models import (
     Report,
     ReportComment,
     ReportAttachment,
+    IssueLearning,
+    IssueLearningComment,
+    IssueLearningAttachment,
 )
 
 
@@ -82,3 +85,23 @@ class ReportCommentAdmin(admin.ModelAdmin):
 class ReportAttachmentAdmin(admin.ModelAdmin):
     list_display = ['report', 'uploaded_by', 'uploaded_at']
     search_fields = ['report__title', 'uploaded_by__username']
+
+
+@admin.register(IssueLearning)
+class IssueLearningAdmin(admin.ModelAdmin):
+    list_display = ['problem_statement', 'project', 'priority', 'status', 'capa_status', 'reporter', 'issue_reported_on', 'closed_on']
+    list_filter = ['priority', 'status', 'capa_status', 'project']
+    search_fields = ['problem_statement', 'issue_description', 'closure_accountability', 'capa_owner', 'root_cause', 'project__project_id']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(IssueLearningComment)
+class IssueLearningCommentAdmin(admin.ModelAdmin):
+    list_display = ['issue', 'author', 'created_at']
+    search_fields = ['body', 'author__username', 'issue__problem_statement']
+
+
+@admin.register(IssueLearningAttachment)
+class IssueLearningAttachmentAdmin(admin.ModelAdmin):
+    list_display = ['issue', 'uploaded_by', 'uploaded_at']
+    search_fields = ['issue__problem_statement', 'uploaded_by__username']

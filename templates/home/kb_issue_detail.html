@@ -1,0 +1,254 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}{{ issue.problem_statement }}{% endblock %}
+
+{% block content %}
+<div class="kb-page">
+  {% include 'home/_kb_header.html' %}
+
+  <div class="kb-main">
+    {% include 'home/_kb_sidebar.html' %}
+
+    <div class="kb-content-panel">
+      <a class="kb-link" href="{% url 'forum-home' %}">Back to Knowledge Base</a>
+
+      <div class="kb-card">
+        <div class="kb-meta" style="margin-bottom: 12px;">
+          <span class="kb-pill kb-pill-app">{{ issue.project.project_id }}</span>
+          <span class="kb-pill status-{{ issue.status }}">{{ issue.get_status_display }}</span>
+          <span class="kb-pill priority-{{ issue.priority }}">{{ issue.get_priority_display }}</span>
+          {% if issue.location_area %}<span>{{ issue.location_area }}</span>{% endif %}
+        </div>
+        <h1 style="margin: 0 0 16px; font-family: 'Space Grotesk', sans-serif;">{{ issue.problem_statement }}</h1>
+        {% if issue.issue_description_is_html %}
+        <div class="kb-rich-content" style="margin: 0 0 16px;">{{ issue.issue_description|safe }}</div>
+        {% else %}
+        <p class="kb-body-copy" style="margin: 0 0 16px;">{{ issue.issue_description|linebreaksbr }}</p>
+        {% endif %}
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          {% for tag in issue.tags.all %}
+          <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
+          {% endfor %}
+        </div>
+
+        <div class="kb-row" style="margin-top: 16px;">
+          <div>
+            <div class="kb-meta">Closure accountability</div>
+            <div>{{ issue.closure_accountability|default:"—" }}</div>
+          </div>
+          <div>
+            <div class="kb-meta">Accountability department</div>
+            <div>{{ issue.closure_accountability_department|default:"—" }}</div>
+          </div>
+        </div>
+        <div class="kb-row" style="margin-top: 12px;">
+          <div>
+            <div class="kb-meta">Issue reported on</div>
+            <div>{{ issue.issue_reported_on|default:"—" }}</div>
+          </div>
+          <div>
+            <div class="kb-meta">Target closure date</div>
+            <div>{{ issue.target_closure_date|default:"—" }}</div>
+          </div>
+          <div>
+            <div class="kb-meta">Closed on</div>
+            <div>{{ issue.closed_on|default:"—" }}</div>
+          </div>
+        </div>
+
+        <div class="kb-meta" style="margin-top: 16px;">
+          <span>Reported by: <a class="kb-link" href="{% url 'kb-user-profile' issue.reporter.username %}">{{ issue.reporter.get_full_name|default:issue.reporter.username }}</a></span>
+          <span>Updated {{ issue.updated_at|timesince }} ago</span>
+          {% if request.user == issue.reporter or request.user.is_staff %}
+          <a class="kb-link" href="{% url 'kb-issue-edit' issue.pk %}">Edit issue</a>
+          <form method="post" action="{% url 'kb-issue-delete' issue.pk %}" style="margin: 0;" onsubmit="return confirm('Delete this issue? This cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="kb-link-btn">Delete issue</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="kb-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="margin: 0;">CAPA (Corrective &amp; Preventive Action)</h2>
+          <span class="kb-pill status-{{ issue.capa_status }}">{{ issue.get_capa_status_display }}</span>
+        </div>
+
+        {% if issue.root_cause %}
+        <div style="margin-bottom: 16px;">
+          <div class="kb-meta" style="margin-bottom: 6px;">Root cause</div>
+          <p class="kb-body-copy" style="margin: 0;">{{ issue.root_cause|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        {% if issue.final_corrective_action %}
+        <div style="margin-bottom: 16px;">
+          <div class="kb-meta" style="margin-bottom: 6px;">Corrective action</div>
+          {% if issue.final_corrective_action_is_html %}
+          <div class="kb-rich-content">{{ issue.final_corrective_action|safe }}</div>
+          {% else %}
+          <p class="kb-body-copy" style="margin: 0;">{{ issue.final_corrective_action|linebreaksbr }}</p>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if issue.preventive_action %}
+        <div style="margin-bottom: 16px;">
+          <div class="kb-meta" style="margin-bottom: 6px;">Preventive action</div>
+          <p class="kb-body-copy" style="margin: 0;">{{ issue.preventive_action|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        <div class="kb-row">
+          <div>
+            <div class="kb-meta">CAPA owner</div>
+            <div>{{ issue.capa_owner|default:"—" }}</div>
+          </div>
+          <div>
+            <div class="kb-meta">Target date</div>
+            <div>{{ issue.capa_target_date|default:"—" }}</div>
+          </div>
+          <div>
+            <div class="kb-meta">Verified on</div>
+            <div>{{ issue.capa_verified_on|default:"—" }}</div>
+          </div>
+        </div>
+
+        {% if issue.capa_verification_notes %}
+        <div style="margin-top: 16px;">
+          <div class="kb-meta" style="margin-bottom: 6px;">Verification notes</div>
+          <p class="kb-body-copy" style="margin: 0;">{{ issue.capa_verification_notes|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        {% if not issue.root_cause and not issue.final_corrective_action and not issue.preventive_action and not issue.capa_owner %}
+        <p style="color: var(--kb-text-muted); margin: 0;">No CAPA logged yet.</p>
+        {% endif %}
+      </div>
+
+      <div class="kb-card">
+        <h2 style="margin: 0 0 16px;">Notes</h2>
+        {% for comment in comments %}
+          <div class="kb-surface-soft" style="margin-bottom: 12px;">
+            {% if comment.is_html %}
+            <div class="kb-rich-content" style="margin: 0 0 10px;">{{ comment.body|safe }}</div>
+            {% else %}
+            <p style="margin: 0 0 10px;">{{ comment.body|linebreaksbr }}</p>
+            {% endif %}
+            <div class="kb-meta">
+              <span><a class="kb-link" href="{% url 'kb-user-profile' comment.author.username %}">{{ comment.author.get_full_name|default:comment.author.username }}</a></span>
+              <span>{{ comment.created_at|date:"d-m-Y" }} &middot; {{ comment.created_at|timesince }} ago</span>
+              {% if request.user == comment.author or request.user.is_staff %}
+              <a class="kb-link" href="{% url 'kb-issue-comment-edit' comment.pk %}">Edit</a>
+              <form method="post" action="{% url 'kb-issue-comment-delete' comment.pk %}" style="margin: 0;" onsubmit="return confirm('Delete this note? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="kb-link-btn">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        {% empty %}
+          <p style="color: var(--kb-text-muted);">No notes yet.</p>
+        {% endfor %}
+      </div>
+
+      {% if attachments %}
+      <div class="kb-card">
+        <h2 style="margin: 0 0 16px;">Attachments</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+          {% for attachment in attachments %}
+            {% if attachment.file.url|lower|slice:"-4:" == ".pdf" %}
+              <a class="kb-link" href="{{ attachment.file.url }}" target="_blank" rel="noopener">{{ attachment.file.name }}</a>
+            {% else %}
+              <button
+                type="button"
+                class="kb-thumb"
+                data-full="{{ attachment.file.url }}"
+                aria-label="Open attachment">
+                <img src="{{ attachment.file.url }}" alt="Attachment" style="width: 100%; height: auto; border-radius: 10px;">
+              </button>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div id="kb-lightbox" style="position: fixed; inset: 0; background: rgba(6, 6, 12, 0.9); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 5vh 5vw;">
+        <button type="button" id="kb-lightbox-close" aria-label="Close preview" style="position: absolute; top: 20px; right: 24px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.4); color: #fff; font-size: 20px; line-height: 1;">
+          &times;
+        </button>
+        <img id="kb-lightbox-image" alt="Attachment preview" style="width: 80vw; height: 80vh; object-fit: contain; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);">
+      </div>
+
+      <div class="kb-card">
+        <h2 style="margin: 0 0 16px;">Add a note</h2>
+        <form method="post">
+          {% csrf_token %}
+          <div class="kb-richtoggle-bar">
+            <button type="button" class="kb-richtoggle-btn" data-richtext-toggle="id_body">
+              <i class="fas fa-paint-brush"></i> Add rich formatting (images, fonts, colors)
+            </button>
+          </div>
+          {{ comment_form.body }}
+          {{ comment_form.body_format }}
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+            <button class="kb-action" type="submit">Post Note</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const lightbox = document.getElementById('kb-lightbox');
+    const lightboxImg = document.getElementById('kb-lightbox-image');
+    const closeBtn = document.getElementById('kb-lightbox-close');
+    const thumbs = document.querySelectorAll('.kb-thumb');
+
+    if (!lightbox || !lightboxImg || !closeBtn || thumbs.length === 0) {
+      return;
+    }
+
+    function openLightbox(src) {
+      lightboxImg.src = src;
+      lightbox.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.style.display = 'none';
+      lightboxImg.src = '';
+      document.body.style.overflow = '';
+    }
+
+    thumbs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const src = btn.getAttribute('data-full');
+        if (src) {
+          openLightbox(src);
+        }
+      });
+    });
+
+    closeBtn.addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeLightbox();
+      }
+    });
+  })();
+</script>
+{% endblock %}

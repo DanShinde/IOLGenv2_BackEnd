@@ -176,6 +176,65 @@
           {% endfor %}
           {% include 'home/_kb_pagination.html' %}
         </div>
+      {% elif active_tab == 'issues' %}
+        <div class="kb-summary-row">
+          <div class="kb-glass kb-summary-tile">
+            <div class="kb-summary-value">{{ total_issues }}</div>
+            <div class="kb-summary-label">Total issues</div>
+          </div>
+          <div class="kb-glass kb-summary-tile accent-success">
+            <div class="kb-summary-value">{{ closed_issues }}</div>
+            <div class="kb-summary-label">Closed issues</div>
+          </div>
+          <div class="kb-glass kb-summary-tile accent-warning">
+            <div class="kb-summary-value">{{ capa_open }}</div>
+            <div class="kb-summary-label">Open CAPA</div>
+          </div>
+          <div class="kb-glass kb-summary-tile accent-success">
+            <div class="kb-summary-value">{{ capa_closed }}</div>
+            <div class="kb-summary-label">Closed CAPA</div>
+          </div>
+        </div>
+        <div class="kb-content" id="issue-list">
+          {% for issue in issues %}
+          <div class="kb-glass kb-card">
+            <a class="kb-card-hit" href="{% url 'kb-issue-detail' issue.pk %}" aria-label="{{ issue.problem_statement }}"></a>
+            <div style="display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px;">
+              <div style="flex: 1;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+                  <span class="kb-pill kb-pill-app">{{ issue.project.project_id }}</span>
+                  <span class="kb-meta">#{{ issue.id }}</span>
+                  <h3 style="margin: 0; font-size: 17px;">{{ issue.problem_statement }}</h3>
+                </div>
+                <p style="margin: 0 0 10px; color: var(--kb-muted);">{{ issue.issue_description|striptags|truncatewords:26 }}</p>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <span class="kb-pill priority-{{ issue.priority }}">{{ issue.get_priority_display }}</span>
+                <span class="kb-pill status-{{ issue.status }}">{{ issue.get_status_display }}</span>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                {% if issue.location_area %}<span class="kb-meta"><i class="fas fa-map-marker-alt"></i> {{ issue.location_area }}</span>{% endif %}
+                <span class="kb-pill status-{{ issue.capa_status }}">CAPA: {{ issue.get_capa_status_display }}</span>
+                {% for tag in issue.tags.all %}
+                <a class="kb-tag" href="{% url 'kb-tag-detail' tag.slug %}">{{ tag.name }}</a>
+                {% endfor %}
+              </div>
+              <div class="kb-meta">
+                <span>{{ issue.comment_count }} notes</span>
+                <span><a class="kb-link" style="position: relative; z-index: 2;" href="{% url 'kb-user-profile' issue.reporter.username %}">{{ issue.reporter.get_full_name|default:issue.reporter.username }}</a></span>
+                <span>{{ issue.updated_at|timesince }} ago</span>
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="kb-empty">
+            {% if query %}No issues match "{{ query }}".{% else %}No issues & learnings logged yet.{% endif %}
+          </div>
+          {% endfor %}
+          {% include 'home/_kb_pagination.html' %}
+        </div>
       {% endif %}
     </section>
   </div>
