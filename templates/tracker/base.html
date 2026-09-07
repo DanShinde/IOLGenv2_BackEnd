@@ -540,6 +540,13 @@
         box-shadow: var(--card-shadow-hover);
         border-top-color: var(--primary);
     }
+    /* The hover lift promotes the card into its own stacking context, which traps any
+       open Bootstrap dropdown inside it behind later sibling cards (e.g. a table card
+       below). Cancel the transform while a dropdown in the card is open so the menu
+       isn't clipped/covered. */
+    .card:has(.dropdown-menu.show):hover {
+        transform: none;
+    }
     .card-header {
         background: white;
         border-bottom: 1px solid var(--border-color);

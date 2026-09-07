@@ -1355,11 +1355,14 @@ from operator import attrgetter
 @login_required
 def upcoming_milestones(request):
     filter_type = request.GET.get('filter', 'all')
+    selected_team_lead = request.GET.get('team_lead', '')
+    selected_segment = request.GET.get('segment', '')
     today = timezone.now().date()
-    
+
     # Use the existing helper function to get the initial filtered list of stages
     stages = get_filtered_stages(filter_type)
-    
+    stages = apply_team_segment_filters(stages, selected_team_lead, selected_segment)
+
     # Add select_related for performance and order by project for grouping
     stages = stages.select_related('project').order_by('project__code', 'planned_date')
 
@@ -1382,6 +1385,10 @@ def upcoming_milestones(request):
             ('Next Month', 'next_month'),
         ],
         'today': today,
+        'all_team_leads': Employee.objects.filter(designation='TEAM_LEAD'),
+        'all_segments': trackerSegment.objects.all(),
+        'selected_team_lead': selected_team_lead,
+        'selected_segment': selected_segment,
     })
 
 
@@ -1427,11 +1434,21 @@ def get_filtered_stages(filter_type):
             status__in=["Not started", "In Progress"],
             planned_date__gte=today
         ).order_by('planned_date')
-    
+
+
+def apply_team_segment_filters(stages, team_lead_id, segment_id):
+    if team_lead_id:
+        stages = stages.filter(project__team_lead_id=team_lead_id)
+    if segment_id:
+        stages = stages.filter(project__segment_con_id=segment_id)
+    return stages
+
+
 @login_required
 def export_milestones_excel(request):
     filter_type = request.GET.get('filter', 'all').capitalize()
     stages = get_filtered_stages(filter_type)
+    stages = apply_team_segment_filters(stages, request.GET.get('team_lead', ''), request.GET.get('segment', ''))
 
     timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
     filename = f'Upcoming Milestones {filter_type} {timestamp}.csv'
@@ -1457,6 +1474,7 @@ def export_milestones_pdf(request):
     raw_filter = request.GET.get('filter', 'all')
     filter_type = raw_filter.lower()
     stages = get_filtered_stages(filter_type)
+    stages = apply_team_segment_filters(stages, request.GET.get('team_lead', ''), request.GET.get('segment', ''))
 
     # Format filename as "Upcoming Milestones [Filter] [dd-mm-yyyy HH-MM].pdf"
     timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
