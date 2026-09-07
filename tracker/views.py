@@ -839,39 +839,6 @@ def project_reports(request):
     # --- Capture QS for Charts (Before Hide Completed) ---
     chart_projects_qs = projects_qs
 
-    # --- Chart Click Filtering ---
-    # The trend chart is an aggregate across all currently-reported stages (no per-stage
-    # picker), so a bar click scopes to stage_keys_to_report rather than one stage name.
-    chart_filter_month = query_params.get('chart_filter_month')
-    chart_filter_type = query_params.get('chart_filter_type')
-
-    if chart_filter_month and chart_filter_type:
-        try:
-            filter_date = parse_date(chart_filter_month)
-            if filter_date:
-                if chart_filter_type == 'planned':
-                    # Matches the trend chart's backlog-inclusive "planned" bucket: due by
-                    # this month's end and not already resolved before this month started.
-                    month_start = filter_date.replace(day=1)
-                    month_end = (month_start + relativedelta(months=1)) - timedelta(days=1)
-                    matching_stage_ids = Stage.objects.filter(
-                        name__in=stage_keys_to_report,
-                        planned_date__gte=plausible_planned_date_floor,
-                        planned_date__lte=month_end,
-                    ).exclude(
-                        Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=month_start))
-                    ).values_list('project_id', flat=True)
-                    projects_qs = projects_qs.filter(id__in=matching_stage_ids)
-                elif chart_filter_type == 'actual':
-                    matching_stage_ids = Stage.objects.filter(
-                        name__in=stage_keys_to_report,
-                        actual_date__year=filter_date.year,
-                        actual_date__month=filter_date.month
-                    ).values_list('project_id', flat=True)
-                    projects_qs = projects_qs.filter(id__in=matching_stage_ids)
-        except (ValueError, TypeError):
-            pass
-
     distinct_projects = projects_qs.distinct()
     distinct_chart_projects = chart_projects_qs.distinct()
     chart_project_ids = chart_projects_qs.values_list('id', flat=True).distinct()
@@ -1222,16 +1189,27 @@ def project_reports(request):
 
     delay_by_team_lead = Counter()
     delay_by_segment = Counter()
+    team_lead_id_by_name = {}
+    segment_id_by_name = {}
     for s in delayed_now_qs:
-        delay_by_team_lead[s.project.team_lead.name if s.project.team_lead else 'Unassigned'] += 1
-        delay_by_segment[s.project.segment_con.name if s.project.segment_con else 'Unassigned'] += 1
+        tl = s.project.team_lead
+        tl_key = tl.name if tl else 'Unassigned'
+        delay_by_team_lead[tl_key] += 1
+        team_lead_id_by_name[tl_key] = tl.id if tl else 'unassigned'
+
+        seg = s.project.segment_con
+        seg_key = seg.name if seg else 'Unassigned'
+        delay_by_segment[seg_key] += 1
+        segment_id_by_name[seg_key] = seg.id if seg else 'unassigned'
 
     delay_by_team_lead_top = delay_by_team_lead.most_common()
     delay_by_segment_top = delay_by_segment.most_common()
     delay_by_team_lead_labels = [x[0] for x in delay_by_team_lead_top]
     delay_by_team_lead_data = [x[1] for x in delay_by_team_lead_top]
+    delay_by_team_lead_ids = [team_lead_id_by_name[x[0]] for x in delay_by_team_lead_top]
     delay_by_segment_labels = [x[0] for x in delay_by_segment_top]
     delay_by_segment_data = [x[1] for x in delay_by_segment_top]
+    delay_by_segment_ids = [segment_id_by_name[x[0]] for x in delay_by_segment_top]
 
     # --- NEW: Emulation Timing Analysis Trends ---
     # Categories:
@@ -1321,8 +1299,10 @@ def project_reports(request):
         'report_kpis': report_kpis,
         'delay_by_team_lead_labels': delay_by_team_lead_labels,
         'delay_by_team_lead_data': delay_by_team_lead_data,
+        'delay_by_team_lead_ids': json.dumps(delay_by_team_lead_ids),
         'delay_by_segment_labels': delay_by_segment_labels,
         'delay_by_segment_data': delay_by_segment_data,
+        'delay_by_segment_ids': json.dumps(delay_by_segment_ids),
         'saved_report_presets': SavedReportFilter.objects.filter(user=request.user) if request.user.is_authenticated else [],
         'current_query_string': request.GET.urlencode(),
     }
@@ -1331,26 +1311,152 @@ def project_reports(request):
 
 @login_required
 def stage_projects_list(request):
-    """Drill-down page for the report's "In Progress by Stage" pie chart: lists the
-    projects currently sitting in a specific stage, honoring whatever report filters
-    (segments, team leads, date window, etc.) were active when the chart was rendered."""
+    """Drill-down page for the report's "In Progress by Stage" pie chart and the "Top
+    Process Bottlenecks" bar chart: lists the projects currently sitting in a specific
+    stage (type=in_progress, the default) or currently overdue at that stage
+    (type=delayed), honoring whatever report filters (segments, team leads, date
+    window, etc.) were active when the chart was rendered."""
     stage_key = request.GET.get('stage', '')
+    list_type = request.GET.get('type', 'in_progress')
     stage_display = dict(Stage.STAGE_NAMES).get(stage_key, stage_key)
+    today = timezone.now().date()
+    plausible_planned_date_floor = today - timedelta(days=MAX_PLAUSIBLE_DAY_DELTA)
 
     filtered = _build_filtered_report_projects(request)
     project_ids = filtered['projects_qs'].values_list('id', flat=True)
 
-    stages = Stage.objects.filter(
-        project_id__in=project_ids,
-        name=stage_key,
-        status='In Progress',
-    ).select_related('project', 'project__team_lead', 'project__segment_con').order_by('planned_date')
+    stages_qs = Stage.objects.filter(project_id__in=project_ids, name=stage_key)
+    if list_type == 'delayed':
+        heading_suffix = 'Delayed'
+        stages_qs = stages_qs.filter(
+            planned_date__gte=plausible_planned_date_floor,
+        ).exclude(status='Not Applicable').filter(
+            Q(actual_date__gt=F('planned_date')) |
+            Q(status__in=['Not started', 'In Progress'], planned_date__lt=today)
+        )
+    else:
+        list_type = 'in_progress'
+        heading_suffix = 'In Progress'
+        stages_qs = stages_qs.filter(status='In Progress')
+
+    stages = stages_qs.select_related('project', 'project__team_lead', 'project__segment_con').order_by('planned_date')
 
     return render(request, 'tracker/stage_projects_list.html', {
         'stage_key': stage_key,
         'stage_display': stage_display,
+        'list_type': list_type,
+        'heading_suffix': heading_suffix,
         'stages': stages,
-        'today': timezone.now().date(),
+        'today': today,
+    })
+
+
+@login_required
+def delay_owner_projects_list(request):
+    """Drill-down for the "Who Owns Today's Delays" charts: lists every currently-overdue
+    stage instance for one team lead or one segment, respecting the report's active
+    filters (segments, team leads, stages, date window, etc.)."""
+    team_lead_id = request.GET.get('team_lead')
+    segment_id = request.GET.get('segment')
+    today = timezone.now().date()
+    plausible_planned_date_floor = today - timedelta(days=MAX_PLAUSIBLE_DAY_DELTA)
+
+    filtered = _build_filtered_report_projects(request)
+    project_ids = filtered['projects_qs'].values_list('id', flat=True)
+    stage_keys = [k for k, _ in filtered['stage_names_to_report']]
+    end_date = filtered['end_date']
+
+    stages = Stage.objects.filter(
+        project_id__in=project_ids,
+        name__in=stage_keys,
+        planned_date__isnull=False,
+        planned_date__gte=plausible_planned_date_floor,
+        planned_date__lte=end_date,
+        status__in=['Not started', 'In Progress'],
+        planned_date__lt=today,
+    ).select_related('project', 'project__team_lead', 'project__segment_con')
+
+    owner_type = 'All'
+    owner_label = 'All Owners'
+    if team_lead_id == 'unassigned':
+        stages = stages.filter(project__team_lead__isnull=True)
+        owner_type = 'Team Lead'
+        owner_label = 'Unassigned'
+    elif team_lead_id:
+        stages = stages.filter(project__team_lead_id=team_lead_id)
+        owner = Employee.objects.filter(id=team_lead_id).first()
+        owner_type = 'Team Lead'
+        owner_label = owner.name if owner else 'Unknown'
+    elif segment_id == 'unassigned':
+        stages = stages.filter(project__segment_con__isnull=True)
+        owner_type = 'Segment'
+        owner_label = 'Unassigned'
+    elif segment_id:
+        stages = stages.filter(project__segment_con_id=segment_id)
+        owner = trackerSegment.objects.filter(id=segment_id).first()
+        owner_type = 'Segment'
+        owner_label = owner.name if owner else 'Unknown'
+
+    stages = stages.order_by('planned_date')
+
+    return render(request, 'tracker/delay_owner_projects_list.html', {
+        'owner_type': owner_type,
+        'owner_label': owner_label,
+        'stages': stages,
+        'today': today,
+    })
+
+
+@login_required
+def trend_month_projects_list(request):
+    """Drill-down for the "Planned vs Actual Trend" chart: lists the stage instances
+    behind the Planned (backlog-inclusive) or Actual (completed) bar for one month,
+    respecting the report's active filters."""
+    month_str = request.GET.get('month', '')
+    list_type = request.GET.get('type', 'planned')
+    today = timezone.now().date()
+    plausible_planned_date_floor = today - timedelta(days=MAX_PLAUSIBLE_DAY_DELTA)
+
+    filtered = _build_filtered_report_projects(request)
+    project_ids = filtered['projects_qs'].values_list('id', flat=True)
+    stage_keys = [k for k, _ in filtered['stage_names_to_report']]
+
+    month_date = parse_date(month_str)
+    if not month_date:
+        stages = Stage.objects.none()
+        month_label = 'Unknown Month'
+    else:
+        month_start = month_date.replace(day=1)
+        month_end = (month_start + relativedelta(months=1)) - timedelta(days=1)
+        month_label = month_start.strftime('%B %Y')
+
+        if list_type == 'actual':
+            stages = Stage.objects.filter(
+                project_id__in=project_ids,
+                name__in=stage_keys,
+                status='Completed',
+                actual_date__year=month_start.year,
+                actual_date__month=month_start.month,
+            ).order_by('actual_date')
+        else:
+            list_type = 'planned'
+            stages = Stage.objects.filter(
+                project_id__in=project_ids,
+                name__in=stage_keys,
+                planned_date__isnull=False,
+                planned_date__gte=plausible_planned_date_floor,
+                planned_date__lte=month_end,
+            ).exclude(
+                Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=month_start))
+            ).order_by('planned_date')
+
+    stages = stages.select_related('project', 'project__team_lead', 'project__segment_con')
+
+    return render(request, 'tracker/trend_month_projects_list.html', {
+        'month_label': month_label,
+        'list_type': list_type,
+        'stages': stages,
+        'today': today,
     })
 
 

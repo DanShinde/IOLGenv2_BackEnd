@@ -430,7 +430,13 @@
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-exclamation-triangle me-2"></i>Top Process Bottlenecks (Delayed Stages)</h5></div>
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Top Process Bottlenecks (Delayed Stages)
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Click a bar to open that stage's currently-overdue projects in a new tab."></i>
+                    </h5>
+                </div>
                 <div class="card-body">
                     <canvas id="stageDelayChart"></canvas>
                 </div>
@@ -464,7 +470,13 @@
     <div class="row mt-4">
         <div class="col-md-6 mb-3 mb-md-0">
             <div class="card h-100">
-                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-user-tie me-2"></i>Who Owns Today's Delays &mdash; by Team Lead</h5></div>
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-user-tie me-2"></i>Who Owns Today's Delays &mdash; by Team Lead
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Click a bar to open that team lead's currently-overdue stages in a new tab."></i>
+                    </h5>
+                </div>
                 <div class="card-body">
                     {% if delay_by_team_lead_labels %}
                     <div style="height: 300px; position: relative;">
@@ -478,7 +490,13 @@
         </div>
         <div class="col-md-6">
             <div class="card h-100">
-                <div class="card-header"><h5 class="card-header-title"><i class="fas fa-layer-group me-2"></i>Who Owns Today's Delays &mdash; by Segment</h5></div>
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-layer-group me-2"></i>Who Owns Today's Delays &mdash; by Segment
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Click a bar to open that segment's currently-overdue stages in a new tab."></i>
+                    </h5>
+                </div>
                 <div class="card-body">
                     {% if delay_by_segment_labels %}
                     <div style="height: 300px; position: relative;">
@@ -582,6 +600,17 @@
 
 {{ block.super }}
 <script>
+// Opens a report drill-down page in a new tab, carrying forward whatever report
+// filters (segments, team leads, date window, etc.) are active on this page load.
+function openDrilldownTab(basePath, extraParams) {
+    const baseQuery = "{{ current_query_string|escapejs }}";
+    const extra = new URLSearchParams(extraParams).toString();
+    window.open(basePath + '?' + (baseQuery ? baseQuery + '&' : '') + extra, '_blank');
+}
+function cursorOnHover(evt, elements) {
+    evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+}
+
 // ✅ NEW: Function to make cards in a row the same height
 function equalizeChartCardHeights() {
     const chartRows = document.querySelectorAll('.row.mt-4');
@@ -705,14 +734,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Chart Initialization Code ---
 
-    // Stage Delay Bar Chart
+    // Stage Delay Bar Chart — click a bar to open that stage's currently-overdue projects
     const stageDelayCtx = document.getElementById('stageDelayChart');
     const stageDelayData = {{ stage_delay_data|safe }};
+    const stageDelayLabels = {{ stage_delay_labels|safe }};
     if (stageDelayCtx && stageDelayData.length > 0) {
         new Chart(stageDelayCtx, {
             type: 'bar',
             data: {
-                labels: {{ stage_delay_labels|safe }},
+                labels: stageDelayLabels,
                 datasets: [{
                     label: 'Delayed Projects',
                     data: stageDelayData,
@@ -721,12 +751,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     borderWidth: 1
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                onClick: (evt, elements) => {
+                    if (!elements.length) return;
+                    const stageKey = stageDelayLabels[elements[0].index];
+                    openDrilldownTab("{% url 'tracker_stage_projects' %}", { stage: stageKey, type: 'delayed' });
+                },
+                onHover: cursorOnHover
+            }
         });
     }
 
-    // Delay cross-tab: by Team Lead / by Segment (who owns today's overdue stages)
-    function initHorizontalBar(canvasId, labels, data, color) {
+    // Delay cross-tab: by Team Lead / by Segment (who owns today's overdue stages) —
+    // click a bar to open that owner's currently-overdue stage instances.
+    function initHorizontalBar(canvasId, labels, data, color, ids, ownerParam) {
         const ctx = document.getElementById(canvasId);
         if (!ctx || !data || data.length === 0) return;
         new Chart(ctx, {
@@ -741,11 +782,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     borderWidth: 1
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                onClick: (evt, elements) => {
+                    if (!elements.length || !ids) return;
+                    const ownerId = ids[elements[0].index];
+                    if (ownerId === undefined || ownerId === null) return;
+                    openDrilldownTab("{% url 'tracker_delay_owner_projects' %}", { [ownerParam]: ownerId });
+                },
+                onHover: cursorOnHover
+            }
         });
     }
-    initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' });
-    initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' });
+    initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' }, {{ delay_by_team_lead_ids|safe }}, 'team_lead');
+    initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' }, {{ delay_by_segment_ids|safe }}, 'segment');
 
     // In Progress Stages pie chart — click a slice to open that stage's project list in a new tab
     const inProgressCtx = document.getElementById('inProgressStageChart');
@@ -775,13 +827,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 onClick: (evt, elements) => {
                     if (!elements.length) return;
                     const stageKey = inProgressKeys[elements[0].index];
-                    const baseQuery = "{{ current_query_string|escapejs }}";
-                    const url = "{% url 'tracker_stage_projects' %}?" + (baseQuery ? baseQuery + '&' : '') + "stage=" + encodeURIComponent(stageKey);
-                    window.open(url, '_blank');
+                    openDrilldownTab("{% url 'tracker_stage_projects' %}", { stage: stageKey, type: 'in_progress' });
                 },
-                onHover: (evt, elements) => {
-                    evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-                }
+                onHover: cursorOnHover
             }
         });
     }
@@ -1073,29 +1121,28 @@ function updateTrendChart() {
                 mode: 'index',
                 intersect: false,
             },
-            onClick: (e, activeElements) => {
-                if (activeElements.length === 0 || viewType !== 'monthly') return;
+            onClick: (e, activeElements, chart) => {
+                if (viewType !== 'monthly') return;
 
-                const index = activeElements[0].index;
-                const datasetIndex = activeElements[0].datasetIndex;
+                // The chart-wide interaction mode ('index'/intersect:false, used for the
+                // combined tooltip) would make activeElements[0] always resolve to the
+                // Planned dataset regardless of which bar was clicked. Re-query precisely
+                // for the bar actually under the pointer instead.
+                const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+                if (points.length === 0) return;
+
+                const index = points[0].index;
+                const datasetIndex = points[0].datasetIndex;
                 if (datasetIndex > 1) return; // OTIF line / target line aren't click-through
 
                 const year = filteredYears[index];
                 const month = filteredMonths[index];
                 const type = datasetIndex === 0 ? 'planned' : 'actual';
+                const monthStr = `${year}-${String(month).padStart(2, '0')}-01`;
 
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-01`;
-
-                const url = new URL(window.location.href);
-                url.searchParams.set('chart_filter_month', dateStr);
-                url.searchParams.set('chart_filter_type', type);
-                url.hash = 'resultsCollapse';
-
-                window.location.href = url.toString();
+                openDrilldownTab("{% url 'tracker_trend_month_projects' %}", { month: monthStr, type: type });
             },
-            onHover: (event, chartElement) => {
-                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-            },
+            onHover: cursorOnHover,
             plugins: {
                 tooltip: {
                     callbacks: {

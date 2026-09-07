@@ -1,20 +1,17 @@
 {% extends 'tracker/base.html' %}
 {% load humanize %}
 
-{% block title %}{{ heading_suffix }}: {{ stage_display }}{% endblock %}
+{% block title %}Delays: {{ owner_label }}{% endblock %}
 
 {% block content %}
 <div class="page-header mb-4">
-    <h1 class="page-title"><i class="fas {% if list_type == 'delayed' %}fa-exclamation-triangle{% else %}fa-spinner{% endif %} me-2"></i>{{ stage_display }} &mdash; {{ heading_suffix }}</h1>
-    <p class="page-subtitle">
-        {% if list_type == 'delayed' %}Projects currently overdue at this stage, matching the report filters used on the chart.
-        {% else %}Projects currently in progress at this stage, matching the report filters used on the chart.{% endif %}
-    </p>
+    <h1 class="page-title"><i class="fas fa-exclamation-triangle me-2"></i>{{ owner_label }} &mdash; Today's Delays</h1>
+    <p class="page-subtitle">Every currently-overdue stage instance owned by this {{ owner_type|lower }}, matching the report filters used on the chart.</p>
 </div>
 
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="card-header-title mb-0"><i class="fas fa-list me-2"></i>{{ stage_display }}</h5>
+        <h5 class="card-header-title mb-0"><i class="fas fa-list me-2"></i>{{ owner_label }}</h5>
         <span class="badge bg-secondary">{{ stages|length }} Found</span>
     </div>
     <div class="card-body p-0">
@@ -24,6 +21,7 @@
                     <tr>
                         <th>Project Code</th>
                         <th>Customer</th>
+                        <th>Stage</th>
                         <th>Segment</th>
                         <th>Team Lead</th>
                         <th>Planned Date</th>
@@ -36,11 +34,12 @@
                     <tr>
                         <td><a href="{% url 'tracker_project_detail' stage.project.id %}" target="_blank"><strong>{{ stage.project.code }}</strong></a></td>
                         <td>{{ stage.project.customer_name }}</td>
+                        <td>{{ stage.name }}</td>
                         <td>{{ stage.project.segment_con.name|default:'N/A' }}</td>
                         <td>{{ stage.project.team_lead.name|default:'N/A' }}</td>
                         <td>{{ stage.planned_date|date:"M d, Y"|default:'N/A' }}</td>
                         <td>
-                            {% if stage.planned_date and stage.planned_date < today %}
+                            {% if stage.planned_date %}
                                 <span class="badge bg-danger-soft text-danger">{{ stage.planned_date|timesince:today }} overdue</span>
                             {% else %}
                                 <span class="text-muted small">&mdash;</span>
@@ -52,7 +51,7 @@
                 {% else %}
                 <tbody>
                     <tr>
-                        <td colspan="6">
+                        <td colspan="7">
                             <div class="text-center py-5">
                                 <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
                                 <p class="text-muted">No projects match this filter.</p>
