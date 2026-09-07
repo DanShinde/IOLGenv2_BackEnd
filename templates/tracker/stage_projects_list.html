@@ -1,0 +1,69 @@
+{% extends 'tracker/base.html' %}
+{% load humanize %}
+
+{% block title %}In Progress: {{ stage_display }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+    <h1 class="page-title"><i class="fas fa-spinner me-2"></i>{{ stage_display }} &mdash; In Progress</h1>
+    <p class="page-subtitle">Projects currently in progress at this stage, matching the report filters used on the chart.</p>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-header-title mb-0"><i class="fas fa-list me-2"></i>{{ stage_display }}</h5>
+        <span class="badge bg-secondary">{{ stages|length }} Found</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Project Code</th>
+                        <th>Customer</th>
+                        <th>Segment</th>
+                        <th>Team Lead</th>
+                        <th>Planned Date</th>
+                        <th>Days Overdue</th>
+                    </tr>
+                </thead>
+                {% if stages %}
+                <tbody>
+                    {% for stage in stages %}
+                    <tr>
+                        <td><a href="{% url 'tracker_project_detail' stage.project.id %}" target="_blank"><strong>{{ stage.project.code }}</strong></a></td>
+                        <td>{{ stage.project.customer_name }}</td>
+                        <td>{{ stage.project.segment_con.name|default:'N/A' }}</td>
+                        <td>{{ stage.project.team_lead.name|default:'N/A' }}</td>
+                        <td>{{ stage.planned_date|date:"M d, Y"|default:'N/A' }}</td>
+                        <td>
+                            {% if stage.planned_date and stage.planned_date < today %}
+                                <span class="badge bg-danger-soft text-danger">{{ stage.planned_date|timesince:today }} overdue</span>
+                            {% else %}
+                                <span class="text-muted small">&mdash;</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% else %}
+                <tbody>
+                    <tr>
+                        <td colspan="6">
+                            <div class="text-center py-5">
+                                <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+                                <p class="text-muted">No projects currently in progress at this stage.</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-danger-soft { background-color: rgba(220, 53, 69, 0.1); }
+</style>
+{% endblock %}

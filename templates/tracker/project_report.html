@@ -439,6 +439,29 @@
     </div>
 
     <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>In Progress Stages
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Count of stage instances currently In Progress within the selected reporting period, split by stage. Click a slice to open the matching project list in a new tab."></i>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if in_progress_stage_labels %}
+                    <div style="max-width: 480px; height: 360px; position: relative; margin: 0 auto;">
+                        <canvas id="inProgressStageChart"></canvas>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">No stages are currently in progress for the selected filters.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
         <div class="col-md-6 mb-3 mb-md-0">
             <div class="card h-100">
                 <div class="card-header"><h5 class="card-header-title"><i class="fas fa-user-tie me-2"></i>Who Owns Today's Delays &mdash; by Team Lead</h5></div>
@@ -723,6 +746,45 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' });
     initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' });
+
+    // In Progress Stages pie chart — click a slice to open that stage's project list in a new tab
+    const inProgressCtx = document.getElementById('inProgressStageChart');
+    const inProgressLabels = {{ in_progress_stage_labels|safe }};
+    const inProgressData = {{ in_progress_stage_data|safe }};
+    const inProgressKeys = {{ in_progress_stage_keys|safe }};
+    if (inProgressCtx && inProgressData.length > 0) {
+        const pieColors = [
+            'rgba(13, 110, 253, 0.8)', 'rgba(220, 53, 69, 0.8)', 'rgba(25, 135, 84, 0.8)',
+            'rgba(255, 193, 7, 0.8)', 'rgba(111, 66, 193, 0.8)', 'rgba(253, 126, 20, 0.8)',
+            'rgba(13, 202, 240, 0.8)', 'rgba(214, 51, 132, 0.8)', 'rgba(108, 117, 125, 0.8)',
+            'rgba(32, 201, 151, 0.8)'
+        ];
+        new Chart(inProgressCtx, {
+            type: 'pie',
+            data: {
+                labels: inProgressLabels,
+                datasets: [{
+                    data: inProgressData,
+                    backgroundColor: inProgressLabels.map((_, i) => pieColors[i % pieColors.length]),
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } },
+                onClick: (evt, elements) => {
+                    if (!elements.length) return;
+                    const stageKey = inProgressKeys[elements[0].index];
+                    const baseQuery = "{{ current_query_string|escapejs }}";
+                    const url = "{% url 'tracker_stage_projects' %}?" + (baseQuery ? baseQuery + '&' : '') + "stage=" + encodeURIComponent(stageKey);
+                    window.open(url, '_blank');
+                },
+                onHover: (evt, elements) => {
+                    evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                }
+            }
+        });
+    }
 
     // Stage Summary table: sortable columns
     const stageSummaryTable = document.getElementById('stageSummaryTable');

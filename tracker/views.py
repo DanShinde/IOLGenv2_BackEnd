@@ -1038,6 +1038,9 @@ def project_reports(request):
     stage_summary = []
     aggregate_planned_list = []
     aggregate_actual_list = []
+    in_progress_stage_labels = []
+    in_progress_stage_data = []
+    in_progress_stage_keys = []
 
     total_planned = total_actual = total_pending = total_delayed = total_on_time = 0
 
@@ -1067,6 +1070,11 @@ def project_reports(request):
         planned_count = planned_backlog_qs.count()
         pending_count = planned_backlog_qs.exclude(status='Completed').count()
         delayed_count = delayed_qs.count()
+        in_progress_count = planned_backlog_qs.filter(status='In Progress').count()
+        if in_progress_count > 0:
+            in_progress_stage_labels.append(stage_display)
+            in_progress_stage_data.append(in_progress_count)
+            in_progress_stage_keys.append(stage_key)
 
         actual_count = actual_period_qs.count()
         on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
@@ -1292,6 +1300,9 @@ def project_reports(request):
         'actual_start_date': actual_start_date, 'actual_end_date': actual_end_date,
         'min_value': min_value, 'max_value': max_value,
         'stage_delay_labels': stage_delay_labels, 'stage_delay_data': stage_delay_data,
+        'in_progress_stage_labels': in_progress_stage_labels,
+        'in_progress_stage_data': in_progress_stage_data,
+        'in_progress_stage_keys': in_progress_stage_keys,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'all_automation_stage_names': Stage.AUTOMATION_STAGES,
         'all_emulation_stage_names': Stage.EMULATION_STAGES,
@@ -1316,6 +1327,31 @@ def project_reports(request):
         'current_query_string': request.GET.urlencode(),
     }
     return render(request, 'tracker/project_report.html', context)
+
+
+@login_required
+def stage_projects_list(request):
+    """Drill-down page for the report's "In Progress by Stage" pie chart: lists the
+    projects currently sitting in a specific stage, honoring whatever report filters
+    (segments, team leads, date window, etc.) were active when the chart was rendered."""
+    stage_key = request.GET.get('stage', '')
+    stage_display = dict(Stage.STAGE_NAMES).get(stage_key, stage_key)
+
+    filtered = _build_filtered_report_projects(request)
+    project_ids = filtered['projects_qs'].values_list('id', flat=True)
+
+    stages = Stage.objects.filter(
+        project_id__in=project_ids,
+        name=stage_key,
+        status='In Progress',
+    ).select_related('project', 'project__team_lead', 'project__segment_con').order_by('planned_date')
+
+    return render(request, 'tracker/stage_projects_list.html', {
+        'stage_key': stage_key,
+        'stage_display': stage_display,
+        'stages': stages,
+        'today': timezone.now().date(),
+    })
 
 
 @login_required

@@ -26,6 +26,7 @@ urlpatterns = [
     path('project/<int:project_id>/archive/', views.toggle_archive_project, name='toggle_archive_project'),
     path('dashboard/', views.dashboard, name='tracker_dashboard'),
     path('project/reports/', views.project_reports, name='project_reports'),
+    path('project/reports/stage-projects/', views.stage_projects_list, name='tracker_stage_projects'),
     path('project/<int:project_id>/activity/', views.project_activity, name='tracker_project_activity'),
 
     # ✅ FIXED: Restored original names 'tracker_...' to match base.html
