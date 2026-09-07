@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import Assignment, Dispatch, History, Item
+from . import services
 
 
 class ReturnWorkflowTests(TestCase):
@@ -126,3 +127,72 @@ class BulkUpdatePermissionTests(TestCase):
         data = response.json()
         self.assertFalse(data['success'])
         self.assertTrue(Item.objects.filter(pk=self.item.pk).exists())
+
+
+class MaterialAssignmentTests(TestCase):
+    """Materials are assignable to a user on a returnable basis, drawn down/restored by quantity."""
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user('staff3', password='pw', is_staff=True)
+        self.worker = User.objects.create_user('worker3', password='pw')
+        self.material = Item.objects.create(
+            item_type='MATERIAL', name='Cable Reel', serial_number='SN-10', quantity=20
+        )
+
+    def _assign(self, quantity=5):
+        assignment = Assignment.objects.create(
+            item=self.material, quantity=quantity, assigned_to=self.worker, assigned_by=self.staff_user,
+            assignment_date=date.today()
+        )
+        self.material.quantity -= quantity
+        self.material.save()
+        return assignment
+
+    def test_assigning_material_draws_down_stock_without_flipping_item_status(self):
+        self._assign(5)
+        self.material.refresh_from_db()
+        self.assertEqual(self.material.quantity, 15)
+        self.assertEqual(self.material.status, 'AVAILABLE')
+
+    def test_good_condition_return_restores_material_stock(self):
+        assignment = self._assign(5)
+        services.process_return(
+            assignment, condition='GOOD', return_notes='', performed_by=self.staff_user,
+            details_prefix='Returned by worker3'
+        )
+        self.material.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertEqual(self.material.quantity, 20)
+        self.assertEqual(self.material.status, 'AVAILABLE')
+        self.assertIsNotNone(assignment.return_date)
+
+    def test_damaged_condition_return_does_not_restock_material(self):
+        assignment = self._assign(5)
+        services.process_return(
+            assignment, condition='DAMAGED', return_notes='Wet and unusable', performed_by=self.staff_user,
+            details_prefix='Returned by worker3'
+        )
+        self.material.refresh_from_db()
+        self.assertEqual(self.material.quantity, 15)
+
+
+class AssignFormMaterialQuerysetTests(TestCase):
+    def test_material_with_stock_is_selectable_zero_stock_is_not(self):
+        from .forms import AssignForm
+
+        in_stock = Item.objects.create(
+            item_type='MATERIAL', name='Pipe', serial_number='SN-20', quantity=3, status='AVAILABLE'
+        )
+        out_of_stock = Item.objects.create(
+            item_type='MATERIAL', name='Wire', serial_number='SN-21', quantity=0, status='AVAILABLE'
+        )
+        queryset = AssignForm().fields['item'].queryset
+        self.assertIn(in_stock, queryset)
+        self.assertNotIn(out_of_stock, queryset)
+
+
+class ItemTypeChoicesTests(TestCase):
+    def test_new_categories_are_available(self):
+        codes = dict(Item.ITEM_TYPES)
+        for expected in ('TOOL', 'IT_ASSET', 'MATERIAL', 'SOFTWARE_LICENSE', 'OTHER'):
+            self.assertIn(expected, codes)

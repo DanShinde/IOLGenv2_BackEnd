@@ -43,7 +43,7 @@
             <div class="quick-action-icon"><i class="fas fa-user-plus"></i></div>
             <div>
                 <div class="font-semibold text-lg">Assign to User</div>
-                <div class="text-sm text-white text-opacity-80">Hand a tool to someone</div>
+                <div class="text-sm text-white text-opacity-80">Hand an item to someone, returnable</div>
             </div>
         </a>
         {% endif %}
@@ -91,7 +91,7 @@
                         {% if item.location %}<p class="text-xs text-gray-400"><i class="fas fa-map-marker-alt mr-1"></i>{{ item.location }}</p>{% endif %}
                     </div>
                     <div class="flex flex-col items-end space-y-1 text-xs">
-                        {% if item.item_type == 'TOOL' and perms.inventory.add_assignment %}
+                        {% if perms.inventory.add_assignment %}
                         <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-user-plus mr-1"></i>Assign</a>
                         {% endif %}
                         {% if perms.inventory.add_dispatch %}
@@ -119,10 +119,11 @@
                             <i class="fas fa-user mr-1"></i>
                             <a href="{% url 'inventory-user-detail' a.assigned_to.pk %}" class="hover:underline">{{ a.assigned_to.get_full_name|default:a.assigned_to.username }}</a>
                         </p>
+                        {% if a.quantity > 1 %}<p class="text-xs text-gray-500">{{ a.quantity }} units</p>{% endif %}
                     </div>
                     <div class="flex flex-col items-end space-y-1 text-xs">
                         {% if a.is_overdue %}<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Overdue {{ a.days_overdue }}d</span>{% endif %}
-                        {% if perms.inventory.add_assignment %}
+                        {% if perms.inventory.add_assignment and a.item.item_type != 'MATERIAL' %}
                         <a href="{% url 'inventory-assign-create' %}?item={{ a.item.pk }}" class="text-green-600 hover:text-green-800"><i class="fas fa-random mr-1"></i>Transfer</a>
                         {% endif %}
                         <a href="{% url 'inventory-return-assignment' a.pk %}" class="text-yellow-600 hover:text-yellow-800"><i class="fas fa-undo mr-1"></i>Return</a>

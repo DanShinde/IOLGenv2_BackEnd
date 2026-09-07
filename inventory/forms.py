@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from django import forms
 from django.contrib.auth.models import User
+from django.db.models import Q
 from .models import Item, History, Reservation, RETURN_CONDITION_CHOICES
 from .utils import get_active_employee_users
 from django.core.exceptions import ValidationError
@@ -15,6 +16,11 @@ class ItemForm(forms.ModelForm):
             'quantity', 'min_quantity', 'location', 'status', 'remarks'
         ]
         widgets = {
+            'name': forms.TextInput(attrs={
+                'list': 'existing-item-names',
+                'autocomplete': 'off',
+                'placeholder': 'Select an existing item or type a new one...',
+            }),
             'description': forms.Textarea(attrs={'rows': 3,
                                             'placeholder': 'Any notes, updates, or important information...'}),
             'remarks': forms.Textarea(attrs={'rows': 3,
@@ -25,6 +31,7 @@ class ItemForm(forms.ModelForm):
             'status': forms.Select(),
         }
         help_texts = {
+            'name': 'Start typing to pick an existing item from the list, or enter a new name.',
             'serial_number': 'Unique identifier for tracking',
             'quantity': 'For materials: stock quantity. For tools: always 1',
             'min_quantity': 'Alert when stock falls below this level',
@@ -186,9 +193,11 @@ def _user_label(user):
     return f"{user.get_full_name()} ({user.username})" if user.get_full_name() else user.username
 
 
-def _assignable_tool_label(item):
+def _assignable_item_label(item):
     label = f"{item.name} ({item.serial_number})"
-    if item.status == 'ASSIGNED':
+    if item.is_stock_tracked:
+        label += f" - {item.quantity} in stock"
+    elif item.status == 'ASSIGNED':
         active = item.assignments.filter(return_date__isnull=True).first()
         if active:
             who = active.assigned_to.get_full_name() or active.assigned_to.username
@@ -197,17 +206,30 @@ def _assignable_tool_label(item):
 
 
 class AssignForm(forms.Form):
-    """Assign an available tool to a user, or transfer an already-assigned tool to someone else"""
+    """
+    Assign an item to a user on a returnable basis.
+    Single-unit items (tools, IT assets, etc.) work as before: assign an available one,
+    or transfer an already-assigned one to someone else. Materials are assigned by
+    quantity, drawn down from stock, and restored to stock on a good-condition return.
+    """
     item = forms.ModelChoiceField(
-        queryset=Item.objects.filter(item_type='TOOL', status__in=['AVAILABLE', 'ASSIGNED']).order_by('name'),
-        label="Tool",
+        queryset=Item.objects.none(),   # lazy placeholder; real qs set per instance in __init__
+        label="Item",
         widget=forms.Select(),
+    )
+    quantity = forms.IntegerField(
+        required=False,
+        initial=1,
+        min_value=1,
+        widget=forms.NumberInput(attrs={'placeholder': '1'}),
+        label="Quantity",
+        help_text="For materials only - how many units to assign"
     )
     assigned_to = forms.ModelChoiceField(
         queryset=User.objects.none(),   # lazy placeholder; real qs set per instance in __init__
         label="Assign To",
         widget=forms.Select(),
-        help_text="Only active employees (per Planner/skill gap analyzer) can be assigned tools.",
+        help_text="Only active employees (per Planner/skill gap analyzer) can be assigned items.",
     )
     assignment_date = forms.DateField(
         initial=date.today,
@@ -226,13 +248,17 @@ class AssignForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['item'].queryset = Item.objects.filter(
+            Q(item_type='MATERIAL', status='AVAILABLE', quantity__gt=0) |
+            (~Q(item_type='MATERIAL') & Q(status__in=['AVAILABLE', 'ASSIGNED']))
+        ).order_by('name')
         self.fields['assigned_to'].queryset = get_active_employee_users()
 
         for field_name, field in self.fields.items():
             if not field.widget.attrs.get('class'):
                 field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 
-        self.fields['item'].label_from_instance = _assignable_tool_label
+        self.fields['item'].label_from_instance = _assignable_item_label
         self.fields['assigned_to'].label_from_instance = _user_label
 
         if not self.initial.get('expected_return_date'):
@@ -241,6 +267,7 @@ class AssignForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         item = cleaned_data.get('item')
+        quantity = cleaned_data.get('quantity') or 1
         assigned_to = cleaned_data.get('assigned_to')
         assignment_date = cleaned_data.get('assignment_date')
         expected_return_date = cleaned_data.get('expected_return_date')
@@ -248,13 +275,16 @@ class AssignForm(forms.Form):
         if expected_return_date and assignment_date and expected_return_date < assignment_date:
             self.add_error('expected_return_date', 'Return date cannot be before assignment date.')
 
-        if item and item.status == 'ASSIGNED' and assigned_to:
+        if item and item.is_stock_tracked:
+            if quantity > item.quantity:
+                self.add_error('quantity', f'Only {item.quantity} units of {item.name} are in stock.')
+        elif item and item.status == 'ASSIGNED' and assigned_to:
             active_assignment = item.assignments.filter(return_date__isnull=True).first()
             if active_assignment and active_assignment.assigned_to == assigned_to:
-                raise ValidationError('This tool is already assigned to that user.')
+                raise ValidationError('This item is already assigned to that user.')
 
         # Don't let a direct assignment silently override someone else's pending reservation
-        if item and assigned_to and assignment_date:
+        if item and not item.is_stock_tracked and assigned_to and assignment_date:
             conflict_end = expected_return_date or assignment_date
             conflicting = Reservation.objects.filter(item=item, status='PENDING').exclude(reserved_for=assigned_to)
             for reservation in conflicting:
@@ -265,6 +295,7 @@ class AssignForm(forms.Form):
                         f'Fulfill or cancel that reservation first.'
                     )
 
+        cleaned_data['quantity'] = quantity
         return cleaned_data
 
 

@@ -275,6 +275,7 @@ def item_create(request):
         'form': form,
         'title': 'Add New Inventory Item',
         'next': next_url,
+        'existing_item_names': Item.objects.order_by('name').values_list('name', flat=True).distinct(),
     }
     return render(request, 'inventory/item_form.html', context)
 
@@ -320,6 +321,7 @@ def item_update(request, pk):
         'title': f'Edit {item.name}',
         'item': item,
         'next': next_url,
+        'existing_item_names': Item.objects.exclude(pk=item.pk).order_by('name').values_list('name', flat=True).distinct(),
     }
     return render(request, 'inventory/item_form.html', context)
 
@@ -677,6 +679,7 @@ def assign_item(request):
         form = AssignForm(request.POST)
         if form.is_valid():
             item = form.cleaned_data['item']
+            quantity = form.cleaned_data['quantity']
             assigned_to = form.cleaned_data['assigned_to']
             assignment_date = form.cleaned_data['assignment_date']
             expected_return_date = form.cleaned_data['expected_return_date']
@@ -684,7 +687,25 @@ def assign_item(request):
             who = assigned_to.get_full_name() or assigned_to.username
 
             with transaction.atomic():
-                if item.status == 'ASSIGNED':
+                if item.is_stock_tracked:
+                    Assignment.objects.create(
+                        item=item, quantity=quantity, assigned_to=assigned_to, assigned_by=request.user,
+                        assignment_date=assignment_date, expected_return_date=expected_return_date,
+                        notes=notes
+                    )
+
+                    item.quantity -= quantity
+                    item.save()
+
+                    History.objects.create(
+                        item=item, action='ASSIGNED', user=request.user,
+                        details=f'{quantity} units assigned to {who}', location=item.location or 'Warehouse'
+                    )
+                    messages.success(
+                        request,
+                        f'Assigned {quantity} units of {item.name} to {who}. Remaining stock: {item.quantity}'
+                    )
+                elif item.status == 'ASSIGNED':
                     active_assignment = item.assignments.filter(return_date__isnull=True).first()
                     prev_who = active_assignment.assigned_to.get_full_name() or active_assignment.assigned_to.username
                     active_assignment.return_date = assignment_date

@@ -22,7 +22,7 @@
                 </a>
                 <div class="mt-2">
                     <span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full font-medium">
-                        {{ active_assignments|length }} tool{{ active_assignments|length|pluralize }} currently held
+                        {{ active_assignments|length }} item{{ active_assignments|length|pluralize }} currently held
                     </span>
                 </div>
             </div>
@@ -40,7 +40,7 @@
         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
             <i class="fas fa-exclamation-triangle mr-2"></i>
             {{ target_user.get_full_name|default:target_user.username }} is not currently an active employee
-            (per Planner/skill gap analyzer), so tools can't be assigned to them. Any tool they still hold can
+            (per Planner/skill gap analyzer), so items can't be assigned to them. Any item they still hold can
             still be returned below.
         </div>
         {% else %}
@@ -65,6 +65,15 @@
                     </label>
                     {{ form.item }}
                     {% if form.item.errors %}<p class="text-sm text-red-600 mt-1">{{ form.item.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="{{ form.quantity.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ form.quantity.label }}
+                    </label>
+                    {{ form.quantity }}
+                    <p class="text-xs text-gray-500 mt-1">{{ form.quantity.help_text }}</p>
+                    {% if form.quantity.errors %}<p class="text-sm text-red-600 mt-1">{{ form.quantity.errors.0 }}</p>{% endif %}
                 </div>
 
                 <div>
@@ -110,7 +119,7 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tool</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Since</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -121,6 +130,7 @@
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-3 whitespace-nowrap">
                                 <a href="{% url 'inventory-item-detail' a.item.pk %}" class="font-medium text-gray-900 hover:text-blue-600">{{ a.item.name }}</a>
+                                {% if a.quantity > 1 %}<span class="text-xs text-gray-500">({{ a.quantity }} units)</span>{% endif %}
                                 <div class="text-xs text-gray-500">{{ a.item.serial_number }}</div>
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ a.assignment_date }}</td>

@@ -56,10 +56,18 @@
             <i class="fas fa-edit mr-2"></i>Edit
         </a>
 
-        {% if perms.inventory.add_assignment and item.item_type == 'TOOL' and item.status == 'AVAILABLE' or perms.inventory.add_assignment and item.item_type == 'TOOL' and item.status == 'ASSIGNED' %}
-        <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
-            <i class="fas fa-user-plus mr-2"></i>{% if item.status == 'ASSIGNED' %}Transfer{% else %}Assign{% endif %}
-        </a>
+        {% if perms.inventory.add_assignment %}
+            {% if item.item_type == 'MATERIAL' %}
+                {% if item.status == 'AVAILABLE' and item.quantity > 0 %}
+                <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
+                    <i class="fas fa-user-plus mr-2"></i>Assign
+                </a>
+                {% endif %}
+            {% elif item.status == 'AVAILABLE' or item.status == 'ASSIGNED' %}
+            <a href="{% url 'inventory-assign-create' %}?item={{ item.pk }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">
+                <i class="fas fa-user-plus mr-2"></i>{% if item.status == 'ASSIGNED' %}Transfer{% else %}Assign{% endif %}
+            </a>
+            {% endif %}
         {% endif %}
 
         {% if perms.inventory.add_dispatch and item.status == 'AVAILABLE' or perms.inventory.add_dispatch and item.status == 'ASSIGNED' %}

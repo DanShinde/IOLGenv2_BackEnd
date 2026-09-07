@@ -35,6 +35,12 @@
                 {% endfor %}
             </div>
 
+            <datalist id="existing-item-names">
+                {% for existing_name in existing_item_names %}
+                <option value="{{ existing_name }}"></option>
+                {% endfor %}
+            </datalist>
+
             <div class="mt-6 flex justify-end space-x-4">
                 <a href="{{ next }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
                     <i class="fas fa-times mr-2"></i>Cancel
@@ -52,13 +58,13 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Tools and materials are always tracked as a single stock line; keep quantity/min_quantity fixed.
+    // Only materials are tracked as a stock quantity; every other item type is a single unit.
     const itemTypeField = document.getElementById('id_item_type');
     const quantityField = document.getElementById('id_quantity');
     const minQuantityField = document.getElementById('id_min_quantity');
 
     function setupQuantityFields() {
-        if (quantityField && itemTypeField && itemTypeField.value === 'TOOL') {
+        if (quantityField && itemTypeField && itemTypeField.value !== 'MATERIAL') {
             quantityField.value = 1;
             quantityField.readOnly = true;
             quantityField.classList.add('bg-gray-100');
