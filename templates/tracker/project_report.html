@@ -610,6 +610,14 @@ function openDrilldownTab(basePath, extraParams) {
 function cursorOnHover(evt, elements) {
     evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
 }
+// Appends the distinct-project count behind a stage-instance count to a tooltip line,
+// so it's clear how many stages vs. how many projects a bar/slice represents.
+function projectCountLabel(ctx, projectCounts) {
+    const base = `${ctx.dataset.label}: ${ctx.raw}`;
+    const count = projectCounts ? projectCounts[ctx.dataIndex] : undefined;
+    if (count === undefined || count === null) return base;
+    return `${base} (${count} project${count === 1 ? '' : 's'})`;
+}
 
 // ✅ NEW: Function to make cards in a row the same height
 function equalizeChartCardHeights() {
@@ -738,13 +746,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const stageDelayCtx = document.getElementById('stageDelayChart');
     const stageDelayData = {{ stage_delay_data|safe }};
     const stageDelayLabels = {{ stage_delay_labels|safe }};
+    const stageDelayProjectCounts = {{ stage_delay_project_counts|safe }};
     if (stageDelayCtx && stageDelayData.length > 0) {
         new Chart(stageDelayCtx, {
             type: 'bar',
             data: {
                 labels: stageDelayLabels,
                 datasets: [{
-                    label: 'Delayed Projects',
+                    label: 'Delayed Stages',
                     data: stageDelayData,
                     backgroundColor: 'rgba(220, 53, 69, 0.7)',
                     borderColor: 'rgba(220, 53, 69, 1)',
@@ -753,7 +762,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => projectCountLabel(ctx, stageDelayProjectCounts) } }
+                },
                 scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
                 onClick: (evt, elements) => {
                     if (!elements.length) return;
@@ -767,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Delay cross-tab: by Team Lead / by Segment (who owns today's overdue stages) —
     // click a bar to open that owner's currently-overdue stage instances.
-    function initHorizontalBar(canvasId, labels, data, color, ids, ownerParam) {
+    function initHorizontalBar(canvasId, labels, data, color, ids, ownerParam, projectCounts) {
         const ctx = document.getElementById(canvasId);
         if (!ctx || !data || data.length === 0) return;
         new Chart(ctx, {
@@ -784,7 +796,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (c) => projectCountLabel(c, projectCounts) } }
+                },
                 scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
                 onClick: (evt, elements) => {
                     if (!elements.length || !ids) return;
@@ -796,14 +811,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' }, {{ delay_by_team_lead_ids|safe }}, 'team_lead');
-    initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' }, {{ delay_by_segment_ids|safe }}, 'segment');
+    initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' }, {{ delay_by_team_lead_ids|safe }}, 'team_lead', {{ delay_by_team_lead_project_counts|safe }});
+    initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' }, {{ delay_by_segment_ids|safe }}, 'segment', {{ delay_by_segment_project_counts|safe }});
 
     // In Progress Stages pie chart — click a slice to open that stage's project list in a new tab
     const inProgressCtx = document.getElementById('inProgressStageChart');
     const inProgressLabels = {{ in_progress_stage_labels|safe }};
     const inProgressData = {{ in_progress_stage_data|safe }};
     const inProgressKeys = {{ in_progress_stage_keys|safe }};
+    const inProgressProjectCounts = {{ in_progress_stage_project_counts|safe }};
     if (inProgressCtx && inProgressData.length > 0) {
         const pieColors = [
             'rgba(13, 110, 253, 0.8)', 'rgba(220, 53, 69, 0.8)', 'rgba(25, 135, 84, 0.8)',
@@ -823,7 +839,18 @@ document.addEventListener('DOMContentLoaded', function() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'right' } },
+                plugins: {
+                    legend: { position: 'right' },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const base = `${ctx.label}: ${ctx.raw}`;
+                                const count = inProgressProjectCounts[ctx.dataIndex];
+                                return count === undefined || count === null ? base : `${base} (${count} project${count === 1 ? '' : 's'})`;
+                            }
+                        }
+                    }
+                },
                 onClick: (evt, elements) => {
                     if (!elements.length) return;
                     const stageKey = inProgressKeys[elements[0].index];
@@ -1005,6 +1032,43 @@ function aggregateQuarterly(rawData, sumKeys, lastKeys) {
     return { quarterlyData, keysOrder };
 }
 
+// Same month->quarter grouping as aggregateQuarterly, but for fields that are lists of
+// project ids rather than plain numbers. unionKeys (flow, e.g. actual completions) are
+// deduplicated across the quarter's months; lastKeys (stock, e.g. backlog-inclusive
+// planned) just keep the end-of-quarter month's list, matching aggregateQuarterly's
+// sum-vs-last split.
+function aggregateQuarterlyIdArrays(rawData, unionKeys, lastKeys) {
+    unionKeys = unionKeys || [];
+    lastKeys = lastKeys || [];
+    let quarterlyData = {};
+    let keysOrder = [];
+
+    if (rawData.financial_years) {
+        for (let i = 0; i < rawData.financial_years.length; i++) {
+            const fy = rawData.financial_years[i];
+            const month = rawData.months[i];
+
+            let qIndex, monthRange;
+            if (month >= 4 && month <= 6) { qIndex = 1; monthRange = "(Apr-Jun)"; }
+            else if (month >= 7 && month <= 9) { qIndex = 2; monthRange = "(Jul-Sep)"; }
+            else if (month >= 10 && month <= 12) { qIndex = 3; monthRange = "(Oct-Dec)"; }
+            else { qIndex = 4; monthRange = "(Jan-Mar)"; }
+
+            const key = `${fy}_Q${qIndex}`;
+            if (!quarterlyData[key]) {
+                const entry = { label: `Q${qIndex}_ ${fy} ${monthRange}` };
+                unionKeys.forEach(k => entry[k] = new Set());
+                lastKeys.forEach(k => entry[k] = []);
+                quarterlyData[key] = entry;
+                keysOrder.push(key);
+            }
+            unionKeys.forEach(k => { (rawData[k][i] || []).forEach(id => quarterlyData[key][k].add(id)); });
+            lastKeys.forEach(k => { quarterlyData[key][k] = rawData[k][i] || []; });
+        }
+    }
+    return { quarterlyData, keysOrder };
+}
+
 function updateTrendChart() {
     if (!trendCtx) return;
 
@@ -1022,6 +1086,7 @@ function updateTrendChart() {
     const otifRaw = otifData || { labels: [], financial_years: [], months: [], total: [], on_time: [] };
 
     let filteredLabels = [], filteredPlanned = [], filteredActual = [], filteredYears = [], filteredMonths = [], filteredOtif = [];
+    let filteredPlannedProjects = [], filteredActualProjects = [];
 
     if (viewType === 'monthly') {
         filteredLabels = trendRaw.labels || [];
@@ -1029,6 +1094,8 @@ function updateTrendChart() {
         filteredActual = trendRaw.actual || [];
         filteredYears = trendRaw.years || [];
         filteredMonths = trendRaw.months || [];
+        filteredPlannedProjects = (trendRaw.planned_project_ids || []).map(ids => (ids || []).length);
+        filteredActualProjects = (trendRaw.actual_project_ids || []).map(ids => (ids || []).length);
 
         const otifByLabel = {};
         (otifRaw.labels || []).forEach((label, i) => {
@@ -1045,6 +1112,14 @@ function updateTrendChart() {
         filteredLabels = trendQ.keysOrder.map(k => trendQ.quarterlyData[k].label);
         filteredPlanned = trendQ.keysOrder.map(k => trendQ.quarterlyData[k].planned);
         filteredActual = trendQ.keysOrder.map(k => trendQ.quarterlyData[k].actual);
+
+        // Same stock-vs-flow treatment for the underlying project ids: the Planned
+        // project count is the end-of-quarter snapshot (last month), while Actual
+        // project counts are unioned across the quarter's months so a project that
+        // completed different stages in different months isn't counted twice.
+        const trendProjQ = aggregateQuarterlyIdArrays(trendRaw, ['actual_project_ids'], ['planned_project_ids']);
+        filteredPlannedProjects = trendQ.keysOrder.map(k => (trendProjQ.quarterlyData[k].planned_project_ids || []).length);
+        filteredActualProjects = trendQ.keysOrder.map(k => trendProjQ.quarterlyData[k].actual_project_ids.size);
 
         const otifQ = aggregateQuarterly(otifRaw, ['total', 'on_time']);
         const otifByLabel = {};
@@ -1144,6 +1219,7 @@ function updateTrendChart() {
             },
             onHover: cursorOnHover,
             plugins: {
+                legend: { position: 'bottom' },
                 tooltip: {
                     callbacks: {
                         title: function(context) {
@@ -1154,7 +1230,13 @@ function updateTrendChart() {
                             if (context.dataset.label === 'OTIF %') {
                                 return context.parsed.y === null ? 'OTIF: N/A' : `OTIF: ${context.parsed.y.toFixed(1)}%`;
                             }
-                            return `${context.dataset.label}: ${context.parsed.y}`;
+                            const projectCount = context.datasetIndex === 0
+                                ? filteredPlannedProjects[context.dataIndex]
+                                : filteredActualProjects[context.dataIndex];
+                            const base = `${context.dataset.label}: ${context.parsed.y}`;
+                            return (projectCount === undefined || projectCount === null)
+                                ? base
+                                : `${base} (${projectCount} project${projectCount === 1 ? '' : 's'})`;
                         }
                     }
                 },
@@ -1169,7 +1251,7 @@ function updateTrendChart() {
                 y: {
                     beginAtZero: true,
                     ticks: { stepSize: 1 },
-                    title: { display: true, text: 'Number of Projects' }
+                    title: { display: true, text: 'Number of Stages' }
                 },
                 y1: {
                     beginAtZero: true,
@@ -1280,7 +1362,8 @@ function updateEmuChart() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `${context.dataset.label}: ${context.raw}`;
+                            const count = context.raw;
+                            return `${context.dataset.label}: ${count} project${count === 1 ? '' : 's'}`;
                         }
                     }
                 },

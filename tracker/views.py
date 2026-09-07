@@ -874,10 +874,13 @@ def project_reports(request):
     )
     if selected_stage_keys:
         delayed_stages_qs = delayed_stages_qs.filter(name__in=stage_keys_to_report)
-    delayed_stages_qs = delayed_stages_qs.values('name').annotate(count=Count('id')).order_by('-count')
+    delayed_stages_qs = delayed_stages_qs.values('name').annotate(
+        count=Count('id'), project_count=Count('project_id', distinct=True)
+    ).order_by('-count')
 
     stage_delay_labels = [item['name'] for item in delayed_stages_qs[:10]] # Top 10 bottlenecks
     stage_delay_data = [item['count'] for item in delayed_stages_qs[:10]]
+    stage_delay_project_counts = [item['project_count'] for item in delayed_stages_qs[:10]]
 
     # --- NEW: Monthly Planned vs Actual Trend (aggregate across all reported stages, with
     # backlog carry-forward) ---
@@ -894,7 +897,7 @@ def project_reports(request):
     ).exclude(status='Not Applicable')
     if selected_stage_keys:
         trend_source_qs = trend_source_qs.filter(name__in=stage_keys_to_report)
-    trend_rows = list(trend_source_qs.values('planned_date', 'actual_date', 'status'))
+    trend_rows = list(trend_source_qs.values('planned_date', 'actual_date', 'status', 'project_id'))
 
     if has_explicit_period:
         trend_range_start = start_date
@@ -911,18 +914,24 @@ def project_reports(request):
 
     trend_planned = []
     trend_actual = []
+    trend_planned_project_ids = []
+    trend_actual_project_ids = []
     for month_start in months_list:
         month_end = (month_start + relativedelta(months=1)) - timedelta(days=1)
-        trend_planned.append(sum(
-            1 for r in trend_rows
+        planned_rows = [
+            r for r in trend_rows
             if r['planned_date'] <= month_end and not (
                 r['status'] == 'Completed' and r['actual_date'] and r['actual_date'] < month_start
             )
-        ))
-        trend_actual.append(sum(
-            1 for r in trend_rows
+        ]
+        actual_rows = [
+            r for r in trend_rows
             if r['actual_date'] and month_start <= r['actual_date'] <= month_end
-        ))
+        ]
+        trend_planned.append(len(planned_rows))
+        trend_actual.append(len(actual_rows))
+        trend_planned_project_ids.append(sorted({r['project_id'] for r in planned_rows}))
+        trend_actual_project_ids.append(sorted({r['project_id'] for r in actual_rows}))
 
     trend_labels = [m.strftime('%b %Y') for m in months_list]
     trend_years = [m.year for m in months_list]
@@ -942,6 +951,8 @@ def project_reports(request):
         'months': trend_months,
         'planned': trend_planned,
         'actual': trend_actual,
+        'planned_project_ids': trend_planned_project_ids,
+        'actual_project_ids': trend_actual_project_ids,
     }
 
     # --- NEW: OTIF Trend (aggregate across all reported stages) ---
@@ -1008,6 +1019,7 @@ def project_reports(request):
     in_progress_stage_labels = []
     in_progress_stage_data = []
     in_progress_stage_keys = []
+    in_progress_stage_project_counts = []
 
     total_planned = total_actual = total_pending = total_delayed = total_on_time = 0
 
@@ -1037,11 +1049,13 @@ def project_reports(request):
         planned_count = planned_backlog_qs.count()
         pending_count = planned_backlog_qs.exclude(status='Completed').count()
         delayed_count = delayed_qs.count()
-        in_progress_count = planned_backlog_qs.filter(status='In Progress').count()
+        in_progress_qs = planned_backlog_qs.filter(status='In Progress')
+        in_progress_count = in_progress_qs.count()
         if in_progress_count > 0:
             in_progress_stage_labels.append(stage_display)
             in_progress_stage_data.append(in_progress_count)
             in_progress_stage_keys.append(stage_key)
+            in_progress_stage_project_counts.append(in_progress_qs.values('project_id').distinct().count())
 
         actual_count = actual_period_qs.count()
         on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
@@ -1191,25 +1205,31 @@ def project_reports(request):
     delay_by_segment = Counter()
     team_lead_id_by_name = {}
     segment_id_by_name = {}
+    team_lead_projects = defaultdict(set)
+    segment_projects = defaultdict(set)
     for s in delayed_now_qs:
         tl = s.project.team_lead
         tl_key = tl.name if tl else 'Unassigned'
         delay_by_team_lead[tl_key] += 1
         team_lead_id_by_name[tl_key] = tl.id if tl else 'unassigned'
+        team_lead_projects[tl_key].add(s.project_id)
 
         seg = s.project.segment_con
         seg_key = seg.name if seg else 'Unassigned'
         delay_by_segment[seg_key] += 1
         segment_id_by_name[seg_key] = seg.id if seg else 'unassigned'
+        segment_projects[seg_key].add(s.project_id)
 
     delay_by_team_lead_top = delay_by_team_lead.most_common()
     delay_by_segment_top = delay_by_segment.most_common()
     delay_by_team_lead_labels = [x[0] for x in delay_by_team_lead_top]
     delay_by_team_lead_data = [x[1] for x in delay_by_team_lead_top]
     delay_by_team_lead_ids = [team_lead_id_by_name[x[0]] for x in delay_by_team_lead_top]
+    delay_by_team_lead_project_counts = [len(team_lead_projects[x[0]]) for x in delay_by_team_lead_top]
     delay_by_segment_labels = [x[0] for x in delay_by_segment_top]
     delay_by_segment_data = [x[1] for x in delay_by_segment_top]
     delay_by_segment_ids = [segment_id_by_name[x[0]] for x in delay_by_segment_top]
+    delay_by_segment_project_counts = [len(segment_projects[x[0]]) for x in delay_by_segment_top]
 
     # --- NEW: Emulation Timing Analysis Trends ---
     # Categories:
@@ -1278,9 +1298,11 @@ def project_reports(request):
         'actual_start_date': actual_start_date, 'actual_end_date': actual_end_date,
         'min_value': min_value, 'max_value': max_value,
         'stage_delay_labels': stage_delay_labels, 'stage_delay_data': stage_delay_data,
+        'stage_delay_project_counts': stage_delay_project_counts,
         'in_progress_stage_labels': in_progress_stage_labels,
         'in_progress_stage_data': in_progress_stage_data,
         'in_progress_stage_keys': in_progress_stage_keys,
+        'in_progress_stage_project_counts': in_progress_stage_project_counts,
         'stage_names': Stage.STAGE_NAMES, 'status_choices': Stage.STATUS_CHOICES,
         'all_automation_stage_names': Stage.AUTOMATION_STAGES,
         'all_emulation_stage_names': Stage.EMULATION_STAGES,
@@ -1300,9 +1322,11 @@ def project_reports(request):
         'delay_by_team_lead_labels': delay_by_team_lead_labels,
         'delay_by_team_lead_data': delay_by_team_lead_data,
         'delay_by_team_lead_ids': json.dumps(delay_by_team_lead_ids),
+        'delay_by_team_lead_project_counts': delay_by_team_lead_project_counts,
         'delay_by_segment_labels': delay_by_segment_labels,
         'delay_by_segment_data': delay_by_segment_data,
         'delay_by_segment_ids': json.dumps(delay_by_segment_ids),
+        'delay_by_segment_project_counts': delay_by_segment_project_counts,
         'saved_report_presets': SavedReportFilter.objects.filter(user=request.user) if request.user.is_authenticated else [],
         'current_query_string': request.GET.urlencode(),
     }
@@ -1340,6 +1364,7 @@ def stage_projects_list(request):
         stages_qs = stages_qs.filter(status='In Progress')
 
     stages = stages_qs.select_related('project', 'project__team_lead', 'project__segment_con').order_by('planned_date')
+    project_count = stages.values('project_id').distinct().count()
 
     return render(request, 'tracker/stage_projects_list.html', {
         'stage_key': stage_key,
@@ -1347,6 +1372,7 @@ def stage_projects_list(request):
         'list_type': list_type,
         'heading_suffix': heading_suffix,
         'stages': stages,
+        'project_count': project_count,
         'today': today,
     })
 
@@ -1398,11 +1424,13 @@ def delay_owner_projects_list(request):
         owner_label = owner.name if owner else 'Unknown'
 
     stages = stages.order_by('planned_date')
+    project_count = stages.values('project_id').distinct().count()
 
     return render(request, 'tracker/delay_owner_projects_list.html', {
         'owner_type': owner_type,
         'owner_label': owner_label,
         'stages': stages,
+        'project_count': project_count,
         'today': today,
     })
 
@@ -1451,11 +1479,13 @@ def trend_month_projects_list(request):
             ).order_by('planned_date')
 
     stages = stages.select_related('project', 'project__team_lead', 'project__segment_con')
+    project_count = stages.values('project_id').distinct().count()
 
     return render(request, 'tracker/trend_month_projects_list.html', {
         'month_label': month_label,
         'list_type': list_type,
         'stages': stages,
+        'project_count': project_count,
         'today': today,
     })
 
