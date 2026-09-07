@@ -45,6 +45,103 @@ class ItemForm(forms.ModelForm):
             if not field.widget.attrs.get('class'):
                 field.widget.attrs['class'] = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 
+        # Only a brand-new item can be given an initial status other than Available -
+        # editing an existing item's status goes through the dedicated Assign/Dispatch/Return
+        # pages instead, so these extra fields don't apply there.
+        self.is_new_item = self.instance.pk is None
+        if self.is_new_item:
+            self._add_initial_status_fields()
+
+    def _add_initial_status_fields(self):
+        text_class = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+        employees = get_active_employee_users()
+
+        self.fields['assigned_to'] = forms.ModelChoiceField(
+            queryset=employees, required=False, label='Assign To',
+            widget=forms.Select(attrs={'class': text_class}),
+            help_text='Only active employees can be assigned items.'
+        )
+        self.fields['assigned_to'].label_from_instance = _user_label
+        self.fields['assignment_date'] = forms.DateField(
+            required=False, initial=date.today, label='Assignment Date',
+            widget=forms.DateInput(attrs={'type': 'date', 'class': text_class})
+        )
+        self.fields['assignment_return_date'] = forms.DateField(
+            required=False, label='Expected Return Date',
+            widget=forms.DateInput(attrs={'type': 'date', 'class': text_class})
+        )
+        self.fields['assignment_notes'] = forms.CharField(
+            required=False, label='Assignment Notes',
+            widget=forms.Textarea(attrs={'rows': 2, 'class': text_class, 'placeholder': 'Notes...'})
+        )
+
+        self.fields['dispatch_project'] = forms.CharField(
+            required=False, label='Project Name',
+            widget=forms.TextInput(attrs={'placeholder': 'Project name', 'class': text_class})
+        )
+        self.fields['dispatch_site_location'] = forms.CharField(
+            required=False, label='Site Location',
+            widget=forms.TextInput(attrs={'placeholder': 'Site location', 'class': text_class})
+        )
+        self.fields['dispatch_responsible_person'] = forms.ModelChoiceField(
+            queryset=employees, required=False, label='Responsible Person',
+            help_text='Active employee at the site responsible for this item - needed to recover it later.',
+            widget=forms.Select(attrs={'class': text_class})
+        )
+        self.fields['dispatch_responsible_person'].label_from_instance = _user_label
+        self.fields['dispatch_date'] = forms.DateField(
+            required=False, initial=date.today, label='Dispatch Date',
+            widget=forms.DateInput(attrs={'type': 'date', 'class': text_class})
+        )
+        self.fields['dispatch_return_date'] = forms.DateField(
+            required=False, label='Expected Return Date',
+            help_text='Only for tools/single-unit items - materials are consumed and will not return',
+            widget=forms.DateInput(attrs={'type': 'date', 'class': text_class})
+        )
+        self.fields['dispatch_notes'] = forms.CharField(
+            required=False, label='Dispatch Notes',
+            widget=forms.Textarea(attrs={'rows': 2, 'class': text_class, 'placeholder': 'Notes...'})
+        )
+
+        self.fields['maintenance_notes'] = forms.CharField(
+            required=False, label='Reason for Maintenance',
+            widget=forms.Textarea(attrs={
+                'rows': 2, 'class': text_class, 'placeholder': 'Describe the issue...'
+            })
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not getattr(self, 'is_new_item', False):
+            return cleaned_data
+
+        status = cleaned_data.get('status')
+        item_type = cleaned_data.get('item_type')
+        quantity = cleaned_data.get('quantity')
+
+        if status in ('ASSIGNED', 'DISPATCHED', 'CONSUMED') and item_type == 'MATERIAL' and not quantity:
+            self.add_error('quantity', 'Enter a quantity greater than 0 to assign/dispatch it at creation.')
+
+        if status == 'ASSIGNED':
+            if not cleaned_data.get('assigned_to'):
+                self.add_error('assigned_to', 'Required when the initial status is Assigned.')
+            if not cleaned_data.get('assignment_date'):
+                self.add_error('assignment_date', 'Required when the initial status is Assigned.')
+
+        elif status in ('DISPATCHED', 'CONSUMED'):
+            if not cleaned_data.get('dispatch_project'):
+                self.add_error('dispatch_project', 'Required when the initial status is Dispatched/Consumed.')
+            if not cleaned_data.get('dispatch_responsible_person'):
+                self.add_error('dispatch_responsible_person', 'Required when the initial status is Dispatched/Consumed.')
+            if not cleaned_data.get('dispatch_date'):
+                self.add_error('dispatch_date', 'Required when the initial status is Dispatched/Consumed.')
+
+        elif status == 'MAINTENANCE':
+            if not cleaned_data.get('maintenance_notes'):
+                self.add_error('maintenance_notes', 'Please describe why this item needs maintenance.')
+
+        return cleaned_data
+
     def clean_serial_number(self):
         serial_number = self.cleaned_data['serial_number']
         if self.instance.pk is None:  # Only check for new items

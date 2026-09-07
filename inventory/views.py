@@ -232,6 +232,73 @@ def item_detail(request, pk):
     return render(request, 'inventory/item_detail.html', context)
 
 
+STATUS_EXTRA_FIELD_NAMES = [
+    'assigned_to', 'assignment_date', 'assignment_return_date', 'assignment_notes',
+    'dispatch_project', 'dispatch_site_location', 'dispatch_responsible_person',
+    'dispatch_date', 'dispatch_return_date', 'dispatch_notes', 'maintenance_notes',
+]
+
+
+def _apply_initial_status(item, form, request):
+    """
+    A brand-new item can be entered directly as already Assigned/Dispatched/Consumed/
+    Under Maintenance rather than Available. This creates the same Assignment/Dispatch/
+    History records that the dedicated Assign/Dispatch pages would create for an
+    existing item, using the extra fields ItemForm adds for new items.
+    Returns the extra history detail line to fold into the 'ADDED' record.
+    """
+    status = item.status
+    quantity = item.quantity if item.is_stock_tracked else 1
+
+    if status == 'ASSIGNED':
+        assigned_to = form.cleaned_data['assigned_to']
+        who = assigned_to.get_full_name() or assigned_to.username
+
+        Assignment.objects.create(
+            item=item, quantity=quantity, assigned_to=assigned_to, assigned_by=request.user,
+            assignment_date=form.cleaned_data['assignment_date'],
+            expected_return_date=form.cleaned_data.get('assignment_return_date'),
+            notes=form.cleaned_data.get('assignment_notes', '')
+        )
+
+        if item.is_stock_tracked:
+            item.quantity -= quantity
+            item.status = 'AVAILABLE'
+        else:
+            item.location = f'With {who}'
+        item.save()
+        return f'Assigned to {who} at creation' + (f' ({quantity} units)' if item.is_stock_tracked else '')
+
+    if status in ('DISPATCHED', 'CONSUMED'):
+        project = form.cleaned_data['dispatch_project']
+        site_location = form.cleaned_data.get('dispatch_site_location', '')
+        responsible_person = form.cleaned_data['dispatch_responsible_person']
+        responsible_name = responsible_person.get_full_name() or responsible_person.username
+
+        Dispatch.objects.create(
+            item=item, quantity=quantity, project=project, site_location=site_location,
+            responsible_person=responsible_person, dispatched_by=request.user,
+            dispatch_date=form.cleaned_data['dispatch_date'],
+            expected_return_date=None if item.is_stock_tracked else form.cleaned_data.get('dispatch_return_date'),
+            notes=form.cleaned_data.get('dispatch_notes', '')
+        )
+
+        if item.is_stock_tracked:
+            item.quantity -= quantity
+            item.status = 'CONSUMED'
+            item.location = f'Consumed at {project}'
+        else:
+            item.status = 'DISPATCHED'
+            item.location = f'{project} - {site_location or "N/A"}'
+        item.save()
+        return f'Dispatched to {project} at creation (responsible: {responsible_name})'
+
+    if status == 'MAINTENANCE':
+        return f"Under maintenance at creation - {form.cleaned_data['maintenance_notes']}"
+
+    return None
+
+
 @login_required
 @permission_required('inventory.add_item', raise_exception=True)
 def item_create(request):
@@ -241,23 +308,29 @@ def item_create(request):
     if request.method == 'POST':
         form = ItemForm(request.POST, request.FILES)
         if form.is_valid():
-            item = form.save()
-            # Set created_by
-            item.created_by = request.user
-            item.save()
+            with transaction.atomic():
+                item = form.save(commit=False)
+                item.created_by = request.user
+                item.save()
+
+                extra_detail = _apply_initial_status(item, form, request)
+
+                details = f'{item.get_item_type_display()} added to inventory with quantity {item.quantity}'
+                if extra_detail:
+                    details += f'. {extra_detail}'
+
+                History.objects.create(
+                    item=item,
+                    action='ADDED',
+                    user=request.user,
+                    details=details,
+                    location=item.location or 'Warehouse'
+                )
 
             # Invalidate caches
             invalidate_cache('items_list')
             invalidate_cache('dashboard_stats')
 
-            # Create history record
-            History.objects.create(
-                item=item,
-                action='ADDED',
-                user=request.user,
-                details=f'{item.get_item_type_display()} added to inventory with quantity {item.quantity}',
-                location=item.location or 'Warehouse'
-            )
             messages.success(request,
                 f'Successfully added {item.name} ({item.serial_number}) to inventory!',
                 extra_tags='bg-green-100 text-green-800'
@@ -276,6 +349,7 @@ def item_create(request):
         'title': 'Add New Inventory Item',
         'next': next_url,
         'existing_item_names': Item.objects.order_by('name').values_list('name', flat=True).distinct(),
+        'status_extra_field_names': STATUS_EXTRA_FIELD_NAMES,
     }
     return render(request, 'inventory/item_form.html', context)
 

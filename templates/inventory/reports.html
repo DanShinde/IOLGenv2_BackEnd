@@ -83,7 +83,7 @@
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div class="mini-stat neutral">
             <p class="text-xs text-gray-500 uppercase font-medium">Inventory Value</p>
-            <p class="text-2xl font-bold text-gray-900">${{ total_value|floatformat:0 }}</p>
+            <p class="text-2xl font-bold text-gray-900">₹{{ total_value|floatformat:0 }}</p>
         </div>
         <div class="mini-stat {% if summary_counts.overdue_assignments > 0 %}alert{% else %}ok{% endif %}">
             <p class="text-xs text-gray-500 uppercase font-medium">Overdue Assignments</p>
