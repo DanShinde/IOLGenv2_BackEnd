@@ -1,0 +1,58 @@
+{% extends 'base_forum.html' %}
+{% load static %}
+
+{% block title %}Upload Issues & Learnings{% endblock %}
+
+{% block content %}
+<div class="kb-page">
+  <div class="kb-panel">
+    <div class="kb-create-header">
+      <div>
+        <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif;">Upload Issues &amp; Learnings from Excel</h1>
+        <p style="margin: 4px 0 0; color: var(--kb-muted);">
+          Bulk-import a spreadsheet of issues in the standard Issues &amp; Learnings layout. Every row in the file
+          becomes a new entry — existing entries are never updated or overwritten.
+        </p>
+      </div>
+      <a class="kb-back" href="{% url 'forum-home' %}?tab=issues">Back to Knowledge Base</a>
+    </div>
+
+    <div class="kb-card">
+      <h2 style="margin: 0 0 12px;">1. Get the template</h2>
+      <p style="margin: 0 0 12px; color: var(--kb-muted);">
+        Download the template, fill in one row per issue, and keep the header row unchanged. A second sheet lists
+        valid project codes to copy from.
+      </p>
+      <a class="kb-action" href="{% url 'kb-issue-excel-template' %}">
+        <i class="fas fa-download"></i>
+        Download Excel Template
+      </a>
+    </div>
+
+    <div class="kb-card">
+      <h2 style="margin: 0 0 12px;">2. Upload your filled-in file</h2>
+      <form method="post" enctype="multipart/form-data" class="kb-form" style="display: flex; flex-direction: column; gap: 16px;">
+        {% csrf_token %}
+        {% if form.errors %}
+          <div class="kb-form-error-box">
+            <strong style="display: block; margin-bottom: 6px;">Please fix the highlighted fields:</strong>
+            <ul style="margin: 0; padding-left: 18px;">
+              {% for field, errors in form.errors.items %}
+                <li>{{ field|capfirst }}: {{ errors|join:", " }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+        <div>
+          <label class="kb-label">{{ form.file.label }}</label>
+          {{ form.file }}
+          {{ form.file.errors }}
+        </div>
+        <div style="display: flex; justify-content: flex-end;">
+          <button class="kb-action" type="submit">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

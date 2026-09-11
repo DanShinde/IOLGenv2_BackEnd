@@ -33,9 +33,21 @@ def process_return(target, condition, return_notes, performed_by, details_prefix
         target.save()
 
         item = target.item
-        item.status = new_status
-        item.location = location
-        item.save()
+
+        if isinstance(target, Assignment) and item.is_stock_tracked:
+            # Materials aren't a single unit whose status can flip - only a good-condition
+            # return puts the assigned quantity back into stock. Other stock may still be
+            # out with other users, so the item's own status/location are left alone.
+            if condition == 'GOOD':
+                item.quantity += target.quantity
+                if item.status == 'CONSUMED' and item.quantity > 0:
+                    item.status = 'AVAILABLE'
+            location = item.location or 'Warehouse'
+            item.save()
+        else:
+            item.status = new_status
+            item.location = location
+            item.save()
 
         details = f'{details_prefix} - Condition: {RETURN_CONDITION_LABELS[condition]}'
         if return_notes:

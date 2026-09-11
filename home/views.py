@@ -6,7 +6,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import IntegrityError, models, transaction
 from django.db.models import Count
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -27,6 +27,9 @@ from .forms import (
     AnswerForm,
     ReportForm,
     ReportCommentForm,
+    IssueLearningForm,
+    IssueLearningCommentForm,
+    IssueLearningExcelUploadForm,
 )
 from .models import (
     Article,
@@ -40,6 +43,9 @@ from .models import (
     Report,
     ReportComment,
     ReportAttachment,
+    IssueLearning,
+    IssueLearningComment,
+    IssueLearningAttachment,
     Tag,
     UserProfile,
     Vote,
@@ -79,6 +85,43 @@ def _apply_search(queryset, query, high_fields, low_fields=()):
         output_field=models.IntegerField(),
     )
     return queryset.filter(q_filter).annotate(relevance=relevance).distinct()
+
+
+def _filter_issues(request):
+    """
+    Shared Issue & Learning filtering, used by both the paginated list in
+    forum_home() and the (unpaginated) Excel export -- so "download the
+    issues I'm currently looking at" and "the list I'm currently looking at"
+    can never drift apart.
+    """
+    query = request.GET.get('q', '').strip()
+    tag_slug = request.GET.get('tag', '').strip()
+    current_tag = Tag.objects.filter(slug=tag_slug).first() if tag_slug else None
+    issue_project = request.GET.get('issue_project', 'all')
+    issue_status = request.GET.get('issue_status', 'all')
+    issue_priority = request.GET.get('issue_priority', 'all')
+    issue_capa_status = request.GET.get('issue_capa_status', 'all')
+
+    issues = IssueLearning.objects.select_related('project', 'reporter').prefetch_related(
+        'tags', 'comments__author'
+    ).annotate(comment_count=Count('comments', distinct=True))
+    issues = _apply_search(
+        issues, query,
+        high_fields=['problem_statement', 'issue_description', 'tags__name', 'closure_accountability'],
+        low_fields=['project__project_id', 'location_area'],
+    )
+    if current_tag:
+        issues = issues.filter(tags=current_tag)
+    if issue_project != 'all':
+        issues = issues.filter(project_id=issue_project)
+    if issue_status != 'all':
+        issues = issues.filter(status=issue_status)
+    if issue_priority != 'all':
+        issues = issues.filter(priority=issue_priority)
+    if issue_capa_status != 'all':
+        issues = issues.filter(capa_status=issue_capa_status)
+    issues = issues.order_by('-relevance', '-updated_at') if query else issues.order_by('-updated_at')
+    return issues
 
 
 def _resolve_tags(names):
@@ -270,6 +313,17 @@ def get_kb_stats_context():
         type=Report.TYPE_FEATURE,
         status__in=[Report.STATUS_OPEN, Report.STATUS_IN_PROGRESS]
     ).count()
+    total_issues = IssueLearning.objects.count()
+    open_issues = IssueLearning.objects.filter(
+        status__in=[IssueLearning.STATUS_OPEN, IssueLearning.STATUS_UNDER_OBSERVATION]
+    ).count()
+    closed_issues = IssueLearning.objects.filter(status=IssueLearning.STATUS_CLOSED).count()
+    capa_open = IssueLearning.objects.filter(
+        capa_status__in=[IssueLearning.CAPA_STATUS_OPEN, IssueLearning.CAPA_STATUS_IN_PROGRESS]
+    ).count()
+    capa_closed = IssueLearning.objects.filter(
+        capa_status__in=[IssueLearning.CAPA_STATUS_COMPLETED, IssueLearning.CAPA_STATUS_VERIFIED]
+    ).count()
     return {
         'total_articles': total_articles,
         'total_questions': total_questions,
@@ -278,6 +332,11 @@ def get_kb_stats_context():
         'total_users': total_users,
         'open_bugs': open_bugs,
         'open_features': open_features,
+        'total_issues': total_issues,
+        'open_issues': open_issues,
+        'closed_issues': closed_issues,
+        'capa_open': capa_open,
+        'capa_closed': capa_closed,
     }
 
 
@@ -300,7 +359,7 @@ def get_kb_sidebar_context():
 @login_required
 def forum_home(request):
     active_tab = request.GET.get('tab', 'wiki')
-    if active_tab not in {'wiki', 'qa', 'reports'}:
+    if active_tab not in {'wiki', 'qa', 'reports', 'issues'}:
         active_tab = 'wiki'
     query = request.GET.get('q', '').strip()
     tag_slug = request.GET.get('tag', '').strip()
@@ -335,6 +394,14 @@ def forum_home(request):
             ),
             query, high_fields=['title', 'description', 'tags__name'], low_fields=['application__name'],
         ).order_by('-relevance', '-updated_at')
+        issue_matches = _apply_search(
+            IssueLearning.objects.select_related('project', 'reporter').prefetch_related('tags').annotate(
+                comment_count=Count('comments', distinct=True)
+            ),
+            query,
+            high_fields=['problem_statement', 'issue_description', 'tags__name', 'closure_accountability'],
+            low_fields=['project__project_id', 'location_area'],
+        ).order_by('-relevance', '-updated_at')
 
         context.update(get_kb_sidebar_context())
         context.update({
@@ -345,6 +412,8 @@ def forum_home(request):
             'search_qa_total': qa_matches.count(),
             'search_report_results': report_matches[:GLOBAL_SEARCH_LIMIT],
             'search_report_total': report_matches.count(),
+            'search_issue_results': issue_matches[:GLOBAL_SEARCH_LIMIT],
+            'search_issue_total': issue_matches.count(),
         })
         return render(request, 'home/forum_home.html', context)
 
@@ -396,7 +465,7 @@ def forum_home(request):
             'questions': page_obj,
             'page_obj': page_obj,
         })
-    else:
+    elif active_tab == 'reports':
         report_type = request.GET.get('report_type', 'all')
         report_status = request.GET.get('report_status', 'all')
         report_priority = request.GET.get('report_priority', 'all')
@@ -424,6 +493,24 @@ def forum_home(request):
             'reports': page_obj,
             'page_obj': page_obj,
         })
+    else:
+        issue_project = request.GET.get('issue_project', 'all')
+        issue_status = request.GET.get('issue_status', 'all')
+        issue_priority = request.GET.get('issue_priority', 'all')
+        issue_capa_status = request.GET.get('issue_capa_status', 'all')
+        issues = _filter_issues(request)
+
+        from planner.models import Project as PlannerProject
+        page_obj = Paginator(issues, KB_PAGE_SIZE).get_page(request.GET.get('page'))
+        context.update({
+            'issue_project': issue_project,
+            'issue_status': issue_status,
+            'issue_priority': issue_priority,
+            'issue_capa_status': issue_capa_status,
+            'issue_projects': PlannerProject.objects.filter(kb_issues__isnull=False).distinct().order_by('project_id'),
+            'issues': page_obj,
+            'page_obj': page_obj,
+        })
 
     return render(request, 'home/forum_home.html', context)
 
@@ -438,6 +525,9 @@ def tag_detail(request, slug):
     report_matches = Report.objects.filter(tags=tag).select_related('application', 'reporter').prefetch_related('tags').annotate(
         comment_count=Count('comments')
     ).order_by('-updated_at')
+    issue_matches = IssueLearning.objects.filter(tags=tag).select_related('project', 'reporter').prefetch_related('tags').annotate(
+        comment_count=Count('comments')
+    ).order_by('-updated_at')
 
     context = {
         'tag': tag,
@@ -448,6 +538,8 @@ def tag_detail(request, slug):
         'search_qa_total': qa_matches.count(),
         'search_report_results': report_matches[:GLOBAL_SEARCH_LIMIT],
         'search_report_total': report_matches.count(),
+        'search_issue_results': issue_matches[:GLOBAL_SEARCH_LIMIT],
+        'search_issue_total': issue_matches.count(),
     }
     context.update(get_kb_stats_context())
     context.update(get_kb_sidebar_context())
@@ -836,6 +928,72 @@ def report_comment_delete(request, pk):
 
 
 @login_required
+def issue_detail(request, pk):
+    issue = get_object_or_404(
+        IssueLearning.objects.select_related('project', 'reporter').prefetch_related('tags', 'comments__author', 'attachments'),
+        pk=pk
+    )
+
+    if request.method == 'POST':
+        form = IssueLearningCommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.issue = issue
+            comment.author = request.user
+            _finalize_richtext(comment, form, 'body')
+            comment.save()
+            _notify(issue.reporter, request.user, 'commented on', issue=issue)
+            messages.success(request, 'Note added.')
+            return redirect('kb-issue-detail', pk=issue.pk)
+        messages.error(request, 'Please correct the errors below.')
+    else:
+        form = IssueLearningCommentForm()
+
+    context = {
+        'issue': issue,
+        'comments': issue.comments.all(),
+        'attachments': issue.attachments.all(),
+        'comment_form': form,
+        'active_tab': 'issues',
+    }
+    context.update(get_kb_stats_context())
+    context.update(get_kb_sidebar_context())
+    return render(request, 'home/kb_issue_detail.html', context)
+
+
+@login_required
+def issue_comment_update(request, pk):
+    comment = get_object_or_404(IssueLearningComment.objects.select_related('issue'), pk=pk)
+    if not (request.user.is_staff or comment.author == request.user):
+        messages.error(request, 'You do not have permission to edit this note.')
+        return redirect(comment.issue.get_absolute_url())
+
+    form = IssueLearningCommentForm(request.POST or None, instance=comment)
+    if request.method == 'POST' and form.is_valid():
+        comment = form.save(commit=False)
+        _finalize_richtext(comment, form, 'body')
+        comment.save()
+        messages.success(request, 'Note updated.')
+        return redirect(comment.issue.get_absolute_url())
+
+    context = {'form': form, 'heading': 'Edit note', 'back_url': comment.issue.get_absolute_url()}
+    return render(request, 'home/kb_content_edit.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def issue_comment_delete(request, pk):
+    comment = get_object_or_404(IssueLearningComment.objects.select_related('issue'), pk=pk)
+    if not (request.user.is_staff or comment.author == request.user):
+        messages.error(request, 'You do not have permission to delete this note.')
+        return redirect(comment.issue.get_absolute_url())
+    issue = comment.issue
+    comment.delete()
+    messages.success(request, 'Note deleted.')
+    return redirect(issue.get_absolute_url())
+
+
+@login_required
 def kb_create(request):
     content_type = request.GET.get('type', '')
     form = None
@@ -844,7 +1002,7 @@ def kb_create(request):
     if request.method == 'POST':
         content_type = request.POST.get('content_type', content_type)
 
-    if content_type not in {'wiki', 'qa', 'report'}:
+    if content_type not in {'wiki', 'qa', 'report', 'issue'}:
         content_type = ''
 
     if content_type == 'wiki':
@@ -916,6 +1074,27 @@ def kb_create(request):
                 )
             messages.success(request, 'Report submitted.')
             return redirect(report.get_absolute_url())
+        if request.method == 'POST' and form.errors:
+            messages.error(request, 'Please correct the errors below.')
+    elif content_type == 'issue':
+        form = IssueLearningForm(request.POST or None, request.FILES or None)
+        if request.method == 'POST' and form.is_valid():
+            issue = form.save(commit=False)
+            issue.reporter = request.user
+            _finalize_richtext(issue, form, 'issue_description')
+            _finalize_richtext(issue, form, 'final_corrective_action')
+            issue.save()
+            form.save_m2m()
+            issue.tags.set(_resolve_tags(form.cleaned_data['tags']))
+            attachments = form.cleaned_data.get('attachments', [])
+            for uploaded_file in attachments:
+                IssueLearningAttachment.objects.create(
+                    issue=issue,
+                    file=uploaded_file,
+                    uploaded_by=request.user
+                )
+            messages.success(request, 'Issue & learning logged.')
+            return redirect(issue.get_absolute_url())
         if request.method == 'POST' and form.errors:
             messages.error(request, 'Please correct the errors below.')
 
@@ -1076,10 +1255,340 @@ def report_delete(request, pk):
 
 
 @login_required
+def issue_update(request, pk):
+    issue = get_object_or_404(IssueLearning, pk=pk)
+    if not (request.user.is_staff or issue.reporter == request.user):
+        messages.error(request, 'You do not have permission to edit this issue.')
+        return redirect(issue.get_absolute_url())
+
+    form = IssueLearningForm(request.POST or None, request.FILES or None, instance=issue)
+    if request.method == 'POST' and form.is_valid():
+        updated_issue = form.save(commit=False)
+        _finalize_richtext(updated_issue, form, 'issue_description')
+        _finalize_richtext(updated_issue, form, 'final_corrective_action')
+        updated_issue.save()
+        form.save_m2m()
+        updated_issue.tags.set(_resolve_tags(form.cleaned_data['tags']))
+        attachments = form.cleaned_data.get('attachments', [])
+        for uploaded_file in attachments:
+            IssueLearningAttachment.objects.create(
+                issue=updated_issue,
+                file=uploaded_file,
+                uploaded_by=request.user
+            )
+        messages.success(request, 'Issue & learning updated.')
+        return redirect(issue.get_absolute_url())
+
+    context = {
+        'content_type': 'issue',
+        'form': form,
+        'object': issue,
+    }
+    return render(request, 'home/kb_create.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def issue_delete(request, pk):
+    issue = get_object_or_404(IssueLearning, pk=pk)
+    if not (request.user.is_staff or issue.reporter == request.user):
+        messages.error(request, 'You do not have permission to delete this issue.')
+        return redirect(issue.get_absolute_url())
+    issue.delete()
+    messages.success(request, 'Issue & learning deleted.')
+    return redirect(f"{reverse('forum-home')}?tab=issues")
+
+
+ISSUE_EXCEL_HEADERS = [
+    'PROJECT', 'PROBLEM STATEMENT', 'ISSUE DESCRIPTION', 'CLOSURE ACCOUNTABILITY',
+    'CLOSURE ACCOUNTABILITY DEPARTMENT', 'LOCATION/AREA', 'ISSUE REPORTED ON',
+    'TARGET CLOSURE DATE', 'PRIORITY', 'STATUS', 'CLOSED ON',
+    'ROOT CAUSE', 'CORRECTIVE ACTION', 'PREVENTIVE ACTION', 'CAPA OWNER',
+    'CAPA TARGET DATE', 'CAPA STATUS', 'CAPA VERIFIED ON', 'CAPA VERIFICATION NOTES',
+    'NOTES',
+]
+
+
+def _parse_excel_date(value):
+    """openpyxl (data_only=True) hands back a datetime/date for date-formatted
+    cells, but a plain string if the source cell was typed as text -- try a
+    few common layouts before giving up."""
+    import datetime
+    if value in (None, ''):
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    for fmt in ('%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d', '%d-%b-%Y', '%d-%b-%y'):
+        try:
+            return datetime.datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+@login_required
+def issue_excel_template_download(request):
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from planner.models import Project as PlannerProject
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Issues & Learnings"
+
+    header_fill = PatternFill(start_color="6B3636", end_color="6B3636", fill_type="solid")
+    white_bold = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_side = Side(style='thin', color='4A4A4A')
+    cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+
+    for col_idx, header in enumerate(ISSUE_EXCEL_HEADERS, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = white_bold
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = cell_border
+    ws.row_dimensions[1].height = 32
+
+    example_row = [
+        'A1477', 'Example: PLC not receiving input signals', 'Describe the issue in detail here.',
+        'Jane Doe & John Smith', 'Automation', 'HDPS', '22-08-2026', '29-08-2026',
+        'P2', 'Open', '',
+        'Why it happened', 'Corrective action once closed.', 'How recurrence is prevented', 'Jane Doe',
+        '29-08-2026', 'Open', '', '', 'Optional first note',
+    ]
+    for col_idx, value in enumerate(example_row, start=1):
+        ws.cell(row=2, column=col_idx, value=value)
+
+    widths = [12, 30, 45, 25, 25, 18, 16, 16, 10, 16, 14, 40, 30, 30, 20, 16, 12, 16, 30, 30]
+    for col_idx, width in enumerate(widths, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
+
+    projects_sheet = wb.create_sheet('Project Codes')
+    projects_sheet.cell(row=1, column=1, value='Project Code').font = white_bold
+    projects_sheet.cell(row=1, column=1).fill = header_fill
+    projects_sheet.cell(row=1, column=2, value='Customer').font = white_bold
+    projects_sheet.cell(row=1, column=2).fill = header_fill
+    for row_idx, project in enumerate(PlannerProject.objects.order_by('project_id'), start=2):
+        projects_sheet.cell(row=row_idx, column=1, value=project.project_id)
+        projects_sheet.cell(row=row_idx, column=2, value=project.customer_name)
+    projects_sheet.column_dimensions['A'].width = 16
+    projects_sheet.column_dimensions['B'].width = 30
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    response = HttpResponse(
+        out.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="Issues_Learnings_Template.xlsx"'
+    return response
+
+
+@login_required
+def issue_excel_upload(request):
+    if request.method == 'POST':
+        form = IssueLearningExcelUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            import openpyxl
+            from planner.models import Project as PlannerProject
+
+            wb = openpyxl.load_workbook(form.cleaned_data['file'], data_only=True)
+            ws = wb.worksheets[0]
+
+            header_lookup = {}
+            for col_idx, cell in enumerate(next(ws.iter_rows(min_row=1, max_row=1)), start=1):
+                if cell.value:
+                    header_lookup[str(cell.value).strip().upper()] = col_idx
+
+            required = ['PROJECT', 'PROBLEM STATEMENT', 'ISSUE DESCRIPTION', 'ISSUE REPORTED ON']
+            missing = [h for h in required if h not in header_lookup]
+            if missing:
+                messages.error(request, f"Missing required column(s): {', '.join(missing)}.")
+                return redirect('kb-issue-excel-upload')
+
+            def cell_value(row, header):
+                col_idx = header_lookup.get(header)
+                if not col_idx:
+                    return None
+                value = row[col_idx - 1].value
+                return value.strip() if isinstance(value, str) else value
+
+            priority_by_label = {label.upper(): value for value, label in IssueLearning.PRIORITY_CHOICES}
+            priority_by_label.update({value.upper(): value for value, _ in IssueLearning.PRIORITY_CHOICES})
+            status_by_label = {label.upper(): value for value, label in IssueLearning.STATUS_CHOICES}
+            status_by_label.update({value.upper(): value for value, _ in IssueLearning.STATUS_CHOICES})
+            capa_status_by_label = {label.upper(): value for value, label in IssueLearning.CAPA_STATUS_CHOICES}
+            capa_status_by_label.update({value.upper(): value for value, _ in IssueLearning.CAPA_STATUS_CHOICES})
+
+            created = 0
+            row_errors = []
+            with transaction.atomic():
+                for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
+                    if all(c.value in (None, '') for c in row):
+                        continue
+
+                    project_code = cell_value(row, 'PROJECT')
+                    problem_statement = cell_value(row, 'PROBLEM STATEMENT')
+                    issue_description = cell_value(row, 'ISSUE DESCRIPTION')
+                    reported_on = _parse_excel_date(cell_value(row, 'ISSUE REPORTED ON'))
+
+                    if not (project_code and problem_statement and issue_description and reported_on):
+                        row_errors.append(f"Row {row_idx}: missing a required value (project, problem statement, issue description, or issue reported on date).")
+                        continue
+
+                    project = PlannerProject.objects.filter(project_id__iexact=str(project_code).strip()).first()
+                    if not project:
+                        row_errors.append(f"Row {row_idx}: no project found with code '{project_code}'.")
+                        continue
+
+                    priority_raw = cell_value(row, 'PRIORITY')
+                    priority = priority_by_label.get(str(priority_raw).strip().upper(), IssueLearning.PRIORITY_P2) if priority_raw else IssueLearning.PRIORITY_P2
+                    status_raw = cell_value(row, 'STATUS')
+                    status = status_by_label.get(str(status_raw).strip().upper(), IssueLearning.STATUS_OPEN) if status_raw else IssueLearning.STATUS_OPEN
+                    capa_status_raw = cell_value(row, 'CAPA STATUS')
+                    capa_status = capa_status_by_label.get(str(capa_status_raw).strip().upper(), IssueLearning.CAPA_STATUS_OPEN) if capa_status_raw else IssueLearning.CAPA_STATUS_OPEN
+
+                    issue = IssueLearning.objects.create(
+                        project=project,
+                        problem_statement=str(problem_statement)[:300],
+                        issue_description=str(issue_description),
+                        closure_accountability=str(cell_value(row, 'CLOSURE ACCOUNTABILITY') or '')[:300],
+                        closure_accountability_department=str(cell_value(row, 'CLOSURE ACCOUNTABILITY DEPARTMENT') or '')[:200],
+                        location_area=str(cell_value(row, 'LOCATION/AREA') or '')[:200],
+                        issue_reported_on=reported_on,
+                        target_closure_date=_parse_excel_date(cell_value(row, 'TARGET CLOSURE DATE')),
+                        priority=priority,
+                        status=status,
+                        closed_on=_parse_excel_date(cell_value(row, 'CLOSED ON')),
+                        final_corrective_action=str(cell_value(row, 'CORRECTIVE ACTION') or ''),
+                        root_cause=str(cell_value(row, 'ROOT CAUSE') or ''),
+                        preventive_action=str(cell_value(row, 'PREVENTIVE ACTION') or ''),
+                        capa_owner=str(cell_value(row, 'CAPA OWNER') or '')[:300],
+                        capa_target_date=_parse_excel_date(cell_value(row, 'CAPA TARGET DATE')),
+                        capa_status=capa_status,
+                        capa_verified_on=_parse_excel_date(cell_value(row, 'CAPA VERIFIED ON')),
+                        capa_verification_notes=str(cell_value(row, 'CAPA VERIFICATION NOTES') or ''),
+                        reporter=request.user,
+                    )
+                    notes = cell_value(row, 'NOTES')
+                    if notes:
+                        IssueLearningComment.objects.create(issue=issue, author=request.user, body=str(notes))
+                    created += 1
+
+            if created:
+                messages.success(request, f"Imported {created} issue(s) & learning(s).")
+            for error in row_errors[:10]:
+                messages.error(request, error)
+            if len(row_errors) > 10:
+                messages.error(request, f"...and {len(row_errors) - 10} more row error(s).")
+            if created:
+                return redirect(f"{reverse('forum-home')}?tab=issues")
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = IssueLearningExcelUploadForm()
+
+    return render(request, 'home/kb_issue_excel_upload.html', {'form': form, 'active_tab': 'issues'})
+
+
+@login_required
+def issue_excel_export(request):
+    """
+    Export Issues & Learnings (with their CAPA fields) to .xlsx, honoring
+    whatever project/status/priority/CAPA-status/search filters are active
+    -- reuses _filter_issues() so this always matches what's on screen.
+    """
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from django.utils.html import strip_tags
+
+    issues = _filter_issues(request)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Issues & Learnings"
+
+    header_fill = PatternFill(start_color="6B3636", end_color="6B3636", fill_type="solid")
+    white_bold = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    wrap_align = Alignment(vertical="top", wrap_text=True)
+    thin_side = Side(style='thin', color='4A4A4A')
+    cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+
+    headers = ['#'] + ISSUE_EXCEL_HEADERS
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = white_bold
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = cell_border
+    ws.row_dimensions[1].height = 32
+
+    date_format = 'DD-MM-YYYY'
+    for row_idx, issue in enumerate(issues, start=2):
+        notes = '\n'.join(
+            f"{comment.created_at:%d-%m-%Y}>> {comment.body}"
+            for comment in issue.comments.all()
+        )
+        values = [
+            issue.id,
+            issue.project.project_id,
+            issue.problem_statement,
+            strip_tags(issue.issue_description) if issue.issue_description_is_html else issue.issue_description,
+            issue.closure_accountability,
+            issue.closure_accountability_department,
+            issue.location_area,
+            issue.issue_reported_on,
+            issue.target_closure_date,
+            issue.get_priority_display(),
+            issue.get_status_display(),
+            issue.closed_on,
+            issue.root_cause,
+            strip_tags(issue.final_corrective_action) if issue.final_corrective_action_is_html else issue.final_corrective_action,
+            issue.preventive_action,
+            issue.capa_owner,
+            issue.capa_target_date,
+            issue.get_capa_status_display(),
+            issue.capa_verified_on,
+            issue.capa_verification_notes,
+            notes,
+        ]
+        for col_idx, value in enumerate(values, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.alignment = wrap_align
+            cell.border = cell_border
+            if hasattr(value, 'strftime'):
+                cell.number_format = date_format
+
+    widths = [6, 12, 30, 45, 25, 25, 18, 16, 16, 10, 16, 14, 30, 30, 30, 20, 16, 12, 16, 30, 30]
+    for col_idx, width in enumerate(widths, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    response = HttpResponse(
+        out.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="Issues_Learnings_Export.xlsx"'
+    return response
+
+
+@login_required
 def notifications_list(request):
     notifications = list(
         Notification.objects.filter(recipient=request.user)
-        .select_related('actor', 'question', 'report', 'article')[:50]
+        .select_related('actor', 'question', 'report', 'article', 'issue')[:50]
     )
     Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
     return render(request, 'home/notifications.html', {'notifications': notifications})

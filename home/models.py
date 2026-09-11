@@ -356,6 +356,112 @@ class ReportAttachment(models.Model):
         return self.file.name
 
 
+class IssueLearning(models.Model):
+    PRIORITY_P1 = 'P1'
+    PRIORITY_P2 = 'P2'
+    PRIORITY_P3 = 'P3'
+    PRIORITY_CHOICES = [
+        (PRIORITY_P1, 'P1'),
+        (PRIORITY_P2, 'P2'),
+        (PRIORITY_P3, 'P3'),
+    ]
+
+    STATUS_OPEN = 'open'
+    STATUS_CLOSED = 'closed'
+    STATUS_UNDER_OBSERVATION = 'under_observation'
+    STATUS_CHOICES = [
+        (STATUS_OPEN, 'Open'),
+        (STATUS_UNDER_OBSERVATION, 'Under Observation'),
+        (STATUS_CLOSED, 'Closed'),
+    ]
+
+    CAPA_STATUS_OPEN = 'open'
+    CAPA_STATUS_IN_PROGRESS = 'in_progress'
+    CAPA_STATUS_COMPLETED = 'completed'
+    CAPA_STATUS_VERIFIED = 'verified'
+    CAPA_STATUS_CHOICES = [
+        (CAPA_STATUS_OPEN, 'Open'),
+        (CAPA_STATUS_IN_PROGRESS, 'In Progress'),
+        (CAPA_STATUS_COMPLETED, 'Completed'),
+        (CAPA_STATUS_VERIFIED, 'Verified'),
+    ]
+
+    project = models.ForeignKey(
+        'planner.Project',
+        on_delete=models.PROTECT,
+        related_name='kb_issues'
+    )
+    problem_statement = models.CharField(max_length=300)
+    issue_description = models.TextField()
+    issue_description_is_html = models.BooleanField(default=False, help_text="Whether issue_description holds sanitized rich-text HTML rather than plain text.")
+    closure_accountability = models.CharField(max_length=300, blank=True, help_text="Person(s) accountable for closure, e.g. 'Mayur Mahajan & Kunal Kuwar'.")
+    closure_accountability_department = models.CharField(max_length=200, blank=True, help_text="Department(s) accountable, e.g. 'IT & Automation'.")
+    location_area = models.CharField(max_length=200, blank=True)
+    issue_reported_on = models.DateField()
+    target_closure_date = models.DateField(null=True, blank=True)
+    priority = models.CharField(max_length=2, choices=PRIORITY_CHOICES, default=PRIORITY_P2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    closed_on = models.DateField(null=True, blank=True)
+    final_corrective_action = models.TextField(blank=True)
+    final_corrective_action_is_html = models.BooleanField(default=False, help_text="Whether final_corrective_action holds sanitized rich-text HTML rather than plain text.")
+    root_cause = models.TextField(blank=True, help_text="Why the issue happened -- the analysis behind the CAPA.")
+    preventive_action = models.TextField(blank=True, help_text="What prevents this issue from recurring.")
+    capa_owner = models.CharField(max_length=300, blank=True, help_text="Person(s) responsible for closing the CAPA.")
+    capa_target_date = models.DateField(null=True, blank=True)
+    capa_status = models.CharField(max_length=20, choices=CAPA_STATUS_CHOICES, default=CAPA_STATUS_OPEN)
+    capa_verified_on = models.DateField(null=True, blank=True)
+    capa_verification_notes = models.TextField(blank=True, help_text="Evidence the corrective/preventive action actually worked.")
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reported_issues')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='issues')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.problem_statement
+
+    def get_absolute_url(self):
+        return reverse('kb-issue-detail', kwargs={'pk': self.pk})
+
+
+class IssueLearningComment(models.Model):
+    issue = models.ForeignKey(IssueLearning, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='issue_comments')
+    body = models.TextField()
+    is_html = models.BooleanField(default=False, help_text="Whether body holds sanitized rich-text HTML rather than plain text.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Comment by {self.author}"
+
+
+def issue_attachment_upload_to(instance, filename):
+    return f"issues/{instance.issue_id}/{filename}"
+
+
+class IssueLearningAttachment(models.Model):
+    issue = models.ForeignKey(IssueLearning, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to=issue_attachment_upload_to)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='issue_uploads'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return self.file.name
+
+
 class Notification(models.Model):
     """
     In-app counterpart to the email-only alerts the KB used to send (tagging
@@ -369,6 +475,7 @@ class Notification(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, null=True, blank=True, related_name='+')
     report = models.ForeignKey(Report, on_delete=models.CASCADE, null=True, blank=True, related_name='+')
     article = models.ForeignKey(Article, on_delete=models.CASCADE, null=True, blank=True, related_name='+')
+    issue = models.ForeignKey(IssueLearning, on_delete=models.CASCADE, null=True, blank=True, related_name='+')
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -385,4 +492,6 @@ class Notification(models.Model):
             return reverse('kb-report-detail', kwargs={'pk': self.report_id})
         if self.article_id:
             return reverse('kb-article-detail', kwargs={'slug': self.article.slug})
+        if self.issue_id:
+            return reverse('kb-issue-detail', kwargs={'pk': self.issue_id})
         return reverse('forum-home')

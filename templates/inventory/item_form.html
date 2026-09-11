@@ -24,6 +24,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {% for field in form %}
+                {% if field.name not in status_extra_field_names %}
                 <div class="{% if field.name == 'description' or field.name == 'remarks' or field.name == 'image' %}md:col-span-2{% endif %}">
                     <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
                         {{ field.label }}{% if field.field.required %} <span class="text-red-500">*</span>{% endif %}
@@ -32,8 +33,112 @@
                     {% if field.help_text %}<p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>{% endif %}
                     {% if field.errors %}<p class="text-sm text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
                 </div>
+                {% endif %}
                 {% endfor %}
             </div>
+
+            {% if form.is_new_item %}
+            <div id="assigned-fields" class="hidden mt-4 border-t pt-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-user-plus mr-1 text-green-600"></i>Who is this item assigned to?
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label for="{{ form.assigned_to.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.assigned_to.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.assigned_to }}
+                        {% if form.assigned_to.help_text %}<p class="text-xs text-gray-500 mt-1">{{ form.assigned_to.help_text }}</p>{% endif %}
+                        {% if form.assigned_to.errors %}<p class="text-sm text-red-600 mt-1">{{ form.assigned_to.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="{{ form.assignment_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.assignment_date.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.assignment_date }}
+                        {% if form.assignment_date.errors %}<p class="text-sm text-red-600 mt-1">{{ form.assignment_date.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="{{ form.assignment_return_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.assignment_return_date.label }}
+                        </label>
+                        {{ form.assignment_return_date }}
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="{{ form.assignment_notes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.assignment_notes.label }}
+                        </label>
+                        {{ form.assignment_notes }}
+                    </div>
+                </div>
+            </div>
+
+            <div id="dispatch-fields" class="hidden mt-4 border-t pt-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-truck mr-1 text-yellow-600"></i>Where is this item dispatched to?
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="{{ form.dispatch_project.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.dispatch_project.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.dispatch_project }}
+                        {% if form.dispatch_project.errors %}<p class="text-sm text-red-600 mt-1">{{ form.dispatch_project.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="{{ form.dispatch_site_location.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.dispatch_site_location.label }}
+                        </label>
+                        {{ form.dispatch_site_location }}
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="{{ form.dispatch_responsible_person.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.dispatch_responsible_person.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.dispatch_responsible_person }}
+                        {% if form.dispatch_responsible_person.help_text %}<p class="text-xs text-gray-500 mt-1">{{ form.dispatch_responsible_person.help_text }}</p>{% endif %}
+                        {% if form.dispatch_responsible_person.errors %}<p class="text-sm text-red-600 mt-1">{{ form.dispatch_responsible_person.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="{{ form.dispatch_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.dispatch_date.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.dispatch_date }}
+                        {% if form.dispatch_date.errors %}<p class="text-sm text-red-600 mt-1">{{ form.dispatch_date.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div id="dispatch-return-date-field">
+                        <label for="{{ form.dispatch_return_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.dispatch_return_date.label }}
+                        </label>
+                        {{ form.dispatch_return_date }}
+                        <p class="text-xs text-gray-500 mt-1">{{ form.dispatch_return_date.help_text }}</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="{{ form.dispatch_notes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                            {{ form.dispatch_notes.label }}
+                        </label>
+                        {{ form.dispatch_notes }}
+                    </div>
+                </div>
+            </div>
+
+            <div id="maintenance-fields" class="hidden mt-4 border-t pt-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-wrench mr-1 text-orange-600"></i>Why is this item under maintenance?
+                </h3>
+                <label for="{{ form.maintenance_notes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ form.maintenance_notes.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.maintenance_notes }}
+                {% if form.maintenance_notes.errors %}<p class="text-sm text-red-600 mt-1">{{ form.maintenance_notes.errors.0 }}</p>{% endif %}
+            </div>
+            {% endif %}
+
+            <datalist id="existing-item-names">
+                {% for existing_name in existing_item_names %}
+                <option value="{{ existing_name }}"></option>
+                {% endfor %}
+            </datalist>
 
             <div class="mt-6 flex justify-end space-x-4">
                 <a href="{{ next }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md">
@@ -52,13 +157,13 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Tools and materials are always tracked as a single stock line; keep quantity/min_quantity fixed.
+    // Only materials are tracked as a stock quantity; every other item type is a single unit.
     const itemTypeField = document.getElementById('id_item_type');
     const quantityField = document.getElementById('id_quantity');
     const minQuantityField = document.getElementById('id_min_quantity');
 
     function setupQuantityFields() {
-        if (quantityField && itemTypeField && itemTypeField.value === 'TOOL') {
+        if (quantityField && itemTypeField && itemTypeField.value !== 'MATERIAL') {
             quantityField.value = 1;
             quantityField.readOnly = true;
             quantityField.classList.add('bg-gray-100');
@@ -71,6 +176,35 @@ document.addEventListener('DOMContentLoaded', function() {
     if (itemTypeField) {
         setupQuantityFields();
         itemTypeField.addEventListener('change', setupQuantityFields);
+    }
+
+    // Show the matching "extra info" section for whatever initial status is picked -
+    // same information the Assign/Dispatch pages would ask for on an existing item.
+    const statusField = document.getElementById('id_status');
+    const assignedFields = document.getElementById('assigned-fields');
+    const dispatchFields = document.getElementById('dispatch-fields');
+    const maintenanceFields = document.getElementById('maintenance-fields');
+    const dispatchReturnDateField = document.getElementById('dispatch-return-date-field');
+
+    function setupStatusFields() {
+        if (!statusField) return;
+        const status = statusField.value;
+
+        if (assignedFields) assignedFields.classList.toggle('hidden', status !== 'ASSIGNED');
+        if (dispatchFields) dispatchFields.classList.toggle('hidden', status !== 'DISPATCHED' && status !== 'CONSUMED');
+        if (maintenanceFields) maintenanceFields.classList.toggle('hidden', status !== 'MAINTENANCE');
+
+        // Materials are consumed (won't return), so an expected return date only makes sense
+        // for single-unit items (tools, IT assets, etc.) being dispatched.
+        if (dispatchReturnDateField && itemTypeField) {
+            dispatchReturnDateField.classList.toggle('hidden', itemTypeField.value === 'MATERIAL' || status === 'CONSUMED');
+        }
+    }
+
+    if (statusField) {
+        setupStatusFields();
+        statusField.addEventListener('change', setupStatusFields);
+        if (itemTypeField) itemTypeField.addEventListener('change', setupStatusFields);
     }
 
     // Show selected file name

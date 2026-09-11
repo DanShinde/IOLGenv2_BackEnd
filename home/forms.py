@@ -2,7 +2,10 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db import models
 
-from .models import Article, ArticleComment, Question, Answer, Report, ReportComment, Tag
+from .models import (
+    Article, ArticleComment, Question, Answer, Report, ReportComment, Tag,
+    IssueLearning, IssueLearningComment,
+)
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -299,6 +302,89 @@ class ReportCommentForm(forms.ModelForm):
         widgets = {
             'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 4, 'placeholder': 'Add a comment'}),
         }
+
+
+class IssueLearningForm(forms.ModelForm):
+    tags = TagsField()
+    attachments = MultipleFileField(
+        required=False,
+        label="Attachments",
+        help_text="Upload supporting files (photos, DBRs, documents)"
+    )
+    issue_description_format = RichTextFormatField()
+    final_corrective_action_format = RichTextFormatField()
+
+    class Meta:
+        model = IssueLearning
+        fields = [
+            'project', 'problem_statement', 'issue_description',
+            'closure_accountability', 'closure_accountability_department',
+            'location_area', 'issue_reported_on', 'target_closure_date',
+            'priority', 'status', 'closed_on', 'final_corrective_action',
+            'root_cause', 'preventive_action', 'capa_owner', 'capa_target_date',
+            'capa_status', 'capa_verified_on', 'capa_verification_notes',
+        ]
+        widgets = {
+            'project': forms.Select(attrs={'class': 'kb-select'}),
+            'problem_statement': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'Short problem statement'}),
+            'issue_description': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 6, 'placeholder': 'Describe the issue in detail'}),
+            'closure_accountability': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'e.g. Mayur Mahajan & Kunal Kuwar'}),
+            'closure_accountability_department': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'e.g. IT & Automation'}),
+            'location_area': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'e.g. HDPS, VRC, GTP'}),
+            'issue_reported_on': forms.DateInput(attrs={'type': 'date', 'class': 'kb-input'}),
+            'target_closure_date': forms.DateInput(attrs={'type': 'date', 'class': 'kb-input'}),
+            'priority': forms.Select(attrs={'class': 'kb-select'}),
+            'status': forms.Select(attrs={'class': 'kb-select'}),
+            'closed_on': forms.DateInput(attrs={'type': 'date', 'class': 'kb-input'}),
+            'final_corrective_action': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 4, 'placeholder': 'Corrective action taken to close the issue'}),
+            'root_cause': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 3, 'placeholder': 'Why did this happen?'}),
+            'preventive_action': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 3, 'placeholder': 'What prevents this from recurring?'}),
+            'capa_owner': forms.TextInput(attrs={'class': 'kb-input', 'placeholder': 'e.g. Mayur Mahajan'}),
+            'capa_target_date': forms.DateInput(attrs={'type': 'date', 'class': 'kb-input'}),
+            'capa_status': forms.Select(attrs={'class': 'kb-select'}),
+            'capa_verified_on': forms.DateInput(attrs={'type': 'date', 'class': 'kb-input'}),
+            'capa_verification_notes': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 3, 'placeholder': 'Evidence the action actually worked'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from planner.models import Project as PlannerProject
+        self.fields['project'].queryset = PlannerProject.objects.order_by('project_id')
+        if 'priority' in self.fields:
+            self.fields['priority'].initial = IssueLearning.PRIORITY_P2
+        if 'status' in self.fields:
+            self.fields['status'].initial = IssueLearning.STATUS_OPEN
+        if 'capa_status' in self.fields:
+            self.fields['capa_status'].initial = IssueLearning.CAPA_STATUS_OPEN
+        if self.instance and self.instance.pk:
+            self.fields['tags'].initial = self.instance.tags.all()
+            self.fields['issue_description_format'].initial = 'html' if self.instance.issue_description_is_html else 'plain'
+            self.fields['final_corrective_action_format'].initial = 'html' if self.instance.final_corrective_action_is_html else 'plain'
+
+
+class IssueLearningCommentForm(forms.ModelForm):
+    body_format = RichTextFormatField()
+
+    class Meta:
+        model = IssueLearningComment
+        fields = ['body']
+        widgets = {
+            'body': forms.Textarea(attrs={'class': 'kb-textarea', 'rows': 4, 'placeholder': 'Add a note'}),
+        }
+
+
+class IssueLearningExcelUploadForm(forms.Form):
+    file = forms.FileField(
+        label="Excel file (.xlsx)",
+        help_text="Upload a spreadsheet using the Issues & Learnings template.",
+        widget=forms.ClearableFileInput(attrs={'class': 'kb-input', 'accept': '.xlsx'})
+    )
+
+    def clean_file(self):
+        uploaded = self.cleaned_data['file']
+        if not uploaded.name.lower().endswith('.xlsx'):
+            raise forms.ValidationError('Please upload a .xlsx file.')
+        return uploaded
 
 
 class ArticleCommentForm(forms.ModelForm):

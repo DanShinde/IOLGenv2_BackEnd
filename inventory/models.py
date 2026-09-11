@@ -47,20 +47,28 @@ class Item(models.Model):
     """
     ITEM_TYPES = [
         ('TOOL', 'Tool'),
+        ('IT_ASSET', 'IT Asset'),
         ('MATERIAL', 'Material'),
+        ('SOFTWARE_LICENSE', 'Software/Licence'),
+        ('OTHER', 'Other'),
     ]
+
+    # MATERIAL is the only stock-tracked type (quantity can be >1 and is drawn down
+    # by assignments/dispatches while stock remains). Every other type is single-unit,
+    # tracked the same way TOOL always has been.
+    STOCK_TRACKED_TYPES = ('MATERIAL',)
 
     STATUS_CHOICES = [
         ('AVAILABLE', 'Available'),
-        ('ASSIGNED', 'Assigned'),      # Only for TOOLS
-        ('DISPATCHED', 'Dispatched'),  # Only for TOOLS
-        ('CONSUMED', 'Consumed'),      # Only for MATERIALS - once dispatched, marked as consumed
-        ('MAINTENANCE', 'Under Maintenance'),  # Only for TOOLS - returned damaged/needing repair
+        ('ASSIGNED', 'Assigned'),      # Only for single-unit items (TOOL, IT_ASSET, SOFTWARE_LICENSE, OTHER)
+        ('DISPATCHED', 'Dispatched'),  # Only for single-unit items
+        ('CONSUMED', 'Consumed'),      # Only for MATERIALS - once fully dispatched (non-returnable), marked as consumed
+        ('MAINTENANCE', 'Under Maintenance'),  # Only for single-unit items - returned damaged/needing repair
         ('RETIRED', 'Retired'),
     ]
 
     # Basic Information
-    item_type = models.CharField(max_length=10, choices=ITEM_TYPES)
+    item_type = models.CharField(max_length=20, choices=ITEM_TYPES)
     name = models.CharField(max_length=100, db_index=True)
     model = models.CharField(max_length=50, blank=True)
     serial_number = models.CharField(max_length=50, unique=True, db_index=True)
@@ -106,6 +114,11 @@ class Item(models.Model):
         return reverse('inventory-item-detail', kwargs={'pk': self.pk})
 
     @property
+    def is_stock_tracked(self):
+        """True for items tracked as a stock quantity (materials) rather than a single unit"""
+        return self.item_type in self.STOCK_TRACKED_TYPES
+
+    @property
     def needs_reorder(self):
         """Check if material stock is below minimum threshold"""
         if self.item_type == 'MATERIAL':
@@ -141,11 +154,14 @@ class Item(models.Model):
 
 class Assignment(models.Model):
     """
-    Track tool assignments to users
-    Tools can be assigned to users and returned
+    Track item assignments to users - always returnable.
+    Single-unit items (tools, IT assets, software licences, other) are assigned whole,
+    the same way tools always worked. Materials are assigned by quantity, drawn down
+    from stock, and restored to stock on a good-condition return.
     """
-    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='assignments',
-                             limit_choices_to={'item_type': 'TOOL'})
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='assignments')
+    quantity = models.PositiveIntegerField(default=1,
+        help_text="For materials: number of units assigned. For single-unit items: always 1")
     assigned_to = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tool_assignments')
     assigned_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assigned_items')
     assignment_date = models.DateField()
@@ -161,7 +177,10 @@ class Assignment(models.Model):
         ordering = ['-assignment_date']
 
     def __str__(self):
-        return f"{self.item.name} assigned to {self.assigned_to.get_full_name() or self.assigned_to.username}"
+        who = self.assigned_to.get_full_name() or self.assigned_to.username
+        if self.quantity > 1:
+            return f"{self.quantity} x {self.item.name} assigned to {who}"
+        return f"{self.item.name} assigned to {who}"
 
     def is_active(self):
         """Check if this assignment is currently active"""

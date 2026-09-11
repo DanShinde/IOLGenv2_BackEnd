@@ -63,7 +63,7 @@ def _build_summary_sheet(ws, data):
         ws.cell(row=row, column=1, value=label)
         cell = ws.cell(row=row, column=2, value=value)
         if label == 'Total Inventory Value':
-            cell.number_format = '"$"#,##0.00'
+            cell.number_format = '"₹"#,##0.00'
         row += 1
 
     row += 1
@@ -120,7 +120,10 @@ def _build_items_sheet(ws, items):
             float(item.purchase_cost) if item.purchase_cost is not None else None,
             current_value, item.remarks,
         ])
-    _write_table(ws, 1, headers, rows)
+    next_row = _write_table(ws, 1, headers, rows)
+    for row in range(2, next_row):
+        ws.cell(row=row, column=12).number_format = '"₹"#,##0.00'
+        ws.cell(row=row, column=13).number_format = '"₹"#,##0.00'
     _autosize(ws, [24, 10, 18, 14, 14, 14, 10, 12, 18, 14, 14, 14, 14, 34])
 
 

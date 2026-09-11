@@ -31,14 +31,27 @@
              <ul class="nav nav-pills">
                 {% for label, value in filter_options %}
                 <li class="nav-item">
-                    <a href="?filter={{ value }}" class="nav-link {% if filter_type == value %}active{% endif %}">{{ label }}</a>
+                    <a href="?filter={{ value }}{% if selected_team_lead %}&team_lead={{ selected_team_lead }}{% endif %}{% if selected_segment %}&segment={{ selected_segment }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}" class="nav-link {% if filter_type == value %}active{% endif %}">{{ label }}</a>
                 </li>
                 {% endfor %}
             </ul>
 
             <div class="d-flex align-items-center gap-2">
                 <form method="get" class="d-flex gap-2">
+                    <input type="hidden" name="filter" value="{{ filter_type }}">
                     <input type="text" name="q" class="form-control form-control-sm" placeholder="Search Project/Customer..." value="{{ request.GET.q }}">
+                    <select name="team_lead" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">All Team Leads</option>
+                        {% for lead in all_team_leads %}
+                        <option value="{{ lead.id }}" {% if selected_team_lead == lead.id|stringformat:"s" %}selected{% endif %}>{{ lead.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="segment" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">All Segments</option>
+                        {% for segment in all_segments %}
+                        <option value="{{ segment.id }}" {% if selected_segment == segment.id|stringformat:"s" %}selected{% endif %}>{{ segment.name }}</option>
+                        {% endfor %}
+                    </select>
                     <button type="submit" class="btn btn-sm btn-secondary">Search</button>
                 </form>
                 <div class="dropdown">

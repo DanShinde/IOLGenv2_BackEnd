@@ -1,10 +1,13 @@
 from datetime import date
+from types import SimpleNamespace
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
 from .models import Assignment, Dispatch, History, Item
+from . import services
+from .views import _apply_initial_status
 
 
 class ReturnWorkflowTests(TestCase):
@@ -126,3 +129,195 @@ class BulkUpdatePermissionTests(TestCase):
         data = response.json()
         self.assertFalse(data['success'])
         self.assertTrue(Item.objects.filter(pk=self.item.pk).exists())
+
+
+class MaterialAssignmentTests(TestCase):
+    """Materials are assignable to a user on a returnable basis, drawn down/restored by quantity."""
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user('staff3', password='pw', is_staff=True)
+        self.worker = User.objects.create_user('worker3', password='pw')
+        self.material = Item.objects.create(
+            item_type='MATERIAL', name='Cable Reel', serial_number='SN-10', quantity=20
+        )
+
+    def _assign(self, quantity=5):
+        assignment = Assignment.objects.create(
+            item=self.material, quantity=quantity, assigned_to=self.worker, assigned_by=self.staff_user,
+            assignment_date=date.today()
+        )
+        self.material.quantity -= quantity
+        self.material.save()
+        return assignment
+
+    def test_assigning_material_draws_down_stock_without_flipping_item_status(self):
+        self._assign(5)
+        self.material.refresh_from_db()
+        self.assertEqual(self.material.quantity, 15)
+        self.assertEqual(self.material.status, 'AVAILABLE')
+
+    def test_good_condition_return_restores_material_stock(self):
+        assignment = self._assign(5)
+        services.process_return(
+            assignment, condition='GOOD', return_notes='', performed_by=self.staff_user,
+            details_prefix='Returned by worker3'
+        )
+        self.material.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertEqual(self.material.quantity, 20)
+        self.assertEqual(self.material.status, 'AVAILABLE')
+        self.assertIsNotNone(assignment.return_date)
+
+    def test_damaged_condition_return_does_not_restock_material(self):
+        assignment = self._assign(5)
+        services.process_return(
+            assignment, condition='DAMAGED', return_notes='Wet and unusable', performed_by=self.staff_user,
+            details_prefix='Returned by worker3'
+        )
+        self.material.refresh_from_db()
+        self.assertEqual(self.material.quantity, 15)
+
+
+class AssignFormMaterialQuerysetTests(TestCase):
+    def test_material_with_stock_is_selectable_zero_stock_is_not(self):
+        from .forms import AssignForm
+
+        in_stock = Item.objects.create(
+            item_type='MATERIAL', name='Pipe', serial_number='SN-20', quantity=3, status='AVAILABLE'
+        )
+        out_of_stock = Item.objects.create(
+            item_type='MATERIAL', name='Wire', serial_number='SN-21', quantity=0, status='AVAILABLE'
+        )
+        queryset = AssignForm().fields['item'].queryset
+        self.assertIn(in_stock, queryset)
+        self.assertNotIn(out_of_stock, queryset)
+
+
+class ItemTypeChoicesTests(TestCase):
+    def test_new_categories_are_available(self):
+        codes = dict(Item.ITEM_TYPES)
+        for expected in ('TOOL', 'IT_ASSET', 'MATERIAL', 'SOFTWARE_LICENSE', 'OTHER'):
+            self.assertIn(expected, codes)
+
+
+class InitialStatusOnCreateTests(TestCase):
+    """New items can be entered directly as Assigned/Dispatched/Consumed/Under Maintenance."""
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user('staff4', password='pw', is_staff=True)
+        self.worker = User.objects.create_user('worker4', password='pw')
+
+    def _fake_form(self, cleaned_data):
+        return SimpleNamespace(cleaned_data=cleaned_data)
+
+    def test_assigned_tool_creates_assignment_and_sets_location(self):
+        tool = Item.objects.create(item_type='TOOL', name='Grinder', serial_number='SN-30', status='ASSIGNED')
+        form = self._fake_form({
+            'assigned_to': self.worker,
+            'assignment_date': date.today(),
+            'assignment_return_date': None,
+            'assignment_notes': '',
+        })
+        _apply_initial_status(tool, form, SimpleNamespace(user=self.staff_user))
+
+        tool.refresh_from_db()
+        assignment = Assignment.objects.get(item=tool)
+        self.assertEqual(assignment.assigned_to, self.worker)
+        self.assertEqual(assignment.quantity, 1)
+        self.assertEqual(tool.status, 'ASSIGNED')
+        self.assertIn('worker4', tool.location)
+
+    def test_assigned_material_draws_down_stock_and_stays_available(self):
+        material = Item.objects.create(item_type='MATERIAL', name='Rope', serial_number='SN-31',
+                                        quantity=30, status='ASSIGNED')
+        form = self._fake_form({
+            'assigned_to': self.worker,
+            'assignment_date': date.today(),
+            'assignment_return_date': None,
+            'assignment_notes': '',
+        })
+        _apply_initial_status(material, form, SimpleNamespace(user=self.staff_user))
+
+        material.refresh_from_db()
+        assignment = Assignment.objects.get(item=material)
+        self.assertEqual(assignment.quantity, 30)
+        self.assertEqual(material.quantity, 0)
+        self.assertEqual(material.status, 'AVAILABLE')
+
+    def test_dispatched_tool_creates_dispatch_record(self):
+        tool = Item.objects.create(item_type='TOOL', name='Ladder', serial_number='SN-32', status='DISPATCHED')
+        form = self._fake_form({
+            'dispatch_project': 'Site B',
+            'dispatch_site_location': 'Bay 3',
+            'dispatch_responsible_person': self.worker,
+            'dispatch_date': date.today(),
+            'dispatch_return_date': None,
+            'dispatch_notes': '',
+        })
+        _apply_initial_status(tool, form, SimpleNamespace(user=self.staff_user))
+
+        tool.refresh_from_db()
+        dispatch = Dispatch.objects.get(item=tool)
+        self.assertEqual(dispatch.project, 'Site B')
+        self.assertEqual(tool.status, 'DISPATCHED')
+
+    def test_consumed_material_creates_dispatch_and_zeroes_stock(self):
+        material = Item.objects.create(item_type='MATERIAL', name='Sand', serial_number='SN-33',
+                                        quantity=12, status='CONSUMED')
+        form = self._fake_form({
+            'dispatch_project': 'Site C',
+            'dispatch_site_location': '',
+            'dispatch_responsible_person': self.worker,
+            'dispatch_date': date.today(),
+            'dispatch_return_date': None,
+            'dispatch_notes': '',
+        })
+        _apply_initial_status(material, form, SimpleNamespace(user=self.staff_user))
+
+        material.refresh_from_db()
+        dispatch = Dispatch.objects.get(item=material)
+        self.assertEqual(dispatch.quantity, 12)
+        self.assertEqual(material.quantity, 0)
+        self.assertEqual(material.status, 'CONSUMED')
+
+    def test_maintenance_returns_history_detail(self):
+        tool = Item.objects.create(item_type='TOOL', name='Saw', serial_number='SN-34', status='MAINTENANCE')
+        form = self._fake_form({'maintenance_notes': 'Blade is bent'})
+        detail = _apply_initial_status(tool, form, SimpleNamespace(user=self.staff_user))
+        self.assertIn('Blade is bent', detail)
+
+    def test_available_status_needs_no_extra_fields(self):
+        tool = Item.objects.create(item_type='TOOL', name='Wrench', serial_number='SN-35', status='AVAILABLE')
+        detail = _apply_initial_status(tool, self._fake_form({}), SimpleNamespace(user=self.staff_user))
+        self.assertIsNone(detail)
+        self.assertFalse(Assignment.objects.filter(item=tool).exists())
+        self.assertFalse(Dispatch.objects.filter(item=tool).exists())
+
+
+class ItemFormStatusValidationTests(TestCase):
+    """ItemForm requires the right extra fields once a non-Available initial status is picked."""
+
+    def _base_data(self, **overrides):
+        data = {
+            'item_type': 'TOOL', 'name': 'Impact Driver', 'serial_number': 'SN-40',
+            'quantity': 1, 'min_quantity': 0, 'status': 'AVAILABLE',
+        }
+        data.update(overrides)
+        return data
+
+    def test_assigned_without_assignee_is_invalid(self):
+        from .forms import ItemForm
+        form = ItemForm(data=self._base_data(status='ASSIGNED'))
+        self.assertFalse(form.is_valid())
+        self.assertIn('assigned_to', form.errors)
+
+    def test_maintenance_without_reason_is_invalid(self):
+        from .forms import ItemForm
+        form = ItemForm(data=self._base_data(status='MAINTENANCE'))
+        self.assertFalse(form.is_valid())
+        self.assertIn('maintenance_notes', form.errors)
+
+    def test_available_status_does_not_require_extra_fields(self):
+        from .forms import ItemForm
+        form = ItemForm(data=self._base_data(status='AVAILABLE'))
+        self.assertTrue(form.is_valid(), form.errors)
