@@ -161,10 +161,9 @@ class ModuleTypeSegmentsView(LoginRequiredMixin, StaffRequiredMixin, TemplateVie
 
 class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
     """The Module Configuration grid for one (Module Type, Segment) combination: every
-    Activity as a row with an editable time value and a unit (seconds/minutes/hours/
-    days). Each row also accepts an alternate batch entry ('N modules take X total'),
-    mutually exclusive with the single-module field -- whichever is filled in is used;
-    the other must be left blank. Saved in one bulk POST."""
+    Activity as a row with an editable time entry ('N modules take X total', where a
+    single-module time is just N=1) and a unit (seconds/minutes/hours/days). Saved in
+    one bulk POST."""
 
     template_name = 'estimator/module_type_matrix.html'
 
@@ -179,20 +178,30 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
         module_type = self.get_module_type()
         segment = self.get_segment()
         existing = {t.activity_id: t for t in ModuleActivityTime.objects.filter(module_type=module_type, segment=segment)}
+
+        def batch_fields(t):
+            # Legacy rows saved via the old single-module field only have `value` set;
+            # show them as an equivalent 1-module batch so they still populate the form.
+            if t.batch_count and t.batch_value is not None:
+                return t.batch_count, t.batch_value
+            if t.value is not None:
+                return 1, t.value
+            return '', ''
+
         context['module_type'] = module_type
         context['segment'] = segment
         context['time_units'] = TimeUnit.choices
-        context['rows'] = [
-            {
+        context['rows'] = []
+        for a in Activity.objects.order_by('category', 'display_order', 'name'):
+            t = existing.get(a.id)
+            batch_count, batch_value = batch_fields(t) if t else ('', '')
+            context['rows'].append({
                 'activity': a,
-                'unit': existing[a.id].unit if a.id in existing else TimeUnit.MINUTES,
-                'value': existing[a.id].value if a.id in existing else '',
-                'batch_count': existing[a.id].batch_count if a.id in existing else '',
-                'batch_value': existing[a.id].batch_value if a.id in existing else '',
-                'remark': existing[a.id].remark if a.id in existing else '',
-            }
-            for a in Activity.objects.order_by('category', 'display_order', 'name')
-        ]
+                'unit': t.unit if t else TimeUnit.MINUTES,
+                'batch_count': batch_count,
+                'batch_value': batch_value,
+                'remark': t.remark if t else '',
+            })
         return context
 
     def post(self, request, *args, **kwargs):
@@ -204,16 +213,11 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
             unit = request.POST.get(f'unit_{activity.id}', TimeUnit.MINUTES).strip()
             if unit not in valid_units:
                 unit = TimeUnit.MINUTES
-            single_raw = request.POST.get(f'value_{activity.id}', '').strip()
             batch_count_raw = request.POST.get(f'batch_count_{activity.id}', '').strip()
             batch_value_raw = request.POST.get(f'batch_value_{activity.id}', '').strip()
             remark = request.POST.get(f'remark_{activity.id}', '').strip()
-            batch_raw = batch_count_raw or batch_value_raw
 
-            if single_raw and batch_raw:
-                messages.error(request, f"'{activity.name}': fill in either a single-module time OR a batch time, not both -- row skipped.")
-                continue
-            if not single_raw and not batch_raw:
+            if not batch_count_raw and not batch_value_raw:
                 # No time entered -- still worth saving if there's a remark to keep
                 # (e.g. a reference note on a cell that isn't configured yet).
                 if remark:
@@ -223,36 +227,22 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
                     )
                 continue
 
-            if single_raw:
-                try:
-                    value = float(single_raw)
-                except ValueError:
-                    messages.error(request, f"Ignored invalid value for '{activity.name}'.")
-                    continue
-                if value < 0:
-                    messages.error(request, f"Ignored negative value for '{activity.name}'.")
-                    continue
-                ModuleActivityTime.objects.update_or_create(
-                    module_type=module_type, segment=segment, activity=activity,
-                    defaults={'unit': unit, 'value': value, 'batch_count': None, 'batch_value': None, 'remark': remark},
-                )
-            else:
-                if not batch_count_raw or not batch_value_raw:
-                    messages.error(request, f"'{activity.name}': batch entry needs both a module count and a total time -- row skipped.")
-                    continue
-                try:
-                    batch_count = int(batch_count_raw)
-                    batch_value = float(batch_value_raw)
-                except ValueError:
-                    messages.error(request, f"Ignored invalid batch value for '{activity.name}'.")
-                    continue
-                if batch_count < 1 or batch_value < 0:
-                    messages.error(request, f"Ignored invalid batch value for '{activity.name}'.")
-                    continue
-                ModuleActivityTime.objects.update_or_create(
-                    module_type=module_type, segment=segment, activity=activity,
-                    defaults={'unit': unit, 'value': None, 'batch_count': batch_count, 'batch_value': batch_value, 'remark': remark},
-                )
+            if not batch_count_raw or not batch_value_raw:
+                messages.error(request, f"'{activity.name}': needs both a module count and a total time -- row skipped.")
+                continue
+            try:
+                batch_count = int(batch_count_raw)
+                batch_value = float(batch_value_raw)
+            except ValueError:
+                messages.error(request, f"Ignored invalid value for '{activity.name}'.")
+                continue
+            if batch_count < 1 or batch_value < 0:
+                messages.error(request, f"Ignored invalid value for '{activity.name}'.")
+                continue
+            ModuleActivityTime.objects.update_or_create(
+                module_type=module_type, segment=segment, activity=activity,
+                defaults={'unit': unit, 'value': None, 'batch_count': batch_count, 'batch_value': batch_value, 'remark': remark},
+            )
 
         messages.success(request, f'Time matrix for "{module_type.name}" / "{segment.name}" saved.')
         return redirect('estimator_module_type_matrix', module_type_pk=module_type.pk, segment_pk=segment.pk)
