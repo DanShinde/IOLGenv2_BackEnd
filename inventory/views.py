@@ -396,6 +396,7 @@ def item_update(request, pk):
         'item': item,
         'next': next_url,
         'existing_item_names': Item.objects.exclude(pk=item.pk).order_by('name').values_list('name', flat=True).distinct(),
+        'status_extra_field_names': STATUS_EXTRA_FIELD_NAMES,
     }
     return render(request, 'inventory/item_form.html', context)
 

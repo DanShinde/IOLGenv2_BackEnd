@@ -51,6 +51,22 @@ class ItemForm(forms.ModelForm):
         self.is_new_item = self.instance.pk is None
         if self.is_new_item:
             self._add_initial_status_fields()
+        else:
+            self._restrict_status_choices_for_edit()
+
+    def _restrict_status_choices_for_edit(self):
+        # Assigned/Dispatched/Consumed/Maintenance all require extra data (who, where, why)
+        # and create Assignment/Dispatch/History records - that only happens correctly through
+        # the dedicated Assign/Dispatch/Maintenance/Return pages, not a direct status edit here.
+        direct_edit_statuses = {'AVAILABLE', 'RETIRED', self.instance.status}
+        status_field = self.fields['status']
+        status_field.choices = [
+            choice for choice in Item.STATUS_CHOICES if choice[0] in direct_edit_statuses
+        ]
+        status_field.help_text = (
+            'To assign, dispatch, or put this item under maintenance, use the Transfers '
+            'pages instead.'
+        )
 
     def _add_initial_status_fields(self):
         text_class = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
