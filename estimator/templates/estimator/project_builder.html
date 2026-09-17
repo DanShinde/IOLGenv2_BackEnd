@@ -39,8 +39,9 @@
 
     {% if has_pending_import %}
     <div class="warning-banner mb-3">
-        <i class="bi bi-exclamation-triangle me-1"></i>An uploaded module list is still awaiting review.
-        <a href="{% url 'estimator_project_import_review' project.pk %}">Finish reviewing it</a>.
+        <i class="bi bi-exclamation-triangle me-1"></i>Some imported rows are missing a Module Type, Segment,
+        and/or Count, so they're not included in this estimate yet.
+        <a href="{% url 'estimator_project_import_review' project.pk %}">Fix them on Review &amp; Correct</a>.
     </div>
     {% endif %}
 

@@ -24,8 +24,9 @@
 
     {% if has_pending_import %}
     <div class="warning-banner mb-3">
-        <i class="bi bi-exclamation-triangle me-1"></i>An uploaded module list is still awaiting review.
-        <a href="{% url 'estimator_project_import_review' project.pk %}">Finish reviewing it</a>.
+        <i class="bi bi-exclamation-triangle me-1"></i>Some imported rows are missing a Module Type, Segment,
+        and/or Count, so they're not included in the Module Summary yet.
+        <a href="{% url 'estimator_project_import_review' project.pk %}">Fix them on Review &amp; Correct</a>.
     </div>
     {% endif %}
 
@@ -33,147 +34,17 @@
         One row per distinct Zone / Segment / Module Type combination, with its total count -- imported rows sharing
         the same three are consolidated here rather than listed one per line of the original sheet. Edit anything
         below and save; the calculated effort updates automatically on the
-        <a href="{% url 'estimator_project_builder' project.pk %}">Calculated Estimate</a> step.
+        <a href="{% url 'estimator_project_builder' project.pk %}">Calculated Estimate</a> step. Rows built from an
+        import are rebuilt from scratch every time <a href="{% url 'estimator_project_import_review' project.pk %}">Review
+        &amp; Correct</a>'s "Confirm &amp; Next" is re-run -- for line-level corrections that should survive
+        that, edit the underlying row there instead. A row added directly here, with no import behind it, is never
+        touched by that process.
     </p>
 
-    <datalist id="moduleRowsZoneSuggestions"></datalist>
-
-    <form method="POST" action="{% url 'estimator_project_modules_sync' project.pk %}" id="moduleRowsForm">
-        {% csrf_token %}
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-list-check me-2"></i>Module Summary</span>
-                <button type="button" id="addModuleRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th style="width: 18%;">Zone</th>
-                                <th style="width: 20%;">Segment</th>
-                                <th style="width: 26%;">Module Type</th>
-                                <th style="width: 12%;">Count</th>
-                                <th style="width: 18%;">Complexity Override</th>
-                                <th style="width: 6%;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="moduleRowsBody">
-                            {% for pm in existing_modules %}
-                            <tr class="module-row">
-                                <td>
-                                    <input type="hidden" name="row_id[]" value="{{ pm.id }}">
-                                    <input type="text" name="zone[]" class="form-control zone-input" value="{{ pm.zone }}" list="moduleRowsZoneSuggestions" placeholder="Optional">
-                                </td>
-                                <td><select name="segment[]" class="form-select segment-select" required><option value="">-- select --</option></select></td>
-                                <td><select name="module_type[]" class="form-select module-type-select" required><option value="">-- select --</option></select></td>
-                                <td><input type="number" name="count[]" class="form-control count-input" min="1" value="{{ pm.count }}" required></td>
-                                <td><select name="complexity_override[]" class="form-select complexity-select"><option value="">Inherit ({{ project.complexity.name }})</option></select></td>
-                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% if not existing_modules %}
-                <div class="empty-state">
-                    <i class="bi bi-boxes"></i>
-                    <p>No module rows yet. Click "Add Module Row" to start, or <a href="{% url 'estimator_project_import_upload' project.pk %}">import a module list</a>.</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        <div class="mt-3">
-            <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>Save Modules</button>
-        </div>
-    </form>
+    {% include 'estimator/_module_rows_editor.html' with project=project existing_modules=existing_modules return_to='module_rows' %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    const SEGMENTS = {{ segments_json|safe }};
-    const MODULE_TYPES = {{ module_types_json|safe }};
-    const COMPLEXITY_LEVELS = {{ complexity_levels_json|safe }};
-    const EXISTING_MODULES = {{ existing_modules_json|safe }};
-    const EXISTING_ZONES = {{ existing_zones_json|safe }};
-    const PROJECT_COMPLEXITY_ID = {{ project_complexity_id }};
-
-    // Zone names come from user-uploaded files or free-typed input (not staff-managed
-    // master data like Segments/Module Types), so they're escaped before ever landing
-    // in innerHTML.
-    function escapeHtml(value) {
-        const div = document.createElement('div');
-        div.textContent = value;
-        return div.innerHTML;
-    }
-
-    document.getElementById('moduleRowsZoneSuggestions').innerHTML = EXISTING_ZONES.map(z => `<option value="${escapeHtml(z)}">`).join('');
-
-    const complexityById = {};
-    COMPLEXITY_LEVELS.forEach(c => complexityById[c.id] = c);
-
-    function segmentOptionsHtml(selectedId) {
-        let html = '<option value="">-- select --</option>';
-        SEGMENTS.forEach(s => {
-            const sel = (String(s.id) === String(selectedId)) ? 'selected' : '';
-            html += `<option value="${s.id}" ${sel}>${s.name}</option>`;
-        });
-        return html;
-    }
-
-    function moduleTypeOptionsHtml(selectedId) {
-        let html = '<option value="">-- select --</option>';
-        MODULE_TYPES.forEach(m => {
-            const sel = (String(m.id) === String(selectedId)) ? 'selected' : '';
-            html += `<option value="${m.id}" ${sel}>${m.name}</option>`;
-        });
-        return html;
-    }
-
-    function complexityOptionsHtml(selectedId) {
-        let html = `<option value="">Inherit (${complexityById[PROJECT_COMPLEXITY_ID] ? complexityById[PROJECT_COMPLEXITY_ID].name : ''})</option>`;
-        COMPLEXITY_LEVELS.forEach(c => {
-            const sel = (String(c.id) === String(selectedId)) ? 'selected' : '';
-            html += `<option value="${c.id}" ${sel}>${c.name} (x${c.multiplier})</option>`;
-        });
-        return html;
-    }
-
-    function hydrateExistingRows() {
-        const rows = document.querySelectorAll('#moduleRowsBody .module-row');
-        rows.forEach((tr, i) => {
-            const data = EXISTING_MODULES[i];
-            tr.querySelector('.segment-select').innerHTML = segmentOptionsHtml(data ? data.segment_id : '');
-            tr.querySelector('.module-type-select').innerHTML = moduleTypeOptionsHtml(data ? data.module_type_id : '');
-            tr.querySelector('.complexity-select').innerHTML = complexityOptionsHtml(data ? data.complexity_override_id : '');
-        });
-    }
-
-    function addModuleRow() {
-        const tbody = document.getElementById('moduleRowsBody');
-        const tr = document.createElement('tr');
-        tr.className = 'module-row';
-        tr.innerHTML = `
-            <td>
-                <input type="hidden" name="row_id[]" value="">
-                <input type="text" name="zone[]" class="form-control zone-input" value="" list="moduleRowsZoneSuggestions" placeholder="Optional">
-            </td>
-            <td><select name="segment[]" class="form-select segment-select" required>${segmentOptionsHtml('')}</select></td>
-            <td><select name="module_type[]" class="form-select module-type-select" required>${moduleTypeOptionsHtml('')}</select></td>
-            <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
-            <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
-            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
-        `;
-        tbody.appendChild(tr);
-    }
-
-    document.getElementById('addModuleRowBtn').addEventListener('click', addModuleRow);
-    document.getElementById('moduleRowsBody').addEventListener('click', (e) => {
-        const btn = e.target.closest('.remove-row-btn');
-        if (btn) btn.closest('tr').remove();
-    });
-
-    hydrateExistingRows();
-</script>
+{% include 'estimator/_module_rows_editor_js.html' %}
 {% endblock %}

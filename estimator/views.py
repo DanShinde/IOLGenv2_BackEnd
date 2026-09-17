@@ -4,13 +4,13 @@ from collections import defaultdict
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
-from .calculations import build_project_estimate
+from .calculations import UNASSIGNED_ZONE, build_project_estimate
 from .exports import render_project_report_excel, render_project_report_pdf
 from .forms import (
     ActivityForm, ComplexityLevelForm, ModuleTypeForm, ProjectForm, ProjectTemplateForm,
@@ -445,6 +445,18 @@ class ProjectDeleteView(LoginRequiredMixin, DeleteView):
         return redirect(self.success_url)
 
 
+def _has_unresolved_import_rows(project):
+    """True when the project has an imported row that's missing a Module Type,
+    Segment, and/or a valid Count -- i.e. one that "Confirm & Next" would skip
+    right now. ModuleImportRow rows are permanent (see project_import_review), so their
+    mere existence doesn't mean anything is outstanding -- only their *validity* does;
+    checking that instead is what keeps the "still needs review" banner from firing
+    forever once a project has ever had anything imported."""
+    return project.import_rows.filter(
+        Q(module_type__isnull=True) | Q(segment__isnull=True) | Q(count__lt=1)
+    ).exists()
+
+
 class ProjectDetailView(LoginRequiredMixin, DetailView):
     """Step 5 of the project wizard: the read-only Calculated Estimate screen (KPIs,
     warnings, per-zone activity-wise breakdown). Editing module rows happens on step 4
@@ -459,8 +471,53 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         project = self.object
         context['estimate'] = build_project_estimate(project)
-        context['has_pending_import'] = project.import_rows.exists()
+        context['has_pending_import'] = _has_unresolved_import_rows(project)
         return context
+
+
+def _module_rows_editor_context(project):
+    """Shared context for the editable module-rows table (Zone/Segment/Module
+    Type/Count/Complexity Override, grouped by zone) -- used both on step 4 (Module
+    Summary, always) and step 3 (Review & Correct, only when nothing is pending) via
+    the estimator/_module_rows_editor.html partial, so there's one implementation of
+    that table/JS, not two drifting copies."""
+    segments = list(Segment.objects.order_by('name'))
+    module_types = list(ModuleType.objects.order_by('name'))
+    complexity_levels = list(ComplexityLevel.objects.order_by('display_order', 'multiplier'))
+    existing_modules = list(
+        project.modules.select_related('segment', 'module_type', 'complexity_override').order_by('order', 'id')
+    )
+    # Grouped by zone for display (Unassigned last, others alphabetical -- same rule
+    # build_project_estimate() uses for zone_groups) via a stable sort, so each zone's
+    # rows keep their original relative order. The template's {% regroup %} needs the
+    # list pre-sorted by the grouping key, and the JSON below must be built from this
+    # exact order too -- JS hydration matches dropdown data to DOM rows purely by
+    # position.
+    existing_modules = sorted(
+        existing_modules, key=lambda pm: ((pm.zone or UNASSIGNED_ZONE) == UNASSIGNED_ZONE, (pm.zone or UNASSIGNED_ZONE).lower())
+    )
+
+    return {
+        'existing_modules': existing_modules,
+        'segments_json': safe_json([{'id': s.id, 'name': s.name} for s in segments]),
+        'module_types_json': safe_json([{'id': mt.id, 'name': mt.name} for mt in module_types]),
+        'complexity_levels_json': safe_json([
+            {'id': c.id, 'name': c.name, 'multiplier': float(c.multiplier)} for c in complexity_levels
+        ]),
+        'existing_modules_json': safe_json([
+            {
+                'id': pm.id,
+                'segment_id': pm.segment_id,
+                'module_type_id': pm.module_type_id,
+                'count': pm.count,
+                'zone': pm.zone,
+                'complexity_override_id': pm.complexity_override_id,
+            }
+            for pm in existing_modules
+        ]),
+        'existing_zones_json': safe_json(sorted({pm.zone for pm in existing_modules if pm.zone})),
+        'project_complexity_id': project.complexity_id,
+    }
 
 
 class ProjectModuleRowsView(LoginRequiredMixin, DetailView):
@@ -477,34 +534,8 @@ class ProjectModuleRowsView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         project = self.object
-
-        segments = list(Segment.objects.order_by('name'))
-        module_types = list(ModuleType.objects.order_by('name'))
-        complexity_levels = list(ComplexityLevel.objects.order_by('display_order', 'multiplier'))
-        existing_modules = list(
-            project.modules.select_related('segment', 'module_type', 'complexity_override').order_by('order', 'id')
-        )
-
-        context['existing_modules'] = existing_modules
-        context['segments_json'] = safe_json([{'id': s.id, 'name': s.name} for s in segments])
-        context['module_types_json'] = safe_json([{'id': mt.id, 'name': mt.name} for mt in module_types])
-        context['complexity_levels_json'] = safe_json([
-            {'id': c.id, 'name': c.name, 'multiplier': float(c.multiplier)} for c in complexity_levels
-        ])
-        context['existing_modules_json'] = safe_json([
-            {
-                'id': pm.id,
-                'segment_id': pm.segment_id,
-                'module_type_id': pm.module_type_id,
-                'count': pm.count,
-                'zone': pm.zone,
-                'complexity_override_id': pm.complexity_override_id,
-            }
-            for pm in existing_modules
-        ])
-        context['existing_zones_json'] = safe_json(sorted({pm.zone for pm in existing_modules if pm.zone}))
-        context['project_complexity_id'] = project.complexity_id
-        context['has_pending_import'] = project.import_rows.exists()
+        context.update(_module_rows_editor_context(project))
+        context['has_pending_import'] = _has_unresolved_import_rows(project)
         return context
 
 
@@ -575,24 +606,33 @@ def project_modules_sync(request, pk):
             messages.error(request, e)
     else:
         messages.success(request, 'Modules saved.')
+
+    # "Next: Calculated Estimate" saves through this same endpoint and moves on to
+    # step 5 -- but only when nothing needs the user's attention here first. Otherwise
+    # this returns to wherever the save was made from: step 4 (Module Summary) by
+    # default, or step 3 (Review & Correct) when that's the page the shared
+    # module-rows-editor partial was rendered on.
+    if request.POST.get('action') == 'next' and not errors:
+        return redirect('estimator_project_builder', pk=project.pk)
+    if request.POST.get('return_to') == 'review':
+        return redirect('estimator_project_import_review', pk=project.pk)
     return redirect('estimator_project_module_rows', pk=project.pk)
 
 
 # --------------------------------------------------------------------------- Module-list import wizard
 #
 # Step 2 (Upload) and step 3 (Review & Correct) of the project wizard, sitting between
-# ProjectCreateView (step 1: project details) and ProjectDetailView (step 4: the
-# auto-calculated, per-zone estimate). Staged rows (ModuleImportRow) never feed the
-# estimate themselves -- only the real ProjectModule rows created on confirm do.
-
-def _import_existing_rows_action_key(project_pk):
-    return f'estimator_import_existing_rows_action_{project_pk}'
-
+# ProjectCreateView (step 1: project details) and ProjectModuleRowsView (step 4: the
+# consolidated Module Summary). ModuleImportRow rows are permanent -- one per line of
+# the uploaded sheet, always visible and editable on step 3 for as long as the project
+# exists -- and never feed the estimate directly; only the from_import=True
+# ProjectModule rows built by consolidating them (project_import_review's "Confirm &
+# Calculate") do.
 
 def project_import_upload(request, pk):
     project = get_object_or_404(Project, pk=pk)
-    existing_module_row_count = project.modules.count()
-    context = {'project': project, 'existing_module_row_count': existing_module_row_count}
+    existing_import_row_count = project.import_rows.count()
+    context = {'project': project, 'existing_module_row_count': existing_import_row_count}
 
     if request.method == 'POST':
         uploaded_file = request.FILES.get('module_list')
@@ -600,14 +640,14 @@ def project_import_upload(request, pk):
             messages.error(request, 'Choose a file to upload.')
             return render(request, 'estimator/project_import_upload.html', context)
 
-        # Asked right here, on "Upload & Continue" -- not later at Confirm -- so the
-        # decision is made before the user spends time reviewing/correcting rows, and
-        # a re-upload can never silently duplicate an already-confirmed import.
+        # Asked right here, on "Upload & Continue" -- the decision (add to, or replace,
+        # the project's existing imported rows) applies immediately below, but only
+        # once the file has actually parsed successfully.
         existing_rows_action = request.POST.get('existing_rows_action', '').strip()
-        if existing_module_row_count and existing_rows_action not in ('add', 'replace'):
+        if existing_import_row_count and existing_rows_action not in ('add', 'replace'):
             messages.error(
                 request,
-                f"This project already has {existing_module_row_count} module row(s) -- choose whether to add "
+                f"This project already has {existing_import_row_count} imported row(s) -- choose whether to add "
                 f"to them or replace them.",
             )
             return render(request, 'estimator/project_import_upload.html', context)
@@ -622,21 +662,16 @@ def project_import_upload(request, pk):
             messages.error(request, 'No module rows found in this file.')
             return render(request, 'estimator/project_import_upload.html', context)
 
-        # The decision only takes effect later, at Confirm -- staging a new upload must
-        # never itself touch the project's existing module rows, in case the user
-        # abandons this import without ever confirming it.
-        if existing_module_row_count:
-            request.session[_import_existing_rows_action_key(project.pk)] = existing_rows_action
-
         module_types = list(ModuleType.objects.all())
         # Only ever auto-fills an exact name match or a mapping the user has
         # explicitly confirmed before (see ModuleNameAlias) -- never a fuzzy guess.
         aliases = {a.raw_name_normalized: a.module_type for a in ModuleNameAlias.objects.select_related('module_type')}
 
         with transaction.atomic():
-            # A fresh upload replaces whatever was staged from a previous, abandoned
-            # upload for this project -- only one import can be "in progress" at a time.
-            project.import_rows.all().delete()
+            if existing_import_row_count and existing_rows_action == 'replace':
+                project.import_rows.all().delete()
+            # Otherwise (first-ever import, or 'add'): existing rows are left alone and
+            # this batch is simply appended to them.
             ModuleImportRow.objects.bulk_create([
                 ModuleImportRow(
                     project=project,
@@ -694,7 +729,7 @@ def project_import_review(request, pk):
         ModuleImportRow.objects.bulk_update(to_update, ['module_type', 'segment', 'zone', 'count'])
 
         # Learned from whatever was just saved -- on *either* button, not only the
-        # final "Confirm & Calculate". A multi-thousand-row sheet is realistically
+        # final "Confirm & Next". A multi-thousand-row sheet is realistically
         # corrected across many "Save Corrections" clicks long before every row is
         # valid, and a selection the user has saved is already a real decision worth
         # remembering, not something that should wait on the whole import finishing.
@@ -708,45 +743,21 @@ def project_import_review(request, pk):
         _learn_module_name_aliases(fresh_rows, update_existing_aliases)
 
         if action == 'confirm':
-            invalid_rows = [r for r in fresh_rows if not r.is_valid]
-            if invalid_rows:
-                numbers = ', '.join(str(r.row_number) for r in invalid_rows)
-                messages.error(
+            # Only currently-valid rows (module type + segment set, count >= 1) are
+            # consolidated; anything else is skipped rather than blocking this
+            # entirely -- the rows themselves are permanent and can be corrected and
+            # re-confirmed at any time, so there's no need for an all-or-nothing gate.
+            valid_count, skipped_count, summary_row_count = _consolidate_and_save_confirmed_rows(project)
+
+            if skipped_count:
+                messages.warning(
                     request,
-                    f"Row(s) {numbers} still need a module type, segment, and/or count before this import can be "
-                    f"confirmed -- corrections have been saved.",
+                    f"{summary_row_count} module summary row(s) built from {valid_count} valid imported row(s) -- "
+                    f"{skipped_count} row(s) skipped (still need a module type, segment, and/or count). "
+                    f"Corrections have been saved; fix and re-confirm those rows whenever ready.",
                 )
-                return redirect('estimator_project_import_review', pk=project.pk)
-
-            # A project that already has module rows (from an earlier import, or typed
-            # in by hand) needs an explicit answer on what happens to them -- silently
-            # adding on top of an already-confirmed import is exactly what duplicated
-            # rows when this wasn't asked. Normally already decided on the Upload page
-            # (see project_import_upload); this only falls back to the POST field for
-            # the rare case where existing rows appeared after that (e.g. added by hand
-            # while this import sat pending) and so were never asked about.
-            has_existing_rows = project.modules.exists()
-            session_key = _import_existing_rows_action_key(project.pk)
-            existing_rows_action = request.session.get(session_key) or request.POST.get('existing_rows_action', '').strip()
-            if has_existing_rows and existing_rows_action not in ('add', 'replace'):
-                messages.error(
-                    request,
-                    f"This project already has {project.modules.count()} module row(s) -- choose whether to add "
-                    f"to them or replace them before confirming.",
-                )
-                return redirect('estimator_project_import_review', pk=project.pk)
-
-            with transaction.atomic():
-                affected = _consolidate_and_save_confirmed_rows(
-                    project, fresh_rows, replace_existing=has_existing_rows and existing_rows_action == 'replace',
-                )
-                project.import_rows.all().delete()
-            request.session.pop(session_key, None)
-
-            if has_existing_rows and existing_rows_action == 'replace':
-                messages.success(request, f"Replaced the project's module rows with {affected} summary row(s) from this import.")
             else:
-                messages.success(request, f'{affected} module summary row(s) added/updated from {len(fresh_rows)} imported row(s).')
+                messages.success(request, f'{summary_row_count} module summary row(s) built from {valid_count} imported row(s).')
             return redirect('estimator_project_module_rows', pk=project.pk)
 
         messages.success(request, 'Corrections saved.')
@@ -772,59 +783,44 @@ def project_import_review(request, pk):
             a.raw_name_normalized: {'module_type_id': a.module_type_id, 'module_type_name': a.module_type.name}
             for a in existing_aliases
         }),
-        # Only relevant once there's nothing pending, so "nothing staged" doesn't read
-        # as data loss -- a confirmed import's rows aren't here anymore because they've
-        # already become real ProjectModule rows (consolidated into Module Summary,
-        # step 4), not because they vanished.
-        'confirmed_module_row_count': project.modules.count(),
-        # Normally already decided on the Upload page; only None when this project had
-        # no rows at the time of upload (nothing to ask about then) -- the fallback
-        # radio below only shows in that case.
-        'existing_rows_action_decided': request.session.get(_import_existing_rows_action_key(project.pk)),
     }
     return render(request, 'estimator/project_import_review.html', context)
 
 
-def _consolidate_and_save_confirmed_rows(project, fresh_rows, replace_existing):
-    """Merges just-confirmed import rows into the project's module rows, consolidated
-    by (Segment, Module Type, Zone) with counts summed -- Module Summary (step 4) shows
-    one row per distinct combination, not one row per line of the original sheet,
-    which for a real BOM export can be a thousand-plus near-duplicate lines.
+def _consolidate_and_save_confirmed_rows(project):
+    """(Re)builds the project's import-derived module rows (ProjectModule.from_import
+    =True) by consolidating ALL of the project's current ModuleImportRow rows --
+    grouped by (Segment, Module Type, Zone) with counts summed -- so Module Summary
+    (step 4) shows one row per distinct combination, not one row per line of the
+    original sheet, which for a real BOM export can be a thousand-plus near-duplicate
+    lines. Only currently-valid rows are included.
 
-    `replace_existing` deletes the project's current module rows first (the "Replace"
-    choice); otherwise a combination that already exists gets its count increased
-    rather than a parallel duplicate row created (the "Add" choice). Returns the
-    number of distinct summary rows created or updated."""
+    Fully replaces the from_import=True rows every time -- since ModuleImportRow is
+    permanent and editable on Review & Correct, this can be re-run any time a
+    correction is made there, and always reflects exactly the current state of those
+    rows. Purely-manual rows (from_import=False, added directly on Module Summary) are
+    never touched. Returns (valid_count, skipped_count, summary_row_count)."""
+    all_rows = list(project.import_rows.select_related('module_type', 'segment').all())
+    valid_rows = [r for r in all_rows if r.is_valid]
+
     totals = defaultdict(int)
-    for row in fresh_rows:
+    for row in valid_rows:
         totals[(row.segment_id, row.module_type_id, row.zone)] += row.count
 
-    if replace_existing:
-        project.modules.all().delete()
-        existing_by_key = {}
-    else:
-        existing_by_key = {(pm.segment_id, pm.module_type_id, pm.zone): pm for pm in project.modules.all()}
-
-    next_order = (project.modules.aggregate(Max('order'))['order__max'] or -1) + 1
-    to_create, to_update = [], []
-    for (segment_id, module_type_id, zone), total_count in totals.items():
-        existing_pm = existing_by_key.get((segment_id, module_type_id, zone))
-        if existing_pm:
-            existing_pm.count += total_count
-            to_update.append(existing_pm)
-        else:
-            to_create.append(ProjectModule(
+    with transaction.atomic():
+        project.modules.filter(from_import=True).delete()
+        next_order = (project.modules.aggregate(Max('order'))['order__max'] or -1) + 1
+        to_create = [
+            ProjectModule(
                 project=project, segment_id=segment_id, module_type_id=module_type_id,
-                zone=zone, count=total_count, order=next_order,
-            ))
-            next_order += 1
+                zone=zone, count=total_count, order=next_order + i, from_import=True,
+            )
+            for i, ((segment_id, module_type_id, zone), total_count) in enumerate(totals.items())
+        ]
+        if to_create:
+            ProjectModule.objects.bulk_create(to_create)
 
-    if to_create:
-        ProjectModule.objects.bulk_create(to_create)
-    if to_update:
-        ProjectModule.objects.bulk_update(to_update, ['count'])
-
-    return len(to_create) + len(to_update)
+    return len(valid_rows), len(all_rows) - len(valid_rows), len(to_create)
 
 
 def _learn_module_name_aliases(rows, update_existing):

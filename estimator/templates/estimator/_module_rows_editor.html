@@ -1,0 +1,70 @@
+{% comment %}
+Shared editable module-rows table (Zone / Segment / Module Type / Count / Complexity
+Override, grouped by zone), saved through estimator_project_modules_sync. Used on both
+step 4 (Module Summary -- always) and step 3 (Review & Correct -- whenever nothing is
+pending, so that step is never a dead end). One implementation, included on both pages,
+so the two never drift apart.
+
+Usage: {% include 'estimator/_module_rows_editor.html' with project=project existing_modules=existing_modules return_to='module_rows' %}
+`return_to` is 'module_rows' or 'review' -- estimator_project_modules_sync uses it to
+send the user back to whichever of the two pages this save was made from.
+{% endcomment %}
+<datalist id="moduleRowsZoneSuggestions"></datalist>
+
+<form method="POST" action="{% url 'estimator_project_modules_sync' project.pk %}" id="moduleRowsForm">
+    {% csrf_token %}
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-check me-2"></i>Module Summary</span>
+            <button type="button" id="addModuleRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 18%;">Zone</th>
+                            <th style="width: 20%;">Segment</th>
+                            <th style="width: 26%;">Module Type</th>
+                            <th style="width: 12%;">Count</th>
+                            <th style="width: 18%;">Complexity Override</th>
+                            <th style="width: 6%;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="moduleRowsBody">
+                        {% regroup existing_modules by zone as zone_groups %}
+                        {% for group in zone_groups %}
+                        <tr class="table-light zone-heading-row">
+                            <td colspan="6" class="fw-bold text-primary"><i class="bi bi-diagram-3 me-1"></i>{{ group.grouper|default:'Unassigned' }}</td>
+                        </tr>
+                        {% for pm in group.list %}
+                        <tr class="module-row">
+                            <td>
+                                <input type="hidden" name="row_id[]" value="{{ pm.id }}">
+                                <input type="text" name="zone[]" class="form-control zone-input" value="{{ pm.zone }}" list="moduleRowsZoneSuggestions" placeholder="Optional">
+                            </td>
+                            <td><select name="segment[]" class="form-select segment-select" required><option value="">-- select --</option></select></td>
+                            <td><select name="module_type[]" class="form-select module-type-select" required><option value="">-- select --</option></select></td>
+                            <td><input type="number" name="count[]" class="form-control count-input" min="1" value="{{ pm.count }}" required></td>
+                            <td><select name="complexity_override[]" class="form-select complexity-select"><option value="">Inherit ({{ project.complexity.name }})</option></select></td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
+                        </tr>
+                        {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not existing_modules %}
+            <div class="empty-state">
+                <i class="bi bi-boxes"></i>
+                <p>No module rows yet. Click "Add Module Row" to start, or <a href="{% url 'estimator_project_import_upload' project.pk %}">import a module list</a>.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="mt-3 d-flex gap-2">
+        <button type="submit" name="action" value="save" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>Save Modules</button>
+        <button type="submit" name="action" value="next" class="btn btn-primary"><i class="bi bi-calculator me-2"></i>Next: Calculated Estimate</button>
+    </div>
+</form>

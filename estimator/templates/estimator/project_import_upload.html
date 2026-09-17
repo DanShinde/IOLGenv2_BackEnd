@@ -25,7 +25,7 @@
                 over for reference. Every other column in the sheet is ignored. You'll be able to review and correct
                 every row -- including assigning a Segment, which isn't in the sheet -- before anything is saved.
             </p>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" id="uploadForm">
                 {% csrf_token %}
                 <div class="mb-3">
                     <label for="module_list" class="form-label fw-semibold">Module List File</label>
@@ -35,8 +35,8 @@
                 {% if existing_module_row_count %}
                 <div class="warning-banner mb-3">
                     <i class="bi bi-exclamation-triangle me-1"></i>
-                    <strong>This project already has {{ existing_module_row_count }} module row(s).</strong> What
-                    should happen to them once this import is confirmed?
+                    <strong>This project already has {{ existing_module_row_count }} imported row(s)</strong> on the
+                    Review &amp; Correct step. What should happen to them?
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="radio" name="existing_rows_action" value="add" id="existingRowsAddUpload" checked>
                         <label class="form-check-label" for="existingRowsAddUpload">
@@ -64,4 +64,22 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // "Replace" deletes the project's existing imported rows immediately once this
+    // upload parses successfully -- not deferred to a later step -- so confirm before
+    // letting that through, same as any other hard-to-undo action in this app.
+    document.getElementById('uploadForm')?.addEventListener('submit', (e) => {
+        const replaceRadio = document.getElementById('existingRowsReplaceUpload');
+        if (replaceRadio && replaceRadio.checked) {
+            const ok = window.confirm(
+                "This will permanently delete this project's existing imported rows and replace them with the " +
+                'rows from this file. This cannot be undone. Continue?'
+            );
+            if (!ok) e.preventDefault();
+        }
+    });
+</script>
 {% endblock %}
