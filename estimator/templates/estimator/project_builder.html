@@ -159,45 +159,16 @@
         </div>
     </div>
 
-    {% if estimate.category_groups %}
-        {% for group in estimate.category_groups %}
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-bar-chart-steps me-2"></i>{{ group.label }} &mdash; Activity-wise Totals</span>
-                <span class="badge bg-primary bg-opacity-10 text-primary category-days-badge" data-category="{{ group.category }}">{{ group.total_days|floatformat:2 }} man-days</span>
-            </div>
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Activity</th>
-                            <th class="text-end activity-total-header">Total (man-days)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for at in group.activity_totals %}
-                        <tr>
-                            <td>{{ at.activity.name }}</td>
-                            <td class="text-end activity-total-cell" data-activity-id="{{ at.activity.id }}">{{ at.total_days|floatformat:3 }}</td>
-                        </tr>
-                        {% endfor %}
-                        <tr class="fw-bold" style="background:#eef2ff;">
-                            <td>{{ group.label }} Total</td>
-                            <td class="text-end category-total-cell" data-category="{{ group.category }}">{{ group.total_days|floatformat:3 }}</td>
-                        </tr>
-                    </tbody>
-                </table>
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><i class="bi bi-bar-chart-steps me-2"></i>Activity-wise Totals by Zone</span>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="expandAllZonesBtn">Expand All</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="collapseAllZonesBtn">Collapse All</button>
             </div>
         </div>
-        {% endfor %}
-    {% else %}
-    <div class="card">
-        <div class="empty-state">
-            <i class="bi bi-bar-chart-steps"></i>
-            <p>No activities configured yet.</p>
-        </div>
+        <div class="accordion accordion-flush" id="zoneActivityAccordion"></div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 
@@ -207,6 +178,7 @@
     const MODULE_TYPES = {{ module_types_json|safe }};
     const COMPLEXITY_LEVELS = {{ complexity_levels_json|safe }};
     const ACTIVITIES = {{ activities_json|safe }};
+    const CATEGORY_LABELS = {{ category_labels_json|safe }};
     const MATRIX = {{ matrix_json|safe }};
     const EXISTING_MODULES = {{ modules_json|safe }};
     const EXISTING_ZONES = {{ existing_zones_json|safe }};
@@ -238,9 +210,6 @@
 
     function toggleCalculation() {
         showingCalculation = !showingCalculation;
-        document.querySelectorAll('.activity-total-header').forEach(th => {
-            th.textContent = showingCalculation ? 'Total Minutes' : 'Total (man-days)';
-        });
         document.getElementById('calcToggleBtn').innerHTML = showingCalculation
             ? '<i class="bi bi-eye-slash me-1"></i>Hide Calculation'
             : '<i class="bi bi-calculator me-1"></i>Show Calculation';
@@ -296,16 +265,115 @@
         return proj ? proj.multiplier : 1;
     }
 
+    // "Show Calculation" reveals the full arithmetic behind each total: for a single
+    // contributing row that's "rate x count x complexity = minutes"; for several rows
+    // it's each row's minutes summed, so the reader can see exactly where the number
+    // came from rather than just the same figure in a different unit.
+    function formulaFor(contributions, total) {
+        if (contributions.length === 0) return '0.0 min';
+        if (contributions.length === 1) {
+            const c = contributions[0];
+            return `${c.count} (no. of modules) x ${c.base.toFixed(1)} (min per module) x ${c.factor.toFixed(2)} (complexity) = ${c.minutes.toFixed(1)} min`;
+        }
+        return contributions.map(c => `${c.minutes.toFixed(1)} (${c.label})`).join(' + ') + ` = ${total.toFixed(1)} min`;
+    }
+
+    // Every zone name seen gets a stable element id for the life of the page (not
+    // re-derived from position/order each recalc), so the accordion's open/closed
+    // state survives a rebuild triggered by the next keystroke.
+    let zoneIdCounter = 0;
+    const zoneIdByName = {};
+    function zoneElementId(zone) {
+        if (!zoneIdByName[zone]) zoneIdByName[zone] = `zoneAct${zoneIdCounter++}`;
+        return zoneIdByName[zone];
+    }
+
+    const CATEGORY_ORDER = [...new Set(ACTIVITIES.map(a => a.category))];
+
+    function renderZoneActivityAccordion(zoneNames, perZone) {
+        const container = document.getElementById('zoneActivityAccordion');
+        const expandedIds = new Set(
+            Array.from(container.querySelectorAll('.accordion-collapse.show')).map(el => el.id)
+        );
+
+        if (zoneNames.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-bar-chart-steps"></i><p>No module rows yet.</p></div>';
+            return;
+        }
+
+        container.innerHTML = zoneNames.map(zone => {
+            const id = zoneElementId(zone);
+            const isOpen = expandedIds.has(id);
+            const zData = perZone[zone];
+
+            const categoriesHtml = CATEGORY_ORDER.map(category => {
+                const categoryActivities = ACTIVITIES.filter(a => a.category === category);
+                const label = CATEGORY_LABELS[category] || category;
+                const rowsHtml = categoryActivities.map(a => {
+                    const total = zData.activityTotals[a.id];
+                    const display = showingCalculation
+                        ? formulaFor(zData.activityContributions[a.id], total)
+                        : (total / MINUTES_PER_DAY).toFixed(3);
+                    return `<tr><td>${escapeHtml(a.name)}</td><td class="text-end">${display}</td></tr>`;
+                }).join('');
+                const categoryTotal = zData.categoryTotals[category] || 0;
+                const categoryContributions = categoryActivities.flatMap(a => zData.activityContributions[a.id]);
+                const categoryDisplay = showingCalculation
+                    ? formulaFor(categoryContributions, categoryTotal)
+                    : (categoryTotal / MINUTES_PER_DAY).toFixed(3);
+                return `
+                    <div class="mb-3">
+                        <div class="fw-semibold text-secondary small text-uppercase mb-1">${escapeHtml(label)}</div>
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Activity</th><th class="text-end">${showingCalculation ? 'Total Minutes' : 'Total (man-days)'}</th></tr></thead>
+                            <tbody>
+                                ${rowsHtml}
+                                <tr class="fw-bold" style="background:#eef2ff;">
+                                    <td>${escapeHtml(label)} Total</td>
+                                    <td class="text-end">${categoryDisplay}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button ${isOpen ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#${id}">
+                            <span class="flex-grow-1">${escapeHtml(zone)}</span>
+                            <span class="badge bg-primary bg-opacity-10 text-primary me-2">${(zData.grandTotal / MINUTES_PER_DAY).toFixed(2)} man-days</span>
+                        </button>
+                    </h2>
+                    <div id="${id}" class="accordion-collapse collapse ${isOpen ? 'show' : ''}">
+                        <div class="accordion-body">${categoriesHtml}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
     function recalc() {
         const rows = document.querySelectorAll('#moduleRowsBody .module-row');
-        const activityTotals = {};
-        const activityContributions = {};
-        ACTIVITIES.forEach(a => { activityTotals[a.id] = 0; activityContributions[a.id] = []; });
-        const categoryTotals = {};
-        ACTIVITIES.forEach(a => categoryTotals[a.category] = 0);
+        const perZone = {};
         let grandTotal = 0;
         const warningTypes = new Set();
-        const zoneTotals = {};
+
+        function ensureZone(zone) {
+            if (!perZone[zone]) {
+                const activityTotals = {};
+                const activityContributions = {};
+                const categoryTotals = {};
+                ACTIVITIES.forEach(a => {
+                    activityTotals[a.id] = 0;
+                    activityContributions[a.id] = [];
+                    categoryTotals[a.category] = 0;
+                });
+                perZone[zone] = { rowCount: 0, grandTotal: 0, activityTotals, activityContributions, categoryTotals };
+            }
+            return perZone[zone];
+        }
 
         rows.forEach(row => {
             const segId = row.querySelector('.segment-select').value;
@@ -313,6 +381,8 @@
             const count = parseFloat(row.querySelector('.count-input').value) || 0;
             const zone = row.querySelector('.zone-input').value.trim() || UNASSIGNED_ZONE;
             const factor = factorForRow(row);
+            const zData = ensureZone(zone);
+            zData.rowCount += 1;
             let rowTotal = 0;
 
             if (segId && mtId) {
@@ -322,12 +392,12 @@
                     if (Object.prototype.hasOwnProperty.call(MATRIX, key)) hasAny = true;
                     const base = MATRIX[key] || 0;
                     const minutes = base * count * factor;
-                    activityTotals[a.id] += minutes;
-                    categoryTotals[a.category] += minutes;
+                    zData.activityTotals[a.id] += minutes;
+                    zData.categoryTotals[a.category] += minutes;
                     rowTotal += minutes;
                     if (minutes > 0) {
                         const label = moduleTypeById[mtId] && segmentById[segId] ? `${moduleTypeById[mtId].name} / ${segmentById[segId].name}` : 'row';
-                        activityContributions[a.id].push({ label, base, count, factor, minutes });
+                        zData.activityContributions[a.id].push({ label, base, count, factor, minutes });
                     }
                 });
                 if (!hasAny && moduleTypeById[mtId] && segmentById[segId]) {
@@ -337,62 +407,26 @@
             row.querySelector('.row-total').textContent = rowTotal.toFixed(1) + ' min';
             row.querySelector('.row-total-days').textContent = (rowTotal / MINUTES_PER_DAY).toFixed(2) + ' man-days';
             grandTotal += rowTotal;
-
-            if (!zoneTotals[zone]) zoneTotals[zone] = { minutes: 0, count: 0 };
-            zoneTotals[zone].minutes += rowTotal;
-            zoneTotals[zone].count += 1;
+            zData.grandTotal += rowTotal;
         });
 
-        const zoneNames = Object.keys(zoneTotals).sort((a, b) => {
+        const zoneNames = Object.keys(perZone).sort((a, b) => {
             if (a === UNASSIGNED_ZONE) return 1;
             if (b === UNASSIGNED_ZONE) return -1;
             return a.localeCompare(b);
         });
+
         document.getElementById('zoneSummaryBody').innerHTML = zoneNames.length
             ? zoneNames.map(z => `
                 <tr>
                     <td class="fw-semibold">${escapeHtml(z)}</td>
-                    <td class="text-end">${zoneTotals[z].count}</td>
-                    <td class="text-end text-primary fw-semibold">${(zoneTotals[z].minutes / MINUTES_PER_DAY).toFixed(2)}</td>
+                    <td class="text-end">${perZone[z].rowCount}</td>
+                    <td class="text-end text-primary fw-semibold">${(perZone[z].grandTotal / MINUTES_PER_DAY).toFixed(2)}</td>
                 </tr>
             `).join('')
             : '<tr><td colspan="3" class="text-muted text-center py-3">No module rows yet.</td></tr>';
 
-        // "Show Calculation" reveals the full arithmetic behind each total: for a single
-        // contributing row that's "rate x count x complexity = minutes"; for several rows
-        // it's each row's minutes summed, so the reader can see exactly where the number
-        // came from rather than just the same figure in a different unit.
-        function formulaFor(contributions, total) {
-            if (contributions.length === 0) return '0.0 min';
-            if (contributions.length === 1) {
-                const c = contributions[0];
-                return `${c.count} (no. of modules) x ${c.base.toFixed(1)} (min per module) x ${c.factor.toFixed(2)} (complexity) = ${c.minutes.toFixed(1)} min`;
-            }
-            return contributions.map(c => `${c.minutes.toFixed(1)} (${c.label})`).join(' + ') + ` = ${total.toFixed(1)} min`;
-        }
-
-        ACTIVITIES.forEach(a => {
-            const cell = document.querySelector(`.activity-total-cell[data-activity-id="${a.id}"]`);
-            if (cell) {
-                cell.textContent = showingCalculation
-                    ? formulaFor(activityContributions[a.id], activityTotals[a.id])
-                    : (activityTotals[a.id] / MINUTES_PER_DAY).toFixed(3);
-            }
-        });
-
-        Object.keys(categoryTotals).forEach(category => {
-            const totalCell = document.querySelector(`.category-total-cell[data-category="${category}"]`);
-            if (totalCell) {
-                const categoryContributions = ACTIVITIES
-                    .filter(a => a.category === category)
-                    .flatMap(a => activityContributions[a.id]);
-                totalCell.textContent = showingCalculation
-                    ? formulaFor(categoryContributions, categoryTotals[category])
-                    : (categoryTotals[category] / MINUTES_PER_DAY).toFixed(3);
-            }
-            const daysBadge = document.querySelector(`.category-days-badge[data-category="${category}"]`);
-            if (daysBadge) daysBadge.textContent = (categoryTotals[category] / MINUTES_PER_DAY).toFixed(2) + ' man-days';
-        });
+        renderZoneActivityAccordion(zoneNames, perZone);
 
         document.getElementById('kpiGrandMinutes').textContent = grandTotal.toFixed(1);
         document.getElementById('kpiGrandHours').textContent = (grandTotal / 60).toFixed(2);
@@ -444,6 +478,15 @@
             btn.closest('tr').remove();
             recalc();
         }
+    });
+
+    document.getElementById('expandAllZonesBtn')?.addEventListener('click', () => {
+        document.querySelectorAll('#zoneActivityAccordion .accordion-collapse').forEach(el => el.classList.add('show'));
+        document.querySelectorAll('#zoneActivityAccordion .accordion-button').forEach(btn => btn.classList.remove('collapsed'));
+    });
+    document.getElementById('collapseAllZonesBtn')?.addEventListener('click', () => {
+        document.querySelectorAll('#zoneActivityAccordion .accordion-collapse').forEach(el => el.classList.remove('show'));
+        document.querySelectorAll('#zoneActivityAccordion .accordion-button').forEach(btn => btn.classList.add('collapsed'));
     });
 
     hydrateExistingRows();

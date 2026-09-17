@@ -18,8 +18,8 @@ from .forms import (
 from .imports import ModuleListParseError, match_module_type, normalize_name, parse_module_list
 from .mixins import CancelUrlMixin, ProtectedDeleteMixin, StaffRequiredMixin
 from .models import (
-    Activity, ComplexityLevel, ModuleActivityTime, ModuleImportRow, ModuleNameAlias, ModuleType,
-    Project, ProjectModule, ProjectTemplate, ProjectTemplateModule, Segment, TimeUnit,
+    Activity, ActivityCategory, ComplexityLevel, ModuleActivityTime, ModuleImportRow, ModuleNameAlias,
+    ModuleType, Project, ProjectModule, ProjectTemplate, ProjectTemplateModule, Segment, TimeUnit,
 )
 
 
@@ -474,6 +474,7 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
             {'id': c.id, 'name': c.name, 'multiplier': float(c.multiplier)} for c in complexity_levels
         ])
         context['activities_json'] = safe_json([{'id': a.id, 'name': a.name, 'category': a.category} for a in activities])
+        context['category_labels_json'] = safe_json(dict(ActivityCategory.choices))
         context['matrix_json'] = safe_json({
             f"{seg_id}_{mt_id}_{act_id}": mins for (seg_id, mt_id, act_id), mins in matrix.items()
         })
