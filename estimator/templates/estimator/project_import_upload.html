@@ -6,20 +6,12 @@
 <div class="animate-fade-in" style="max-width: 720px; margin: 0 auto;">
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-file-earmark-arrow-up me-2 text-primary"></i>Import Module List</h1>
-        <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i>Skip / Back to Builder
+        <a href="{% url 'estimator_project_module_rows' project.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Skip / Go to Module Summary
         </a>
     </div>
 
-    <div class="d-flex align-items-center gap-2 mb-3 text-muted small">
-        <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>1. Project Details</span>
-        <i class="bi bi-chevron-right"></i>
-        <span class="fw-bold text-primary">2. Upload Module List</span>
-        <i class="bi bi-chevron-right"></i>
-        <span>3. Review &amp; Correct</span>
-        <i class="bi bi-chevron-right"></i>
-        <span>4. Calculated Estimate</span>
-    </div>
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=2 %}
 
     <div class="card">
         <div class="card-header"><i class="bi bi-info-circle me-2"></i>{{ project.name }}</div>
@@ -39,11 +31,32 @@
                     <label for="module_list" class="form-label fw-semibold">Module List File</label>
                     <input type="file" name="module_list" id="module_list" class="form-control" accept=".xlsx,.xls,.csv" required>
                 </div>
+
+                {% if existing_module_row_count %}
+                <div class="warning-banner mb-3">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>This project already has {{ existing_module_row_count }} module row(s).</strong> What
+                    should happen to them once this import is confirmed?
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="radio" name="existing_rows_action" value="add" id="existingRowsAddUpload" checked>
+                        <label class="form-check-label" for="existingRowsAddUpload">
+                            <strong>Add</strong> to the existing {{ existing_module_row_count }} row(s)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="existing_rows_action" value="replace" id="existingRowsReplaceUpload">
+                        <label class="form-check-label" for="existingRowsReplaceUpload">
+                            <strong>Replace</strong> the existing {{ existing_module_row_count }} row(s) with this import
+                        </label>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="d-flex gap-2 mt-3">
                     <button type="submit" class="btn btn-primary flex-grow-1">
                         <i class="bi bi-upload me-2"></i>Upload &amp; Continue
                     </button>
-                    <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-outline-secondary flex-grow-1">
+                    <a href="{% url 'estimator_project_module_rows' project.pk %}" class="btn btn-outline-secondary flex-grow-1">
                         <i class="bi bi-pencil me-2"></i>Add Modules Manually Instead
                     </a>
                 </div>

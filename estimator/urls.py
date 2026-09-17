@@ -11,6 +11,7 @@ urlpatterns = [
     path('projects/<int:pk>/delete/', views.ProjectDeleteView.as_view(), name='estimator_project_delete'),
     path('projects/<int:pk>/duplicate/', views.project_duplicate, name='estimator_project_duplicate'),
     path('projects/<int:pk>/modules/sync/', views.project_modules_sync, name='estimator_project_modules_sync'),
+    path('projects/<int:pk>/module-rows/', views.ProjectModuleRowsView.as_view(), name='estimator_project_module_rows'),
     path('projects/<int:pk>/import/', views.project_import_upload, name='estimator_project_import_upload'),
     path('projects/<int:pk>/import/review/', views.project_import_review, name='estimator_project_import_review'),
     path('projects/<int:pk>/report/', views.ProjectReportView.as_view(), name='estimator_project_report'),

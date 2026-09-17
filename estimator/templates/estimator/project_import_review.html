@@ -39,30 +39,64 @@
         </a>
     </div>
 
-    <div class="d-flex align-items-center gap-2 mb-3 text-muted small">
-        <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>1. Project Details</span>
-        <i class="bi bi-chevron-right"></i>
-        <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>2. Upload Module List</span>
-        <i class="bi bi-chevron-right"></i>
-        <span class="fw-bold text-primary">3. Review &amp; Correct</span>
-        <i class="bi bi-chevron-right"></i>
-        <span>4. Calculated Estimate</span>
-    </div>
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=3 %}
 
+    {% if rows %}
     <p class="text-muted">
         Correct any row where the Module Type wasn't matched to a standard module, or the Zone needs fixing.
         <strong>Segment</strong> isn't in the uploaded sheet, so it must be chosen for every row here.
         <strong>Sr.</strong>, <strong>Module No.</strong> and <strong>Floor Level</strong> are shown for reference
         only, exactly as read from the sheet. Rows still flagged
         <i class="bi bi-exclamation-triangle-fill text-warning"></i> below are missing a Module Type, Segment,
-        and/or a valid Count, and will block "Confirm &amp; Calculate" until fixed.
+        and/or a valid Count, and will block "Confirm &amp; Calculate" until fixed. Once confirmed, matching rows
+        (same Zone, Segment and Module Type) are consolidated into a single summary row on the
+        <a href="{% url 'estimator_project_module_rows' project.pk %}">Module Summary</a> step, not kept one-per-line.
     </p>
+    {% endif %}
 
     <div id="statusBanner" class="warning-banner" style="display:none;"></div>
 
+    {% if rows %}
     <form method="POST" id="reviewForm">
         {% csrf_token %}
         <input type="hidden" name="update_aliases" id="updateAliasesInput" value="0">
+
+        {% if confirmed_module_row_count %}
+        <div class="card mb-3">
+            <div class="card-body">
+                {% if existing_rows_action_decided %}
+                <p class="mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    You chose on the Upload step to
+                    {% if existing_rows_action_decided == 'replace' %}
+                    <strong class="text-danger">replace</strong> the project's existing
+                    {% else %}
+                    <strong>add</strong> these rows to the existing
+                    {% endif %}
+                    {{ confirmed_module_row_count }} module row(s) once confirmed.
+                </p>
+                {% else %}
+                <p class="fw-semibold mb-2">
+                    This project already has {{ confirmed_module_row_count }} module row(s). What should happen to
+                    them when you confirm this import?
+                </p>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="existing_rows_action" value="add" id="existingRowsAdd" checked>
+                    <label class="form-check-label" for="existingRowsAdd">
+                        <strong>Add</strong> these rows alongside the existing {{ confirmed_module_row_count }}
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="existing_rows_action" value="replace" id="existingRowsReplace">
+                    <label class="form-check-label" for="existingRowsReplace">
+                        <strong>Replace</strong> the existing {{ confirmed_module_row_count }} row(s) with this import
+                    </label>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card mb-3">
             <div class="card-body">
                 <div class="d-flex flex-wrap align-items-center gap-2">
@@ -130,8 +164,6 @@
                                     {% endif %}
                                 </td>
                             </tr>
-                            {% empty %}
-                            <tr><td colspan="8" class="text-muted text-center py-3">No staged rows -- upload a file first.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -148,6 +180,21 @@
             </button>
         </div>
     </form>
+
+    {% else %}
+    <div class="alert alert-light border mb-3">
+        {% if confirmed_module_row_count %}
+        Nothing <strong>pending</strong> review -- your last import was already confirmed and is safe: it's part of
+        this project's <strong>{{ confirmed_module_row_count }}</strong> module summary row(s), editable on the
+        <a href="{% url 'estimator_project_module_rows' project.pk %}">Module Summary</a> step. This step only ever
+        queues an <em>upload that hasn't been confirmed yet</em> above.
+        {% else %}
+        Nothing staged right now.
+        <a href="{% url 'estimator_project_import_upload' project.pk %}">Upload a module list</a> to get started --
+        you can always come back to this step later, even after confirming a previous import.
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -157,6 +204,7 @@
     // batch, keyed by normalized (trim+lowercase) raw name -- mirrors
     // imports.normalize_name() so the two agree on what counts as "the same name".
     const ALIASES = {{ aliases_json|safe }};
+    const EXISTING_ROWS_ACTION_DECIDED = '{{ existing_rows_action_decided|default:""|escapejs }}';
 
     function normalizeName(raw) {
         return raw.trim().toLowerCase();
@@ -210,7 +258,27 @@
     // Calculate" -- warn when a correction would change a mapping that was already
     // saved from an earlier import. The user decides whether that becomes the new
     // default for future imports, or just applies to this save.
-    document.getElementById('reviewForm')?.addEventListener('submit', () => {
+    document.getElementById('reviewForm')?.addEventListener('submit', (e) => {
+        // "Replace" permanently deletes the project's existing module rows -- confirm
+        // before letting a destructive choice through, same as any other hard-to-undo
+        // action in this app. Only relevant on "Confirm & Calculate", not "Save
+        // Corrections" (which never touches ProjectModule rows at all). The choice is
+        // usually already made on the Upload page (EXISTING_ROWS_ACTION_DECIDED); the
+        // fallback radio only renders when that wasn't possible.
+        const isConfirm = e.submitter?.value === 'confirm';
+        const replaceRadio = document.getElementById('existingRowsReplace');
+        const willReplace = EXISTING_ROWS_ACTION_DECIDED === 'replace' || (replaceRadio && replaceRadio.checked);
+        if (isConfirm && willReplace) {
+            const ok = window.confirm(
+                "This will permanently delete this project's existing module rows and replace them with the " +
+                'rows from this import. This cannot be undone. Continue?'
+            );
+            if (!ok) {
+                e.preventDefault();
+                return;
+            }
+        }
+
         const changes = [];
         document.querySelectorAll('#importRowsBody .import-row').forEach(row => {
             const rawName = row.dataset.rawName;
