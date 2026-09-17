@@ -287,6 +287,12 @@ LOGOUT_REDIRECT_URL = '/accounts/loginw/'  # or wherever you want to land after 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Several pages (e.g. the Estimator's module-list import review, and the Project
+# Builder's module rows) submit one POST with several fields per row via raw arrays
+# (field[]) rather than a formset. A real BOM import can be thousands of rows -- well
+# past Django's default 1000-field cap -- so it's raised generously here.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 100000
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',

@@ -63,11 +63,24 @@
         </div>
     </div>
 
+    <datalist id="zoneSuggestions"></datalist>
+
     <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span><i class="bi bi-boxes me-2"></i>Module Rows</span>
-            <button type="button" id="addRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
+            <div class="d-flex gap-2">
+                <a href="{% url 'estimator_project_import_upload' project.pk %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-file-earmark-arrow-up me-1"></i>Import Module List
+                </a>
+                <button type="button" id="addRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
+            </div>
         </div>
+        {% if has_pending_import %}
+        <div class="warning-banner mx-3 mt-3 mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>An uploaded module list is still awaiting review.
+            <a href="{% url 'estimator_project_import_review' project.pk %}">Finish reviewing it</a>.
+        </div>
+        {% endif %}
         <div class="card-body">
             <form method="POST" action="{% url 'estimator_project_modules_sync' project.pk %}" id="modulesForm">
                 {% csrf_token %}
@@ -75,12 +88,13 @@
                     <table class="table align-middle mb-0">
                         <thead>
                             <tr>
-                                <th style="width: 20%;">Segment</th>
-                                <th style="width: 24%;">Module Type</th>
-                                <th style="width: 10%;">Count</th>
-                                <th style="width: 20%;">Complexity Override</th>
-                                <th class="text-end" style="width: 18%;">Row Total</th>
-                                <th style="width: 8%;"></th>
+                                <th style="width: 16%;">Zone</th>
+                                <th style="width: 17%;">Segment</th>
+                                <th style="width: 20%;">Module Type</th>
+                                <th style="width: 9%;">Count</th>
+                                <th style="width: 17%;">Complexity Override</th>
+                                <th class="text-end" style="width: 15%;">Row Total</th>
+                                <th style="width: 6%;"></th>
                             </tr>
                         </thead>
                         <tbody id="moduleRowsBody">
@@ -88,6 +102,9 @@
                             <tr class="module-row">
                                 <td>
                                     <input type="hidden" name="row_id[]" value="{{ row.module.id }}">
+                                    <input type="text" name="zone[]" class="form-control zone-input" value="{{ row.module.zone }}" list="zoneSuggestions" placeholder="Optional">
+                                </td>
+                                <td>
                                     <select name="segment[]" class="form-select segment-select" required>
                                         <option value="">-- select --</option>
                                     </select>
@@ -116,13 +133,29 @@
                 {% if not estimate.rows %}
                 <div class="empty-state">
                     <i class="bi bi-boxes"></i>
-                    <p>No module rows yet. Click "Add Module Row" to start building the estimate.</p>
+                    <p>No module rows yet. Click "Add Module Row" to start building the estimate, or import a module list.</p>
                 </div>
                 {% endif %}
                 <div class="mt-3">
                     <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>Save Modules</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-diagram-3 me-2"></i>By Zone</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Zone</th>
+                        <th class="text-end">Module Rows</th>
+                        <th class="text-end">Man-days</th>
+                    </tr>
+                </thead>
+                <tbody id="zoneSummaryBody"></tbody>
+            </table>
         </div>
     </div>
 
@@ -176,8 +209,21 @@
     const ACTIVITIES = {{ activities_json|safe }};
     const MATRIX = {{ matrix_json|safe }};
     const EXISTING_MODULES = {{ modules_json|safe }};
+    const EXISTING_ZONES = {{ existing_zones_json|safe }};
     const PROJECT_COMPLEXITY_ID = {{ project_complexity_id }};
     const MINUTES_PER_DAY = {{ minutes_per_day }};
+    const UNASSIGNED_ZONE = 'Unassigned';
+
+    // Zone names come from user-uploaded files or free-typed input (not staff-managed
+    // master data like Segments/Module Types), so they're escaped before ever landing
+    // in innerHTML.
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value;
+        return div.innerHTML;
+    }
+
+    document.getElementById('zoneSuggestions').innerHTML = EXISTING_ZONES.map(z => `<option value="${escapeHtml(z)}">`).join('');
 
     const complexityById = {};
     COMPLEXITY_LEVELS.forEach(c => complexityById[c.id] = c);
@@ -259,11 +305,13 @@
         ACTIVITIES.forEach(a => categoryTotals[a.category] = 0);
         let grandTotal = 0;
         const warningTypes = new Set();
+        const zoneTotals = {};
 
         rows.forEach(row => {
             const segId = row.querySelector('.segment-select').value;
             const mtId = row.querySelector('.module-type-select').value;
             const count = parseFloat(row.querySelector('.count-input').value) || 0;
+            const zone = row.querySelector('.zone-input').value.trim() || UNASSIGNED_ZONE;
             const factor = factorForRow(row);
             let rowTotal = 0;
 
@@ -289,7 +337,26 @@
             row.querySelector('.row-total').textContent = rowTotal.toFixed(1) + ' min';
             row.querySelector('.row-total-days').textContent = (rowTotal / MINUTES_PER_DAY).toFixed(2) + ' man-days';
             grandTotal += rowTotal;
+
+            if (!zoneTotals[zone]) zoneTotals[zone] = { minutes: 0, count: 0 };
+            zoneTotals[zone].minutes += rowTotal;
+            zoneTotals[zone].count += 1;
         });
+
+        const zoneNames = Object.keys(zoneTotals).sort((a, b) => {
+            if (a === UNASSIGNED_ZONE) return 1;
+            if (b === UNASSIGNED_ZONE) return -1;
+            return a.localeCompare(b);
+        });
+        document.getElementById('zoneSummaryBody').innerHTML = zoneNames.length
+            ? zoneNames.map(z => `
+                <tr>
+                    <td class="fw-semibold">${escapeHtml(z)}</td>
+                    <td class="text-end">${zoneTotals[z].count}</td>
+                    <td class="text-end text-primary fw-semibold">${(zoneTotals[z].minutes / MINUTES_PER_DAY).toFixed(2)}</td>
+                </tr>
+            `).join('')
+            : '<tr><td colspan="3" class="text-muted text-center py-3">No module rows yet.</td></tr>';
 
         // "Show Calculation" reveals the full arithmetic behind each total: for a single
         // contributing row that's "rate x count x complexity = minutes"; for several rows
@@ -348,6 +415,9 @@
         tr.innerHTML = `
             <td>
                 <input type="hidden" name="row_id[]" value="">
+                <input type="text" name="zone[]" class="form-control zone-input" value="" list="zoneSuggestions" placeholder="Optional">
+            </td>
+            <td>
                 <select name="segment[]" class="form-select segment-select" required>${segmentOptionsHtml('')}</select>
             </td>
             <td>

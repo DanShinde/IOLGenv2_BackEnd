@@ -187,6 +187,11 @@ class ProjectModule(models.Model):
     segment = models.ForeignKey(Segment, on_delete=models.PROTECT, related_name='project_modules')
     module_type = models.ForeignKey(ModuleType, on_delete=models.PROTECT, related_name='project_modules')
     count = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    zone = models.CharField(
+        max_length=150, blank=True, default='',
+        help_text="Optional line/zone label (e.g. from an imported module list). Rows are grouped by this "
+                   "on the estimate to calculate effort separately per zone within the project.",
+    )
     complexity_override = models.ForeignKey(
         ComplexityLevel, on_delete=models.PROTECT, null=True, blank=True, related_name='+',
         help_text="Optional. Overrides the project's complexity for this module line only.",
@@ -250,3 +255,60 @@ class ProjectTemplateModule(models.Model):
 
     def __str__(self):
         return f"{self.template.name} - {self.segment.name} / {self.module_type.name} x{self.count}"
+
+
+class ModuleNameAlias(models.Model):
+    """A remembered mapping from a raw Module Name string (exactly as it appears in an
+    uploaded sheet) to the standard ModuleType a user has confirmed it means. Learned
+    automatically the first time a raw name is mapped during an import's review step --
+    no guessing involved, so future imports of the same raw name auto-fill exactly what
+    was confirmed before rather than a fuzzy best-guess. If a later import maps the same
+    raw name to a *different* ModuleType, the user is asked whether to update this
+    alias for future imports too, or just use the new mapping for that one import."""
+
+    raw_name_normalized = models.CharField(max_length=200, unique=True, help_text="raw_name.strip().lower(), used for lookup.")
+    raw_name = models.CharField(max_length=200, help_text="Display form of the raw name, as most recently seen.")
+    module_type = models.ForeignKey(ModuleType, on_delete=models.CASCADE, related_name='name_aliases')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['raw_name']
+
+    def __str__(self):
+        return f"{self.raw_name} -> {self.module_type.name}"
+
+
+class ModuleImportRow(models.Model):
+    """One row of an in-progress module-list import, staged for the user to correct
+    (module type match, zone, segment, count) before being committed to real
+    ProjectModule rows. A fresh upload for a project clears any rows left over from a
+    prior, abandoned upload. Never contributes to the project's estimate itself --
+    only the ProjectModule rows created from it (on confirm) do."""
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='import_rows')
+    row_number = models.PositiveIntegerField(help_text="The row's position in the uploaded sheet, for reference.")
+    sr = models.CharField(max_length=50, blank=True, help_text="Sr. No. from the sheet, for reference only.")
+    raw_module_name = models.CharField(max_length=200, blank=True, help_text="Module Name exactly as read from the sheet.")
+    module_no = models.CharField(max_length=100, blank=True, help_text="Module No. from the sheet, for reference only.")
+    floor_level = models.CharField(max_length=50, blank=True, help_text="Floor Level from the sheet, for reference only.")
+    zone = models.CharField(max_length=150, blank=True, default='', help_text="From the sheet's Line/Zone column; editable.")
+    module_type = models.ForeignKey(
+        ModuleType, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+        help_text="Matched via an exact name match or a previously-saved ModuleNameAlias, or user-corrected. "
+                   "Blank means unmatched -- must be set before this row can be confirmed. Never a fuzzy guess.",
+    )
+    segment = models.ForeignKey(
+        Segment, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+        help_text="Not present in the sheet -- the user must choose one before this row can be confirmed.",
+    )
+    count = models.PositiveIntegerField(default=0, help_text="0 means unresolved -- must be corrected to 1 or more before this row can be confirmed.")
+
+    class Meta:
+        ordering = ['row_number']
+
+    def __str__(self):
+        return f"{self.project.name} import row {self.row_number}: {self.raw_module_name}"
+
+    @property
+    def is_valid(self):
+        return self.module_type_id is not None and self.segment_id is not None and self.count >= 1

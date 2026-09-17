@@ -1,0 +1,54 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Import Module List - {{ project.name }} - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in" style="max-width: 720px; margin: 0 auto;">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-file-earmark-arrow-up me-2 text-primary"></i>Import Module List</h1>
+        <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Skip / Back to Builder
+        </a>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-3 text-muted small">
+        <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>1. Project Details</span>
+        <i class="bi bi-chevron-right"></i>
+        <span class="fw-bold text-primary">2. Upload Module List</span>
+        <i class="bi bi-chevron-right"></i>
+        <span>3. Review &amp; Correct</span>
+        <i class="bi bi-chevron-right"></i>
+        <span>4. Calculated Estimate</span>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><i class="bi bi-info-circle me-2"></i>{{ project.name }}</div>
+        <div class="card-body">
+            <p class="text-muted">
+                Upload the project's module list (.xlsx, .xls, or .csv). <strong>Line/Zone</strong> (groups modules
+                so effort can be calculated separately per zone), <strong>Module Name</strong> (matched against the
+                standard module types), and a count, taken from <strong>No. of DC roller/AC motor</strong> (falling
+                back to <strong>Quantity</strong> when that's blank or zero), drive the calculation.
+                <strong>Sr.</strong>, <strong>Module No.</strong> and <strong>Floor Level</strong> are also carried
+                over for reference. Every other column in the sheet is ignored. You'll be able to review and correct
+                every row -- including assigning a Segment, which isn't in the sheet -- before anything is saved.
+            </p>
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="module_list" class="form-label fw-semibold">Module List File</label>
+                    <input type="file" name="module_list" id="module_list" class="form-control" accept=".xlsx,.xls,.csv" required>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="bi bi-upload me-2"></i>Upload &amp; Continue
+                    </button>
+                    <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-outline-secondary flex-grow-1">
+                        <i class="bi bi-pencil me-2"></i>Add Modules Manually Instead
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
