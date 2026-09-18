@@ -20,7 +20,20 @@ send the user back to whichever of the two pages this save was made from.
             <button type="button" id="addModuleRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="zone-review-layout">
+                {% regroup existing_modules by zone as zone_groups %}
+                {% if zone_summary and zone_summary|length > 1 %}
+                <div class="zone-nav-rail no-print">
+                    <div class="zone-nav-rail-title">Jump to Zone</div>
+                    {% for zs in zone_summary %}
+                    <button type="button" class="zone-nav-item" data-zone-target="module-zone-heading-{{ forloop.counter0 }}">
+                        <span class="zone-nav-name">{{ zs.zone|default:'Unassigned' }}</span>
+                        <span class="zone-nav-count">{{ zs.count }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="zone-table-scroll">
                 <table class="table align-middle mb-0">
                     <thead>
                         <tr>
@@ -33,9 +46,8 @@ send the user back to whichever of the two pages this save was made from.
                         </tr>
                     </thead>
                     <tbody id="moduleRowsBody">
-                        {% regroup existing_modules by zone as zone_groups %}
                         {% for group in zone_groups %}
-                        <tr class="table-light zone-heading-row">
+                        <tr class="table-light zone-heading-row" id="module-zone-heading-{{ forloop.counter0 }}">
                             <td colspan="6" class="fw-bold text-primary"><i class="bi bi-diagram-3 me-1"></i>{{ group.grouper|default:'Unassigned' }}</td>
                         </tr>
                         {% for pm in group.list %}
@@ -54,6 +66,7 @@ send the user back to whichever of the two pages this save was made from.
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
             </div>
             {% if not existing_modules %}
             <div class="empty-state">

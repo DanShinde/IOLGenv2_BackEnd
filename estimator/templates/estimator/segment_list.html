@@ -6,9 +6,19 @@
 <div class="animate-fade-in">
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-diagram-3 me-2 text-primary"></i>Segments</h1>
-        <a href="{% url 'estimator_segment_new' %}" class="btn btn-primary">
-            <i class="bi bi-plus-circle me-2"></i>Add Segment
-        </a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="list-toolbar">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search segments...">
+            </div>
+            <span class="row-count" id="tableRowCount">{{ segments|length }} segment{{ segments|length|pluralize }}</span>
+            <a href="{% url 'estimator_segment_new' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>Add Segment
+            </a>
+        </div>
     </div>
 
     <div class="card">
@@ -24,12 +34,14 @@
                 </thead>
                 <tbody>
                     {% for segment in segments %}
-                    <tr>
+                    <tr data-searchable-row>
                         <td class="fw-semibold">{{ segment.name }}</td>
                         <td class="text-muted">{{ segment.description|default:'-' }}</td>
                         <td class="text-end">
-                            <a href="{% url 'estimator_segment_edit' segment.pk %}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
-                            <a href="{% url 'estimator_segment_delete' segment.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                            <span class="row-actions">
+                                <a href="{% url 'estimator_segment_edit' segment.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                <a href="{% url 'estimator_segment_delete' segment.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                            </span>
                         </td>
                     </tr>
                     {% endfor %}
@@ -44,4 +56,8 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'estimator/_list_search_js.html' with noun_singular='segment' noun_plural='segments' %}
 {% endblock %}

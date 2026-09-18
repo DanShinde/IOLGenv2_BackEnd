@@ -10,6 +10,7 @@
     .review-table thead th {
         padding: 0.5rem 0.6rem;
         font-size: 0.7rem;
+        height: 34px;
     }
     .review-table tbody td {
         padding: 0.25rem 0.5rem;
@@ -27,6 +28,12 @@
         line-height: 1.1;
         margin-top: 1px;
     }
+
+    /* This page's table is the dense review-table variant (34px header row) --
+       the zone-heading row pins just below it at the same offset. The shared
+       .zone-review-layout/.zone-nav-rail/.zone-table-scroll rail-and-sticky
+       component itself is defined once in base.html. */
+    .zone-table-scroll .zone-heading-row td { top: 34px; }
 </style>
 {% endblock %}
 
@@ -84,7 +91,20 @@
 
         <div class="card mb-3">
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="zone-review-layout">
+                    {% regroup rows by zone as review_zone_groups %}
+                    {% if zone_summary|length > 1 %}
+                    <div class="zone-nav-rail no-print">
+                        <div class="zone-nav-rail-title">Jump to Zone</div>
+                        {% for zs in zone_summary %}
+                        <button type="button" class="zone-nav-item{% if zs.pending %} has-pending{% endif %}" data-zone-target="zone-heading-{{ forloop.counter0 }}">
+                            <span class="zone-nav-name">{{ zs.zone|default:'Unassigned' }}</span>
+                            <span class="zone-nav-count">{% if zs.pending %}{{ zs.pending }}&#9888;{% else %}{{ zs.count }}{% endif %}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="zone-table-scroll">
                     <table class="table table-sm align-middle mb-0 review-table" style="min-width: 1300px;">
                         <thead>
                             <tr>
@@ -99,9 +119,8 @@
                             </tr>
                         </thead>
                         <tbody id="importRowsBody">
-                            {% regroup rows by zone as review_zone_groups %}
                             {% for group in review_zone_groups %}
-                            <tr class="table-light zone-heading-row">
+                            <tr class="table-light zone-heading-row" id="zone-heading-{{ forloop.counter0 }}">
                                 <td colspan="8">
                                     <div class="d-flex flex-wrap align-items-center gap-2">
                                         <span class="fw-bold text-primary"><i class="bi bi-diagram-3 me-1"></i>{{ group.grouper|default:'Unassigned' }}</span>
@@ -160,6 +179,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -188,6 +208,19 @@
     function normalizeName(raw) {
         return raw.trim().toLowerCase();
     }
+
+    // Zone nav rail -- jumps the (independently scrolling) table container to that
+    // zone's heading row, which then stays pinned under the sticky column header as
+    // you scroll past its rows.
+    document.querySelectorAll('.zone-nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = document.getElementById(btn.dataset.zoneTarget);
+            if (!target) return;
+            target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            document.querySelectorAll('.zone-nav-item').forEach(b => b.classList.remove('is-current'));
+            btn.classList.add('is-current');
+        });
+    });
 
     // Client-side validity mirrors ModuleImportRow.is_valid (module type + segment set,
     // count >= 1) so the ⚠/✓ icons and the summary banner update live as corrections

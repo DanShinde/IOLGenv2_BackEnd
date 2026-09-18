@@ -13,32 +13,47 @@
 
     <style>
         :root {
-            /* Deep indigo primary with a lighter tint for gradients/hovers, and a
-               cyan accent used sparingly for "you are here" states (the wizard
-               stepper's active step) so it reads distinctly from ordinary primary
-               actions like Save/Submit buttons. */
-            --primary: #4338CA;
-            --primary-light: #6366F1;
-            --primary-dark: #312E81;
-            --primary-tint: #EEF2FF;
-            --accent: #0891B2;
-            --accent-tint: #ECFEFF;
-            --secondary: #64748B;
-            --success: #059669;
-            --success-tint: #ECFDF5;
-            --warning: #D97706;
-            --warning-tint: #FFFBEB;
+            /* Graphite Teal -- near-black graphite for primary actions and headings,
+               one teal accent used sparingly for focus/active/interactive states,
+               flat surfaces and thin 1px borders instead of soft shadows. */
+            --primary: #18181B;
+            --primary-light: #3F3F46;
+            --primary-dark: #09090B;
+            --primary-tint: #F4F4F5;
+            --accent: #14B8A6;
+            --accent-tint: #F0FDFA;
+            --secondary: #71717A;
+            --success: #16A34A;
+            --success-tint: #F0FDF4;
+            --warning: #CA8A04;
+            --warning-tint: #FEFCE8;
             --danger: #DC2626;
             --danger-tint: #FEF2F2;
             --surface: #FFFFFF;
-            --surface-alt: #F8FAFC;
-            --border: #E2E8F0;
-            --border-strong: #CBD5E1;
-            --dark: #0F172A;
-            --light: #F8FAFC;
-            --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 10px -2px rgba(15, 23, 42, 0.06);
-            --card-hover-shadow: 0 10px 20px -5px rgba(15, 23, 42, 0.1), 0 6px 8px -6px rgba(15, 23, 42, 0.08);
-            --transition: all 0.2s ease;
+            --surface-alt: #FAFAFA;
+            --border: #E4E4E7;
+            --border-strong: #D4D4D8;
+            --dark: #18181B;
+            --light: #FAFAFA;
+            --card-shadow: 0 1px 2px rgba(24, 24, 27, 0.04);
+            --card-hover-shadow: 0 4px 10px -4px rgba(24, 24, 27, 0.12);
+            --transition: all 0.15s ease;
+
+            /* Bootstrap's own theme variables, so utility classes used throughout
+               (bg-primary/text-primary badges, bg-opacity-10, border-primary, etc.)
+               pick up this palette too instead of Bootstrap's default blue. */
+            --bs-primary: var(--primary);
+            --bs-primary-rgb: 24, 24, 27;
+            --bs-secondary: var(--secondary);
+            --bs-secondary-rgb: 113, 113, 122;
+            --bs-success: var(--success);
+            --bs-success-rgb: 22, 163, 74;
+            --bs-danger: var(--danger);
+            --bs-danger-rgb: 220, 38, 38;
+            --bs-warning: var(--warning);
+            --bs-warning-rgb: 202, 138, 4;
+            --bs-info: var(--accent);
+            --bs-info-rgb: 20, 184, 166;
         }
 
         * { box-sizing: border-box; }
@@ -46,11 +61,7 @@
         html { -webkit-font-smoothing: antialiased; }
 
         body {
-            background: #F1F5F9;
-            background-image:
-                radial-gradient(at 0% 0%, rgba(67, 56, 202, 0.06) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(8, 145, 178, 0.05) 0px, transparent 50%);
-            background-attachment: fixed;
+            background: var(--surface-alt);
             min-height: 100vh;
             font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
             color: var(--dark);
@@ -60,22 +71,23 @@
 
         /* ------------------------------------------------------------- Navbar */
         .navbar {
-            background: linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 55%, var(--accent) 150%) !important;
-            box-shadow: 0 2px 16px rgba(15, 23, 42, 0.18);
+            background: var(--primary) !important;
+            box-shadow: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             padding: 0.85rem 0;
         }
 
         .navbar-brand { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
-        .nav-link { font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 8px; transition: var(--transition); margin: 0 2px; }
-        .nav-link:hover { background: rgba(255, 255, 255, 0.12); }
-        .nav-link.active { background: rgba(255, 255, 255, 0.18); font-weight: 600; }
+        .nav-link { font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 6px; transition: var(--transition); margin: 0 2px; border-bottom: 2px solid transparent; }
+        .nav-link:hover { background: rgba(255, 255, 255, 0.08); }
+        .nav-link.active { background: transparent; border-bottom-color: var(--accent); font-weight: 600; }
 
         /* --------------------------------------------------------------- Cards */
-        .card { border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--card-shadow); background: var(--surface); overflow: hidden; }
+        .card { border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--card-shadow); background: var(--surface); overflow: hidden; }
         .card-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.1rem 1.4rem; font-weight: 600; color: var(--dark); }
         .card-body { padding: 1.4rem; }
 
-        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.35rem 1.5rem; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
+        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.5rem; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
         .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
         .kpi-card.success::before { background: var(--success); }
         .kpi-card.warning::before { background: var(--warning); }
@@ -83,12 +95,12 @@
         .kpi-label { color: var(--secondary); font-size: 0.8rem; font-weight: 500; margin-top: 0.4rem; }
 
         /* -------------------------------------------------------------- Buttons */
-        .btn { border-radius: 9px; font-weight: 600; padding: 0.5rem 1.15rem; transition: var(--transition); font-size: 0.9rem; }
-        .btn-sm { border-radius: 7px; }
-        .btn-primary { background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%); border: none; box-shadow: 0 1px 2px rgba(67, 56, 202, 0.15); }
-        .btn-primary:hover, .btn-primary:focus { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); }
-        .btn-success { background: linear-gradient(135deg, var(--success) 0%, #047857 100%); border: none; }
-        .btn-outline-primary { color: var(--primary); border-color: var(--primary-light); }
+        .btn { border-radius: 6px; font-weight: 600; padding: 0.5rem 1.15rem; transition: var(--transition); font-size: 0.9rem; }
+        .btn-sm { border-radius: 5px; }
+        .btn-primary { background: var(--primary); border: 1px solid var(--primary); box-shadow: none; }
+        .btn-primary:hover, .btn-primary:focus { background: var(--primary-dark); border-color: var(--primary-dark); }
+        .btn-success { background: var(--success); border: 1px solid var(--success); }
+        .btn-outline-primary { color: var(--primary); border-color: var(--border-strong); }
         .btn-outline-primary:hover { background: var(--primary); border-color: var(--primary); }
         .btn-outline-secondary { color: var(--secondary); border-color: var(--border-strong); }
         .btn-outline-secondary:hover { background: var(--secondary); border-color: var(--secondary); color: #fff; }
@@ -98,7 +110,7 @@
         .table { margin-bottom: 0; }
         .table thead th { background: var(--surface-alt); color: var(--secondary); font-weight: 700; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); padding: 0.8rem 0.85rem; vertical-align: middle; }
         .table tbody td { padding: 0.8rem 0.85rem; vertical-align: middle; border-color: var(--border); }
-        .table-hover tbody tr:hover { background-color: var(--primary-tint); }
+        .table-hover tbody tr:hover { background-color: var(--accent-tint); }
         .table-filter-row th { background: var(--surface); padding: 0.5rem 0.85rem; }
         .table-filter-row .form-control { font-weight: 400; text-transform: none; letter-spacing: normal; }
 
@@ -109,9 +121,81 @@
         .table td > form + .btn,
         .table td > form + form { margin-left: 0.4rem; }
 
+        /* A row-actions button group (Open/Duplicate/Delete etc.) with connected,
+           shared borders instead of separate floating buttons. A <form> posting one
+           of the actions is given display:contents so its button participates in the
+           group's border-trimming/overlap rules as if it were an unwrapped sibling. */
+        .row-actions { display: inline-flex; }
+        .row-actions form { display: contents; }
+
+        /* ------------------------------------------------------- List toolbar */
+        .list-toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.85rem 1.1rem; }
+        .search-box { position: relative; flex-grow: 1; min-width: 200px; }
+        .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--secondary); font-size: 0.85rem; pointer-events: none; }
+        .search-box .form-control { padding-left: 34px; }
+        .list-toolbar .row-count { color: var(--secondary); font-size: 0.82rem; white-space: nowrap; }
+
+        /* --------------------------------------------------- Zone nav rail + sticky
+           A left rail that jumps a scrolling, zone-grouped table to a given zone;
+           the table's own column header and each zone's own heading row stay pinned
+           while scrolling past that zone's rows. Used wherever a table can run to
+           hundreds/thousands of rows across many zones (module-list review, module
+           summary). Callers set .zone-heading-row td's sticky `top` to match their
+           own header row's height. */
+        .zone-review-layout { display: flex; align-items: stretch; }
+        .zone-nav-rail {
+            width: 180px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            padding: 10px 8px;
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+        .zone-nav-rail-title {
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--secondary);
+            padding: 4px 8px 8px;
+        }
+        .zone-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--dark);
+            cursor: pointer;
+            margin-bottom: 2px;
+        }
+        .zone-nav-item:hover { background: var(--surface-alt); }
+        .zone-nav-item.is-current { background: var(--accent-tint); color: var(--accent); }
+        .zone-nav-name { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .zone-nav-count {
+            font-size: 0.66rem;
+            font-weight: 700;
+            color: var(--secondary);
+            background: var(--surface-alt);
+            border-radius: 20px;
+            padding: 1px 7px;
+            flex-shrink: 0;
+        }
+        .zone-nav-item.has-pending .zone-nav-count { background: var(--warning-tint); color: var(--warning); }
+
+        .zone-table-scroll { flex-grow: 1; min-width: 0; max-height: 65vh; overflow: auto; }
+        .zone-table-scroll thead th { position: sticky; top: 0; z-index: 3; }
+        .zone-table-scroll .zone-heading-row td { position: sticky; z-index: 2; }
+
         /* ---------------------------------------------------------------- Forms */
-        .form-control, .form-select { border-radius: 9px; border: 1.5px solid var(--border); padding: 0.55rem 0.85rem; transition: var(--transition); font-size: 0.9rem; }
-        .form-control:focus, .form-select:focus { border-color: var(--primary-light); box-shadow: 0 0 0 3px var(--primary-tint); }
+        .form-control, .form-select { border-radius: 6px; border: 1.5px solid var(--border); padding: 0.55rem 0.85rem; transition: var(--transition); font-size: 0.9rem; }
+        .form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
         .form-label { font-weight: 600; font-size: 0.85rem; color: var(--dark); }
 
         /* ---------------------------------------------------------- Page header */
@@ -119,9 +203,9 @@
         .page-title { font-size: 1.55rem; font-weight: 800; color: var(--dark); letter-spacing: -0.02em; }
 
         .empty-state { text-align: center; padding: 3rem; color: var(--secondary); }
-        .empty-state i { font-size: 3.5rem; margin-bottom: 1rem; opacity: 0.4; color: var(--primary-light); }
+        .empty-state i { font-size: 3.5rem; margin-bottom: 1rem; opacity: 0.35; color: var(--secondary); }
 
-        .warning-banner { background: var(--warning-tint); border: 1px solid #FDE68A; color: #92400E; border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+        .warning-banner { background: var(--warning-tint); border: 1px solid #FDE68A; color: #854D0E; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
 
         /* ------------------------------------------------------- Wizard stepper */
         .wizard-stepper {
@@ -129,7 +213,7 @@
             align-items: flex-start;
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 14px;
+            border-radius: 8px;
             box-shadow: var(--card-shadow);
             padding: 1.1rem 1.25rem 0.9rem;
             margin-bottom: 1.5rem;
@@ -150,13 +234,13 @@
             top: 18px;
             right: 50%;
             width: 100%;
-            height: 2px;
+            height: 1px;
             background: var(--border);
             z-index: 0;
         }
         .wizard-step.is-done:not(:first-child)::before,
         .wizard-step.is-done + .wizard-step::before {
-            background: var(--success);
+            background: var(--primary);
         }
         .wizard-step-circle {
             position: relative;
@@ -169,7 +253,7 @@
             justify-content: center;
             font-weight: 700;
             font-size: 0.85rem;
-            border: 2px solid var(--border-strong);
+            border: 1.5px solid var(--border-strong);
             background: var(--surface);
             color: var(--secondary);
             transition: var(--transition);
@@ -182,11 +266,11 @@
             line-height: 1.25;
             padding: 0 0.25rem;
         }
-        .wizard-step.is-done .wizard-step-circle { background: var(--success); border-color: var(--success); color: #fff; }
+        .wizard-step.is-done .wizard-step-circle { background: var(--primary); border-color: var(--primary); color: #fff; }
         .wizard-step.is-done .wizard-step-label { color: var(--dark); }
-        .wizard-step.is-active .wizard-step-circle { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-tint); transform: scale(1.08); }
+        .wizard-step.is-active .wizard-step-circle { background: var(--surface); border-color: var(--accent); color: var(--accent); }
         .wizard-step.is-active .wizard-step-label { color: var(--accent); font-weight: 700; }
-        .wizard-step:hover .wizard-step-circle { border-color: var(--primary-light); }
+        .wizard-step:hover .wizard-step-circle { border-color: var(--accent); }
         .wizard-step.is-done:hover .wizard-step-circle,
         .wizard-step.is-active:hover .wizard-step-circle { border-color: currentColor; }
 

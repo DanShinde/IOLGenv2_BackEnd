@@ -2,6 +2,16 @@
 
 {% block title %}{{ project.name }} - Module Summary - Estimator{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* This page's module-rows table uses the default (non-dense) row height, so the
+       zone-heading row's sticky offset matches that taller header instead of the
+       Review & Correct page's dense 34px one. */
+    .zone-table-scroll thead th { height: 42px; }
+    .zone-table-scroll .zone-heading-row td { top: 42px; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="animate-fade-in">
     {% include 'estimator/_wizard_steps.html' with project=project active_step=4 %}
@@ -35,7 +45,7 @@
         save, then continue to the Calculated Estimate.
     </p>
 
-    {% include 'estimator/_module_rows_editor.html' with project=project existing_modules=existing_modules return_to='module_rows' %}
+    {% include 'estimator/_module_rows_editor.html' with project=project existing_modules=existing_modules zone_summary=zone_summary return_to='module_rows' %}
 </div>
 {% endblock %}
 

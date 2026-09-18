@@ -87,5 +87,17 @@ partial above.
         if (btn) btn.closest('tr').remove();
     });
 
+    // Zone nav rail -- jumps the (independently scrolling) table container to that
+    // zone's heading row, which then stays pinned under the sticky column header.
+    document.querySelectorAll('.zone-nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = document.getElementById(btn.dataset.zoneTarget);
+            if (!target) return;
+            target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            document.querySelectorAll('.zone-nav-item').forEach(b => b.classList.remove('is-current'));
+            btn.classList.add('is-current');
+        });
+    });
+
     hydrateExistingRows();
 </script>

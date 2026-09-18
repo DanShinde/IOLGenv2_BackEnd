@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+from itertools import groupby
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -501,9 +502,18 @@ def _module_rows_editor_context(project):
     existing_modules = sorted(
         existing_modules, key=lambda pm: ((pm.zone or UNASSIGNED_ZONE) == UNASSIGNED_ZONE, (pm.zone or UNASSIGNED_ZONE).lower())
     )
+    # One entry per zone, in the same order the template's {% regroup %} produces --
+    # drives the zone nav rail's counts without the template doing arithmetic.
+    zone_summary = [
+        {'zone': zone, 'count': len(group_rows)}
+        for zone, group_rows in (
+            (zone, list(group)) for zone, group in groupby(existing_modules, key=lambda pm: pm.zone or UNASSIGNED_ZONE)
+        )
+    ]
 
     return {
         'existing_modules': existing_modules,
+        'zone_summary': zone_summary,
         'segments_json': safe_json([{'id': s.id, 'name': s.name} for s in segments]),
         'module_types_json': safe_json([{'id': mt.id, 'name': mt.name} for mt in module_types]),
         'complexity_levels_json': safe_json([
@@ -783,12 +793,23 @@ def project_import_review(request, pk):
     segments = list(Segment.objects.order_by('name'))
     module_types = list(ModuleType.objects.order_by('name'))
 
+    # One entry per zone, in the same order the template's {% regroup %} produces
+    # (rows are already sorted by zone above) -- drives the zone nav rail so it can
+    # show each zone's row/pending counts without the template doing arithmetic.
+    zone_summary = [
+        {'zone': zone, 'count': len(group_rows), 'pending': sum(1 for r in group_rows if not r.is_valid)}
+        for zone, group_rows in (
+            (zone, list(group)) for zone, group in groupby(rows, key=lambda r: r.zone or UNASSIGNED_ZONE)
+        )
+    ]
+
     context = {
         'project': project,
         'rows': rows,
         'invalid_count': sum(1 for r in rows if not r.is_valid),
         'module_types': module_types,
         'segments': segments,
+        'zone_summary': zone_summary,
         'aliases_json': safe_json({
             a.raw_name_normalized: {'module_type_id': a.module_type_id, 'module_type_name': a.module_type.name}
             for a in existing_aliases
