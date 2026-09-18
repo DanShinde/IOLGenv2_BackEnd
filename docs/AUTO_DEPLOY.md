@@ -67,7 +67,7 @@ removes waiting; it is never the sole path.
    ```
 
    If this prompts for a username or password, fix that first — see
-   [Git credentials](#git-credentials) below. An unattended task cannot answer a prompt.
+   [Logon type and git credentials](#logon-type-and-git-credentials) below. An unattended task cannot answer a prompt.
 
 3. **Dry-run the worker** from an elevated prompt:
 
@@ -84,7 +84,10 @@ removes waiting; it is never the sole path.
    .\Register-AutoPullTask.ps1
    ```
 
-   It prompts for the Windows password of the account it runs as. Options:
+   It prompts for the Windows password of the account it runs as. **If that password
+   rotates (a monthly domain policy, for example), use `-LogonType S4U` instead** so
+   nothing is stored — see [Logon type and git credentials](#logon-type-and-git-credentials).
+   Options:
 
    ```powershell
    .\Register-AutoPullTask.ps1 -IntervalMinutes 1 -AppPoolName "YourPoolName"
@@ -148,34 +151,88 @@ are all gitignored, so a fast-forward pull cannot overwrite them.
 
 ---
 
-## Git credentials
+## Logon type and git credentials
 
-The remote is `https://github.com/DanShinde/IOLGenv2_BackEnd.git` over HTTPS, so the
-task's account needs non-interactive credentials. Two workable setups:
+These two choices are linked: how the task logs on decides what git can use to
+authenticate. Pick the row that matches your environment.
 
-**A. Credential Manager (what the repo is configured for).** `credential.helper` is
-already `manager`. Log in as the task account once, run `git pull` interactively, and
-let the manager store the credential. This is why `Register-AutoPullTask.ps1` registers
-with a **stored password** rather than SYSTEM or S4U logon — Credential Manager secrets
-are protected by the user's DPAPI key, which only unlocks under a password logon.
+| `-LogonType` | Password stored? | Survives password rotation | Git auth available |
+|---|---|---|---|
+| `Password` (default) | Yes | **No** | Credential Manager, PAT, or deploy key |
+| `S4U` | No | Yes | PAT or deploy key only |
+| `System` | No | Yes | PAT or deploy key only |
 
-**B. A token file (no stored Windows password).** Create a fine-grained GitHub PAT with
-read-only Contents access on this repo, then, as the task account:
+**If the account's password rotates — on a monthly domain policy, say — do not use
+`Password`.** Task Scheduler keeps using the old password, every run fails to log on,
+and deploys stop with no error anywhere except the task's history. Use `S4U`.
+
+Only a password logon can open Windows Credential Manager, because its secrets are
+sealed with a DPAPI key that unlocks from the logon password. S4U and SYSTEM get a
+local-only token with no DPAPI access, so `credential.helper=manager` cannot work
+under them — which is why those two need a token or key instead.
+
+### Recommended: S4U + a read-only PAT
+
+Keeps the deploy running as your own account, stores no password, and never needs
+touching when the domain password changes.
+
+1. Create a **fine-grained personal access token** on GitHub with read-only
+   **Contents** access to this repository only.
+
+2. Put it in the remote URL, as the account the task will run as:
+
+   ```powershell
+   cd C:\IOLGenv2_BackEnd
+   git remote set-url origin https://<PAT>@github.com/DanShinde/IOLGenv2_BackEnd.git
+   git pull --ff-only origin main   # must succeed with no prompt
+   ```
+
+   The token lives in `.git\config`, which is on the server and NTFS-protected. It is
+   read-only and scoped to one repo, so a leak cannot be used to push. Restrict the
+   file if the VM has other users:
+
+   ```powershell
+   icacls C:\IOLGenv2_BackEnd\.git\config /inheritance:r /grant "%USERNAME%:R" "Administrators:F"
+   ```
+
+3. Register the task without a password:
+
+   ```powershell
+   .\deploy\Register-AutoPullTask.ps1 -IntervalMinutes 1 -LogonType S4U
+   ```
+
+Rotating the PAT later is one `git remote set-url` — no task changes.
+
+> **Prefer a credentials file to a URL?** `git config --local credential.helper ""`
+> followed by `git config --local --add credential.helper store`, then one manual
+> `git pull` where you paste the PAT as the password. The empty value first is what
+> clears the inherited `manager` helper; without it git tries `manager` first and
+> hangs waiting for a prompt. The token lands in `%USERPROFILE%\.git-credentials`.
+
+### Cleanest: an SSH deploy key
+
+If the VM can reach GitHub on port 22, a read-only deploy key beats both. Generate a
+key as the task account, add the public half under **Repo → Settings → Deploy keys**
+(leave *Allow write access* unchecked), and switch the remote:
 
 ```powershell
-cd C:\IOLGenv2_BackEnd
-git config credential.helper store
-git config credential.https://github.com.username DanShinde
-# next pull writes the token to %USERPROFILE%\.git-credentials
-git pull origin main   # paste the PAT as the password
+git remote set-url origin git@github.com:DanShinde/IOLGenv2_BackEnd.git
 ```
 
-The token then sits in plaintext in that user's profile — lock the file down with
-`icacls` and use a read-only PAT. With B you can register the task with a different
-logon type if storing the Windows password is not acceptable in your environment.
+Nothing expires, nothing rotates, and the key cannot push. Combine with `-LogonType S4U`.
 
-A read-only **deploy key** over SSH is the cleanest option of all if the VM can reach
-GitHub on port 22; it needs the remote switched to the `git@github.com:` form.
+### If the password is stable
+
+Credential Manager is fine. Log in as the task account once, run `git pull`
+interactively so the manager stores the credential, and register with the default
+`-LogonType Password`.
+
+### Not usually worth it: gMSA
+
+A group Managed Service Account has AD rotate its password automatically and works with
+Task Scheduler. It needs a domain admin to create it, and it still has no Credential
+Manager — so it lands on the same PAT or deploy key as S4U, for more setup. Only makes
+sense if your policy forbids S4U.
 
 ---
 
@@ -295,6 +352,16 @@ Pass `-AppPoolName` so the script recycles the pool explicitly, or run `iisreset
 
 **Migrations ran but the app 500s.** Look at `logs\err.log` (the wfastcgi log) — the
 pull succeeded, so this is an application error, not a deploy one.
+
+**Task history shows "logon failure" / result `0x8007052E`, and deploys silently
+stopped.** The stored password is stale — almost always a rotated domain password.
+Re-register with `-LogonType S4U` so there is nothing to go stale, after setting git
+up with a PAT or deploy key.
+
+**Task runs as S4U/SYSTEM and git hangs or fails to authenticate.** Those logon types
+have no Credential Manager access. Switch the remote to a PAT or deploy key as shown
+above; the give-away is the run timing out at the 30-minute limit with nothing after
+the fetch in the log.
 
 **Webhook delivery shows 404 in GitHub.** The signature didn't verify. The secret in
 the GitHub hook and `DEPLOY_WEBHOOK_SECRET` in `.env` differ, or the app wasn't
