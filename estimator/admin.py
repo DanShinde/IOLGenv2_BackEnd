@@ -1,8 +1,8 @@
 from django.contrib import admin
 
 from .models import (
-    Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule,
-    ProjectTemplate, ProjectTemplateModule, Segment,
+    Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectHistoryEntry,
+    ProjectModule, ProjectTemplate, ProjectTemplateModule, Segment,
 )
 
 
@@ -51,6 +51,20 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ('complexity',)
     search_fields = ('name', 'customer')
     inlines = [ProjectModuleInline]
+
+
+@admin.register(ProjectHistoryEntry)
+class ProjectHistoryEntryAdmin(admin.ModelAdmin):
+    list_display = ('project', 'action', 'user', 'summary', 'created_at')
+    list_filter = ('action',)
+    search_fields = ('project__name', 'summary', 'user__username')
+    readonly_fields = ('project', 'user', 'created_at', 'action', 'summary', 'details')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class ProjectTemplateModuleInline(admin.TabularInline):

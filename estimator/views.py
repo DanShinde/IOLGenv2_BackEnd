@@ -21,7 +21,8 @@ from .imports import ModuleListParseError, match_module_type, normalize_name, pa
 from .mixins import CancelUrlMixin, ProtectedDeleteMixin, StaffRequiredMixin
 from .models import (
     Activity, ComplexityLevel, ModuleActivityTime, ModuleImportRow, ModuleNameAlias, ModuleType,
-    Project, ProjectModule, ProjectTemplate, ProjectTemplateModule, Segment, TimeUnit,
+    Project, ProjectHistoryAction, ProjectHistoryEntry, ProjectModule, ProjectTemplate,
+    ProjectTemplateModule, Segment, TimeUnit,
 )
 
 
@@ -42,6 +43,39 @@ def unique_name(model, base_name, exclude_pk=None):
     while _taken(f'{base_name} ({counter})'):
         counter += 1
     return f'{base_name} ({counter})'
+
+
+def _diff_model_fields(old_instance, new_instance, field_specs):
+    """Compares `old_instance` and `new_instance` (same model, two different moments)
+    field by field, returning a [{'field', 'old', 'new'}, ...] list for whichever
+    ones differ -- the shape ProjectHistoryEntry.details expects.
+
+    `field_specs` is a list of (attr, label) or (attr, label, display_fn); display_fn
+    defaults to str() (blank for None/'') and is how a FK field is shown by name
+    rather than by id."""
+    changes = []
+    for spec in field_specs:
+        attr, label = spec[0], spec[1]
+        display_fn = spec[2] if len(spec) > 2 else (lambda v: '' if v in (None, '') else str(v))
+        old_val = display_fn(getattr(old_instance, attr))
+        new_val = display_fn(getattr(new_instance, attr))
+        if old_val != new_val:
+            changes.append({'field': label, 'old': old_val, 'new': new_val})
+    return changes
+
+
+def _log_project_history(project, user, action, summary, details=None):
+    """Records one entry in a project's permanent audit trail (see
+    ProjectHistoryEntry). `user` is left blank rather than raising if it isn't a real
+    logged-in user, though every view that calls this sits behind
+    EstimatorGroupRequiredMiddleware, so that's not expected to happen in practice."""
+    ProjectHistoryEntry.objects.create(
+        project=project,
+        user=user if getattr(user, 'is_authenticated', False) else None,
+        action=action,
+        summary=summary,
+        details=details,
+    )
 
 
 def safe_json(data):
@@ -398,8 +432,13 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
                     )
                     for tm in template.modules.all()
                 ])
+                _log_project_history(
+                    self.object, self.request.user, ProjectHistoryAction.CREATED,
+                    f'Created from template "{template.name}"',
+                )
                 messages.success(self.request, f'Project "{form.instance.name}" created from template "{template.name}".')
             else:
+                _log_project_history(self.object, self.request.user, ProjectHistoryAction.CREATED, 'Created')
                 messages.success(self.request, f'Project "{form.instance.name}" created. Next, import a module list or add rows manually.')
         return response
 
@@ -431,8 +470,22 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+        old = Project.objects.get(pk=self.object.pk)
+        response = super().form_valid(form)
+        changes = _diff_model_fields(old, self.object, [
+            ('name', 'Name'),
+            ('customer', 'Customer'),
+            ('complexity', 'Complexity', lambda c: c.name if c else ''),
+            ('notes', 'Notes'),
+            ('minutes_per_working_day', 'Minutes / Working Day'),
+        ])
+        if changes:
+            _log_project_history(
+                self.object, self.request.user, ProjectHistoryAction.DETAILS_UPDATED,
+                'Updated ' + ', '.join(c['field'] for c in changes), changes,
+            )
         messages.success(self.request, f'Project "{form.instance.name}" updated.')
-        return super().form_valid(form)
+        return response
 
     def get_success_url(self):
         return reverse('estimator_project_builder', args=[self.object.pk])
@@ -560,7 +613,12 @@ def project_modules_sync(request, pk):
     id, creates rows with a blank id, deletes any row not resubmitted. Raw POST arrays
     (row_id[]/segment[]/module_type[]/count[]/zone[]/complexity_override[]) rather than
     a Django formset, matching this codebase's existing convention for multi-row form
-    submission."""
+    submission.
+
+    Every row actually added, changed, or removed gets its own ProjectHistoryEntry --
+    unlike the (much larger, and machine-generated) rebuild import confirmation does,
+    a Module Summary save is a small, deliberate, hand-made edit, so a per-row entry
+    is the useful grain here rather than noise."""
 
     project = get_object_or_404(Project, pk=pk)
 
@@ -574,6 +632,18 @@ def project_modules_sync(request, pk):
 
     kept_ids = set()
     errors = []
+
+    segment_names = dict(Segment.objects.values_list('id', 'name'))
+    module_type_names = dict(ModuleType.objects.values_list('id', 'name'))
+    complexity_names = dict(ComplexityLevel.objects.values_list('id', 'name'))
+    old_rows_by_id = {pm.id: pm for pm in project.modules.all()}
+
+    def describe(segment_id, module_type_id, zone, count):
+        seg = segment_names.get(int(segment_id)) if segment_id else None
+        mt = module_type_names.get(int(module_type_id)) if module_type_id else None
+        return f"{zone or UNASSIGNED_ZONE} / {seg or '?'} / {mt or '?'} x{count}"
+
+    history_entries = []
 
     with transaction.atomic():
         for index, module_type_id in enumerate(module_type_ids):
@@ -621,13 +691,48 @@ def project_modules_sync(request, pk):
             }
 
             if row_id:
+                old = old_rows_by_id.get(int(row_id))
                 ProjectModule.objects.filter(pk=row_id, project=project).update(**defaults)
                 kept_ids.add(int(row_id))
+                if old:
+                    changes = _diff_model_fields(old, ProjectModule(**defaults), [
+                        ('segment_id', 'Segment', lambda v: segment_names.get(int(v), '') if v else ''),
+                        ('module_type_id', 'Module Type', lambda v: module_type_names.get(int(v), '') if v else ''),
+                        ('count', 'Count'),
+                        ('modified_count', 'Modified Count'),
+                        ('zone', 'Zone'),
+                        ('complexity_override_id', 'Complexity Override', lambda v: complexity_names.get(int(v), '') if v else ''),
+                    ])
+                    if changes:
+                        history_entries.append(ProjectHistoryEntry(
+                            project=project,
+                            user=request.user if request.user.is_authenticated else None,
+                            action=ProjectHistoryAction.MODULE_UPDATED,
+                            summary=f"Updated module row: {describe(segment_id, module_type_id, zone, count)}",
+                            details=changes,
+                        ))
             else:
                 pm = ProjectModule.objects.create(project=project, **defaults)
                 kept_ids.add(pm.id)
+                history_entries.append(ProjectHistoryEntry(
+                    project=project,
+                    user=request.user if request.user.is_authenticated else None,
+                    action=ProjectHistoryAction.MODULE_ADDED,
+                    summary=f"Added module row: {describe(segment_id, module_type_id, zone, count)}",
+                ))
 
+        removed_rows = [pm for pm in old_rows_by_id.values() if pm.id not in kept_ids]
         project.modules.exclude(id__in=kept_ids).delete()
+        for pm in removed_rows:
+            history_entries.append(ProjectHistoryEntry(
+                project=project,
+                user=request.user if request.user.is_authenticated else None,
+                action=ProjectHistoryAction.MODULE_REMOVED,
+                summary=f"Removed module row: {describe(pm.segment_id, pm.module_type_id, pm.zone, pm.count)}",
+            ))
+
+        if history_entries:
+            ProjectHistoryEntry.objects.bulk_create(history_entries)
 
     if errors:
         for e in errors:
@@ -714,6 +819,13 @@ def project_import_upload(request, pk):
                 )
                 for r in parsed_rows
             ])
+            mode_note = ''
+            if existing_import_row_count:
+                mode_note = ' (replaced existing rows)' if existing_rows_action == 'replace' else ' (added to existing rows)'
+            _log_project_history(
+                project, request.user, ProjectHistoryAction.IMPORT_UPLOADED,
+                f'Uploaded module list: {len(parsed_rows)} row(s){mode_note}',
+            )
 
         messages.success(request, f'{len(parsed_rows)} row(s) read. Review and correct them below.')
         return redirect('estimator_project_import_review', pk=project.pk)
@@ -776,6 +888,13 @@ def project_import_review(request, pk):
             # entirely -- the rows themselves are permanent and can be corrected and
             # re-confirmed at any time, so there's no need for an all-or-nothing gate.
             valid_count, skipped_count, summary_row_count = _consolidate_and_save_confirmed_rows(project)
+
+            skipped_note = f', {skipped_count} skipped' if skipped_count else ''
+            _log_project_history(
+                project, request.user, ProjectHistoryAction.IMPORT_CONFIRMED,
+                f'Confirmed import: {valid_count} valid row(s) consolidated into {summary_row_count} '
+                f'module summary row(s){skipped_note}',
+            )
 
             if skipped_count:
                 messages.warning(
@@ -934,6 +1053,21 @@ class ProjectReportView(LoginRequiredMixin, DetailView):
         return context
 
 
+class ProjectHistoryView(LoginRequiredMixin, DetailView):
+    """Who created this project, and the complete, permanent audit trail of who's
+    changed it since -- details edits, Module Summary row changes, and import
+    uploads/confirmations (see ProjectHistoryEntry)."""
+
+    model = Project
+    template_name = 'estimator/project_history.html'
+    context_object_name = 'project'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['history_entries'] = self.object.history_entries.select_related('user')
+        return context
+
+
 def project_export_pdf(request, pk):
     project = get_object_or_404(Project, pk=pk)
     estimate = build_project_estimate(project)
@@ -971,6 +1105,9 @@ def project_duplicate(request, pk):
             )
             for pm in original.modules.all()
         ])
+        _log_project_history(
+            copy, request.user, ProjectHistoryAction.CREATED, f'Duplicated from project "{original.name}"',
+        )
     messages.success(request, f'Duplicated as "{copy.name}".')
     return redirect('estimator_project_builder', pk=copy.pk)
 

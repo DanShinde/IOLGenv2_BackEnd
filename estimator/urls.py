@@ -15,6 +15,7 @@ urlpatterns = [
     path('projects/<int:pk>/import/', views.project_import_upload, name='estimator_project_import_upload'),
     path('projects/<int:pk>/import/review/', views.project_import_review, name='estimator_project_import_review'),
     path('projects/<int:pk>/report/', views.ProjectReportView.as_view(), name='estimator_project_report'),
+    path('projects/<int:pk>/history/', views.ProjectHistoryView.as_view(), name='estimator_project_history'),
     path('projects/<int:pk>/report/pdf/', views.project_export_pdf, name='estimator_project_export_pdf'),
     path('projects/<int:pk>/report/excel/', views.project_export_excel, name='estimator_project_export_excel'),
     path('projects/<int:pk>/save-as-template/', views.ProjectSaveAsTemplateView.as_view(), name='estimator_project_save_as_template'),

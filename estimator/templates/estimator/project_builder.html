@@ -19,6 +19,7 @@
             <a href="{% url 'estimator_project_edit' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit Details</a>
             <a href="{% url 'estimator_project_module_rows' project.pk %}" class="btn btn-outline-primary"><i class="bi bi-boxes me-1"></i>Module Summary</a>
             <a href="{% url 'estimator_project_report' project.pk %}" class="btn btn-outline-primary"><i class="bi bi-file-earmark-text me-1"></i>Report</a>
+            <a href="{% url 'estimator_project_history' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i>History</a>
             <a href="{% url 'estimator_project_export_pdf' project.pk %}" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
             <a href="{% url 'estimator_project_export_excel' project.pk %}" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
             <form method="POST" action="{% url 'estimator_project_duplicate' project.pk %}" class="d-inline">

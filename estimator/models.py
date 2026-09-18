@@ -179,6 +179,48 @@ class Project(models.Model):
         return self.name
 
 
+class ProjectHistoryAction(models.TextChoices):
+    CREATED = 'created', 'Created'
+    DETAILS_UPDATED = 'details_updated', 'Details Updated'
+    MODULE_ADDED = 'module_added', 'Module Row Added'
+    MODULE_UPDATED = 'module_updated', 'Module Row Updated'
+    MODULE_REMOVED = 'module_removed', 'Module Row Removed'
+    IMPORT_UPLOADED = 'import_uploaded', 'Module List Uploaded'
+    IMPORT_CONFIRMED = 'import_confirmed', 'Import Confirmed'
+
+
+class ProjectHistoryEntry(models.Model):
+    """One entry in a project's audit trail -- who did what, and when.
+
+    Covers project detail edits (Step 1), Module Summary row changes (Step 4), and
+    import uploads/confirmations (Steps 2-3). An import is logged as one summarized
+    entry per action (e.g. "Uploaded 812 row(s)") rather than one entry per row --
+    a real BOM import can be a thousand-plus rows, which would otherwise flood the
+    log. Never deleted or edited after creation; project.history_entries is the
+    complete, permanent record."""
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='history_entries')
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+        help_text="Who made this change. Blank if the acting user could not be determined.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=30, choices=ProjectHistoryAction.choices)
+    summary = models.CharField(max_length=500)
+    details = models.JSONField(
+        null=True, blank=True,
+        help_text="Field-level changes for this entry, when applicable: a list of "
+                   "{'field', 'old', 'new'} dicts.",
+    )
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        verbose_name_plural = 'project history entries'
+
+    def __str__(self):
+        return f"{self.project.name}: {self.summary}"
+
+
 class ProjectModule(models.Model):
     """One module line item on a project: a module type (used within a segment) and
     how many of it."""
