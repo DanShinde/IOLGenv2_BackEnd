@@ -503,7 +503,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # --- Deploy webhook (deploy/views.py) ----------------------------------------
 # GitHub POSTs here on push to main; the view only verifies the HMAC signature and
 # writes DEPLOY_TRIGGER_FILE, which deploy\auto_pull.ps1 consumes on its next tick.
-# The endpoint is inert until DEPLOY_WEBHOOK_SECRET is set - see deploy/README.md.
+# The endpoint is inert until DEPLOY_WEBHOOK_SECRET is set - see docs/AUTO_DEPLOY.md.
 DEPLOY_WEBHOOK_SECRET = os.getenv('DEPLOY_WEBHOOK_SECRET', '')
 DEPLOY_WEBHOOK_BRANCH = os.getenv('DEPLOY_WEBHOOK_BRANCH', 'main')
 DEPLOY_TRIGGER_FILE = os.getenv(

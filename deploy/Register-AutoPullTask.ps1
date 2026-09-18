@@ -9,7 +9,7 @@
     than as SYSTEM or with S4U logon. That is deliberate: git needs credentials for the
     private GitHub remote, and the Windows Credential Manager entry used by
     credential.helper=manager can only be decrypted under a password logon. See
-    README.md for the token-file alternative if you would rather not store a password.
+    docs/AUTO_DEPLOY.md for the token-file alternative if you would rather not store a password.
 
 .PARAMETER RepoPath
     The deployment checkout. Defaults to C:\IOLGenv2_BackEnd.

@@ -16,7 +16,7 @@ goes to the OneDesigner sub‑application; everything else stays with this app.
 
 ## Why the IIS sub‑application approach
 
-This app is hosted **inside IIS via wfastcgi** (see [`web.config`](web.config) —
+This app is hosted **inside IIS via wfastcgi** (see [`web.config`](../web.config) —
 `FastCgiModule` + `wfastcgi.py`). When the parent app is already an IIS/wfastcgi
 site, the clean way to add a second app is an **IIS Application nested under the same
 site**. IIS does the path routing natively — `/onedesigner/*` is handled by the

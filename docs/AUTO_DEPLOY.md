@@ -1,14 +1,14 @@
 # Auto-pull: keeping the Windows VM in sync with `main`
 
-This folder holds the deployment-side automation that pulls new commits from
-`origin/main` onto the IIS VM and refreshes the running app.
+How new commits on `origin/main` reach the IIS VM and refresh the running app.
+The code this describes lives in [`deploy/`](../deploy/) at the repo root.
 
 | File | What it is |
 |---|---|
-| [`auto_pull.ps1`](auto_pull.ps1) | The worker. Fetch → compare → pull → pip/migrate/collectstatic → restart. Safe to run on every tick. |
-| [`Register-AutoPullTask.ps1`](Register-AutoPullTask.ps1) | One-time setup: registers the Windows Scheduled Task that runs the worker. |
-| [`views.py`](views.py) | The GitHub webhook endpoint at `/deploy-hook/`. Verifies the HMAC signature and writes a trigger file — nothing else. |
-| [`urls.py`](urls.py) | Wires that view up; included from [`IOLGenv2_BackEnd/urls.py`](../IOLGenv2_BackEnd/urls.py). |
+| [`auto_pull.ps1`](../deploy/auto_pull.ps1) | The worker. Fetch → compare → pull → pip/migrate/collectstatic → restart. Safe to run on every tick. |
+| [`Register-AutoPullTask.ps1`](../deploy/Register-AutoPullTask.ps1) | One-time setup: registers the Windows Scheduled Task that runs the worker. |
+| [`views.py`](../deploy/views.py) | The GitHub webhook endpoint at `/deploy-hook/`. Verifies the HMAC signature and writes a trigger file — nothing else. |
+| [`urls.py`](../deploy/urls.py) | Wires that view up; included from [`IOLGenv2_BackEnd/urls.py`](../IOLGenv2_BackEnd/urls.py). |
 
 The deployment is IIS + wfastcgi rooted at `C:\IOLGenv2_BackEnd` with its venv at
 `C:\IOLGenv2_BackEnd\.venv` — those paths come straight out of

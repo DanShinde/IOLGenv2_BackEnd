@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Intended to run unattended from a Windows Scheduled Task on the deployment VM
-    (see Register-AutoPullTask.ps1 and README.md in this folder).
+    (see Register-AutoPullTask.ps1 here, and docs/AUTO_DEPLOY.md for the runbook).
 
     Each run:
       1. Fetches the remote branch and compares it with the local HEAD.
