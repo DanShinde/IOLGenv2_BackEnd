@@ -1,0 +1,371 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Review Import - {{ project.name }} - Estimator{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* A dense variant of the app's default table, scoped to this page -- with
+       hundreds/thousands of imported rows from a real BOM, the default spacious
+       padding and full-size form controls burn too much vertical space per row. */
+    .review-table thead th {
+        padding: 0.5rem 0.6rem;
+        font-size: 0.7rem;
+        height: 34px;
+    }
+    .review-table tbody td {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.825rem;
+    }
+    .review-table .form-select,
+    .review-table .form-control {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.8rem;
+        min-height: unset;
+        border-radius: 6px;
+    }
+    /* Reserve room for the select's caret icon -- the dense padding above is
+       symmetric, which otherwise overlaps the icon with the option text. */
+    .review-table .form-select {
+        padding-right: 1.7rem;
+        background-position: right 0.5rem center;
+        background-size: 14px 11px;
+    }
+    .review-table .row-note {
+        font-size: 0.7rem;
+        line-height: 1.1;
+        margin-top: 1px;
+    }
+
+    /* This page's table is the dense review-table variant (34px header row) --
+       the zone-heading row pins just below it at the same offset. The shared
+       .zone-review-layout/.zone-nav-rail/.zone-table-scroll rail-and-sticky
+       component itself is defined once in base.html. */
+    .zone-table-scroll .zone-heading-row td { top: 34px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=3 %}
+
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-ui-checks me-2 text-primary"></i>Review &amp; Correct Import</h1>
+        <a href="{% url 'estimator_project_import_upload' project.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Upload a Different File
+        </a>
+    </div>
+
+    <p class="text-muted small mb-3">
+        <i class="bi bi-info-circle me-1"></i>Fix any row flagged <i class="bi bi-exclamation-triangle-fill text-warning"></i>,
+        then Confirm &amp; Next to build the Module Summary.
+    </p>
+
+    <div id="statusBanner" class="warning-banner" style="display:none;"></div>
+
+    {% if rows %}
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="fw-semibold small">Show:</span>
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-secondary active" id="filterShowAllBtn">All (<span id="filterAllCount">{{ rows|length }}</span>)</button>
+            <button type="button" class="btn btn-outline-secondary" id="filterShowPendingBtn">Pending Review (<span id="filterPendingCount">{{ invalid_count }}</span>)</button>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" id="reviewForm">
+        {% csrf_token %}
+        <input type="hidden" name="update_aliases" id="updateAliasesInput" value="0">
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <label class="form-label mb-0 fw-semibold">Bulk apply Segment:</label>
+                    <select id="bulkSegmentSelect" class="form-select" style="max-width: 260px;">
+                        <option value="">-- choose --</option>
+                        {% for s in segments %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                    </select>
+                    <button type="button" id="bulkApplySegmentBtn" class="btn btn-outline-primary btn-sm">Apply to All Rows</button>
+                    <div class="form-check ms-2">
+                        <input class="form-check-input" type="checkbox" id="bulkOverwriteCheck">
+                        <label class="form-check-label small text-muted" for="bulkOverwriteCheck">Overwrite rows that already have a segment</label>
+                    </div>
+                </div>
+                <div class="form-text mt-1">
+                    Or use each zone's own "Apply to Zone" control below to assign a Segment to just that zone's rows.
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body p-0">
+                <div class="zone-review-layout">
+                    {% regroup rows by zone as review_zone_groups %}
+                    {% if zone_summary|length > 1 %}
+                    <div class="zone-nav-rail no-print">
+                        <div class="zone-nav-rail-title">Jump to Zone</div>
+                        {% for zs in zone_summary %}
+                        <button type="button" class="zone-nav-item{% if zs.pending %} has-pending{% endif %}" data-zone-target="zone-heading-{{ forloop.counter0 }}">
+                            <span class="zone-nav-name">{{ zs.zone|default:'Unassigned' }}</span>
+                            <span class="zone-nav-count">{% if zs.pending %}{{ zs.pending }}&#9888;{% else %}{{ zs.count }}{% endif %}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="zone-table-scroll">
+                    <table class="table table-sm align-middle mb-0 review-table" style="min-width: 1300px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">Sr.</th>
+                                <th style="width: 14%;">Zone</th>
+                                <th style="width: 16%;">Segment</th>
+                                <th style="width: 20%;">Module Name</th>
+                                <th style="width: 12%;">Module No.</th>
+                                <th style="width: 10%;">Floor Level</th>
+                                <th style="width: 9%;">Count</th>
+                                <th class="text-center" style="width: 7%;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="importRowsBody">
+                            {% for group in review_zone_groups %}
+                            <tr class="table-light zone-heading-row" id="zone-heading-{{ forloop.counter0 }}">
+                                <td colspan="8">
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <span class="fw-bold text-primary"><i class="bi bi-diagram-3 me-1"></i>{{ group.grouper|default:'Unassigned' }}</span>
+                                        <span class="text-muted small">({{ group.list|length }} row{{ group.list|length|pluralize }})</span>
+                                        <div class="ms-auto d-flex align-items-center gap-2">
+                                            <select class="form-select form-select-sm zone-segment-select" style="width: auto; min-width: 180px;">
+                                                <option value="">-- segment for this zone --</option>
+                                                {% for s in segments %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                                            </select>
+                                            <button type="button" class="btn btn-sm btn-outline-primary zone-apply-segment-btn">Apply to Zone</button>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% for row in group.list %}
+                            <tr class="import-row" data-row-id="{{ row.id }}" data-raw-name="{{ row.raw_module_name }}">
+                                <td>{{ row.sr|default:row.row_number }}</td>
+                                <td><input type="text" name="zone[]" class="form-control zone-input" value="{{ row.zone }}"></td>
+                                <td>
+                                    <select name="segment[]" class="form-select segment-select">
+                                        <option value="">-- select --</option>
+                                        {% for s in segments %}
+                                        <option value="{{ s.id }}" {% if row.segment_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="hidden" name="import_row_id[]" value="{{ row.id }}">
+                                    <select name="module_type[]" class="form-select module-type-select">
+                                        <option value="">-- select --</option>
+                                        {% for mt in module_types %}
+                                        <option value="{{ mt.id }}" {% if row.module_type_id == mt.id %}selected{% endif %}>{{ mt.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if row.raw_module_name %}<div class="row-note text-muted">As read: {{ row.raw_module_name }}</div>{% endif %}
+                                </td>
+                                <td class="text-muted small">{{ row.module_no }}</td>
+                                <td class="text-muted small">{{ row.floor_level }}</td>
+                                <td><input type="number" name="count[]" class="form-control count-input" min="0" value="{{ row.count }}"></td>
+                                <td class="text-center row-status">
+                                    {% if row.is_valid %}
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    {% else %}
+                                    <i class="bi bi-exclamation-triangle-fill text-warning" title="Needs a module type, segment and/or count"></i>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-muted text-center py-4">
+                                    No module list imported yet.
+                                    <a href="{% url 'estimator_project_import_upload' project.pk %}">Upload one</a> to get started.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if rows %}
+        <div class="d-flex gap-2">
+            <button type="submit" name="action" value="save" class="btn btn-outline-secondary">
+                <i class="bi bi-save me-2"></i>Save Corrections
+            </button>
+            <button type="submit" name="action" value="confirm" class="btn btn-primary">
+                <i class="bi bi-arrow-right-circle me-2"></i>Confirm &amp; Next
+            </button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Previously-saved raw-name -> ModuleType mappings for the raw names in this
+    // batch, keyed by normalized (trim+lowercase) raw name -- mirrors
+    // imports.normalize_name() so the two agree on what counts as "the same name".
+    const ALIASES = {{ aliases_json|safe }};
+
+    function normalizeName(raw) {
+        return raw.trim().toLowerCase();
+    }
+
+    // Zone nav rail -- jumps the (independently scrolling) table container to that
+    // zone's heading row, which then stays pinned under the sticky column header as
+    // you scroll past its rows.
+    document.querySelectorAll('.zone-nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = document.getElementById(btn.dataset.zoneTarget);
+            if (!target) return;
+            target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            document.querySelectorAll('.zone-nav-item').forEach(b => b.classList.remove('is-current'));
+            btn.classList.add('is-current');
+        });
+    });
+
+    // Client-side validity mirrors ModuleImportRow.is_valid (module type + segment set,
+    // count >= 1) so the ⚠/✓ icons and the summary banner update live as corrections
+    // are made, without a round trip -- the server re-validates independently on
+    // "Confirm & Next" regardless.
+    function rowIsValid(row) {
+        const moduleType = row.querySelector('.module-type-select').value;
+        const segment = row.querySelector('.segment-select').value;
+        const count = parseInt(row.querySelector('.count-input').value, 10) || 0;
+        return Boolean(moduleType) && Boolean(segment) && count >= 1;
+    }
+
+    function updateRowStatuses() {
+        const rows = document.querySelectorAll('#importRowsBody .import-row');
+        let invalidCount = 0;
+        rows.forEach(row => {
+            const valid = rowIsValid(row);
+            if (!valid) invalidCount++;
+            row.querySelector('.row-status').innerHTML = valid
+                ? '<i class="bi bi-check-circle-fill text-success"></i>'
+                : '<i class="bi bi-exclamation-triangle-fill text-warning" title="Needs a module type, segment and/or count"></i>';
+        });
+        const banner = document.getElementById('statusBanner');
+        if (invalidCount > 0) {
+            banner.style.display = '';
+            banner.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>${invalidCount} of ${rows.length} row(s) still need attention -- these will be skipped by "Confirm & Next" until fixed.`;
+        } else {
+            banner.style.display = 'none';
+        }
+
+        const allCountEl = document.getElementById('filterAllCount');
+        const pendingCountEl = document.getElementById('filterPendingCount');
+        if (allCountEl) allCountEl.textContent = rows.length;
+        if (pendingCountEl) pendingCountEl.textContent = invalidCount;
+
+        applyRowFilter();
+    }
+
+    // "Show: All / Pending Review" -- filters which rows (and, when every row in a
+    // zone is filtered out, that zone's heading too) are visible. Purely a display
+    // filter: hidden rows are still submitted with the form when saving/confirming.
+    let filterMode = 'all';
+
+    function applyRowFilter() {
+        const visibleHeadings = new Set();
+        document.querySelectorAll('#importRowsBody .import-row').forEach(row => {
+            const show = filterMode === 'all' || !rowIsValid(row);
+            row.style.display = show ? '' : 'none';
+            if (show) {
+                let heading = row.previousElementSibling;
+                while (heading && !heading.classList.contains('zone-heading-row')) {
+                    heading = heading.previousElementSibling;
+                }
+                if (heading) visibleHeadings.add(heading);
+            }
+        });
+        document.querySelectorAll('#importRowsBody .zone-heading-row').forEach(heading => {
+            heading.style.display = visibleHeadings.has(heading) ? '' : 'none';
+        });
+    }
+
+    document.getElementById('filterShowAllBtn')?.addEventListener('click', (e) => {
+        filterMode = 'all';
+        e.target.closest('.btn-group').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        applyRowFilter();
+    });
+    document.getElementById('filterShowPendingBtn')?.addEventListener('click', (e) => {
+        filterMode = 'pending';
+        e.target.closest('.btn-group').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        applyRowFilter();
+    });
+
+    // Per-zone "Apply to Zone": sets the Segment on every row between this zone's
+    // heading and the next one (or the end of the table), without touching other
+    // zones -- for when each zone naturally maps to its own Segment and re-picking it
+    // per row would be tedious.
+    document.getElementById('importRowsBody')?.addEventListener('click', (e) => {
+        const zoneBtn = e.target.closest('.zone-apply-segment-btn');
+        if (!zoneBtn) return;
+        const heading = zoneBtn.closest('tr');
+        const value = heading.querySelector('.zone-segment-select').value;
+        if (!value) return;
+        let sibling = heading.nextElementSibling;
+        while (sibling && !sibling.classList.contains('zone-heading-row')) {
+            if (sibling.classList.contains('import-row')) {
+                sibling.querySelector('.segment-select').value = value;
+            }
+            sibling = sibling.nextElementSibling;
+        }
+        updateRowStatuses();
+    });
+
+    document.getElementById('importRowsBody')?.addEventListener('input', updateRowStatuses);
+    document.getElementById('importRowsBody')?.addEventListener('change', updateRowStatuses);
+
+    document.getElementById('bulkApplySegmentBtn')?.addEventListener('click', () => {
+        const value = document.getElementById('bulkSegmentSelect').value;
+        if (!value) return;
+        const overwrite = document.getElementById('bulkOverwriteCheck').checked;
+        document.querySelectorAll('.segment-select').forEach(sel => {
+            if (overwrite || !sel.value) sel.value = value;
+        });
+        updateRowStatuses();
+    });
+
+    // Before saving -- on either button, since a multi-thousand-row sheet gets
+    // corrected across many "Save Corrections" clicks, not just "Confirm & Next" --
+    // warn when a correction would change a mapping that was already saved from an
+    // earlier import. The user decides whether that becomes the new default for
+    // future imports, or just applies to this save.
+    document.getElementById('reviewForm')?.addEventListener('submit', () => {
+        const changes = [];
+        document.querySelectorAll('#importRowsBody .import-row').forEach(row => {
+            const rawName = row.dataset.rawName;
+            if (!rawName) return;
+            const alias = ALIASES[normalizeName(rawName)];
+            if (!alias) return;
+
+            const select = row.querySelector('.module-type-select');
+            const selectedId = select.value;
+            const selectedName = select.options[select.selectedIndex]?.text || '';
+            if (selectedId && String(alias.module_type_id) !== String(selectedId)) {
+                changes.push(`"${rawName}": was "${alias.module_type_name}", now "${selectedName}"`);
+            }
+        });
+
+        if (changes.length === 0) return;
+
+        const preview = changes.slice(0, 8).join('\n') + (changes.length > 8 ? `\n...and ${changes.length - 8} more` : '');
+        const updateSaved = window.confirm(
+            `${changes.length} module name mapping(s) changed from what was previously saved:\n\n${preview}\n\n` +
+            `Save these as the new default for future imports? (Cancel keeps the old saved mapping -- this import still uses your new selection either way.)`
+        );
+        document.getElementById('updateAliasesInput').value = updateSaved ? '1' : '0';
+    });
+
+    updateRowStatuses();
+</script>
+{% endblock %}

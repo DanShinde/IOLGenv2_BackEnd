@@ -1,0 +1,37 @@
+{% comment %}
+Shared live-search script for the "Enhanced Table" list toolbar (search box +
+row-count + data-searchable-row/-group markers). Include once, in a page's
+{% block extra_js %}, with noun_singular/noun_plural for the row-count text:
+
+{% include 'estimator/_list_search_js.html' with noun_singular='project' noun_plural='projects' %}
+
+data-searchable-group is optional -- only pages that group rows into several
+cards/tables (e.g. Activities, grouped by category) need it, to hide a whole
+group once none of its rows match.
+{% endcomment %}
+<script>
+    (function () {
+        const input = document.getElementById('tableSearchInput');
+        if (!input) return;
+        const rows = document.querySelectorAll('[data-searchable-row]');
+        const countEl = document.getElementById('tableRowCount');
+        const noun = (n) => n === 1 ? '{{ noun_singular }}' : '{{ noun_plural }}';
+
+        input.addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            let visible = 0;
+            rows.forEach(row => {
+                const match = !q || row.textContent.toLowerCase().includes(q);
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            document.querySelectorAll('[data-searchable-group]').forEach(group => {
+                const anyVisible = Array.from(group.querySelectorAll('[data-searchable-row]')).some(r => r.style.display !== 'none');
+                group.style.display = anyVisible ? '' : 'none';
+            });
+            if (countEl) {
+                countEl.textContent = q ? `${visible} of ${rows.length}` : `${rows.length} ${noun(rows.length)}`;
+            }
+        });
+    })();
+</script>

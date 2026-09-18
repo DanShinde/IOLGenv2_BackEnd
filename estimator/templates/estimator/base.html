@@ -5,71 +5,289 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Estimator{% endblock %}</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
     <style>
         :root {
-            --primary: #4f46e5;
-            --primary-dark: #4338ca;
-            --secondary: #64748b;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --light: #f8fafc;
-            --dark: #1e293b;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-            --card-hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-            --transition: all 0.3s ease;
+            /* Steel & Amber -- industrial precision, fitting a material-handling
+               engineering tool: a steel-navy primary for actions and headings, one
+               amber accent used for active/highlight states, squarer corners and
+               uppercase labels instead of rounded, quiet chrome. */
+            --primary: #16283F;
+            --primary-light: #3B6EA5;
+            --primary-dark: #0D1F33;
+            --primary-tint: #EDF1F4;
+            --accent: #F59E0B;
+            --accent-tint: #FFF7ED;
+            --secondary: #5B6B7C;
+            --success: #15803D;
+            --success-tint: #F0FDF4;
+            --warning: #EA580C;
+            --warning-tint: #FFF3E8;
+            --danger: #B91C1C;
+            --danger-tint: #FEF2F2;
+            --surface: #FFFFFF;
+            --surface-alt: #F3F5F7;
+            --border: #DCE2E8;
+            --border-strong: #B7C2CC;
+            --dark: #1A2634;
+            --light: #F3F5F7;
+            --card-shadow: 0 1px 2px rgba(26, 38, 52, 0.05);
+            --card-hover-shadow: 0 4px 10px -4px rgba(26, 38, 52, 0.16);
+            --transition: all 0.15s ease;
+
+            /* Bootstrap's own theme variables, so utility classes used throughout
+               (bg-primary/text-primary badges, bg-opacity-10, border-primary, etc.)
+               pick up this palette too instead of Bootstrap's default blue. */
+            --bs-primary: var(--primary);
+            --bs-primary-rgb: 22, 40, 63;
+            --bs-secondary: var(--secondary);
+            --bs-secondary-rgb: 91, 107, 124;
+            --bs-success: var(--success);
+            --bs-success-rgb: 21, 128, 61;
+            --bs-danger: var(--danger);
+            --bs-danger-rgb: 185, 28, 28;
+            --bs-warning: var(--warning);
+            --bs-warning-rgb: 234, 88, 12;
+            --bs-info: var(--accent);
+            --bs-info-rgb: 245, 158, 11;
         }
 
         * { box-sizing: border-box; }
 
+        html { -webkit-font-smoothing: antialiased; }
+
         body {
-            background: linear-gradient(135deg, #f0f4ff 0%, #f8fafc 100%);
+            background: var(--surface-alt);
             min-height: 100vh;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: var(--dark);
         }
 
+        h1, h2, h3, h4, h5, h6 { font-weight: 700; letter-spacing: -0.01em; }
+
+        /* ------------------------------------------------------------- Navbar */
         .navbar {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
-            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
-            padding: 1rem 0;
+            background: var(--primary) !important;
+            box-shadow: none;
+            border-bottom: 3px solid var(--accent);
+            padding: 0.85rem 0;
         }
 
-        .navbar-brand { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
-        .nav-link { font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 8px; transition: var(--transition); margin: 0 4px; }
-        .nav-link:hover, .nav-link.active { background: rgba(255, 255, 255, 0.15); transform: translateY(-2px); }
+        .navbar-brand { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+        .nav-link { font-weight: 700; font-size: 0.82rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.5rem 1rem !important; border-radius: 4px; transition: var(--transition); margin: 0 2px; border-bottom: 2px solid transparent; }
+        .nav-link:hover { background: rgba(255, 255, 255, 0.08); }
+        .nav-link.active { background: transparent; border-bottom-color: var(--accent); font-weight: 700; }
 
-        .card { border: none; border-radius: 16px; box-shadow: var(--card-shadow); background: white; overflow: hidden; }
-        .card-header { background: white; border-bottom: 2px solid #f1f5f9; padding: 1.25rem 1.5rem; font-weight: 600; color: var(--dark); }
-        .card-body { padding: 1.5rem; }
+        /* --------------------------------------------------------------- Cards */
+        .card { border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--card-shadow); background: var(--surface); overflow: hidden; }
+        .card-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.1rem 1.4rem; font-weight: 700; color: var(--dark); }
+        .card-body { padding: 1.4rem; }
 
-        .kpi-card { background: white; border-radius: 16px; padding: 1.5rem; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
+        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.35rem 1.5rem; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
         .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
         .kpi-card.success::before { background: var(--success); }
         .kpi-card.warning::before { background: var(--warning); }
-        .kpi-value { font-size: 1.85rem; font-weight: 700; color: var(--dark); line-height: 1; }
-        .kpi-label { color: var(--secondary); font-size: 0.8rem; margin-top: 0.5rem; }
+        .kpi-value { font-family: 'SFMono-Regular', ui-monospace, Consolas, Menlo, monospace; font-size: 1.75rem; font-weight: 700; color: var(--dark); line-height: 1; letter-spacing: -0.01em; }
+        .kpi-label { color: var(--secondary); font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.5rem; }
 
-        .btn { border-radius: 10px; font-weight: 500; padding: 0.5rem 1.25rem; transition: var(--transition); }
-        .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); border: none; }
-        .btn-success { background: linear-gradient(135deg, var(--success) 0%, #059669 100%); border: none; }
+        /* -------------------------------------------------------------- Buttons */
+        .btn { border-radius: 4px; font-weight: 600; padding: 0.5rem 1.15rem; transition: var(--transition); font-size: 0.9rem; }
+        .btn-sm { border-radius: 4px; }
+        .btn-primary { background: var(--primary); border: 1px solid var(--primary); box-shadow: none; }
+        .btn-primary:hover, .btn-primary:focus { background: var(--primary-dark); border-color: var(--primary-dark); }
+        .btn-success { background: var(--success); border: 1px solid var(--success); }
+        .btn-outline-primary { color: var(--primary); border-color: var(--border-strong); }
+        .btn-outline-primary:hover { background: var(--primary); border-color: var(--primary); }
+        .btn-outline-secondary { color: var(--secondary); border-color: var(--border-strong); }
+        .btn-outline-secondary:hover { background: var(--secondary); border-color: var(--secondary); color: #fff; }
+        .btn-outline-success:hover, .btn-outline-danger:hover { color: #fff; }
 
+        .badge { border-radius: 3px; font-weight: 700; }
+
+        /* --------------------------------------------------------------- Tables */
         .table { margin-bottom: 0; }
-        .table thead th { background: #f8fafc; color: var(--secondary); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; padding: 0.85rem; vertical-align: middle; }
-        .table tbody td { padding: 0.85rem; vertical-align: middle; border-color: #f1f5f9; }
+        .table thead th { background: var(--surface-alt); color: var(--secondary); font-weight: 700; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); padding: 0.8rem 0.85rem; vertical-align: middle; }
+        .table tbody td { padding: 0.8rem 0.85rem; vertical-align: middle; border-color: var(--border); }
+        .table-hover tbody tr:hover { background-color: var(--accent-tint); }
+        .table-filter-row th { background: var(--surface); padding: 0.5rem 0.85rem; }
+        .table-filter-row .form-control { font-weight: 400; text-transform: none; letter-spacing: normal; }
 
-        .form-control, .form-select { border-radius: 10px; border: 2px solid #e2e8f0; padding: 0.6rem 0.9rem; transition: var(--transition); }
-        .form-control:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+        /* Action buttons packed into a table cell (Edit/Delete/etc.) -- consistent
+           breathing room without having to wrap every row's actions in a flex div. */
+        .table td > .btn + .btn,
+        .table td > .btn + form,
+        .table td > form + .btn,
+        .table td > form + form { margin-left: 0.4rem; }
 
+        /* A row-actions button group (Open/Duplicate/Delete etc.) with connected,
+           shared borders instead of separate floating buttons. A <form> posting one
+           of the actions is given display:contents so its button participates in the
+           group's border-trimming/overlap rules as if it were an unwrapped sibling. */
+        .row-actions { display: inline-flex; }
+        .row-actions form { display: contents; }
+
+        /* ------------------------------------------------------- List toolbar */
+        .list-toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.85rem 1.1rem; }
+        .search-box { position: relative; flex-grow: 1; min-width: 200px; }
+        .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--secondary); font-size: 0.85rem; pointer-events: none; }
+        .search-box .form-control { padding-left: 34px; }
+        .list-toolbar .row-count { color: var(--secondary); font-size: 0.82rem; white-space: nowrap; }
+
+        /* --------------------------------------------------- Zone nav rail + sticky
+           A left rail that jumps a scrolling, zone-grouped table to a given zone;
+           the table's own column header and each zone's own heading row stay pinned
+           while scrolling past that zone's rows. Used wherever a table can run to
+           hundreds/thousands of rows across many zones (module-list review, module
+           summary). Callers set .zone-heading-row td's sticky `top` to match their
+           own header row's height. */
+        .zone-review-layout { display: flex; align-items: stretch; }
+        .zone-nav-rail {
+            width: 180px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            padding: 10px 8px;
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+        .zone-nav-rail-title {
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--secondary);
+            padding: 4px 8px 8px;
+        }
+        .zone-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--dark);
+            cursor: pointer;
+            margin-bottom: 2px;
+        }
+        .zone-nav-item:hover { background: var(--surface-alt); }
+        .zone-nav-item.is-current { background: var(--accent-tint); color: var(--accent); }
+        .zone-nav-name { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .zone-nav-count {
+            font-size: 0.66rem;
+            font-weight: 700;
+            color: var(--secondary);
+            background: var(--surface-alt);
+            border-radius: 3px;
+            padding: 1px 7px;
+            flex-shrink: 0;
+        }
+        .zone-nav-item.has-pending .zone-nav-count { background: var(--warning-tint); color: var(--warning); }
+
+        .zone-table-scroll { flex-grow: 1; min-width: 0; max-height: 65vh; overflow: auto; }
+        .zone-table-scroll thead th { position: sticky; top: 0; z-index: 3; }
+        .zone-table-scroll .zone-heading-row td { position: sticky; z-index: 2; }
+
+        /* ---------------------------------------------------------------- Forms */
+        .form-control, .form-select { border-radius: 4px; border: 1.5px solid var(--border); padding: 0.55rem 0.85rem; transition: var(--transition); font-size: 0.9rem; }
+        /* Bootstrap reserves the right-hand padding on .form-select for its caret
+           background-image -- the symmetric padding above would otherwise overlap
+           the icon with the selected option's text (worse still on any denser
+           override, e.g. the zone-segment select on the import review table). */
+        .form-select { padding-right: 2.25rem; background-position: right 0.75rem center; }
+        .form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+        .form-label { font-weight: 600; font-size: 0.85rem; color: var(--dark); }
+
+        /* ---------------------------------------------------------- Page header */
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
-        .page-title { font-size: 1.6rem; font-weight: 700; color: #1e293b; }
+        .page-title { font-size: 1.55rem; font-weight: 800; color: var(--dark); letter-spacing: -0.02em; }
 
         .empty-state { text-align: center; padding: 3rem; color: var(--secondary); }
-        .empty-state i { font-size: 3.5rem; margin-bottom: 1rem; opacity: 0.5; }
+        .empty-state i { font-size: 3.5rem; margin-bottom: 1rem; opacity: 0.35; color: var(--secondary); }
 
-        .warning-banner { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+        .warning-banner { background: var(--warning-tint); border: 1px solid #FDBA74; color: #9A3412; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+
+        /* ------------------------------------------------------- Wizard stepper */
+        .wizard-stepper {
+            display: flex;
+            align-items: flex-start;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: var(--card-shadow);
+            padding: 1.1rem 1.25rem 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+        .wizard-step {
+            position: relative;
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            min-width: 0;
+        }
+        .wizard-step:not(:first-child)::before {
+            content: '';
+            position: absolute;
+            top: 18px;
+            right: 50%;
+            width: 100%;
+            height: 1px;
+            background: var(--border);
+            z-index: 0;
+        }
+        .wizard-step.is-done:not(:first-child)::before,
+        .wizard-step.is-done + .wizard-step::before {
+            background: var(--success);
+        }
+        .wizard-step-circle {
+            position: relative;
+            z-index: 1;
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.85rem;
+            border: 1.5px solid var(--border-strong);
+            background: var(--surface);
+            color: var(--secondary);
+            transition: var(--transition);
+            margin-bottom: 0.45rem;
+        }
+        .wizard-step-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--secondary);
+            line-height: 1.25;
+            padding: 0 0.25rem;
+        }
+        .wizard-step.is-done .wizard-step-circle { background: var(--success); border-color: var(--success); color: #fff; }
+        .wizard-step.is-done .wizard-step-label { color: var(--dark); }
+        .wizard-step.is-active .wizard-step-circle { background: var(--accent); border-color: var(--accent); color: var(--primary); }
+        .wizard-step.is-active .wizard-step-label { color: var(--primary); font-weight: 800; }
+        .wizard-step:hover .wizard-step-circle { border-color: var(--accent); }
+        .wizard-step.is-done:hover .wizard-step-circle,
+        .wizard-step.is-active:hover .wizard-step-circle { border-color: currentColor; }
+
+        @media (max-width: 640px) {
+            .wizard-step-label { display: none; }
+            .wizard-stepper { padding: 0.85rem 0.75rem; }
+        }
 
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeInUp 0.4s ease forwards; }

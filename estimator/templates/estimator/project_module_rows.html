@@ -1,0 +1,54 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}{{ project.name }} - Module Summary - Estimator{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* This page's module-rows table uses the default (non-dense) row height, so the
+       zone-heading row's sticky offset matches that taller header instead of the
+       Review & Correct page's dense 34px one. */
+    .zone-table-scroll thead th { height: 42px; }
+    .zone-table-scroll .zone-heading-row td { top: 42px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=4 %}
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title mb-1"><i class="bi bi-boxes me-2 text-primary"></i>{{ project.name }} &mdash; Module Summary</h1>
+            <div class="text-muted">
+                {{ project.customer|default:'No customer set' }} &middot;
+                Complexity: <strong>{{ project.complexity.name }} (x{{ project.complexity.multiplier }})</strong>
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'estimator_project_edit' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit Details</a>
+            <a href="{% url 'estimator_project_import_upload' project.pk %}" class="btn btn-outline-primary"><i class="bi bi-file-earmark-arrow-up me-1"></i>Import Module List</a>
+            <a href="{% url 'estimator_project_builder' project.pk %}" class="btn btn-outline-success"><i class="bi bi-calculator me-1"></i>Calculated Estimate</a>
+            <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Projects</a>
+        </div>
+    </div>
+
+    {% if has_pending_import %}
+    <div class="warning-banner mb-3">
+        <i class="bi bi-exclamation-triangle me-1"></i>Some imported rows are missing a Module Type, Segment,
+        and/or Count, so they're not included in the Module Summary yet.
+        <a href="{% url 'estimator_project_import_review' project.pk %}">Fix them on Review &amp; Correct</a>.
+    </div>
+    {% endif %}
+
+    <p class="text-muted small mb-3">
+        <i class="bi bi-info-circle me-1"></i>One row per Zone / Segment / Module Type, with total count. Edit and
+        save, then continue to the Calculated Estimate.
+    </p>
+
+    {% include 'estimator/_module_rows_editor.html' with project=project existing_modules=existing_modules zone_summary=zone_summary return_to='module_rows' %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'estimator/_module_rows_editor_js.html' %}
+{% endblock %}

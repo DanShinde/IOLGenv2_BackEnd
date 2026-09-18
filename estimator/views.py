@@ -1,23 +1,28 @@
 import json
+from collections import defaultdict
+from itertools import groupby
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
+from django.db.models import Max, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
-from .calculations import build_project_estimate
+from .calculations import UNASSIGNED_ZONE, build_project_estimate
 from .exports import render_project_report_excel, render_project_report_pdf
 from .forms import (
     ActivityForm, ComplexityLevelForm, ModuleTypeForm, ProjectForm, ProjectTemplateForm,
     SaveProjectAsTemplateForm, SegmentForm,
 )
+from .imports import ModuleListParseError, match_module_type, normalize_name, parse_module_list
 from .mixins import CancelUrlMixin, ProtectedDeleteMixin, StaffRequiredMixin
 from .models import (
-    Activity, ComplexityLevel, ModuleActivityTime, ModuleType, Project, ProjectModule,
-    ProjectTemplate, ProjectTemplateModule, Segment, TimeUnit,
+    Activity, ComplexityLevel, ModuleActivityTime, ModuleImportRow, ModuleNameAlias, ModuleType,
+    Project, ProjectHistoryAction, ProjectHistoryEntry, ProjectModule, ProjectTemplate,
+    ProjectTemplateModule, Segment, TimeUnit,
 )
 
 
@@ -38,6 +43,39 @@ def unique_name(model, base_name, exclude_pk=None):
     while _taken(f'{base_name} ({counter})'):
         counter += 1
     return f'{base_name} ({counter})'
+
+
+def _diff_model_fields(old_instance, new_instance, field_specs):
+    """Compares `old_instance` and `new_instance` (same model, two different moments)
+    field by field, returning a [{'field', 'old', 'new'}, ...] list for whichever
+    ones differ -- the shape ProjectHistoryEntry.details expects.
+
+    `field_specs` is a list of (attr, label) or (attr, label, display_fn); display_fn
+    defaults to str() (blank for None/'') and is how a FK field is shown by name
+    rather than by id."""
+    changes = []
+    for spec in field_specs:
+        attr, label = spec[0], spec[1]
+        display_fn = spec[2] if len(spec) > 2 else (lambda v: '' if v in (None, '') else str(v))
+        old_val = display_fn(getattr(old_instance, attr))
+        new_val = display_fn(getattr(new_instance, attr))
+        if old_val != new_val:
+            changes.append({'field': label, 'old': old_val, 'new': new_val})
+    return changes
+
+
+def _log_project_history(project, user, action, summary, details=None):
+    """Records one entry in a project's permanent audit trail (see
+    ProjectHistoryEntry). `user` is left blank rather than raising if it isn't a real
+    logged-in user, though every view that calls this sits behind
+    EstimatorGroupRequiredMiddleware, so that's not expected to happen in practice."""
+    ProjectHistoryEntry.objects.create(
+        project=project,
+        user=user if getattr(user, 'is_authenticated', False) else None,
+        action=action,
+        summary=summary,
+        details=details,
+    )
 
 
 def safe_json(data):
@@ -161,10 +199,9 @@ class ModuleTypeSegmentsView(LoginRequiredMixin, StaffRequiredMixin, TemplateVie
 
 class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
     """The Module Configuration grid for one (Module Type, Segment) combination: every
-    Activity as a row with an editable time value and a unit (seconds/minutes/hours/
-    days). Each row also accepts an alternate batch entry ('N modules take X total'),
-    mutually exclusive with the single-module field -- whichever is filled in is used;
-    the other must be left blank. Saved in one bulk POST."""
+    Activity as a row with an editable time entry ('N modules take X total', where a
+    single-module time is just N=1) and a unit (seconds/minutes/hours/days). Saved in
+    one bulk POST."""
 
     template_name = 'estimator/module_type_matrix.html'
 
@@ -179,20 +216,30 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
         module_type = self.get_module_type()
         segment = self.get_segment()
         existing = {t.activity_id: t for t in ModuleActivityTime.objects.filter(module_type=module_type, segment=segment)}
+
+        def batch_fields(t):
+            # Legacy rows saved via the old single-module field only have `value` set;
+            # show them as an equivalent 1-module batch so they still populate the form.
+            if t.batch_count and t.batch_value is not None:
+                return t.batch_count, t.batch_value
+            if t.value is not None:
+                return 1, t.value
+            return '', ''
+
         context['module_type'] = module_type
         context['segment'] = segment
         context['time_units'] = TimeUnit.choices
-        context['rows'] = [
-            {
+        context['rows'] = []
+        for a in Activity.objects.order_by('category', 'display_order', 'name'):
+            t = existing.get(a.id)
+            batch_count, batch_value = batch_fields(t) if t else ('', '')
+            context['rows'].append({
                 'activity': a,
-                'unit': existing[a.id].unit if a.id in existing else TimeUnit.MINUTES,
-                'value': existing[a.id].value if a.id in existing else '',
-                'batch_count': existing[a.id].batch_count if a.id in existing else '',
-                'batch_value': existing[a.id].batch_value if a.id in existing else '',
-                'remark': existing[a.id].remark if a.id in existing else '',
-            }
-            for a in Activity.objects.order_by('category', 'display_order', 'name')
-        ]
+                'unit': t.unit if t else TimeUnit.MINUTES,
+                'batch_count': batch_count,
+                'batch_value': batch_value,
+                'remark': t.remark if t else '',
+            })
         return context
 
     def post(self, request, *args, **kwargs):
@@ -204,16 +251,11 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
             unit = request.POST.get(f'unit_{activity.id}', TimeUnit.MINUTES).strip()
             if unit not in valid_units:
                 unit = TimeUnit.MINUTES
-            single_raw = request.POST.get(f'value_{activity.id}', '').strip()
             batch_count_raw = request.POST.get(f'batch_count_{activity.id}', '').strip()
             batch_value_raw = request.POST.get(f'batch_value_{activity.id}', '').strip()
             remark = request.POST.get(f'remark_{activity.id}', '').strip()
-            batch_raw = batch_count_raw or batch_value_raw
 
-            if single_raw and batch_raw:
-                messages.error(request, f"'{activity.name}': fill in either a single-module time OR a batch time, not both -- row skipped.")
-                continue
-            if not single_raw and not batch_raw:
+            if not batch_count_raw and not batch_value_raw:
                 # No time entered -- still worth saving if there's a remark to keep
                 # (e.g. a reference note on a cell that isn't configured yet).
                 if remark:
@@ -223,36 +265,22 @@ class ModuleTypeMatrixView(LoginRequiredMixin, StaffRequiredMixin, TemplateView)
                     )
                 continue
 
-            if single_raw:
-                try:
-                    value = float(single_raw)
-                except ValueError:
-                    messages.error(request, f"Ignored invalid value for '{activity.name}'.")
-                    continue
-                if value < 0:
-                    messages.error(request, f"Ignored negative value for '{activity.name}'.")
-                    continue
-                ModuleActivityTime.objects.update_or_create(
-                    module_type=module_type, segment=segment, activity=activity,
-                    defaults={'unit': unit, 'value': value, 'batch_count': None, 'batch_value': None, 'remark': remark},
-                )
-            else:
-                if not batch_count_raw or not batch_value_raw:
-                    messages.error(request, f"'{activity.name}': batch entry needs both a module count and a total time -- row skipped.")
-                    continue
-                try:
-                    batch_count = int(batch_count_raw)
-                    batch_value = float(batch_value_raw)
-                except ValueError:
-                    messages.error(request, f"Ignored invalid batch value for '{activity.name}'.")
-                    continue
-                if batch_count < 1 or batch_value < 0:
-                    messages.error(request, f"Ignored invalid batch value for '{activity.name}'.")
-                    continue
-                ModuleActivityTime.objects.update_or_create(
-                    module_type=module_type, segment=segment, activity=activity,
-                    defaults={'unit': unit, 'value': None, 'batch_count': batch_count, 'batch_value': batch_value, 'remark': remark},
-                )
+            if not batch_count_raw or not batch_value_raw:
+                messages.error(request, f"'{activity.name}': needs both a module count and a total time -- row skipped.")
+                continue
+            try:
+                batch_count = int(batch_count_raw)
+                batch_value = float(batch_value_raw)
+            except ValueError:
+                messages.error(request, f"Ignored invalid value for '{activity.name}'.")
+                continue
+            if batch_count < 1 or batch_value < 0:
+                messages.error(request, f"Ignored invalid value for '{activity.name}'.")
+                continue
+            ModuleActivityTime.objects.update_or_create(
+                module_type=module_type, segment=segment, activity=activity,
+                defaults={'unit': unit, 'value': None, 'batch_count': batch_count, 'batch_value': batch_value, 'remark': remark},
+            )
 
         messages.success(request, f'Time matrix for "{module_type.name}" / "{segment.name}" saved.')
         return redirect('estimator_module_type_matrix', module_type_pk=module_type.pk, segment_pk=segment.pk)
@@ -386,9 +414,12 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
+        # Must be set before super().form_valid() runs -- it builds the redirect via
+        # get_success_url() internally, which reads this flag.
+        template = form.cleaned_data.get('start_from_template')
+        self._started_from_template = bool(template)
         with transaction.atomic():
             response = super().form_valid(form)
-            template = form.cleaned_data.get('start_from_template')
             if template:
                 ProjectModule.objects.bulk_create([
                     ProjectModule(
@@ -401,13 +432,25 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
                     )
                     for tm in template.modules.all()
                 ])
+                _log_project_history(
+                    self.object, self.request.user, ProjectHistoryAction.CREATED,
+                    f'Created from template "{template.name}"',
+                )
                 messages.success(self.request, f'Project "{form.instance.name}" created from template "{template.name}".')
             else:
-                messages.success(self.request, f'Project "{form.instance.name}" created. Now add its modules below.')
+                _log_project_history(self.object, self.request.user, ProjectHistoryAction.CREATED, 'Created')
+                messages.success(self.request, f'Project "{form.instance.name}" created. Next, import a module list or add rows manually.')
         return response
 
     def get_success_url(self):
-        return reverse('estimator_project_builder', args=[self.object.pk])
+        # A project started from a template already has its module rows, so it goes
+        # straight to the builder like before. An empty project goes to the import
+        # wizard's upload step instead -- that's what makes "New Project" a wizard
+        # (Details -> Upload -> Review -> Module Summary -> Calculated) rather than a
+        # bare empty grid.
+        if self._started_from_template:
+            return reverse('estimator_project_module_rows', args=[self.object.pk])
+        return reverse('estimator_project_import_upload', args=[self.object.pk])
 
 
 class ProjectUpdateView(LoginRequiredMixin, UpdateView):
@@ -419,11 +462,30 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Edit Project'
         context['cancel_url'] = reverse('estimator_project_builder', args=[self.object.pk])
+        # Only ProjectUpdateView (not the other add_form.html users -- Activity,
+        # Segment, etc. -- and not ProjectCreateView, which has no pk yet for the
+        # stepper's other-step links) shows the wizard stepper, as step 1.
+        context['project'] = self.object
+        context['wizard_active_step'] = 1
         return context
 
     def form_valid(self, form):
+        old = Project.objects.get(pk=self.object.pk)
+        response = super().form_valid(form)
+        changes = _diff_model_fields(old, self.object, [
+            ('name', 'Name'),
+            ('customer', 'Customer'),
+            ('complexity', 'Complexity', lambda c: c.name if c else ''),
+            ('notes', 'Notes'),
+            ('minutes_per_working_day', 'Minutes / Working Day'),
+        ])
+        if changes:
+            _log_project_history(
+                self.object, self.request.user, ProjectHistoryAction.DETAILS_UPDATED,
+                'Updated ' + ', '.join(c['field'] for c in changes), changes,
+            )
         messages.success(self.request, f'Project "{form.instance.name}" updated.')
-        return super().form_valid(form)
+        return response
 
     def get_success_url(self):
         return reverse('estimator_project_builder', args=[self.object.pk])
@@ -442,8 +504,23 @@ class ProjectDeleteView(LoginRequiredMixin, DeleteView):
         return redirect(self.success_url)
 
 
+def _has_unresolved_import_rows(project):
+    """True when the project has an imported row that's missing a Module Type,
+    Segment, and/or a valid Count -- i.e. one that "Confirm & Next" would skip
+    right now. ModuleImportRow rows are permanent (see project_import_review), so their
+    mere existence doesn't mean anything is outstanding -- only their *validity* does;
+    checking that instead is what keeps the "still needs review" banner from firing
+    forever once a project has ever had anything imported."""
+    return project.import_rows.filter(
+        Q(module_type__isnull=True) | Q(segment__isnull=True) | Q(count__lt=1)
+    ).exists()
+
+
 class ProjectDetailView(LoginRequiredMixin, DetailView):
-    """The Project Builder / Estimator main screen."""
+    """Step 5 of the project wizard: the read-only Calculated Estimate screen (KPIs,
+    warnings, per-zone activity-wise breakdown). Editing module rows happens on step 4
+    (ProjectModuleRowsView) instead -- this page has nothing to save, so it's rendered
+    entirely from build_project_estimate() with no editing JSON/JS needed."""
 
     model = Project
     template_name = 'estimator/project_builder.html'
@@ -452,42 +529,81 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         project = self.object
-        estimate = build_project_estimate(project)
-        context['estimate'] = estimate
+        context['estimate'] = build_project_estimate(project)
+        context['has_pending_import'] = _has_unresolved_import_rows(project)
+        return context
 
-        segments = list(Segment.objects.order_by('name'))
-        module_types = list(ModuleType.objects.order_by('name'))
-        complexity_levels = list(ComplexityLevel.objects.order_by('display_order', 'multiplier'))
-        activities = estimate['activities']
-        # Resolved for *this* project's own minutes_per_working_day, so a 'day'-unit
-        # matrix cell contributes the right number of minutes here even though it isn't
-        # a fixed conversion across projects.
-        matrix = {
-            (t.segment_id, t.module_type_id, t.activity_id): float(t.effective_minutes(project.minutes_per_working_day))
-            for t in ModuleActivityTime.objects.all()
-        }
 
-        context['segments_json'] = safe_json([{'id': s.id, 'name': s.name} for s in segments])
-        context['module_types_json'] = safe_json([{'id': mt.id, 'name': mt.name} for mt in module_types])
-        context['complexity_levels_json'] = safe_json([
+def _module_rows_editor_context(project):
+    """Shared context for the editable module-rows table (Zone/Segment/Module
+    Type/Count/Complexity Override, grouped by zone) -- used both on step 4 (Module
+    Summary, always) and step 3 (Review & Correct, only when nothing is pending) via
+    the estimator/_module_rows_editor.html partial, so there's one implementation of
+    that table/JS, not two drifting copies."""
+    segments = list(Segment.objects.order_by('name'))
+    module_types = list(ModuleType.objects.order_by('name'))
+    complexity_levels = list(ComplexityLevel.objects.order_by('display_order', 'multiplier'))
+    existing_modules = list(
+        project.modules.select_related('segment', 'module_type', 'complexity_override').order_by('order', 'id')
+    )
+    # Grouped by zone for display (Unassigned last, others alphabetical -- same rule
+    # build_project_estimate() uses for zone_groups) via a stable sort, so each zone's
+    # rows keep their original relative order. The template's {% regroup %} needs the
+    # list pre-sorted by the grouping key, and the JSON below must be built from this
+    # exact order too -- JS hydration matches dropdown data to DOM rows purely by
+    # position.
+    existing_modules = sorted(
+        existing_modules, key=lambda pm: ((pm.zone or UNASSIGNED_ZONE) == UNASSIGNED_ZONE, (pm.zone or UNASSIGNED_ZONE).lower())
+    )
+    # One entry per zone, in the same order the template's {% regroup %} produces --
+    # drives the zone nav rail's counts without the template doing arithmetic.
+    zone_summary = [
+        {'zone': zone, 'count': len(group_rows)}
+        for zone, group_rows in (
+            (zone, list(group)) for zone, group in groupby(existing_modules, key=lambda pm: pm.zone or UNASSIGNED_ZONE)
+        )
+    ]
+
+    return {
+        'existing_modules': existing_modules,
+        'zone_summary': zone_summary,
+        'segments_json': safe_json([{'id': s.id, 'name': s.name} for s in segments]),
+        'module_types_json': safe_json([{'id': mt.id, 'name': mt.name} for mt in module_types]),
+        'complexity_levels_json': safe_json([
             {'id': c.id, 'name': c.name, 'multiplier': float(c.multiplier)} for c in complexity_levels
-        ])
-        context['activities_json'] = safe_json([{'id': a.id, 'name': a.name, 'category': a.category} for a in activities])
-        context['matrix_json'] = safe_json({
-            f"{seg_id}_{mt_id}_{act_id}": mins for (seg_id, mt_id, act_id), mins in matrix.items()
-        })
-        context['modules_json'] = safe_json([
+        ]),
+        'existing_modules_json': safe_json([
             {
                 'id': pm.id,
                 'segment_id': pm.segment_id,
                 'module_type_id': pm.module_type_id,
                 'count': pm.count,
+                'zone': pm.zone,
                 'complexity_override_id': pm.complexity_override_id,
             }
-            for pm in project.modules.order_by('order', 'id')
-        ])
-        context['project_complexity_id'] = project.complexity_id
-        context['minutes_per_day'] = project.minutes_per_working_day
+            for pm in existing_modules
+        ]),
+        'existing_zones_json': safe_json(sorted({pm.zone for pm in existing_modules if pm.zone})),
+        'project_complexity_id': project.complexity_id,
+    }
+
+
+class ProjectModuleRowsView(LoginRequiredMixin, DetailView):
+    """Step 4 of the project wizard: Module Summary -- every module row the project
+    actually has (one per distinct Zone/Segment/Module Type combination -- imports are
+    consolidated into this shape at confirm time, see project_import_review), editable
+    here and saved through the same project_modules_sync endpoint used since before
+    the import wizard existed."""
+
+    model = Project
+    template_name = 'estimator/project_module_rows.html'
+    context_object_name = 'project'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        project = self.object
+        context.update(_module_rows_editor_context(project))
+        context['has_pending_import'] = _has_unresolved_import_rows(project)
         return context
 
 
@@ -495,9 +611,14 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
 def project_modules_sync(request, pk):
     """Persists the Project Builder's module rows in one shot: updates existing rows by
     id, creates rows with a blank id, deletes any row not resubmitted. Raw POST arrays
-    (row_id[]/segment[]/module_type[]/count[]/complexity_override[]) rather than a
-    Django formset, matching this codebase's existing convention for multi-row form
-    submission."""
+    (row_id[]/segment[]/module_type[]/count[]/zone[]/complexity_override[]) rather than
+    a Django formset, matching this codebase's existing convention for multi-row form
+    submission.
+
+    Every row actually added, changed, or removed gets its own ProjectHistoryEntry --
+    unlike the (much larger, and machine-generated) rebuild import confirmation does,
+    a Module Summary save is a small, deliberate, hand-made edit, so a per-row entry
+    is the useful grain here rather than noise."""
 
     project = get_object_or_404(Project, pk=pk)
 
@@ -505,10 +626,24 @@ def project_modules_sync(request, pk):
     segment_ids = request.POST.getlist('segment[]')
     module_type_ids = request.POST.getlist('module_type[]')
     counts = request.POST.getlist('count[]')
+    modified_counts = request.POST.getlist('modified_count[]')
+    zones = request.POST.getlist('zone[]')
     complexity_override_ids = request.POST.getlist('complexity_override[]')
 
     kept_ids = set()
     errors = []
+
+    segment_names = dict(Segment.objects.values_list('id', 'name'))
+    module_type_names = dict(ModuleType.objects.values_list('id', 'name'))
+    complexity_names = dict(ComplexityLevel.objects.values_list('id', 'name'))
+    old_rows_by_id = {pm.id: pm for pm in project.modules.all()}
+
+    def describe(segment_id, module_type_id, zone, count):
+        seg = segment_names.get(int(segment_id)) if segment_id else None
+        mt = module_type_names.get(int(module_type_id)) if module_type_id else None
+        return f"{zone or UNASSIGNED_ZONE} / {seg or '?'} / {mt or '?'} x{count}"
+
+    history_entries = []
 
     with transaction.atomic():
         for index, module_type_id in enumerate(module_type_ids):
@@ -531,31 +666,380 @@ def project_modules_sync(request, pk):
                 continue
 
             complexity_override_id = complexity_override_ids[index].strip() if index < len(complexity_override_ids) else ''
+            zone = zones[index].strip() if index < len(zones) else ''
             row_id = row_ids[index].strip() if index < len(row_ids) else ''
+
+            modified_count_raw = modified_counts[index].strip() if index < len(modified_counts) else ''
+            modified_count = None
+            if modified_count_raw:
+                try:
+                    modified_count = int(modified_count_raw)
+                except ValueError:
+                    modified_count = None
+                if modified_count is not None and modified_count < 1:
+                    errors.append(f"Row {index + 1}: modified count must be at least 1 -- ignored.")
+                    modified_count = None
 
             defaults = {
                 'segment_id': segment_id,
                 'module_type_id': module_type_id,
                 'count': count,
+                'modified_count': modified_count,
+                'zone': zone,
                 'complexity_override_id': complexity_override_id or None,
                 'order': index,
             }
 
             if row_id:
+                old = old_rows_by_id.get(int(row_id))
                 ProjectModule.objects.filter(pk=row_id, project=project).update(**defaults)
                 kept_ids.add(int(row_id))
+                if old:
+                    changes = _diff_model_fields(old, ProjectModule(**defaults), [
+                        ('segment_id', 'Segment', lambda v: segment_names.get(int(v), '') if v else ''),
+                        ('module_type_id', 'Module Type', lambda v: module_type_names.get(int(v), '') if v else ''),
+                        ('count', 'Count'),
+                        ('modified_count', 'Modified Count'),
+                        ('zone', 'Zone'),
+                        ('complexity_override_id', 'Complexity Override', lambda v: complexity_names.get(int(v), '') if v else ''),
+                    ])
+                    if changes:
+                        history_entries.append(ProjectHistoryEntry(
+                            project=project,
+                            user=request.user if request.user.is_authenticated else None,
+                            action=ProjectHistoryAction.MODULE_UPDATED,
+                            summary=f"Updated module row: {describe(segment_id, module_type_id, zone, count)}",
+                            details=changes,
+                        ))
             else:
                 pm = ProjectModule.objects.create(project=project, **defaults)
                 kept_ids.add(pm.id)
+                history_entries.append(ProjectHistoryEntry(
+                    project=project,
+                    user=request.user if request.user.is_authenticated else None,
+                    action=ProjectHistoryAction.MODULE_ADDED,
+                    summary=f"Added module row: {describe(segment_id, module_type_id, zone, count)}",
+                ))
 
+        removed_rows = [pm for pm in old_rows_by_id.values() if pm.id not in kept_ids]
         project.modules.exclude(id__in=kept_ids).delete()
+        for pm in removed_rows:
+            history_entries.append(ProjectHistoryEntry(
+                project=project,
+                user=request.user if request.user.is_authenticated else None,
+                action=ProjectHistoryAction.MODULE_REMOVED,
+                summary=f"Removed module row: {describe(pm.segment_id, pm.module_type_id, pm.zone, pm.count)}",
+            ))
+
+        if history_entries:
+            ProjectHistoryEntry.objects.bulk_create(history_entries)
 
     if errors:
         for e in errors:
             messages.error(request, e)
     else:
         messages.success(request, 'Modules saved.')
-    return redirect('estimator_project_builder', pk=project.pk)
+
+    # "Next: Calculated Estimate" saves through this same endpoint and moves on to
+    # step 5 -- but only when nothing needs the user's attention here first. Otherwise
+    # this returns to wherever the save was made from: step 4 (Module Summary) by
+    # default, or step 3 (Review & Correct) when that's the page the shared
+    # module-rows-editor partial was rendered on.
+    if request.POST.get('action') == 'next' and not errors:
+        return redirect('estimator_project_builder', pk=project.pk)
+    if request.POST.get('return_to') == 'review':
+        return redirect('estimator_project_import_review', pk=project.pk)
+    return redirect('estimator_project_module_rows', pk=project.pk)
+
+
+# --------------------------------------------------------------------------- Module-list import wizard
+#
+# Step 2 (Upload) and step 3 (Review & Correct) of the project wizard, sitting between
+# ProjectCreateView (step 1: project details) and ProjectModuleRowsView (step 4: the
+# consolidated Module Summary). ModuleImportRow rows are permanent -- one per line of
+# the uploaded sheet, always visible and editable on step 3 for as long as the project
+# exists -- and never feed the estimate directly; only the from_import=True
+# ProjectModule rows built by consolidating them (project_import_review's "Confirm &
+# Calculate") do.
+
+def project_import_upload(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    existing_import_row_count = project.import_rows.count()
+    context = {'project': project, 'existing_module_row_count': existing_import_row_count}
+
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('module_list')
+        if not uploaded_file:
+            messages.error(request, 'Choose a file to upload.')
+            return render(request, 'estimator/project_import_upload.html', context)
+
+        # Asked right here, on "Upload & Continue" -- the decision (add to, or replace,
+        # the project's existing imported rows) applies immediately below, but only
+        # once the file has actually parsed successfully.
+        existing_rows_action = request.POST.get('existing_rows_action', '').strip()
+        if existing_import_row_count and existing_rows_action not in ('add', 'replace'):
+            messages.error(
+                request,
+                f"This project already has {existing_import_row_count} imported row(s) -- choose whether to add "
+                f"to them or replace them.",
+            )
+            return render(request, 'estimator/project_import_upload.html', context)
+
+        try:
+            parsed_rows = parse_module_list(uploaded_file)
+        except ModuleListParseError as exc:
+            messages.error(request, str(exc))
+            return render(request, 'estimator/project_import_upload.html', context)
+
+        if not parsed_rows:
+            messages.error(request, 'No module rows found in this file.')
+            return render(request, 'estimator/project_import_upload.html', context)
+
+        module_types = list(ModuleType.objects.all())
+        # Only ever auto-fills an exact name match or a mapping the user has
+        # explicitly confirmed before (see ModuleNameAlias) -- never a fuzzy guess.
+        aliases = {a.raw_name_normalized: a.module_type for a in ModuleNameAlias.objects.select_related('module_type')}
+
+        with transaction.atomic():
+            if existing_import_row_count and existing_rows_action == 'replace':
+                project.import_rows.all().delete()
+            # Otherwise (first-ever import, or 'add'): existing rows are left alone and
+            # this batch is simply appended to them.
+            ModuleImportRow.objects.bulk_create([
+                ModuleImportRow(
+                    project=project,
+                    row_number=r['row_number'],
+                    sr=r['sr'],
+                    raw_module_name=r['raw_module_name'],
+                    module_no=r['module_no'],
+                    floor_level=r['floor_level'],
+                    zone=r['zone'],
+                    module_type=match_module_type(r['raw_module_name'], module_types, aliases),
+                    count=r['count'],
+                )
+                for r in parsed_rows
+            ])
+            mode_note = ''
+            if existing_import_row_count:
+                mode_note = ' (replaced existing rows)' if existing_rows_action == 'replace' else ' (added to existing rows)'
+            _log_project_history(
+                project, request.user, ProjectHistoryAction.IMPORT_UPLOADED,
+                f'Uploaded module list: {len(parsed_rows)} row(s){mode_note}',
+            )
+
+        messages.success(request, f'{len(parsed_rows)} row(s) read. Review and correct them below.')
+        return redirect('estimator_project_import_review', pk=project.pk)
+
+    return render(request, 'estimator/project_import_upload.html', context)
+
+
+def project_import_review(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+
+    if request.method == 'POST':
+        action = request.POST.get('action', 'save')
+        row_ids = request.POST.getlist('import_row_id[]')
+        module_type_ids = request.POST.getlist('module_type[]')
+        zones = request.POST.getlist('zone[]')
+        segment_ids = request.POST.getlist('segment[]')
+        counts = request.POST.getlist('count[]')
+
+        staged_by_id = {r.id: r for r in project.import_rows.all()}
+        to_update = []
+        for index, row_id_raw in enumerate(row_ids):
+            row_id_raw = row_id_raw.strip()
+            row = staged_by_id.get(int(row_id_raw)) if row_id_raw.isdigit() else None
+            if not row:
+                continue
+
+            module_type_id = module_type_ids[index].strip() if index < len(module_type_ids) else ''
+            segment_id = segment_ids[index].strip() if index < len(segment_ids) else ''
+            count_raw = counts[index].strip() if index < len(counts) else ''
+            try:
+                count = int(count_raw)
+            except ValueError:
+                count = 0
+
+            row.module_type_id = module_type_id or None
+            row.segment_id = segment_id or None
+            row.zone = zones[index].strip() if index < len(zones) else row.zone
+            row.count = max(count, 0)
+            to_update.append(row)
+
+        ModuleImportRow.objects.bulk_update(to_update, ['module_type', 'segment', 'zone', 'count'])
+
+        # Learned from whatever was just saved -- on *either* button, not only the
+        # final "Confirm & Next". A multi-thousand-row sheet is realistically
+        # corrected across many "Save Corrections" clicks long before every row is
+        # valid, and a selection the user has saved is already a real decision worth
+        # remembering, not something that should wait on the whole import finishing.
+        # The browser already asked (via confirm()) whether to overwrite any mapping
+        # that differs from what's saved -- this is just that answer. Missing/absent
+        # means either nothing needed asking, or JS didn't run; either way, an
+        # *existing* alias is left untouched rather than silently overwritten, though
+        # a brand-new mapping is always learned regardless.
+        update_existing_aliases = request.POST.get('update_aliases') == '1'
+        fresh_rows = list(project.import_rows.select_related('module_type', 'segment').all())
+        _learn_module_name_aliases(fresh_rows, update_existing_aliases)
+
+        if action == 'confirm':
+            # Only currently-valid rows (module type + segment set, count >= 1) are
+            # consolidated; anything else is skipped rather than blocking this
+            # entirely -- the rows themselves are permanent and can be corrected and
+            # re-confirmed at any time, so there's no need for an all-or-nothing gate.
+            valid_count, skipped_count, summary_row_count = _consolidate_and_save_confirmed_rows(project)
+
+            skipped_note = f', {skipped_count} skipped' if skipped_count else ''
+            _log_project_history(
+                project, request.user, ProjectHistoryAction.IMPORT_CONFIRMED,
+                f'Confirmed import: {valid_count} valid row(s) consolidated into {summary_row_count} '
+                f'module summary row(s){skipped_note}',
+            )
+
+            if skipped_count:
+                messages.warning(
+                    request,
+                    f"{summary_row_count} module summary row(s) built from {valid_count} valid imported row(s) -- "
+                    f"{skipped_count} row(s) skipped (still need a module type, segment, and/or count). "
+                    f"Corrections have been saved; fix and re-confirm those rows whenever ready.",
+                )
+            else:
+                messages.success(request, f'{summary_row_count} module summary row(s) built from {valid_count} imported row(s).')
+            return redirect('estimator_project_module_rows', pk=project.pk)
+
+        messages.success(request, 'Corrections saved.')
+        return redirect('estimator_project_import_review', pk=project.pk)
+
+    rows = list(project.import_rows.select_related('module_type', 'segment').all())
+    # Grouped by zone for display (Unassigned last, others alphabetical -- same rule
+    # used everywhere else this app groups by zone) via a stable sort, so rows within
+    # a zone keep their original (row_number) order. Lets the template's {% regroup %}
+    # show a heading per zone with its own "apply this Segment to the whole zone" tool.
+    rows = sorted(rows, key=lambda r: ((r.zone or UNASSIGNED_ZONE) == UNASSIGNED_ZONE, (r.zone or UNASSIGNED_ZONE).lower()))
+    normalized_names = {normalize_name(r.raw_module_name) for r in rows if r.raw_module_name}
+    # Only the aliases relevant to raw names actually staged here -- lets the review
+    # page's JS warn *before* submit when a correction would change an existing saved
+    # mapping, without shipping the whole (potentially large) alias table.
+    existing_aliases = ModuleNameAlias.objects.filter(raw_name_normalized__in=normalized_names).select_related('module_type')
+
+    segments = list(Segment.objects.order_by('name'))
+    module_types = list(ModuleType.objects.order_by('name'))
+
+    # One entry per zone, in the same order the template's {% regroup %} produces
+    # (rows are already sorted by zone above) -- drives the zone nav rail so it can
+    # show each zone's row/pending counts without the template doing arithmetic.
+    zone_summary = [
+        {'zone': zone, 'count': len(group_rows), 'pending': sum(1 for r in group_rows if not r.is_valid)}
+        for zone, group_rows in (
+            (zone, list(group)) for zone, group in groupby(rows, key=lambda r: r.zone or UNASSIGNED_ZONE)
+        )
+    ]
+
+    context = {
+        'project': project,
+        'rows': rows,
+        'invalid_count': sum(1 for r in rows if not r.is_valid),
+        'module_types': module_types,
+        'segments': segments,
+        'zone_summary': zone_summary,
+        'aliases_json': safe_json({
+            a.raw_name_normalized: {'module_type_id': a.module_type_id, 'module_type_name': a.module_type.name}
+            for a in existing_aliases
+        }),
+    }
+    return render(request, 'estimator/project_import_review.html', context)
+
+
+def _consolidate_and_save_confirmed_rows(project):
+    """(Re)builds the project's import-derived module rows (ProjectModule.from_import
+    =True) by consolidating ALL of the project's current ModuleImportRow rows --
+    grouped by (Segment, Module Type, Zone) with counts summed -- so Module Summary
+    (step 4) shows one row per distinct combination, not one row per line of the
+    original sheet, which for a real BOM export can be a thousand-plus near-duplicate
+    lines. Only currently-valid rows are included.
+
+    Fully replaces the from_import=True rows every time -- since ModuleImportRow is
+    permanent and editable on Review & Correct, this can be re-run any time a
+    correction is made there, and always reflects exactly the current state of those
+    rows. Purely-manual rows (from_import=False, added directly on Module Summary) are
+    never touched. Each new row's Modified Count is carried over from whichever old
+    row shared its (Segment, Module Type, Zone) key, so a hand-entered override on
+    Module Summary survives even though the row itself is rebuilt from scratch.
+    Returns (valid_count, skipped_count, summary_row_count)."""
+    all_rows = list(project.import_rows.select_related('module_type', 'segment').all())
+    valid_rows = [r for r in all_rows if r.is_valid]
+
+    totals = defaultdict(int)
+    for row in valid_rows:
+        totals[(row.segment_id, row.module_type_id, row.zone)] += row.count
+
+    # A Modified Count entered by hand on Module Summary (step 4) must survive this
+    # rebuild -- carried forward onto whichever new row has the same (Segment, Module
+    # Type, Zone) key these totals are grouped by. If that combination no longer
+    # exists after the re-import, its override has nothing to carry onto and is
+    # dropped along with the old row.
+    previous_modified_counts = {
+        (pm.segment_id, pm.module_type_id, pm.zone): pm.modified_count
+        for pm in project.modules.filter(from_import=True)
+        if pm.modified_count is not None
+    }
+
+    with transaction.atomic():
+        project.modules.filter(from_import=True).delete()
+        next_order = (project.modules.aggregate(Max('order'))['order__max'] or -1) + 1
+        to_create = [
+            ProjectModule(
+                project=project, segment_id=segment_id, module_type_id=module_type_id,
+                zone=zone, count=total_count, order=next_order + i, from_import=True,
+                modified_count=previous_modified_counts.get((segment_id, module_type_id, zone)),
+            )
+            for i, ((segment_id, module_type_id, zone), total_count) in enumerate(totals.items())
+        ]
+        if to_create:
+            ProjectModule.objects.bulk_create(to_create)
+
+    return len(valid_rows), len(all_rows) - len(valid_rows), len(to_create)
+
+
+def _learn_module_name_aliases(rows, update_existing):
+    """Saves/updates ModuleNameAlias rows from a just-confirmed import: a raw name
+    mapped to a ModuleType whose name it doesn't literally equal is a "learned"
+    mapping worth remembering. A brand-new mapping is always saved; a mapping that
+    already exists and differs is only overwritten when `update_existing` is True --
+    the caller has already gotten the user's yes/no on that."""
+    candidates = {}
+    for row in rows:
+        if not row.raw_module_name or not row.module_type_id:
+            continue
+        normalized = normalize_name(row.raw_module_name)
+        if normalized == normalize_name(row.module_type.name):
+            continue  # literal match -- always resolves the same way, nothing to remember
+        candidates[normalized] = row  # last one wins if the same raw name repeats in this batch
+
+    if not candidates:
+        return
+
+    existing_by_key = {
+        a.raw_name_normalized: a
+        for a in ModuleNameAlias.objects.filter(raw_name_normalized__in=candidates.keys())
+    }
+
+    to_create, to_update = [], []
+    for normalized, row in candidates.items():
+        existing = existing_by_key.get(normalized)
+        if not existing:
+            to_create.append(ModuleNameAlias(
+                raw_name_normalized=normalized, raw_name=row.raw_module_name, module_type=row.module_type,
+            ))
+        elif existing.module_type_id != row.module_type_id and update_existing:
+            existing.raw_name = row.raw_module_name
+            existing.module_type = row.module_type
+            to_update.append(existing)
+
+    if to_create:
+        ModuleNameAlias.objects.bulk_create(to_create)
+    if to_update:
+        ModuleNameAlias.objects.bulk_update(to_update, ['raw_name', 'module_type', 'updated_at'])
 
 
 class ProjectReportView(LoginRequiredMixin, DetailView):
@@ -566,6 +1050,21 @@ class ProjectReportView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['estimate'] = build_project_estimate(self.object)
+        return context
+
+
+class ProjectHistoryView(LoginRequiredMixin, DetailView):
+    """Who created this project, and the complete, permanent audit trail of who's
+    changed it since -- details edits, Module Summary row changes, and import
+    uploads/confirmations (see ProjectHistoryEntry)."""
+
+    model = Project
+    template_name = 'estimator/project_history.html'
+    context_object_name = 'project'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['history_entries'] = self.object.history_entries.select_related('user')
         return context
 
 
@@ -599,11 +1098,16 @@ def project_duplicate(request, pk):
                 segment=pm.segment,
                 module_type=pm.module_type,
                 count=pm.count,
+                modified_count=pm.modified_count,
+                zone=pm.zone,
                 complexity_override=pm.complexity_override,
                 order=pm.order,
             )
             for pm in original.modules.all()
         ])
+        _log_project_history(
+            copy, request.user, ProjectHistoryAction.CREATED, f'Duplicated from project "{original.name}"',
+        )
     messages.success(request, f'Duplicated as "{copy.name}".')
     return redirect('estimator_project_builder', pk=copy.pk)
 
@@ -813,7 +1317,7 @@ class ProjectSaveAsTemplateView(LoginRequiredMixin, CreateView):
                     template=self.object,
                     segment=pm.segment,
                     module_type=pm.module_type,
-                    count=pm.count,
+                    count=pm.effective_count,
                     complexity_override=pm.complexity_override,
                     order=pm.order,
                 )

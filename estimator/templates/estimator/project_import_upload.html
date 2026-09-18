@@ -1,0 +1,82 @@
+{% extends 'estimator/base.html' %}
+
+{% block title %}Import Module List - {{ project.name }} - Estimator{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=2 %}
+
+    <div style="max-width: 720px; margin: 0 auto;">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-file-earmark-arrow-up me-2 text-primary"></i>Import Module List</h1>
+        <a href="{% url 'estimator_project_module_rows' project.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Skip / Go to Module Summary
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><i class="bi bi-info-circle me-2"></i>{{ project.name }}</div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                <i class="bi bi-info-circle me-1"></i>Upload a .xlsx, .xls, or .csv module list &mdash; you'll review
+                and correct every row next.
+            </p>
+            <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="module_list" class="form-label fw-semibold">Module List File</label>
+                    <input type="file" name="module_list" id="module_list" class="form-control" accept=".xlsx,.xls,.csv" required>
+                </div>
+
+                {% if existing_module_row_count %}
+                <div class="warning-banner mb-3">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>This project already has {{ existing_module_row_count }} imported row(s)</strong> on the
+                    Review &amp; Correct step. What should happen to them?
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="radio" name="existing_rows_action" value="add" id="existingRowsAddUpload" checked>
+                        <label class="form-check-label" for="existingRowsAddUpload">
+                            <strong>Add</strong> to the existing {{ existing_module_row_count }} row(s)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="existing_rows_action" value="replace" id="existingRowsReplaceUpload">
+                        <label class="form-check-label" for="existingRowsReplaceUpload">
+                            <strong>Replace</strong> the existing {{ existing_module_row_count }} row(s) with this import
+                        </label>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="bi bi-upload me-2"></i>Upload &amp; Continue
+                    </button>
+                    <a href="{% url 'estimator_project_module_rows' project.pk %}" class="btn btn-outline-secondary flex-grow-1">
+                        <i class="bi bi-pencil me-2"></i>Add Modules Manually Instead
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // "Replace" deletes the project's existing imported rows immediately once this
+    // upload parses successfully -- not deferred to a later step -- so confirm before
+    // letting that through, same as any other hard-to-undo action in this app.
+    document.getElementById('uploadForm')?.addEventListener('submit', (e) => {
+        const replaceRadio = document.getElementById('existingRowsReplaceUpload');
+        if (replaceRadio && replaceRadio.checked) {
+            const ok = window.confirm(
+                "This will permanently delete this project's existing imported rows and replace them with the " +
+                'rows from this file. This cannot be undone. Continue?'
+            );
+            if (!ok) e.preventDefault();
+        }
+    });
+</script>
+{% endblock %}

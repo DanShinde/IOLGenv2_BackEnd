@@ -6,9 +6,19 @@
 <div class="animate-fade-in">
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-boxes me-2 text-primary"></i>Module Types</h1>
-        <a href="{% url 'estimator_module_type_new' %}" class="btn btn-primary">
-            <i class="bi bi-plus-circle me-2"></i>Add Module Type
-        </a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="list-toolbar">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search module types...">
+            </div>
+            <span class="row-count" id="tableRowCount">{{ module_types|length }} module type{{ module_types|length|pluralize }}</span>
+            <a href="{% url 'estimator_module_type_new' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>Add Module Type
+            </a>
+        </div>
     </div>
 
     <div class="card">
@@ -25,7 +35,7 @@
                 </thead>
                 <tbody>
                     {% for module_type in module_types %}
-                    <tr>
+                    <tr data-searchable-row>
                         <td class="fw-semibold">{{ module_type.name }}</td>
                         <td class="text-muted">{{ module_type.description|default:'-' }}</td>
                         <td>
@@ -38,9 +48,11 @@
                             {% endwith %}
                         </td>
                         <td class="text-end">
-                            <a href="{% url 'estimator_module_type_segments' module_type.pk %}" class="btn btn-sm btn-outline-success"><i class="bi bi-grid-3x3-gap me-1"></i>Segments &amp; Matrix</a>
-                            <a href="{% url 'estimator_module_type_edit' module_type.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                            <a href="{% url 'estimator_module_type_delete' module_type.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <span class="row-actions">
+                                <a href="{% url 'estimator_module_type_segments' module_type.pk %}" class="btn btn-sm btn-outline-secondary" title="Segments &amp; Matrix"><i class="bi bi-grid-3x3-gap"></i></a>
+                                <a href="{% url 'estimator_module_type_edit' module_type.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                <a href="{% url 'estimator_module_type_delete' module_type.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                            </span>
                         </td>
                     </tr>
                     {% endfor %}
@@ -55,4 +67,8 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'estimator/_list_search_js.html' with noun_singular='module type' noun_plural='module types' %}
 {% endblock %}

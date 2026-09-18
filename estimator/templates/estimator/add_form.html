@@ -3,7 +3,12 @@
 {% block title %}{{ title }} - Estimator{% endblock %}
 
 {% block content %}
-<div class="animate-fade-in" style="max-width: 640px; margin: 0 auto;">
+<div class="animate-fade-in">
+    {% if wizard_active_step and project %}
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=wizard_active_step %}
+    {% endif %}
+
+    <div style="max-width: 640px; margin: 0 auto;">
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-pencil-square me-2 text-primary"></i>{{ title }}</h1>
     </div>
@@ -35,6 +40,7 @@
                 </div>
             </form>
         </div>
+    </div>
     </div>
 </div>
 {% endblock %}

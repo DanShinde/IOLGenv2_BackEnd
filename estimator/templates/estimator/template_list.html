@@ -7,14 +7,22 @@
     <div class="page-header">
         <div>
             <h1 class="page-title mb-1"><i class="bi bi-file-earmark-ruled me-2 text-primary"></i>Templates</h1>
-            <div class="text-muted">Reusable module combinations, shared by everyone with Estimator access. Start a new project from one, or save any project as a new template.</div>
+            <div class="text-muted">Reusable module combinations, shared by everyone with Estimator access.</div>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-2"></i>Projects
-            </a>
-            <a href="{% url 'estimator_template_new' %}" class="btn btn-primary">
-                <i class="bi bi-plus-circle me-2"></i>New Template
+        <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Projects
+        </a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="list-toolbar">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search templates...">
+            </div>
+            <span class="row-count" id="tableRowCount">{{ templates|length }} template{{ templates|length|pluralize }}</span>
+            <a href="{% url 'estimator_template_new' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>New Template
             </a>
         </div>
     </div>
@@ -33,19 +41,10 @@
                         <th>Updated</th>
                         <th class="text-end">Actions</th>
                     </tr>
-                    <tr class="table-filter-row">
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Name..." onkeyup="filterTable(this)"></th>
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Description..." onkeyup="filterTable(this)"></th>
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Complexity..." onkeyup="filterTable(this)"></th>
-                        <th></th>
-                        <th><input type="text" class="form-control form-control-sm" placeholder="Filter Creator..." onkeyup="filterTable(this)"></th>
-                        <th></th>
-                        <th></th> {# No filter for Actions #}
-                    </tr>
                 </thead>
                 <tbody>
                     {% for template in templates %}
-                    <tr>
+                    <tr data-searchable-row>
                         <td><a href="{% url 'estimator_template_builder' template.pk %}" class="fw-semibold text-decoration-none">{{ template.name }}</a></td>
                         <td class="text-muted">{{ template.description|default:'-'|truncatechars:60 }}</td>
                         <td><span class="badge bg-primary bg-opacity-10 text-primary">{{ template.complexity.name }} (x{{ template.complexity.multiplier }})</span></td>
@@ -53,9 +52,11 @@
                         <td class="text-muted">{{ template.created_by.get_username|default:'-' }}</td>
                         <td class="text-muted">{{ template.updated_at|date:'d M Y H:i' }}</td>
                         <td class="text-end">
-                            <a href="{% url 'estimator_template_builder' template.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Open</a>
-                            <a href="{% url 'estimator_project_new' %}?template={{ template.pk }}" class="btn btn-sm btn-outline-success"><i class="bi bi-plus-circle"></i> Use</a>
-                            <a href="{% url 'estimator_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <span class="row-actions">
+                                <a href="{% url 'estimator_template_builder' template.pk %}" class="btn btn-sm btn-outline-secondary" title="Open"><i class="bi bi-pencil-square"></i></a>
+                                <a href="{% url 'estimator_project_new' %}?template={{ template.pk }}" class="btn btn-sm btn-outline-secondary" title="Use for new project"><i class="bi bi-plus-circle"></i></a>
+                                <a href="{% url 'estimator_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                            </span>
                         </td>
                     </tr>
                     {% endfor %}
@@ -73,37 +74,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    function filterTable(inputEl) {
-        const table = inputEl.closest('table');
-        const filterRow = table.querySelector('.table-filter-row');
-        const tableBody = table.querySelector('tbody');
-        const dataRows = tableBody.querySelectorAll('tr');
-
-        const filterInputs = Array.from(filterRow.querySelectorAll('th'));
-        const filters = {};
-        filterInputs.forEach((th, index) => {
-            const input = th.querySelector('input');
-            if (input && input.value !== '') {
-                filters[index] = input.value.toUpperCase();
-            }
-        });
-
-        dataRows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length === 0) return;
-
-            let rowVisible = true;
-            for (const colIndex in filters) {
-                const filterText = filters[colIndex];
-                const cellText = cells[colIndex] ? cells[colIndex].textContent.toUpperCase() : '';
-                if (!cellText.includes(filterText)) {
-                    rowVisible = false;
-                    break;
-                }
-            }
-            row.style.display = rowVisible ? "" : "none";
-        });
-    }
-</script>
+{% include 'estimator/_list_search_js.html' with noun_singular='template' noun_plural='templates' %}
 {% endblock %}

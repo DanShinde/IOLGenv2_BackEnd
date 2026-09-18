@@ -74,8 +74,16 @@ def _write_summary_sheet(ws, estimate):
         ws.cell(row=row, column=1, value=f"{group['label']}:").font = Font(bold=True, color='64748B')
         ws.cell(row=row, column=2, value=f"{float(group['total_days']):.2f} man-days").font = Font(bold=True, color='4F46E5')
 
+    if len(estimate['zone_groups']) > 1:
+        row += 1
+        ws.cell(row=row, column=1, value='By Zone:').font = Font(bold=True, color='64748B')
+        for zg in estimate['zone_groups']:
+            row += 1
+            ws.cell(row=row, column=1, value=zg['zone']).font = Font(color='64748B')
+            ws.cell(row=row, column=2, value=f"{float(zg['grand_total_days']):.2f} man-days").font = Font(bold=True, color='4F46E5')
+
     row += 2
-    headers = ['Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)', 'Row Total (man-days)']
+    headers = ['Zone', 'Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)', 'Row Total (man-days)']
     for col, header in enumerate(headers, start=1):
         cell = ws.cell(row=row, column=col, value=header)
         cell.font = HEADER_FONT
@@ -83,12 +91,13 @@ def _write_summary_sheet(ws, estimate):
     row += 1
 
     for r in estimate['rows']:
-        ws.cell(row=row, column=1, value=r['segment'].name)
-        ws.cell(row=row, column=2, value=r['module_type'].name)
-        ws.cell(row=row, column=3, value=r['count'])
-        ws.cell(row=row, column=4, value=f"{r['complexity'].name} (x{r['complexity'].multiplier})" if r['complexity'] else '-')
-        ws.cell(row=row, column=5, value=float(r['row_total_minutes']))
-        days_cell = ws.cell(row=row, column=6, value=round(float(r['row_total_days']), 2))
+        ws.cell(row=row, column=1, value=r['zone'])
+        ws.cell(row=row, column=2, value=r['segment'].name)
+        ws.cell(row=row, column=3, value=r['module_type'].name)
+        ws.cell(row=row, column=4, value=r['effective_count'])
+        ws.cell(row=row, column=5, value=f"{r['complexity'].name} (x{r['complexity'].multiplier})" if r['complexity'] else '-')
+        ws.cell(row=row, column=6, value=float(r['row_total_minutes']))
+        days_cell = ws.cell(row=row, column=7, value=round(float(r['row_total_days']), 2))
         days_cell.font = Font(bold=True, color='4F46E5')
         row += 1
 
@@ -99,12 +108,13 @@ def _write_summary_sheet(ws, estimate):
     ws.cell(row=row, column=3, value=f"{float(estimate['grand_total_hours']):.2f} hrs").fill = TOTAL_FILL
     ws.cell(row=row, column=4, value=f"{float(estimate['grand_total_days']):.2f} man-days").fill = TOTAL_FILL
 
-    ws.column_dimensions['A'].width = 20
-    ws.column_dimensions['B'].width = 24
-    ws.column_dimensions['C'].width = 10
-    ws.column_dimensions['D'].width = 20
-    ws.column_dimensions['E'].width = 16
-    ws.column_dimensions['F'].width = 18
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 24
+    ws.column_dimensions['D'].width = 10
+    ws.column_dimensions['E'].width = 20
+    ws.column_dimensions['F'].width = 16
+    ws.column_dimensions['G'].width = 18
 
 
 def _write_breakdown_sheet(ws, group):
@@ -143,7 +153,7 @@ def _write_breakdown_sheet(ws, group):
         row = row_offset + 2
         ws.cell(row=row, column=1, value=r['segment'].name)
         ws.cell(row=row, column=2, value=r['module_type'].name)
-        ws.cell(row=row, column=3, value=r['count'])
+        ws.cell(row=row, column=3, value=r['effective_count'])
         for col, act_data in enumerate(r['activities'], start=4):
             cell = ws.cell(row=row, column=col, value=round(float(act_data['days']), 3))
             cell.alignment = Alignment(horizontal='center')
@@ -219,6 +229,10 @@ def render_project_report_pdf(estimate):
     story.append(Paragraph('Module Summary', heading_style))
     story.append(_module_summary_table(estimate))
 
+    if len(estimate['zone_groups']) > 1:
+        story.append(Paragraph('By Zone', heading_style))
+        story.append(_zone_summary_table(estimate))
+
     for group in estimate['category_groups']:
         story.append(Paragraph(
             f"{group['label']} &mdash; Activity-wise Breakdown (man-days) "
@@ -239,17 +253,18 @@ def render_project_report_pdf(estimate):
 
 
 def _module_summary_table(estimate):
-    data = [['Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)', 'Row Total (man-days)']]
+    data = [['Zone', 'Segment', 'Module Type', 'Count', 'Complexity', 'Row Total (min)', 'Row Total (man-days)']]
     for r in estimate['rows']:
         data.append([
+            r['zone'],
             r['segment'].name,
             r['module_type'].name,
-            str(r['count']),
+            str(r['effective_count']),
             f"{r['complexity'].name} (x{r['complexity'].multiplier})" if r['complexity'] else '-',
             f"{r['row_total_minutes']:.1f}",
             f"{r['row_total_days']:.2f}",
         ])
-    table = Table(data, colWidths=[4 * cm, 5 * cm, 2 * cm, 4.5 * cm, 4 * cm, 4.5 * cm])
+    table = Table(data, colWidths=[3 * cm, 3.5 * cm, 4.5 * cm, 1.7 * cm, 4 * cm, 3.5 * cm, 4 * cm])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -258,8 +273,27 @@ def _module_summary_table(estimate):
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('FONTNAME', (5, 1), (5, -1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (5, 1), (5, -1), colors.HexColor('#4F46E5')),
+        ('FONTNAME', (6, 1), (6, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (6, 1), (6, -1), colors.HexColor('#4F46E5')),
+    ]))
+    return table
+
+
+def _zone_summary_table(estimate):
+    data = [['Zone', 'Module Rows', 'Man-days']]
+    for zg in estimate['zone_groups']:
+        data.append([zg['zone'], str(len(zg['rows'])), f"{zg['grand_total_days']:.2f}"])
+    table = Table(data, colWidths=[8 * cm, 5 * cm, 5 * cm])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('FONTNAME', (2, 1), (2, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (2, 1), (2, -1), colors.HexColor('#4F46E5')),
     ]))
     return table
 
@@ -283,7 +317,7 @@ def _activity_breakdown_tables(group):
         data = [header]
         for r in rows:
             act_by_id = {ad['activity'].id: ad for ad in r['activities']}
-            row_vals = [r['segment'].name, r['module_type'].name, str(r['count'])]
+            row_vals = [r['segment'].name, r['module_type'].name, str(r['effective_count'])]
             for a in chunk:
                 row_vals.append(f"{act_by_id[a.id]['days']:.3f}")
             if is_last_chunk:

@@ -6,15 +6,25 @@
 <div class="animate-fade-in">
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-list-check me-2 text-primary"></i>Activity Master</h1>
-        <a href="{% url 'estimator_activity_new' %}" class="btn btn-primary">
-            <i class="bi bi-plus-circle me-2"></i>Add Activity
-        </a>
     </div>
 
     {% regroup activities by get_category_display as category_list %}
     {% if activities %}
-        {% for category in category_list %}
         <div class="card mb-3">
+            <div class="list-toolbar">
+                <div class="search-box">
+                    <i class="bi bi-search"></i>
+                    <input type="text" class="form-control" id="tableSearchInput" placeholder="Search activities...">
+                </div>
+                <span class="row-count" id="tableRowCount">{{ activities|length }} activit{{ activities|length|pluralize:'y,ies' }}</span>
+                <a href="{% url 'estimator_activity_new' %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle me-1"></i>Add Activity
+                </a>
+            </div>
+        </div>
+
+        {% for category in category_list %}
+        <div class="card mb-3" data-searchable-group>
             <div class="card-header"><i class="bi bi-tag me-2"></i>{{ category.grouper }}</div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -28,13 +38,15 @@
                     </thead>
                     <tbody>
                         {% for activity in category.list %}
-                        <tr>
+                        <tr data-searchable-row>
                             <td>{{ activity.display_order }}</td>
                             <td class="fw-semibold">{{ activity.name }}</td>
                             <td class="text-muted">{{ activity.description|default:'-' }}</td>
                             <td class="text-end">
-                                <a href="{% url 'estimator_activity_edit' activity.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                                <a href="{% url 'estimator_activity_delete' activity.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                                <span class="row-actions">
+                                    <a href="{% url 'estimator_activity_edit' activity.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                    <a href="{% url 'estimator_activity_delete' activity.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
+                                </span>
                             </td>
                         </tr>
                         {% endfor %}
@@ -52,4 +64,8 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'estimator/_list_search_js.html' with noun_singular='activity' noun_plural='activities' %}
 {% endblock %}

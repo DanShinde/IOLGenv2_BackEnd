@@ -4,6 +4,8 @@
 
 {% block content %}
 <div class="animate-fade-in">
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=5 %}
+
     <div class="page-header">
         <div>
             <h1 class="page-title mb-1"><i class="bi bi-clipboard2-data me-2 text-primary"></i>{{ project.name }}</h1>
@@ -15,7 +17,9 @@
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a href="{% url 'estimator_project_edit' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit Details</a>
+            <a href="{% url 'estimator_project_module_rows' project.pk %}" class="btn btn-outline-primary"><i class="bi bi-boxes me-1"></i>Module Summary</a>
             <a href="{% url 'estimator_project_report' project.pk %}" class="btn btn-outline-primary"><i class="bi bi-file-earmark-text me-1"></i>Report</a>
+            <a href="{% url 'estimator_project_history' project.pk %}" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i>History</a>
             <a href="{% url 'estimator_project_export_pdf' project.pk %}" class="btn btn-outline-danger"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
             <a href="{% url 'estimator_project_export_excel' project.pk %}" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
             <form method="POST" action="{% url 'estimator_project_duplicate' project.pk %}" class="d-inline">
@@ -34,349 +38,167 @@
     <div class="alert alert-light border mb-3">{{ project.notes }}</div>
     {% endif %}
 
-    <div id="liveWarningBanner" class="warning-banner" style="display:none;"></div>
+    {% if has_pending_import %}
+    <div class="warning-banner mb-3">
+        <i class="bi bi-exclamation-triangle me-1"></i>Some imported rows are missing a Module Type, Segment,
+        and/or Count, so they're not included in this estimate yet.
+        <a href="{% url 'estimator_project_import_review' project.pk %}">Fix them on Review &amp; Correct</a>.
+    </div>
+    {% endif %}
+
+    {% if estimate.warnings %}
+    <div class="warning-banner mb-3">
+        {% for w in estimate.warnings %}<div><i class="bi bi-exclamation-triangle me-1"></i>{{ w }}</div>{% endfor %}
+    </div>
+    {% endif %}
 
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3">
             <div class="kpi-card">
-                <div class="kpi-value" id="kpiGrandMinutes">0</div>
+                <div class="kpi-value">{{ estimate.grand_total_minutes|floatformat:1 }}</div>
                 <div class="kpi-label">Total Minutes</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="kpi-card success">
-                <div class="kpi-value" id="kpiGrandHours">0</div>
+                <div class="kpi-value">{{ estimate.grand_total_hours|floatformat:2 }}</div>
                 <div class="kpi-label">Total Hours</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="kpi-card warning">
-                <div class="kpi-value" id="kpiGrandDays">0</div>
+                <div class="kpi-value">{{ estimate.grand_total_days|floatformat:2 }}</div>
                 <div class="kpi-label">Man-days (@ {{ project.minutes_per_working_day }} min/day)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="kpi-card">
-                <div class="kpi-value" id="kpiModuleCount">0</div>
+                <div class="kpi-value">{{ estimate.rows|length }}</div>
                 <div class="kpi-label">Module Rows</div>
             </div>
         </div>
     </div>
 
     <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-boxes me-2"></i>Module Rows</span>
-            <button type="button" id="addRowBtn" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Module Row</button>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{% url 'estimator_project_modules_sync' project.pk %}" id="modulesForm">
-                {% csrf_token %}
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th style="width: 20%;">Segment</th>
-                                <th style="width: 24%;">Module Type</th>
-                                <th style="width: 10%;">Count</th>
-                                <th style="width: 20%;">Complexity Override</th>
-                                <th class="text-end" style="width: 18%;">Row Total</th>
-                                <th style="width: 8%;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="moduleRowsBody">
-                            {% for row in estimate.rows %}
-                            <tr class="module-row">
-                                <td>
-                                    <input type="hidden" name="row_id[]" value="{{ row.module.id }}">
-                                    <select name="segment[]" class="form-select segment-select" required>
-                                        <option value="">-- select --</option>
-                                    </select>
-                                </td>
-                                <td>
-                                    <select name="module_type[]" class="form-select module-type-select" required>
-                                        <option value="">-- select --</option>
-                                    </select>
-                                </td>
-                                <td><input type="number" name="count[]" class="form-control count-input" min="1" value="{{ row.count }}" required></td>
-                                <td>
-                                    <select name="complexity_override[]" class="form-select complexity-select">
-                                        <option value="">Inherit ({{ project.complexity.name }})</option>
-                                    </select>
-                                </td>
-                                <td class="text-end">
-                                    <div class="row-total fw-semibold">{{ row.row_total_minutes|floatformat:1 }} min</div>
-                                    <div class="row-total-days small text-primary">{{ row.row_total_days|floatformat:2 }} man-days</div>
-                                </td>
-                                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% if not estimate.rows %}
-                <div class="empty-state">
-                    <i class="bi bi-boxes"></i>
-                    <p>No module rows yet. Click "Add Module Row" to start building the estimate.</p>
-                </div>
-                {% endif %}
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-2"></i>Save Modules</button>
-                </div>
-            </form>
+        <div class="card-header"><i class="bi bi-diagram-3 me-2"></i>By Zone</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Zone</th>
+                        <th class="text-end">Module Rows</th>
+                        <th class="text-end">Man-days</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for zg in estimate.zone_groups %}
+                    <tr>
+                        <td class="fw-semibold">{{ zg.zone }}</td>
+                        <td class="text-end">{{ zg.rows|length }}</td>
+                        <td class="text-end text-primary fw-semibold">{{ zg.grand_total_days|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted text-center py-3">No module rows yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 
-    {% if estimate.category_groups %}
-        {% for group in estimate.category_groups %}
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-bar-chart-steps me-2"></i>{{ group.label }} &mdash; Activity-wise Totals</span>
-                <span class="badge bg-primary bg-opacity-10 text-primary category-days-badge" data-category="{{ group.category }}">{{ group.total_days|floatformat:2 }} man-days</span>
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><i class="bi bi-bar-chart-steps me-2"></i>Activity-wise Totals by Zone</span>
+            {% if estimate.zone_groups %}
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="expandAllZonesBtn">Expand All</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="collapseAllZonesBtn">Collapse All</button>
             </div>
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Activity</th>
-                            <th class="text-end activity-total-header">Total (man-days)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for at in group.activity_totals %}
-                        <tr>
-                            <td>{{ at.activity.name }}</td>
-                            <td class="text-end activity-total-cell" data-activity-id="{{ at.activity.id }}">{{ at.total_days|floatformat:3 }}</td>
-                        </tr>
-                        {% endfor %}
-                        <tr class="fw-bold" style="background:#eef2ff;">
-                            <td>{{ group.label }} Total</td>
-                            <td class="text-end category-total-cell" data-category="{{ group.category }}">{{ group.total_days|floatformat:3 }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            {% endif %}
         </div>
-        {% endfor %}
-    {% else %}
-    <div class="card">
+        {% if estimate.zone_groups %}
+        <div class="accordion accordion-flush" id="zoneActivityAccordion">
+            {% for zg in estimate.zone_groups %}
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#zoneAct{{ forloop.counter }}">
+                        <span class="flex-grow-1">{{ zg.zone }}</span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary me-2">{{ zg.grand_total_days|floatformat:2 }} man-days</span>
+                    </button>
+                </h2>
+                <div id="zoneAct{{ forloop.counter }}" class="accordion-collapse collapse">
+                    <div class="accordion-body">
+                        <div class="row g-3">
+                            {% for group in zg.category_groups %}
+                            <div class="col-lg-6">
+                                <div class="fw-semibold text-secondary small text-uppercase mb-1">{{ group.label }}</div>
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Activity</th>
+                                            <th class="text-end activity-total-header">Total (man-days)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for at in group.activity_totals %}
+                                        <tr>
+                                            <td>{{ at.activity.name }}</td>
+                                            <td class="text-end calc-cell" data-days="{{ at.total_days|floatformat:3 }}"
+                                                data-formula="{% for c in at.contributions %}{% if not forloop.first %} + {% endif %}{{ c.minutes|floatformat:1 }} ({{ c.label }}){% empty %}0.0{% endfor %} = {{ at.total_minutes|floatformat:1 }} min">{{ at.total_days|floatformat:3 }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <tr class="fw-bold" style="background:#EDF1F4;">
+                                            <td>{{ group.label }} Total</td>
+                                            <td class="text-end">{{ group.total_days|floatformat:3 }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
         <div class="empty-state">
             <i class="bi bi-bar-chart-steps"></i>
-            <p>No activities configured yet.</p>
+            <p>No module rows yet. <a href="{% url 'estimator_project_module_rows' project.pk %}">Add some on Module Summary</a>.</p>
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    const SEGMENTS = {{ segments_json|safe }};
-    const MODULE_TYPES = {{ module_types_json|safe }};
-    const COMPLEXITY_LEVELS = {{ complexity_levels_json|safe }};
-    const ACTIVITIES = {{ activities_json|safe }};
-    const MATRIX = {{ matrix_json|safe }};
-    const EXISTING_MODULES = {{ modules_json|safe }};
-    const PROJECT_COMPLEXITY_ID = {{ project_complexity_id }};
-    const MINUTES_PER_DAY = {{ minutes_per_day }};
-
-    const complexityById = {};
-    COMPLEXITY_LEVELS.forEach(c => complexityById[c.id] = c);
-    const moduleTypeById = {};
-    MODULE_TYPES.forEach(m => moduleTypeById[m.id] = m);
-    const segmentById = {};
-    SEGMENTS.forEach(s => segmentById[s.id] = s);
-
     // Activity-wise totals default to man-days (matching the KPI headline); "Show
-    // Calculation" reveals the underlying minutes they were derived from.
+    // Calculation" reveals the underlying minutes they were derived from. Everything
+    // on this page is server-rendered from the current estimate -- editing happens on
+    // the Module Summary step instead -- so this is just a text-swap on pre-rendered
+    // data attributes, no recomputation.
     let showingCalculation = false;
 
     function toggleCalculation() {
         showingCalculation = !showingCalculation;
+        document.querySelectorAll('.calc-cell').forEach(cell => {
+            cell.textContent = showingCalculation ? cell.dataset.formula : cell.dataset.days;
+        });
         document.querySelectorAll('.activity-total-header').forEach(th => {
             th.textContent = showingCalculation ? 'Total Minutes' : 'Total (man-days)';
         });
         document.getElementById('calcToggleBtn').innerHTML = showingCalculation
             ? '<i class="bi bi-eye-slash me-1"></i>Hide Calculation'
             : '<i class="bi bi-calculator me-1"></i>Show Calculation';
-        recalc();
     }
 
-    function segmentOptionsHtml(selectedId) {
-        let html = '<option value="">-- select --</option>';
-        SEGMENTS.forEach(s => {
-            const sel = (String(s.id) === String(selectedId)) ? 'selected' : '';
-            html += `<option value="${s.id}" ${sel}>${s.name}</option>`;
-        });
-        return html;
-    }
-
-    function moduleTypeOptionsHtml(selectedId) {
-        let html = '<option value="">-- select --</option>';
-        MODULE_TYPES.forEach(m => {
-            const sel = (String(m.id) === String(selectedId)) ? 'selected' : '';
-            html += `<option value="${m.id}" ${sel}>${m.name}</option>`;
-        });
-        return html;
-    }
-
-    function complexityOptionsHtml(selectedId) {
-        let html = `<option value="">Inherit (${complexityById[PROJECT_COMPLEXITY_ID] ? complexityById[PROJECT_COMPLEXITY_ID].name : ''})</option>`;
-        COMPLEXITY_LEVELS.forEach(c => {
-            const sel = (String(c.id) === String(selectedId)) ? 'selected' : '';
-            html += `<option value="${c.id}" ${sel}>${c.name} (x${c.multiplier})</option>`;
-        });
-        return html;
-    }
-
-    function hydrateExistingRows() {
-        const rows = document.querySelectorAll('#moduleRowsBody .module-row');
-        rows.forEach((tr, i) => {
-            const data = EXISTING_MODULES[i];
-            const segSelect = tr.querySelector('.segment-select');
-            const mtSelect = tr.querySelector('.module-type-select');
-            const cxSelect = tr.querySelector('.complexity-select');
-            segSelect.innerHTML = segmentOptionsHtml(data ? data.segment_id : '');
-            mtSelect.innerHTML = moduleTypeOptionsHtml(data ? data.module_type_id : '');
-            cxSelect.innerHTML = complexityOptionsHtml(data ? data.complexity_override_id : '');
-        });
-    }
-
-    function factorForRow(row) {
-        const overrideId = row.querySelector('.complexity-select').value;
-        if (overrideId && complexityById[overrideId]) {
-            return complexityById[overrideId].multiplier;
-        }
-        const proj = complexityById[PROJECT_COMPLEXITY_ID];
-        return proj ? proj.multiplier : 1;
-    }
-
-    function recalc() {
-        const rows = document.querySelectorAll('#moduleRowsBody .module-row');
-        const activityTotals = {};
-        const activityContributions = {};
-        ACTIVITIES.forEach(a => { activityTotals[a.id] = 0; activityContributions[a.id] = []; });
-        const categoryTotals = {};
-        ACTIVITIES.forEach(a => categoryTotals[a.category] = 0);
-        let grandTotal = 0;
-        const warningTypes = new Set();
-
-        rows.forEach(row => {
-            const segId = row.querySelector('.segment-select').value;
-            const mtId = row.querySelector('.module-type-select').value;
-            const count = parseFloat(row.querySelector('.count-input').value) || 0;
-            const factor = factorForRow(row);
-            let rowTotal = 0;
-
-            if (segId && mtId) {
-                let hasAny = false;
-                ACTIVITIES.forEach(a => {
-                    const key = segId + '_' + mtId + '_' + a.id;
-                    if (Object.prototype.hasOwnProperty.call(MATRIX, key)) hasAny = true;
-                    const base = MATRIX[key] || 0;
-                    const minutes = base * count * factor;
-                    activityTotals[a.id] += minutes;
-                    categoryTotals[a.category] += minutes;
-                    rowTotal += minutes;
-                    if (minutes > 0) {
-                        const label = moduleTypeById[mtId] && segmentById[segId] ? `${moduleTypeById[mtId].name} / ${segmentById[segId].name}` : 'row';
-                        activityContributions[a.id].push({ label, base, count, factor, minutes });
-                    }
-                });
-                if (!hasAny && moduleTypeById[mtId] && segmentById[segId]) {
-                    warningTypes.add(`${moduleTypeById[mtId].name} / ${segmentById[segId].name}`);
-                }
-            }
-            row.querySelector('.row-total').textContent = rowTotal.toFixed(1) + ' min';
-            row.querySelector('.row-total-days').textContent = (rowTotal / MINUTES_PER_DAY).toFixed(2) + ' man-days';
-            grandTotal += rowTotal;
-        });
-
-        // "Show Calculation" reveals the full arithmetic behind each total: for a single
-        // contributing row that's "rate x count x complexity = minutes"; for several rows
-        // it's each row's minutes summed, so the reader can see exactly where the number
-        // came from rather than just the same figure in a different unit.
-        function formulaFor(contributions, total) {
-            if (contributions.length === 0) return '0.0 min';
-            if (contributions.length === 1) {
-                const c = contributions[0];
-                return `${c.count} (no. of modules) x ${c.base.toFixed(1)} (min per module) x ${c.factor.toFixed(2)} (complexity) = ${c.minutes.toFixed(1)} min`;
-            }
-            return contributions.map(c => `${c.minutes.toFixed(1)} (${c.label})`).join(' + ') + ` = ${total.toFixed(1)} min`;
-        }
-
-        ACTIVITIES.forEach(a => {
-            const cell = document.querySelector(`.activity-total-cell[data-activity-id="${a.id}"]`);
-            if (cell) {
-                cell.textContent = showingCalculation
-                    ? formulaFor(activityContributions[a.id], activityTotals[a.id])
-                    : (activityTotals[a.id] / MINUTES_PER_DAY).toFixed(3);
-            }
-        });
-
-        Object.keys(categoryTotals).forEach(category => {
-            const totalCell = document.querySelector(`.category-total-cell[data-category="${category}"]`);
-            if (totalCell) {
-                const categoryContributions = ACTIVITIES
-                    .filter(a => a.category === category)
-                    .flatMap(a => activityContributions[a.id]);
-                totalCell.textContent = showingCalculation
-                    ? formulaFor(categoryContributions, categoryTotals[category])
-                    : (categoryTotals[category] / MINUTES_PER_DAY).toFixed(3);
-            }
-            const daysBadge = document.querySelector(`.category-days-badge[data-category="${category}"]`);
-            if (daysBadge) daysBadge.textContent = (categoryTotals[category] / MINUTES_PER_DAY).toFixed(2) + ' man-days';
-        });
-
-        document.getElementById('kpiGrandMinutes').textContent = grandTotal.toFixed(1);
-        document.getElementById('kpiGrandHours').textContent = (grandTotal / 60).toFixed(2);
-        document.getElementById('kpiGrandDays').textContent = (grandTotal / MINUTES_PER_DAY).toFixed(2);
-        document.getElementById('kpiModuleCount').textContent = rows.length;
-
-        const banner = document.getElementById('liveWarningBanner');
-        if (warningTypes.size > 0) {
-            banner.style.display = '';
-            banner.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>No configured times for: ' + Array.from(warningTypes).join(', ');
-        } else {
-            banner.style.display = 'none';
-        }
-    }
-
-    function addRow() {
-        const tbody = document.getElementById('moduleRowsBody');
-        const tr = document.createElement('tr');
-        tr.className = 'module-row';
-        tr.innerHTML = `
-            <td>
-                <input type="hidden" name="row_id[]" value="">
-                <select name="segment[]" class="form-select segment-select" required>${segmentOptionsHtml('')}</select>
-            </td>
-            <td>
-                <select name="module_type[]" class="form-select module-type-select" required>${moduleTypeOptionsHtml('')}</select>
-            </td>
-            <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
-            <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
-            <td class="text-end">
-                <div class="row-total fw-semibold">0 min</div>
-                <div class="row-total-days small text-primary">0.00 man-days</div>
-            </td>
-            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
-        `;
-        tbody.appendChild(tr);
-        recalc();
-    }
-
-    document.getElementById('addRowBtn').addEventListener('click', addRow);
-    document.getElementById('moduleRowsBody').addEventListener('input', recalc);
-    document.getElementById('moduleRowsBody').addEventListener('change', recalc);
-    document.getElementById('moduleRowsBody').addEventListener('click', (e) => {
-        const btn = e.target.closest('.remove-row-btn');
-        if (btn) {
-            btn.closest('tr').remove();
-            recalc();
-        }
+    document.getElementById('expandAllZonesBtn')?.addEventListener('click', () => {
+        document.querySelectorAll('#zoneActivityAccordion .accordion-collapse').forEach(el => el.classList.add('show'));
+        document.querySelectorAll('#zoneActivityAccordion .accordion-button').forEach(btn => btn.classList.remove('collapsed'));
     });
-
-    hydrateExistingRows();
-    recalc();
+    document.getElementById('collapseAllZonesBtn')?.addEventListener('click', () => {
+        document.querySelectorAll('#zoneActivityAccordion .accordion-collapse').forEach(el => el.classList.remove('show'));
+        document.querySelectorAll('#zoneActivityAccordion .accordion-button').forEach(btn => btn.classList.add('collapsed'));
+    });
 </script>
 {% endblock %}
