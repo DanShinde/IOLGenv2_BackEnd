@@ -30,15 +30,9 @@
     </div>
     {% endif %}
 
-    <p class="text-muted">
-        One row per distinct Zone / Segment / Module Type combination, with its total count -- imported rows sharing
-        the same three are consolidated here rather than listed one per line of the original sheet. Edit anything
-        below and save; the calculated effort updates automatically on the
-        <a href="{% url 'estimator_project_builder' project.pk %}">Calculated Estimate</a> step. Rows built from an
-        import are rebuilt from scratch every time <a href="{% url 'estimator_project_import_review' project.pk %}">Review
-        &amp; Correct</a>'s "Confirm &amp; Next" is re-run -- for line-level corrections that should survive
-        that, edit the underlying row there instead. A row added directly here, with no import behind it, is never
-        touched by that process.
+    <p class="text-muted small mb-3">
+        <i class="bi bi-info-circle me-1"></i>One row per Zone / Segment / Module Type, with total count. Edit and
+        save, then continue to the Calculated Estimate.
     </p>
 
     {% include 'estimator/_module_rows_editor.html' with project=project existing_modules=existing_modules return_to='module_rows' %}

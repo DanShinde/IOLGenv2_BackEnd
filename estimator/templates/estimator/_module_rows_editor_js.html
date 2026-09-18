@@ -76,7 +76,7 @@ partial above.
             <td><select name="module_type[]" class="form-select module-type-select" required>${moduleTypeOptionsHtml('')}</select></td>
             <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
             <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
-            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
+            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn" title="Remove row"><i class="bi bi-x-lg"></i></button></td>
         `;
         tbody.appendChild(tr);
     }

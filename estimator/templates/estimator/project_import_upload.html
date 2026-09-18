@@ -17,14 +17,9 @@
     <div class="card">
         <div class="card-header"><i class="bi bi-info-circle me-2"></i>{{ project.name }}</div>
         <div class="card-body">
-            <p class="text-muted">
-                Upload the project's module list (.xlsx, .xls, or .csv). <strong>Line/Zone</strong> (groups modules
-                so effort can be calculated separately per zone), <strong>Module Name</strong> (matched against the
-                standard module types), and a count, taken from <strong>No. of DC roller/AC motor</strong> (falling
-                back to <strong>Quantity</strong> when that's blank or zero), drive the calculation.
-                <strong>Sr.</strong>, <strong>Module No.</strong> and <strong>Floor Level</strong> are also carried
-                over for reference. Every other column in the sheet is ignored. You'll be able to review and correct
-                every row -- including assigning a Segment, which isn't in the sheet -- before anything is saved.
+            <p class="text-muted small mb-3">
+                <i class="bi bi-info-circle me-1"></i>Upload a .xlsx, .xls, or .csv module list &mdash; you'll review
+                and correct every row next.
             </p>
             <form method="POST" enctype="multipart/form-data" id="uploadForm">
                 {% csrf_token %}

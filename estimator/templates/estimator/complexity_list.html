@@ -30,8 +30,8 @@
                         <td class="fw-semibold">{{ level.name }}</td>
                         <td><span class="badge bg-primary bg-opacity-10 text-primary">x{{ level.multiplier }}</span></td>
                         <td class="text-end">
-                            <a href="{% url 'estimator_complexity_edit' level.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                            <a href="{% url 'estimator_complexity_delete' level.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <a href="{% url 'estimator_complexity_edit' level.pk %}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'estimator_complexity_delete' level.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
                         </td>
                     </tr>
                     {% endfor %}

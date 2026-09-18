@@ -28,8 +28,8 @@
                         <td class="fw-semibold">{{ segment.name }}</td>
                         <td class="text-muted">{{ segment.description|default:'-' }}</td>
                         <td class="text-end">
-                            <a href="{% url 'estimator_segment_edit' segment.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                            <a href="{% url 'estimator_segment_delete' segment.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <a href="{% url 'estimator_segment_edit' segment.pk %}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'estimator_segment_delete' segment.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
                         </td>
                     </tr>
                     {% endfor %}

@@ -49,7 +49,7 @@
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-files"></i> Duplicate</button>
                             </form>
-                            <a href="{% url 'estimator_project_delete' project.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <a href="{% url 'estimator_project_delete' project.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
                         </td>
                     </tr>
                     {% endfor %}

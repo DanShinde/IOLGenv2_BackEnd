@@ -55,7 +55,7 @@
                         <td class="text-end">
                             <a href="{% url 'estimator_template_builder' template.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Open</a>
                             <a href="{% url 'estimator_project_new' %}?template={{ template.pk }}" class="btn btn-sm btn-outline-success"><i class="bi bi-plus-circle"></i> Use</a>
-                            <a href="{% url 'estimator_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <a href="{% url 'estimator_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
                         </td>
                     </tr>
                     {% endfor %}

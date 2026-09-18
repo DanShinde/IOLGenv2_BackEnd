@@ -41,17 +41,9 @@
         </a>
     </div>
 
-    <p class="text-muted">
-        Every row imported from the module list, permanently -- correct any row where the Module Type wasn't
-        matched to a standard module, or the Zone needs fixing. <strong>Segment</strong> isn't in the uploaded
-        sheet, so it must be chosen here. <strong>Sr.</strong>, <strong>Module No.</strong> and
-        <strong>Floor Level</strong> are shown for reference only, exactly as read from the sheet. Rows flagged
-        <i class="bi bi-exclamation-triangle-fill text-warning"></i> below are missing a Module Type, Segment,
-        and/or a valid Count; "Confirm &amp; Next" builds the
-        <a href="{% url 'estimator_project_module_rows' project.pk %}">Module Summary</a> step from whichever rows
-        are currently valid (matching rows -- same Zone, Segment and Module Type -- consolidated into one summary
-        row with counts summed), skipping the rest until they're fixed. Come back and re-confirm any time after
-        correcting more.
+    <p class="text-muted small mb-3">
+        <i class="bi bi-info-circle me-1"></i>Fix any row flagged <i class="bi bi-exclamation-triangle-fill text-warning"></i>,
+        then Confirm &amp; Next to build the Module Summary.
     </p>
 
     <div id="statusBanner" class="warning-banner" style="display:none;"></div>

@@ -13,13 +13,9 @@
 
     <div class="card">
         <div class="card-body">
-            <p class="text-muted">
-                For each activity, fill in the modules and total time it takes (e.g. "1 module takes 5 min" for a
-                single-module time, or "10 modules take 20 min total" for a batch). Pick whichever unit is most
-                convenient (seconds, minutes, hours, or days). "Days" always means that <em>project's own</em>
-                working-day length, resolved when the estimate is calculated &mdash; not a fixed 24 hours. Leave
-                blank if this activity doesn't apply. The <strong>Remark</strong> column is for your own reference
-                (e.g. the basis for the figure) &mdash; it never appears on the project report, PDF, or Excel export.
+            <p class="text-muted small mb-3">
+                <i class="bi bi-info-circle me-1"></i>Enter modules &amp; total time per activity (e.g. "10 modules
+                take 20 min"). Leave blank to skip an activity.
             </p>
             {% if rows %}
             <form method="POST">

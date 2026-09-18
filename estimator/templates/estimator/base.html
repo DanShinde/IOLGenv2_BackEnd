@@ -91,13 +91,23 @@
         .btn-outline-primary { color: var(--primary); border-color: var(--primary-light); }
         .btn-outline-primary:hover { background: var(--primary); border-color: var(--primary); }
         .btn-outline-secondary { color: var(--secondary); border-color: var(--border-strong); }
-        .btn-outline-secondary:hover { background: var(--dark); border-color: var(--dark); }
+        .btn-outline-secondary:hover { background: var(--secondary); border-color: var(--secondary); color: #fff; }
+        .btn-outline-success:hover, .btn-outline-danger:hover { color: #fff; }
 
         /* --------------------------------------------------------------- Tables */
         .table { margin-bottom: 0; }
         .table thead th { background: var(--surface-alt); color: var(--secondary); font-weight: 700; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); padding: 0.8rem 0.85rem; vertical-align: middle; }
         .table tbody td { padding: 0.8rem 0.85rem; vertical-align: middle; border-color: var(--border); }
         .table-hover tbody tr:hover { background-color: var(--primary-tint); }
+        .table-filter-row th { background: var(--surface); padding: 0.5rem 0.85rem; }
+        .table-filter-row .form-control { font-weight: 400; text-transform: none; letter-spacing: normal; }
+
+        /* Action buttons packed into a table cell (Edit/Delete/etc.) -- consistent
+           breathing room without having to wrap every row's actions in a flex div. */
+        .table td > .btn + .btn,
+        .table td > .btn + form,
+        .table td > form + .btn,
+        .table td > form + form { margin-left: 0.4rem; }
 
         /* ---------------------------------------------------------------- Forms */
         .form-control, .form-select { border-radius: 9px; border: 1.5px solid var(--border); padding: 0.55rem 0.85rem; transition: var(--transition); font-size: 0.9rem; }

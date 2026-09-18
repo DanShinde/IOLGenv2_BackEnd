@@ -48,7 +48,7 @@ send the user back to whichever of the two pages this save was made from.
                             <td><select name="module_type[]" class="form-select module-type-select" required><option value="">-- select --</option></select></td>
                             <td><input type="number" name="count[]" class="form-control count-input" min="1" value="{{ pm.count }}" required></td>
                             <td><select name="complexity_override[]" class="form-select complexity-select"><option value="">Inherit ({{ project.complexity.name }})</option></select></td>
-                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="bi bi-x-lg"></i></button></td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn" title="Remove row"><i class="bi bi-x-lg"></i></button></td>
                         </tr>
                         {% endfor %}
                         {% endfor %}

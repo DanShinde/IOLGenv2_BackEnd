@@ -39,8 +39,8 @@
                         </td>
                         <td class="text-end">
                             <a href="{% url 'estimator_module_type_segments' module_type.pk %}" class="btn btn-sm btn-outline-success"><i class="bi bi-grid-3x3-gap me-1"></i>Segments &amp; Matrix</a>
-                            <a href="{% url 'estimator_module_type_edit' module_type.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                            <a href="{% url 'estimator_module_type_delete' module_type.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                            <a href="{% url 'estimator_module_type_edit' module_type.pk %}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'estimator_module_type_delete' module_type.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
                         </td>
                     </tr>
                     {% endfor %}
