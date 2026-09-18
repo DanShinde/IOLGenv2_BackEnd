@@ -2,29 +2,34 @@
 Shared step indicator for the project wizard (Details -> Upload -> Review -> Module
 Summary -> Calculated Estimate). Every step is a real link, all the time, regardless of
 where the project currently stands -- the wizard isn't a one-way gate: a project's
-details, its imported module list, and its module rows can all be revisited and changed
-at any point, not just in forward order. Usage:
-{% include 'estimator/_wizard_steps.html' with project=project active_step=N %}
+details, its imported module list, and its module rows can all be revisited and
+changed at any point, not just in forward order.
+
+Placed at the very top of every wizard page's content block (above the page title) so
+it reads as a persistent, uniform progress bar rather than page-specific chrome.
+
+Usage: {% include 'estimator/_wizard_steps.html' with project=project active_step=N %}
 where N is 1-5.
 {% endcomment %}
-<div class="d-flex align-items-center gap-2 mb-3 text-muted small flex-wrap wizard-steps">
-    <a href="{% url 'estimator_project_edit' project.pk %}" class="text-decoration-none {% if active_step == 1 %}fw-bold text-primary{% elif active_step > 1 %}text-success{% else %}text-muted{% endif %}">
-        {% if active_step > 1 %}<i class="bi bi-check-circle-fill me-1"></i>{% endif %}1. Project Details
+<div class="wizard-stepper no-print">
+    <a href="{% url 'estimator_project_edit' project.pk %}" class="wizard-step {% if active_step > 1 %}is-done{% elif active_step == 1 %}is-active{% endif %}">
+        <div class="wizard-step-circle">{% if active_step > 1 %}<i class="bi bi-check-lg"></i>{% else %}1{% endif %}</div>
+        <div class="wizard-step-label">Project Details</div>
     </a>
-    <i class="bi bi-chevron-right"></i>
-    <a href="{% url 'estimator_project_import_upload' project.pk %}" class="text-decoration-none {% if active_step == 2 %}fw-bold text-primary{% elif active_step > 2 %}text-success{% else %}text-muted{% endif %}">
-        {% if active_step > 2 %}<i class="bi bi-check-circle-fill me-1"></i>{% endif %}2. Upload Module List
+    <a href="{% url 'estimator_project_import_upload' project.pk %}" class="wizard-step {% if active_step > 2 %}is-done{% elif active_step == 2 %}is-active{% endif %}">
+        <div class="wizard-step-circle">{% if active_step > 2 %}<i class="bi bi-check-lg"></i>{% else %}2{% endif %}</div>
+        <div class="wizard-step-label">Upload Module List</div>
     </a>
-    <i class="bi bi-chevron-right"></i>
-    <a href="{% url 'estimator_project_import_review' project.pk %}" class="text-decoration-none {% if active_step == 3 %}fw-bold text-primary{% elif active_step > 3 %}text-success{% else %}text-muted{% endif %}">
-        {% if active_step > 3 %}<i class="bi bi-check-circle-fill me-1"></i>{% endif %}3. Review &amp; Correct
+    <a href="{% url 'estimator_project_import_review' project.pk %}" class="wizard-step {% if active_step > 3 %}is-done{% elif active_step == 3 %}is-active{% endif %}">
+        <div class="wizard-step-circle">{% if active_step > 3 %}<i class="bi bi-check-lg"></i>{% else %}3{% endif %}</div>
+        <div class="wizard-step-label">Review &amp; Correct</div>
     </a>
-    <i class="bi bi-chevron-right"></i>
-    <a href="{% url 'estimator_project_module_rows' project.pk %}" class="text-decoration-none {% if active_step == 4 %}fw-bold text-primary{% elif active_step > 4 %}text-success{% else %}text-muted{% endif %}">
-        {% if active_step > 4 %}<i class="bi bi-check-circle-fill me-1"></i>{% endif %}4. Module Summary
+    <a href="{% url 'estimator_project_module_rows' project.pk %}" class="wizard-step {% if active_step > 4 %}is-done{% elif active_step == 4 %}is-active{% endif %}">
+        <div class="wizard-step-circle">{% if active_step > 4 %}<i class="bi bi-check-lg"></i>{% else %}4{% endif %}</div>
+        <div class="wizard-step-label">Module Summary</div>
     </a>
-    <i class="bi bi-chevron-right"></i>
-    <a href="{% url 'estimator_project_builder' project.pk %}" class="text-decoration-none {% if active_step == 5 %}fw-bold text-primary{% else %}text-muted{% endif %}">
-        5. Calculated Estimate
+    <a href="{% url 'estimator_project_builder' project.pk %}" class="wizard-step {% if active_step == 5 %}is-active{% endif %}">
+        <div class="wizard-step-circle">5</div>
+        <div class="wizard-step-label">Calculated Estimate</div>
     </a>
 </div>

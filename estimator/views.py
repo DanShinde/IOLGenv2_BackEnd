@@ -422,6 +422,11 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Edit Project'
         context['cancel_url'] = reverse('estimator_project_builder', args=[self.object.pk])
+        # Only ProjectUpdateView (not the other add_form.html users -- Activity,
+        # Segment, etc. -- and not ProjectCreateView, which has no pk yet for the
+        # stepper's other-step links) shows the wizard stepper, as step 1.
+        context['project'] = self.object
+        context['wizard_active_step'] = 1
         return context
 
     def form_valid(self, form):

@@ -4,6 +4,8 @@
 
 {% block content %}
 <div class="animate-fade-in">
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=4 %}
+
     <div class="page-header">
         <div>
             <h1 class="page-title mb-1"><i class="bi bi-boxes me-2 text-primary"></i>{{ project.name }} &mdash; Module Summary</h1>
@@ -19,8 +21,6 @@
             <a href="{% url 'estimator_project_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Projects</a>
         </div>
     </div>
-
-    {% include 'estimator/_wizard_steps.html' with project=project active_step=4 %}
 
     {% if has_pending_import %}
     <div class="warning-banner mb-3">

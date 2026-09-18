@@ -32,14 +32,14 @@
 
 {% block content %}
 <div class="animate-fade-in">
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=3 %}
+
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-ui-checks me-2 text-primary"></i>Review &amp; Correct Import</h1>
         <a href="{% url 'estimator_project_import_upload' project.pk %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-2"></i>Upload a Different File
         </a>
     </div>
-
-    {% include 'estimator/_wizard_steps.html' with project=project active_step=3 %}
 
     <p class="text-muted">
         Every row imported from the module list, permanently -- correct any row where the Module Type wasn't

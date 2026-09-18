@@ -3,15 +3,16 @@
 {% block title %}Import Module List - {{ project.name }} - Estimator{% endblock %}
 
 {% block content %}
-<div class="animate-fade-in" style="max-width: 720px; margin: 0 auto;">
+<div class="animate-fade-in">
+    {% include 'estimator/_wizard_steps.html' with project=project active_step=2 %}
+
+    <div style="max-width: 720px; margin: 0 auto;">
     <div class="page-header">
         <h1 class="page-title"><i class="bi bi-file-earmark-arrow-up me-2 text-primary"></i>Import Module List</h1>
         <a href="{% url 'estimator_project_module_rows' project.pk %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-2"></i>Skip / Go to Module Summary
         </a>
     </div>
-
-    {% include 'estimator/_wizard_steps.html' with project=project active_step=2 %}
 
     <div class="card">
         <div class="card-header"><i class="bi bi-info-circle me-2"></i>{{ project.name }}</div>
@@ -62,6 +63,7 @@
                 </div>
             </form>
         </div>
+    </div>
     </div>
 </div>
 {% endblock %}
