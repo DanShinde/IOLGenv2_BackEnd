@@ -498,3 +498,15 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'mhshvsnt@gmail.com'  # <--- Update this
 EMAIL_HOST_PASSWORD = 'xcga fato fzoj bzox'      # <--- Paste your 16-char App Password here
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+# --- Deploy webhook (deploy/views.py) ----------------------------------------
+# GitHub POSTs here on push to main; the view only verifies the HMAC signature and
+# writes DEPLOY_TRIGGER_FILE, which deploy\auto_pull.ps1 consumes on its next tick.
+# The endpoint is inert until DEPLOY_WEBHOOK_SECRET is set - see docs/AUTO_DEPLOY.md.
+DEPLOY_WEBHOOK_SECRET = os.getenv('DEPLOY_WEBHOOK_SECRET', '')
+DEPLOY_WEBHOOK_BRANCH = os.getenv('DEPLOY_WEBHOOK_BRANCH', 'main')
+DEPLOY_TRIGGER_FILE = os.getenv(
+    'DEPLOY_TRIGGER_FILE',
+    str(BASE_DIR / 'logs' / 'deploy.trigger'),
+)
