@@ -32,6 +32,7 @@ urlpatterns = [
     path('skillgap/', include('gap_analysis.urls')),
     path('testvault/', include('testvault.urls')),
     path('estimator/', include('estimator.urls')),
+    path('deploy-hook/', include('deploy.urls')),
 ]
 
 if settings.DEBUG:
