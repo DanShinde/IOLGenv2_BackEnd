@@ -143,11 +143,14 @@ $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
                                   -Argument ($scriptArgs -join ' ') `
                                   -WorkingDirectory $RepoPath
 
-# One trigger, repeating forever. -RepetitionDuration of MaxValue means "indefinitely".
+# One trigger, repeating forever. -RepetitionDuration is deliberately OMITTED: that
+# leaves <Duration> empty in the task XML, which Task Scheduler reads as "indefinitely".
+# Passing [TimeSpan]::MaxValue (a common suggestion) serializes to P99999999DT23H59M59S
+# and Register-ScheduledTask rejects it outright: "The task XML contains a value which
+# is incorrectly formatted or out of range."
 $trigger = New-ScheduledTaskTrigger -Once `
                                     -At (Get-Date).AddMinutes(1) `
-                                    -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) `
-                                    -RepetitionDuration ([TimeSpan]::MaxValue)
+                                    -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
 
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew `
                                          -StartWhenAvailable `
@@ -208,7 +211,8 @@ if ($LogonType -eq 'Password') {
                                -Settings $settings `
                                -User $credential.UserName `
                                -Password $plainPassword `
-                               -RunLevel Highest | Out-Null
+                               -RunLevel Highest `
+                               -ErrorAction Stop | Out-Null
     }
     finally {
         $plainPassword = $null
@@ -227,10 +231,17 @@ else {
                            -Action $action `
                            -Trigger $trigger `
                            -Settings $settings `
-                           -Principal $principal | Out-Null
+                           -Principal $principal `
+                           -ErrorAction Stop | Out-Null
+}
+
+# Register-ScheduledTask can surface a CIM failure without halting the script, which
+# previously let it print "Registered" directly over an error and leave nothing behind.
+if (-not (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
+    throw "Registration did not create a task named '$TaskName'. Nothing was scheduled."
 }
 
 Write-Host ''
-Write-Host "Registered. Verify with a manual run:"
+Write-Host "Registered. Verify with a manual run:" -ForegroundColor Green
 Write-Host "  Start-ScheduledTask -TaskName '$TaskName'"
 Write-Host "  Get-Content '$RepoPath\logs\auto_pull.log' -Tail 20"
