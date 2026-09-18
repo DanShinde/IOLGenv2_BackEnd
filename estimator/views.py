@@ -568,6 +568,7 @@ def project_modules_sync(request, pk):
     segment_ids = request.POST.getlist('segment[]')
     module_type_ids = request.POST.getlist('module_type[]')
     counts = request.POST.getlist('count[]')
+    modified_counts = request.POST.getlist('modified_count[]')
     zones = request.POST.getlist('zone[]')
     complexity_override_ids = request.POST.getlist('complexity_override[]')
 
@@ -598,10 +599,22 @@ def project_modules_sync(request, pk):
             zone = zones[index].strip() if index < len(zones) else ''
             row_id = row_ids[index].strip() if index < len(row_ids) else ''
 
+            modified_count_raw = modified_counts[index].strip() if index < len(modified_counts) else ''
+            modified_count = None
+            if modified_count_raw:
+                try:
+                    modified_count = int(modified_count_raw)
+                except ValueError:
+                    modified_count = None
+                if modified_count is not None and modified_count < 1:
+                    errors.append(f"Row {index + 1}: modified count must be at least 1 -- ignored.")
+                    modified_count = None
+
             defaults = {
                 'segment_id': segment_id,
                 'module_type_id': module_type_id,
                 'count': count,
+                'modified_count': modified_count,
                 'zone': zone,
                 'complexity_override_id': complexity_override_id or None,
                 'order': index,
@@ -830,13 +843,27 @@ def _consolidate_and_save_confirmed_rows(project):
     permanent and editable on Review & Correct, this can be re-run any time a
     correction is made there, and always reflects exactly the current state of those
     rows. Purely-manual rows (from_import=False, added directly on Module Summary) are
-    never touched. Returns (valid_count, skipped_count, summary_row_count)."""
+    never touched. Each new row's Modified Count is carried over from whichever old
+    row shared its (Segment, Module Type, Zone) key, so a hand-entered override on
+    Module Summary survives even though the row itself is rebuilt from scratch.
+    Returns (valid_count, skipped_count, summary_row_count)."""
     all_rows = list(project.import_rows.select_related('module_type', 'segment').all())
     valid_rows = [r for r in all_rows if r.is_valid]
 
     totals = defaultdict(int)
     for row in valid_rows:
         totals[(row.segment_id, row.module_type_id, row.zone)] += row.count
+
+    # A Modified Count entered by hand on Module Summary (step 4) must survive this
+    # rebuild -- carried forward onto whichever new row has the same (Segment, Module
+    # Type, Zone) key these totals are grouped by. If that combination no longer
+    # exists after the re-import, its override has nothing to carry onto and is
+    # dropped along with the old row.
+    previous_modified_counts = {
+        (pm.segment_id, pm.module_type_id, pm.zone): pm.modified_count
+        for pm in project.modules.filter(from_import=True)
+        if pm.modified_count is not None
+    }
 
     with transaction.atomic():
         project.modules.filter(from_import=True).delete()
@@ -845,6 +872,7 @@ def _consolidate_and_save_confirmed_rows(project):
             ProjectModule(
                 project=project, segment_id=segment_id, module_type_id=module_type_id,
                 zone=zone, count=total_count, order=next_order + i, from_import=True,
+                modified_count=previous_modified_counts.get((segment_id, module_type_id, zone)),
             )
             for i, ((segment_id, module_type_id, zone), total_count) in enumerate(totals.items())
         ]
@@ -936,6 +964,7 @@ def project_duplicate(request, pk):
                 segment=pm.segment,
                 module_type=pm.module_type,
                 count=pm.count,
+                modified_count=pm.modified_count,
                 zone=pm.zone,
                 complexity_override=pm.complexity_override,
                 order=pm.order,
@@ -1151,7 +1180,7 @@ class ProjectSaveAsTemplateView(LoginRequiredMixin, CreateView):
                     template=self.object,
                     segment=pm.segment,
                     module_type=pm.module_type,
-                    count=pm.count,
+                    count=pm.effective_count,
                     complexity_override=pm.complexity_override,
                     order=pm.order,
                 )

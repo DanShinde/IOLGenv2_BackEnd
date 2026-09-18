@@ -126,32 +126,34 @@
                 </h2>
                 <div id="zoneAct{{ forloop.counter }}" class="accordion-collapse collapse">
                     <div class="accordion-body">
-                        {% for group in zg.category_groups %}
-                        <div class="mb-3">
-                            <div class="fw-semibold text-secondary small text-uppercase mb-1">{{ group.label }}</div>
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Activity</th>
-                                        <th class="text-end activity-total-header">Total (man-days)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for at in group.activity_totals %}
-                                    <tr>
-                                        <td>{{ at.activity.name }}</td>
-                                        <td class="text-end calc-cell" data-days="{{ at.total_days|floatformat:3 }}"
-                                            data-formula="{% for c in at.contributions %}{% if not forloop.first %} + {% endif %}{{ c.minutes|floatformat:1 }} ({{ c.label }}){% empty %}0.0{% endfor %} = {{ at.total_minutes|floatformat:1 }} min">{{ at.total_days|floatformat:3 }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                    <tr class="fw-bold" style="background:#F4F4F5;">
-                                        <td>{{ group.label }} Total</td>
-                                        <td class="text-end">{{ group.total_days|floatformat:3 }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="row g-3">
+                            {% for group in zg.category_groups %}
+                            <div class="col-lg-6">
+                                <div class="fw-semibold text-secondary small text-uppercase mb-1">{{ group.label }}</div>
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Activity</th>
+                                            <th class="text-end activity-total-header">Total (man-days)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for at in group.activity_totals %}
+                                        <tr>
+                                            <td>{{ at.activity.name }}</td>
+                                            <td class="text-end calc-cell" data-days="{{ at.total_days|floatformat:3 }}"
+                                                data-formula="{% for c in at.contributions %}{% if not forloop.first %} + {% endif %}{{ c.minutes|floatformat:1 }} ({{ c.label }}){% empty %}0.0{% endfor %} = {{ at.total_minutes|floatformat:1 }} min">{{ at.total_days|floatformat:3 }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        <tr class="fw-bold" style="background:#EDF1F4;">
+                                            <td>{{ group.label }} Total</td>
+                                            <td class="text-end">{{ group.total_days|floatformat:3 }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </div>
                 </div>
             </div>

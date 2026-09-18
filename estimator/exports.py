@@ -94,7 +94,7 @@ def _write_summary_sheet(ws, estimate):
         ws.cell(row=row, column=1, value=r['zone'])
         ws.cell(row=row, column=2, value=r['segment'].name)
         ws.cell(row=row, column=3, value=r['module_type'].name)
-        ws.cell(row=row, column=4, value=r['count'])
+        ws.cell(row=row, column=4, value=r['effective_count'])
         ws.cell(row=row, column=5, value=f"{r['complexity'].name} (x{r['complexity'].multiplier})" if r['complexity'] else '-')
         ws.cell(row=row, column=6, value=float(r['row_total_minutes']))
         days_cell = ws.cell(row=row, column=7, value=round(float(r['row_total_days']), 2))
@@ -153,7 +153,7 @@ def _write_breakdown_sheet(ws, group):
         row = row_offset + 2
         ws.cell(row=row, column=1, value=r['segment'].name)
         ws.cell(row=row, column=2, value=r['module_type'].name)
-        ws.cell(row=row, column=3, value=r['count'])
+        ws.cell(row=row, column=3, value=r['effective_count'])
         for col, act_data in enumerate(r['activities'], start=4):
             cell = ws.cell(row=row, column=col, value=round(float(act_data['days']), 3))
             cell.alignment = Alignment(horizontal='center')
@@ -259,7 +259,7 @@ def _module_summary_table(estimate):
             r['zone'],
             r['segment'].name,
             r['module_type'].name,
-            str(r['count']),
+            str(r['effective_count']),
             f"{r['complexity'].name} (x{r['complexity'].multiplier})" if r['complexity'] else '-',
             f"{r['row_total_minutes']:.1f}",
             f"{r['row_total_days']:.2f}",
@@ -317,7 +317,7 @@ def _activity_breakdown_tables(group):
         data = [header]
         for r in rows:
             act_by_id = {ad['activity'].id: ad for ad in r['activities']}
-            row_vals = [r['segment'].name, r['module_type'].name, str(r['count'])]
+            row_vals = [r['segment'].name, r['module_type'].name, str(r['effective_count'])]
             for a in chunk:
                 row_vals.append(f"{act_by_id[a.id]['days']:.3f}")
             if is_last_chunk:

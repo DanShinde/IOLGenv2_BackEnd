@@ -23,6 +23,13 @@
         min-height: unset;
         border-radius: 6px;
     }
+    /* Reserve room for the select's caret icon -- the dense padding above is
+       symmetric, which otherwise overlaps the icon with the option text. */
+    .review-table .form-select {
+        padding-right: 1.7rem;
+        background-position: right 0.5rem center;
+        background-size: 14px 11px;
+    }
     .review-table .row-note {
         font-size: 0.7rem;
         line-height: 1.1;

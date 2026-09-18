@@ -13,47 +13,48 @@
 
     <style>
         :root {
-            /* Graphite Teal -- near-black graphite for primary actions and headings,
-               one teal accent used sparingly for focus/active/interactive states,
-               flat surfaces and thin 1px borders instead of soft shadows. */
-            --primary: #18181B;
-            --primary-light: #3F3F46;
-            --primary-dark: #09090B;
-            --primary-tint: #F4F4F5;
-            --accent: #14B8A6;
-            --accent-tint: #F0FDFA;
-            --secondary: #71717A;
-            --success: #16A34A;
+            /* Steel & Amber -- industrial precision, fitting a material-handling
+               engineering tool: a steel-navy primary for actions and headings, one
+               amber accent used for active/highlight states, squarer corners and
+               uppercase labels instead of rounded, quiet chrome. */
+            --primary: #16283F;
+            --primary-light: #3B6EA5;
+            --primary-dark: #0D1F33;
+            --primary-tint: #EDF1F4;
+            --accent: #F59E0B;
+            --accent-tint: #FFF7ED;
+            --secondary: #5B6B7C;
+            --success: #15803D;
             --success-tint: #F0FDF4;
-            --warning: #CA8A04;
-            --warning-tint: #FEFCE8;
-            --danger: #DC2626;
+            --warning: #EA580C;
+            --warning-tint: #FFF3E8;
+            --danger: #B91C1C;
             --danger-tint: #FEF2F2;
             --surface: #FFFFFF;
-            --surface-alt: #FAFAFA;
-            --border: #E4E4E7;
-            --border-strong: #D4D4D8;
-            --dark: #18181B;
-            --light: #FAFAFA;
-            --card-shadow: 0 1px 2px rgba(24, 24, 27, 0.04);
-            --card-hover-shadow: 0 4px 10px -4px rgba(24, 24, 27, 0.12);
+            --surface-alt: #F3F5F7;
+            --border: #DCE2E8;
+            --border-strong: #B7C2CC;
+            --dark: #1A2634;
+            --light: #F3F5F7;
+            --card-shadow: 0 1px 2px rgba(26, 38, 52, 0.05);
+            --card-hover-shadow: 0 4px 10px -4px rgba(26, 38, 52, 0.16);
             --transition: all 0.15s ease;
 
             /* Bootstrap's own theme variables, so utility classes used throughout
                (bg-primary/text-primary badges, bg-opacity-10, border-primary, etc.)
                pick up this palette too instead of Bootstrap's default blue. */
             --bs-primary: var(--primary);
-            --bs-primary-rgb: 24, 24, 27;
+            --bs-primary-rgb: 22, 40, 63;
             --bs-secondary: var(--secondary);
-            --bs-secondary-rgb: 113, 113, 122;
+            --bs-secondary-rgb: 91, 107, 124;
             --bs-success: var(--success);
-            --bs-success-rgb: 22, 163, 74;
+            --bs-success-rgb: 21, 128, 61;
             --bs-danger: var(--danger);
-            --bs-danger-rgb: 220, 38, 38;
+            --bs-danger-rgb: 185, 28, 28;
             --bs-warning: var(--warning);
-            --bs-warning-rgb: 202, 138, 4;
+            --bs-warning-rgb: 234, 88, 12;
             --bs-info: var(--accent);
-            --bs-info-rgb: 20, 184, 166;
+            --bs-info-rgb: 245, 158, 11;
         }
 
         * { box-sizing: border-box; }
@@ -73,30 +74,30 @@
         .navbar {
             background: var(--primary) !important;
             box-shadow: none;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 3px solid var(--accent);
             padding: 0.85rem 0;
         }
 
-        .navbar-brand { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
-        .nav-link { font-weight: 500; padding: 0.5rem 1rem !important; border-radius: 6px; transition: var(--transition); margin: 0 2px; border-bottom: 2px solid transparent; }
+        .navbar-brand { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+        .nav-link { font-weight: 700; font-size: 0.82rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.5rem 1rem !important; border-radius: 4px; transition: var(--transition); margin: 0 2px; border-bottom: 2px solid transparent; }
         .nav-link:hover { background: rgba(255, 255, 255, 0.08); }
-        .nav-link.active { background: transparent; border-bottom-color: var(--accent); font-weight: 600; }
+        .nav-link.active { background: transparent; border-bottom-color: var(--accent); font-weight: 700; }
 
         /* --------------------------------------------------------------- Cards */
-        .card { border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--card-shadow); background: var(--surface); overflow: hidden; }
-        .card-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.1rem 1.4rem; font-weight: 600; color: var(--dark); }
+        .card { border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--card-shadow); background: var(--surface); overflow: hidden; }
+        .card-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.1rem 1.4rem; font-weight: 700; color: var(--dark); }
         .card-body { padding: 1.4rem; }
 
-        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.35rem 1.5rem; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
+        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.35rem 1.5rem; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
         .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
         .kpi-card.success::before { background: var(--success); }
         .kpi-card.warning::before { background: var(--warning); }
-        .kpi-value { font-size: 1.9rem; font-weight: 800; color: var(--dark); line-height: 1; letter-spacing: -0.02em; }
-        .kpi-label { color: var(--secondary); font-size: 0.8rem; font-weight: 500; margin-top: 0.4rem; }
+        .kpi-value { font-family: 'SFMono-Regular', ui-monospace, Consolas, Menlo, monospace; font-size: 1.75rem; font-weight: 700; color: var(--dark); line-height: 1; letter-spacing: -0.01em; }
+        .kpi-label { color: var(--secondary); font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.5rem; }
 
         /* -------------------------------------------------------------- Buttons */
-        .btn { border-radius: 6px; font-weight: 600; padding: 0.5rem 1.15rem; transition: var(--transition); font-size: 0.9rem; }
-        .btn-sm { border-radius: 5px; }
+        .btn { border-radius: 4px; font-weight: 600; padding: 0.5rem 1.15rem; transition: var(--transition); font-size: 0.9rem; }
+        .btn-sm { border-radius: 4px; }
         .btn-primary { background: var(--primary); border: 1px solid var(--primary); box-shadow: none; }
         .btn-primary:hover, .btn-primary:focus { background: var(--primary-dark); border-color: var(--primary-dark); }
         .btn-success { background: var(--success); border: 1px solid var(--success); }
@@ -105,6 +106,8 @@
         .btn-outline-secondary { color: var(--secondary); border-color: var(--border-strong); }
         .btn-outline-secondary:hover { background: var(--secondary); border-color: var(--secondary); color: #fff; }
         .btn-outline-success:hover, .btn-outline-danger:hover { color: #fff; }
+
+        .badge { border-radius: 3px; font-weight: 700; }
 
         /* --------------------------------------------------------------- Tables */
         .table { margin-bottom: 0; }
@@ -167,7 +170,7 @@
             text-align: left;
             background: none;
             border: none;
-            border-radius: 6px;
+            border-radius: 4px;
             padding: 6px 8px;
             font-size: 0.78rem;
             font-weight: 600;
@@ -183,7 +186,7 @@
             font-weight: 700;
             color: var(--secondary);
             background: var(--surface-alt);
-            border-radius: 20px;
+            border-radius: 3px;
             padding: 1px 7px;
             flex-shrink: 0;
         }
@@ -194,7 +197,12 @@
         .zone-table-scroll .zone-heading-row td { position: sticky; z-index: 2; }
 
         /* ---------------------------------------------------------------- Forms */
-        .form-control, .form-select { border-radius: 6px; border: 1.5px solid var(--border); padding: 0.55rem 0.85rem; transition: var(--transition); font-size: 0.9rem; }
+        .form-control, .form-select { border-radius: 4px; border: 1.5px solid var(--border); padding: 0.55rem 0.85rem; transition: var(--transition); font-size: 0.9rem; }
+        /* Bootstrap reserves the right-hand padding on .form-select for its caret
+           background-image -- the symmetric padding above would otherwise overlap
+           the icon with the selected option's text (worse still on any denser
+           override, e.g. the zone-segment select on the import review table). */
+        .form-select { padding-right: 2.25rem; background-position: right 0.75rem center; }
         .form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
         .form-label { font-weight: 600; font-size: 0.85rem; color: var(--dark); }
 
@@ -205,7 +213,7 @@
         .empty-state { text-align: center; padding: 3rem; color: var(--secondary); }
         .empty-state i { font-size: 3.5rem; margin-bottom: 1rem; opacity: 0.35; color: var(--secondary); }
 
-        .warning-banner { background: var(--warning-tint); border: 1px solid #FDE68A; color: #854D0E; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+        .warning-banner { background: var(--warning-tint); border: 1px solid #FDBA74; color: #9A3412; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
 
         /* ------------------------------------------------------- Wizard stepper */
         .wizard-stepper {
@@ -213,7 +221,7 @@
             align-items: flex-start;
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 6px;
             box-shadow: var(--card-shadow);
             padding: 1.1rem 1.25rem 0.9rem;
             margin-bottom: 1.5rem;
@@ -240,18 +248,18 @@
         }
         .wizard-step.is-done:not(:first-child)::before,
         .wizard-step.is-done + .wizard-step::before {
-            background: var(--primary);
+            background: var(--success);
         }
         .wizard-step-circle {
             position: relative;
             z-index: 1;
             width: 36px;
             height: 36px;
-            border-radius: 50%;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 700;
+            font-weight: 800;
             font-size: 0.85rem;
             border: 1.5px solid var(--border-strong);
             background: var(--surface);
@@ -260,16 +268,18 @@
             margin-bottom: 0.45rem;
         }
         .wizard-step-label {
-            font-size: 0.72rem;
-            font-weight: 600;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
             color: var(--secondary);
             line-height: 1.25;
             padding: 0 0.25rem;
         }
-        .wizard-step.is-done .wizard-step-circle { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .wizard-step.is-done .wizard-step-circle { background: var(--success); border-color: var(--success); color: #fff; }
         .wizard-step.is-done .wizard-step-label { color: var(--dark); }
-        .wizard-step.is-active .wizard-step-circle { background: var(--surface); border-color: var(--accent); color: var(--accent); }
-        .wizard-step.is-active .wizard-step-label { color: var(--accent); font-weight: 700; }
+        .wizard-step.is-active .wizard-step-circle { background: var(--accent); border-color: var(--accent); color: var(--primary); }
+        .wizard-step.is-active .wizard-step-label { color: var(--primary); font-weight: 800; }
         .wizard-step:hover .wizard-step-circle { border-color: var(--accent); }
         .wizard-step.is-done:hover .wizard-step-circle,
         .wizard-step.is-active:hover .wizard-step-circle { border-color: currentColor; }

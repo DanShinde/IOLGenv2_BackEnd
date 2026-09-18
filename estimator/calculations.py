@@ -42,11 +42,15 @@ def build_project_estimate(project):
             warnings.append(f"'{mt.name}' in '{segment.name}' has no configured activity times yet -- its estimate will be 0.")
             warned_combos.add((segment.id, mt.id))
 
+        # modified_count (set by hand on Module Summary) overrides count for every
+        # calculation when present -- see ProjectModule.effective_count.
+        effective_count = pm.effective_count
+
         row_activities = []
         row_total = Decimal('0')
         for a in activities:
             base_minutes = matrix.get((segment.id, mt.id, a.id), Decimal('0'))
-            minutes = base_minutes * pm.count * factor
+            minutes = base_minutes * effective_count * factor
             row_activities.append({
                 'activity': a,
                 'base_minutes': base_minutes,
@@ -61,6 +65,8 @@ def build_project_estimate(project):
             'segment': segment,
             'module_type': mt,
             'count': pm.count,
+            'modified_count': pm.modified_count,
+            'effective_count': effective_count,
             'zone': pm.zone or UNASSIGNED_ZONE,
             'complexity': complexity,
             'activities': row_activities,
@@ -116,7 +122,7 @@ def _summarize(rows, activities, per_day):
                 activity_contributions[ad['activity'].id].append({
                     'label': f"{r['module_type'].name} / {r['segment'].name}",
                     'base_minutes': ad['base_minutes'],
-                    'count': r['count'],
+                    'count': r['effective_count'],
                     'complexity_multiplier': ad['complexity_multiplier'],
                     'minutes': ad['minutes'],
                 })

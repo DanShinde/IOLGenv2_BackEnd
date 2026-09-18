@@ -75,6 +75,7 @@ partial above.
             <td><select name="segment[]" class="form-select segment-select" required>${segmentOptionsHtml('')}</select></td>
             <td><select name="module_type[]" class="form-select module-type-select" required>${moduleTypeOptionsHtml('')}</select></td>
             <td><input type="number" name="count[]" class="form-control count-input" min="1" value="1" required></td>
+            <td><input type="number" name="modified_count[]" class="form-control modified-count-input" min="1" value="" placeholder="Optional" title="Overrides Count for calculations, and survives a re-import"></td>
             <td><select name="complexity_override[]" class="form-select complexity-select">${complexityOptionsHtml('')}</select></td>
             <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn" title="Remove row"><i class="bi bi-x-lg"></i></button></td>
         `;

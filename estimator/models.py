@@ -187,6 +187,14 @@ class ProjectModule(models.Model):
     segment = models.ForeignKey(Segment, on_delete=models.PROTECT, related_name='project_modules')
     module_type = models.ForeignKey(ModuleType, on_delete=models.PROTECT, related_name='project_modules')
     count = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    modified_count = models.PositiveIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1)],
+        help_text="Optional override of Count, entered by hand on Module Summary. When set, every "
+                   "calculation (estimate, report, PDF, Excel) uses this instead of Count -- and, "
+                   "unlike Count itself, it survives a from_import row being rebuilt by re-running "
+                   "'Confirm & Next' on Review & Correct (e.g. after a fresh Excel import), as long as "
+                   "the row's Zone/Segment/Module Type combination still exists afterwards.",
+    )
     zone = models.CharField(
         max_length=150, blank=True, default='',
         help_text="Optional line/zone label (e.g. from an imported module list). Rows are grouped by this "
@@ -215,6 +223,10 @@ class ProjectModule(models.Model):
     @property
     def effective_complexity(self):
         return self.complexity_override or self.project.complexity
+
+    @property
+    def effective_count(self):
+        return self.modified_count if self.modified_count is not None else self.count
 
 
 class ProjectTemplate(models.Model):
