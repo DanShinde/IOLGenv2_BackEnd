@@ -764,6 +764,11 @@ def project_import_review(request, pk):
         return redirect('estimator_project_import_review', pk=project.pk)
 
     rows = list(project.import_rows.select_related('module_type', 'segment').all())
+    # Grouped by zone for display (Unassigned last, others alphabetical -- same rule
+    # used everywhere else this app groups by zone) via a stable sort, so rows within
+    # a zone keep their original (row_number) order. Lets the template's {% regroup %}
+    # show a heading per zone with its own "apply this Segment to the whole zone" tool.
+    rows = sorted(rows, key=lambda r: ((r.zone or UNASSIGNED_ZONE) == UNASSIGNED_ZONE, (r.zone or UNASSIGNED_ZONE).lower()))
     normalized_names = {normalize_name(r.raw_module_name) for r in rows if r.raw_module_name}
     # Only the aliases relevant to raw names actually staged here -- lets the review
     # page's JS warn *before* submit when a correction would change an existing saved
