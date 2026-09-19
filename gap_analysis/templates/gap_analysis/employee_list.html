@@ -155,6 +155,9 @@
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
+                                {% for segment in employee.segments.all %}
+                                    <span class="badge bg-light text-muted"><i class="bi bi-geo-alt me-1"></i>{{ segment.name }}</span>
+                                {% endfor %}
                             </td>
                             <td data-label="Status">
                                 {% if employee.status == 'active' %}

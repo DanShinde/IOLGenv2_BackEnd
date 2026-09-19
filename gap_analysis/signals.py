@@ -28,10 +28,16 @@ def sync_skill_matrix_with_employee(sender, instance, created, **kwargs):
         # was inactive since creation (so the roster never picked it up) and has now been
         # activated. Either way, bring it in the same way.
         if instance.is_active:
-            SkillMatrix.objects.get_or_create(
+            new_sm, sm_created = SkillMatrix.objects.get_or_create(
                 employee=instance,
                 defaults={'user': find_matching_user(instance.name)},
             )
+            if sm_created and instance.segment_id:
+                # One-time default so a new hire isn't silently evaluated against only
+                # General skills until someone remembers to set this here -- SkillMatrix.segments
+                # is otherwise independent of Employee.segment from this point on (staff add/
+                # remove segments directly in the Skill Gap Analyzer for anyone multi-segment).
+                new_sm.segments.add(instance.segment_id)
         return
 
     if not instance.is_active and sm.status != 'inactive':

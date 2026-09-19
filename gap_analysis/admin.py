@@ -8,9 +8,9 @@ class RoleMatrixAdmin(admin.ModelAdmin):
 
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category')
+    list_display = ('name', 'category', 'scope', 'segment')
     search_fields = ('name', 'category')
-    list_filter = ('category',)
+    list_filter = ('scope', 'segment', 'category')
 
 @admin.register(SkillBenchmark)
 class SkillBenchmarkAdmin(admin.ModelAdmin):
@@ -20,8 +20,9 @@ class SkillBenchmarkAdmin(admin.ModelAdmin):
 @admin.register(SkillMatrix)
 class SkillMatrixAdmin(admin.ModelAdmin):
     list_display = ('name', 'role_matrix', 'status')
-    list_filter = ('status', 'role_matrix')
+    list_filter = ('status', 'role_matrix', 'segments')
     search_fields = ('employee__name',)
+    filter_horizontal = ('segments',)
 
 @admin.register(EmployeeSkill)
 class EmployeeSkillAdmin(admin.ModelAdmin):

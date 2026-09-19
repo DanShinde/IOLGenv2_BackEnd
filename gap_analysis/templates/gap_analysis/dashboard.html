@@ -551,6 +551,56 @@
     </div>
 
     <div class="row mt-4">
+        <!-- Segment Gap Summary -->
+        <div class="col-lg-12 animate-fade-in">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <div class="dashboard-card-title">
+                        <i class="bi bi-geo-alt"></i> Segment Gap Summary
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if segment_gap_data %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 mobile-cards">
+                            <thead>
+                                <tr>
+                                    <th>Segment</th>
+                                    <th>Employees</th>
+                                    <th>Avg Gap</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for segment in segment_gap_data %}
+                                <tr>
+                                    <td data-label="Segment"><strong>{{ segment.segment }}</strong></td>
+                                    <td data-label="Employees">{{ segment.employee_count }}</td>
+                                    <td data-label="Avg Gap">
+                                        {% if segment.avg_gap > 1.5 %}
+                                            <span class="badge bg-danger">{{ segment.avg_gap }}</span>
+                                        {% elif segment.avg_gap > 0.5 %}
+                                            <span class="badge bg-warning">{{ segment.avg_gap }}</span>
+                                        {% else %}
+                                            <span class="badge bg-success">{{ segment.avg_gap }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="no-data">
+                        <i class="bi bi-inbox"></i>
+                        <p>No segment data available -- assign employees to segments in People &gt; Skill Matrix.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
         <!-- Top Performers -->
         <div class="col-lg-6 animate-fade-in">
             <div class="dashboard-card h-100">

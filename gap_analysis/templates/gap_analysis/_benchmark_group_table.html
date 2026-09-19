@@ -1,0 +1,51 @@
+{% if benchmarks %}
+<div class="card mb-4">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 mobile-cards">
+                <thead>
+                    <tr>
+                        <th>Skill Name</th>
+                        <th>Category</th>
+                        <th>Required Level</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for benchmark in benchmarks %}
+                    <tr>
+                        <td data-label="Skill Name">
+                            <strong>{{ benchmark.skill.name }}</strong>
+                        </td>
+                        <td data-label="Category">
+                            {% if benchmark.skill.category %}
+                                <span class="badge bg-light text-muted">{{ benchmark.skill.category }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Required Level">
+                            <span class="level-badge level-{{ benchmark.required_level }}">{{ benchmark.required_level }}/5</span>
+                        </td>
+                        <td data-label="Actions">
+                            <div class="d-flex justify-content-end gap-2">
+                                {% if user.is_staff %}
+                                <a href="{% url 'skillgap_designation_benchmark_delete' benchmark.id %}" class="btn btn-danger btn-icon" title="Remove">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="empty-state py-4">
+    <i class="bi bi-bookmark-check d-block"></i>
+    <p>{{ empty_message|default:"No skills defined here yet." }}</p>
+</div>
+{% endif %}

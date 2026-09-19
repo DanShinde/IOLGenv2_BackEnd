@@ -42,6 +42,25 @@
         <div class="card-header">
             <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Base Skills</h5>
         </div>
+        <div class="card-body border-bottom">
+            <form method="get" class="d-flex flex-wrap gap-2">
+                <select name="scope" class="form-select form-select-sm" style="max-width: 220px;" onchange="this.form.submit()">
+                    <option value="">All Scopes</option>
+                    {% for value, label in scope_choices %}
+                        <option value="{{ value }}" {% if selected_scope == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <select name="segment" class="form-select form-select-sm" style="max-width: 220px;" onchange="this.form.submit()">
+                    <option value="">All Segments</option>
+                    {% for segment in segments %}
+                        <option value="{{ segment.id }}" {% if selected_segment == segment.id|stringformat:'s' %}selected{% endif %}>{{ segment.name }}</option>
+                    {% endfor %}
+                </select>
+                {% if selected_scope or selected_segment %}
+                    <a href="{% url 'skillgap_skill_list' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                {% endif %}
+            </form>
+        </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0 mobile-cards">
@@ -49,6 +68,7 @@
                         <tr>
                             <th>Skill Name</th>
                             <th>Category</th>
+                            <th>Scope</th>
                             <th>Used In Benchmarks</th>
                             <th class="text-end">Actions</th>
                         </tr>
@@ -66,6 +86,13 @@
                                     </span>
                                 {% else %}
                                     <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Scope">
+                                {% if skill.scope == 'segment' %}
+                                    <span class="badge bg-warning text-dark">{{ skill.segment.name }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">General</span>
                                 {% endif %}
                             </td>
                             <td data-label="Used In Benchmarks">
@@ -90,7 +117,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4">
+                            <td colspan="5">
                                 <div class="empty-state py-5">
                                     <i class="bi bi-lightning d-block"></i>
                                     <p>No skills found yet.</p>

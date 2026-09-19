@@ -23,67 +23,40 @@
         {% endif %}
     </div>
 
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Required Skills</h5>
-            <span class="badge bg-info">{{ benchmark_count }} skill{{ benchmark_count|pluralize }}</span>
+    {% if benchmark_count %}
+        <!-- General Skills: apply to everyone in this role, regardless of segment -->
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="mb-0"><i class="bi bi-diagram-3 me-2 text-secondary"></i>General Skills</h5>
+            <span class="badge bg-secondary">{{ general_benchmarks|length }} skill{{ general_benchmarks|length|pluralize }}</span>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 mobile-cards">
-                    <thead>
-                        <tr>
-                            <th>Skill Name</th>
-                            <th>Category</th>
-                            <th>Required Level</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for benchmark in benchmarks %}
-                        <tr>
-                            <td data-label="Skill Name">
-                                <strong>{{ benchmark.skill.name }}</strong>
-                            </td>
-                            <td data-label="Category">
-                                {% if benchmark.skill.category %}
-                                    <span class="badge bg-light text-muted">{{ benchmark.skill.category }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Required Level">
-                                <span class="level-badge level-{{ benchmark.required_level }}">{{ benchmark.required_level }}/5</span>
-                            </td>
-                            <td data-label="Actions">
-                                <div class="d-flex justify-content-end gap-2">
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_designation_benchmark_delete' benchmark.id %}" class="btn btn-danger btn-icon" title="Remove">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4">
-                                <div class="empty-state py-5">
-                                    <i class="bi bi-bookmark-check d-block"></i>
-                                    <p>No skills defined for this designation yet.</p>
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_designation_benchmark_add' designation.id %}" class="btn btn-primary mt-2">
-                                        <i class="bi bi-plus-circle me-2"></i>Add First Skill
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        {% include 'gap_analysis/_benchmark_group_table.html' with benchmarks=general_benchmarks empty_message="No General skills defined for this role yet." %}
+
+        <!-- Segment-Specific Skills: one section per segment (alphabetical), only applies to
+             an employee in this role who is also assigned that segment -->
+        {% for group in segment_benchmark_groups %}
+        <div class="d-flex align-items-center justify-content-between mb-3 mt-4">
+            <h5 class="mb-0"><i class="bi bi-geo-alt me-2 text-warning"></i>{{ group.segment_name }}</h5>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-warning text-dark">{{ group.benchmarks|length }} skill{{ group.benchmarks|length|pluralize }}</span>
+                {% if user.is_staff %}
+                <a href="{% url 'skillgap_designation_benchmark_add' designation.id %}?segment={{ group.segment_id }}" class="btn btn-sm btn-outline-primary" title="Add another skill to {{ group.segment_name }}">
+                    <i class="bi bi-plus-circle"></i>
+                </a>
+                {% endif %}
             </div>
         </div>
-    </div>
+        {% include 'gap_analysis/_benchmark_group_table.html' with benchmarks=group.benchmarks %}
+        {% endfor %}
+    {% else %}
+        <div class="empty-state py-5">
+            <i class="bi bi-bookmark-check d-block"></i>
+            <p>No skills defined for this designation yet.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'skillgap_designation_benchmark_add' designation.id %}" class="btn btn-primary mt-2">
+                <i class="bi bi-plus-circle me-2"></i>Add First Skill
+            </a>
+            {% endif %}
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

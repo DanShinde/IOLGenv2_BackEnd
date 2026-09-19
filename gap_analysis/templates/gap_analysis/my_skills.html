@@ -36,7 +36,12 @@
                     <tbody>
                         {% for skill in skill_data %}
                         <tr>
-                            <td data-label="Skill"><strong>{{ skill.skill_name }}</strong></td>
+                            <td data-label="Skill">
+                                <strong>{{ skill.skill_name }}</strong>
+                                {% if skill.skill_scope == 'segment' %}
+                                    <span class="badge bg-warning text-dark ms-1" title="Segment-specific requirement">{{ skill.skill_segment }}</span>
+                                {% endif %}
+                            </td>
                             <td data-label="Category">
                                 {% if skill.skill_category %}
                                     <span class="badge bg-light text-dark">{{ skill.skill_category }}</span>

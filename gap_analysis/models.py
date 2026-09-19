@@ -81,16 +81,38 @@ class Skill(models.Model):
         ('tools', 'Tools & Software'),
         ('other', 'Other'),
     ]
-    
+
+    SCOPE_GENERAL = 'general'
+    SCOPE_SEGMENT = 'segment'
+    SCOPE_CHOICES = [
+        (SCOPE_GENERAL, 'General (every Automation Engineer)'),
+        (SCOPE_SEGMENT, 'Segment-Specific'),
+    ]
+
     name = models.CharField(max_length=100, unique=True)
     category = models.CharField(max_length=100, choices=CATEGORY_CHOICES, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    
+    scope = models.CharField(
+        max_length=10, choices=SCOPE_CHOICES, default=SCOPE_GENERAL,
+        help_text="General skills are expected of every engineer. Segment-specific skills only apply to employees currently in the linked segment.",
+    )
+    segment = models.ForeignKey(
+        'planner.Segment', on_delete=models.PROTECT, null=True, blank=True, related_name='segment_skills',
+        help_text="Required when Scope is Segment-Specific; must be left blank for General skills.",
+    )
+
     class Meta:
         ordering = ['name']
-    
+
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.segment})" if self.scope == self.SCOPE_SEGMENT and self.segment_id else self.name
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.scope == self.SCOPE_SEGMENT and not self.segment_id:
+            raise ValidationError({'segment': 'Segment-specific skills must specify a segment.'})
+        if self.scope == self.SCOPE_GENERAL and self.segment_id:
+            raise ValidationError({'segment': 'General skills must not have a segment set.'})
 
 class SkillBenchmark(models.Model):
     role_matrix = models.ForeignKey(RoleMatrix, on_delete=models.CASCADE, related_name='benchmarks')
@@ -127,6 +149,19 @@ class SkillMatrix(models.Model):
     role_matrix = models.ForeignKey(RoleMatrix, on_delete=models.SET_NULL, null=True, blank=True, help_text="Assigned Role")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
 
+    # Deliberately separate from employees.Employee.segment (a single FK Planner's
+    # workforce/capacity-planning views use for headcount-per-segment math). An engineer can
+    # work across several segments at once (e.g. both HDPS and SRM), and evaluating them
+    # against only one segment's skills would understate what they're actually expected to
+    # know -- but folding that into Employee.segment would also change what Planner's
+    # headcount reports count, which is a separate decision. This is managed independently,
+    # here, for skill-gap purposes only; it does not sync from or to Employee.segment after
+    # the one-time backfill in migration 0005.
+    segments = models.ManyToManyField(
+        'planner.Segment', blank=True, related_name='skillgap_employees',
+        help_text="All segments/teams this employee currently works in. Drives which segment-specific skills they're evaluated against, in addition to General skills.",
+    )
+
     class Meta:
         ordering = ['employee__name']
 
@@ -156,18 +191,43 @@ class SkillMatrix(models.Model):
         return self.skills.select_related('skill').all()
     
     def get_required_benchmarks(self):
-        if self.role_matrix:
-            return self.role_matrix.benchmarks.select_related('skill').all()
-        return SkillBenchmark.objects.none()
+        """This employee's applicable skill set: their designation's General-skill benchmarks,
+        plus the benchmarks for any segment-specific skill matching ANY of this employee's
+        currently-assigned segments (they can work across more than one, e.g. both HDPS and
+        SRM). Computed live off self.segments rather than stored, so adding/removing a segment
+        here immediately changes what they're evaluated against.
+        """
+        if not self.role_matrix:
+            return SkillBenchmark.objects.none()
+        return self.role_matrix.benchmarks.select_related('skill', 'skill__segment').filter(
+            models.Q(skill__scope=Skill.SCOPE_GENERAL) |
+            models.Q(skill__scope=Skill.SCOPE_SEGMENT, skill__segment__in=self.segments.all())
+        )
+
+    def get_other_segment_benchmarks(self):
+        """The complement of get_required_benchmarks()'s segment-specific half: this role's
+        segment-specific benchmarks for segments this employee is NOT currently assigned to
+        (e.g. Case Handling, for an employee only assigned to HTTPS and Pallet Handling).
+
+        Surfaced as "Other Skills" on the profile -- not required, excluded from gap scoring,
+        but still viewable/ratable so staff can track readiness for a future segment move.
+        Assigning that segment later moves the same skill (and whatever level was already
+        recorded for it) into get_required_benchmarks() automatically -- nothing is copied.
+        """
+        if not self.role_matrix:
+            return SkillBenchmark.objects.none()
+        return self.role_matrix.benchmarks.select_related('skill', 'skill__segment').filter(
+            skill__scope=Skill.SCOPE_SEGMENT
+        ).exclude(skill__segment__in=self.segments.all())
 
     def has_benchmarks(self):
-        return bool(self.role_matrix and self.role_matrix.benchmarks.exists())
+        return self.get_required_benchmarks().exists()
 
     def get_missing_benchmarks(self):
         if not self.role_matrix:
             return Skill.objects.none()
-        required_skills = set(b.skill.id for b in self.role_matrix.benchmarks.all())
-        recorded_skills = set(s.skill.id for s in self.skills.all())
+        required_skills = set(b.skill_id for b in self.get_required_benchmarks())
+        recorded_skills = set(s.skill_id for s in self.skills.all())
         missing = required_skills - recorded_skills
         return Skill.objects.filter(id__in=missing)
     

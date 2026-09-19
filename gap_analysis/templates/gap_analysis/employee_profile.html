@@ -191,6 +191,52 @@
     .skill-level-input {
         width: 60px;
     }
+
+    /* Sub-tabs nested inside the Skills Assessment tab: General / per-segment / Other.
+       Visually smaller/secondary compared to .tabs-nav so the nesting reads clearly. */
+    .skill-subtabs-nav {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .skill-subtab-btn {
+        padding: 0.5rem 1rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        font-weight: 500;
+        font-size: 0.875rem;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .skill-subtab-btn:hover {
+        border-color: #4f46e5;
+        color: #4f46e5;
+    }
+
+    .skill-subtab-btn.active {
+        color: #fff;
+        background: #4f46e5;
+        border-color: #4f46e5;
+    }
+
+    .skill-subtab-btn .badge {
+        margin-left: 0.35rem;
+    }
+
+    .skill-subtab-content {
+        display: none;
+    }
+
+    .skill-subtab-content.active {
+        display: block;
+    }
 </style>
 {% endblock %}
 
@@ -209,6 +255,14 @@
                 <p class="designation">
                     <i class="bi bi-briefcase me-2"></i>
                     {{ employee.role_matrix.title|default:"No designation assigned" }}
+                </p>
+                <p class="mb-1">
+                    <i class="bi bi-geo-alt me-2"></i>
+                    {% for segment in employee.segments.all %}
+                        <span class="badge bg-light text-dark me-1">{{ segment.name }}</span>
+                    {% empty %}
+                        <span class="text-white-50">No segments assigned</span>
+                    {% endfor %}
                 </p>
                 <p class="mb-0">
                     {% if employee.email %}
@@ -269,123 +323,8 @@
         </div>
         {% endif %}
         {% if skill_data %}
-            <div class="card">
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0 mobile-cards">
-                            <thead>
-                                <tr>
-                                    <th>Skill</th>
-                                    <th>Category</th>
-                                    <th>Required</th>
-                                    <th>Self Rating</th>
-                                    <th>Manager Level</th>
-                                    <th>Gap</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for skill in skill_data %}
-                                <tr>
-                                    <td data-label="Skill">
-                                        <strong>{{ skill.skill_name }}</strong>
-                                    </td>
-                                    <td data-label="Category">
-                                        {% if skill.skill_category %}
-                                            <span class="badge bg-light text-dark">{{ skill.skill_category }}</span>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td data-label="Required">
-                                        {% if skill.required_level is not None %}
-                                            <span class="fw-bold text-danger">{{ skill.required_level }}</span>
-                                        {% else %}
-                                            <span class="text-muted" title="No benchmark defined for this skill">&mdash;</span>
-                                        {% endif %}
-                                    </td>
-                                    <td data-label="Self Rating" id="self-rating-cell-{{ skill.skill_id }}">
-                                        {% if skill.self_rated_level is not None %}
-                                            <span class="fw-bold">{{ skill.self_rated_level }}/5</span>
-                                            <span id="rating-status-badge-{{ skill.skill_id }}">
-                                                {% if skill.rating_status == 'pending' %}
-                                                    <span class="badge bg-warning ms-1">Pending</span>
-                                                {% elif skill.rating_status == 'approved' %}
-                                                    <span class="badge bg-success ms-1">Approved</span>
-                                                {% elif skill.rating_status == 'overridden' %}
-                                                    <span class="badge bg-secondary ms-1">Overridden</span>
-                                                {% endif %}
-                                            </span>
-                                            {% if can_rate_employee %}
-                                            <button type="button" class="btn btn-sm {% if skill.has_active_development_plan %}btn-outline-secondary{% else %}btn-outline-success{% endif %} mt-1 d-block"
-                                                    id="approve-btn-{{ skill.skill_id }}"
-                                                    onclick="approveSelfRating({{ employee.id }}, {{ skill.skill_id }})"
-                                                    {% if skill.rating_status != 'pending' %}style="display: none;"{% endif %}
-                                                    {% if skill.has_active_development_plan %}disabled title="Blocked: mark this skill's development plan Completed before approving"{% endif %}>
-                                                <i class="bi bi-{% if skill.has_active_development_plan %}lock{% else %}check-lg{% endif %} me-1"></i>{% if skill.has_active_development_plan %}Blocked{% else %}Approve{% endif %}
-                                            </button>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="text-muted">Not rated</span>
-                                        {% endif %}
-                                    </td>
-                                    <td data-label="Manager Level">
-                                        <div class="d-flex align-items-center gap-2">
-                                            {% if can_rate_employee %}
-                                            <input type="number"
-                                                   class="skill-level-input"
-                                                   id="skill-{{ skill.skill_id }}"
-                                                   value="{{ skill.actual_level }}"
-                                                   min="0"
-                                                   max="5"
-                                                   onchange="updateSkill({{ employee.id }}, {{ skill.skill_id }}, this.value)"
-                                                   style="width: 60px;">
-                                            {% else %}
-                                            <span class="fw-bold" style="width: 60px;">{{ skill.actual_level }}</span>
-                                            {% endif %}
-                                            <div class="progress flex-grow-1" style="height: 8px;">
-                                                <div class="progress-bar bg-primary" id="bar-{{ skill.skill_id }}" style="width: {{ skill.level_percentage }}%"></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td data-label="Gap" id="gap-cell-{{ skill.skill_id }}">
-                                        {% if skill.gap is None %}
-                                            <span class="text-muted">&mdash;</span>
-                                        {% elif skill.gap > 0 %}
-                                            <span class="text-danger fw-bold">-{{ skill.gap }}</span>
-                                        {% else %}
-                                            <span class="text-success">0</span>
-                                        {% endif %}
-                                    </td>
-                                    <td data-label="Status" id="status-cell-{{ skill.skill_id }}">
-                                        {% if skill.status == 'met' %}
-                                            <span class="badge bg-success">
-                                                <i class="bi bi-check-circle me-1"></i>Met
-                                            </span>
-                                        {% elif skill.status == 'warning' %}
-                                            <span class="badge bg-warning">
-                                                <i class="bi bi-exclamation-triangle me-1"></i>Warning
-                                            </span>
-                                        {% elif skill.status == 'extra' %}
-                                            <span class="badge bg-light text-dark" title="Recorded, but not part of this employee's role benchmark">
-                                                <i class="bi bi-info-circle me-1"></i>No Benchmark
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-danger">
-                                                <i class="bi bi-x-circle me-1"></i>Gap
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Summary Cards -->
-            <div class="row mt-4">
+            <!-- Overall Summary Cards (across every group below) -->
+            <div class="row mb-4">
                 <div class="col-md-4">
                     <div class="card bg-success text-white">
                         <div class="card-body text-center">
@@ -411,6 +350,58 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Skill group sub-tabs: General, then each assigned segment (alphabetical), then
+                 Other Skills (this role's skills for segments NOT assigned, plus anything
+                 recorded outside the role's benchmark entirely) -->
+            <div class="skill-subtabs-nav">
+                <button class="skill-subtab-btn active" onclick="showSkillSubTab('general')">
+                    <i class="bi bi-diagram-3 me-1"></i>General
+                    <span class="badge bg-light text-dark">{{ general_skill_data|length }}</span>
+                </button>
+                {% for group in segment_skill_groups %}
+                <button class="skill-subtab-btn" onclick="showSkillSubTab('segment-{{ forloop.counter }}')">
+                    <i class="bi bi-geo-alt me-1"></i>{{ group.segment_name }}
+                    <span class="badge bg-light text-dark">{{ group.skills|length }}</span>
+                </button>
+                {% endfor %}
+                {% if other_segment_groups or extra_skill_data %}
+                <button class="skill-subtab-btn" onclick="showSkillSubTab('other')">
+                    <i class="bi bi-dash-circle me-1"></i>Other Skills
+                    <span class="badge bg-light text-dark">{{ other_skills_total_count }}</span>
+                </button>
+                {% endif %}
+            </div>
+
+            <div id="skill-subtab-general" class="skill-subtab-content active">
+                {% include 'gap_analysis/_skill_group_table.html' with skills=general_skill_data summary=general_summary empty_message="No General skills are benchmarked for this role yet." %}
+            </div>
+            {% for group in segment_skill_groups %}
+            <div id="skill-subtab-segment-{{ forloop.counter }}" class="skill-subtab-content">
+                {% include 'gap_analysis/_skill_group_table.html' with skills=group.skills summary=group.summary empty_message="No segment-specific skills are benchmarked for this role in this segment yet." %}
+            </div>
+            {% endfor %}
+            {% if other_segment_groups or extra_skill_data %}
+            <div id="skill-subtab-other" class="skill-subtab-content">
+                {% if other_segment_groups %}
+                <p class="text-muted small mb-3">
+                    This role's skills for segments {{ employee.name }} isn't currently assigned to. Not required, not
+                    counted toward the gap/benchmark scores above -- but still viewable and ratable, so you can track
+                    readiness for a future segment move. Assigning a segment moves its skills into that segment's tab
+                    automatically, with whatever level is already recorded here intact.
+                </p>
+                {% for group in other_segment_groups %}
+                <h6 class="mt-4 mb-2"><i class="bi bi-geo-alt me-1 text-muted"></i>{{ group.segment_name }}</h6>
+                {% include 'gap_analysis/_skill_group_table.html' with skills=group.skills summary=group.summary %}
+                {% endfor %}
+                {% endif %}
+                {% if extra_skill_data %}
+                <h6 class="mt-4 mb-2"><i class="bi bi-info-circle me-1 text-muted"></i>Not Part of This Role</h6>
+                <p class="text-muted small mb-3">Recorded for this employee but not part of this role's benchmark at all -- e.g. a skill recorded before a role change.</p>
+                {% include 'gap_analysis/_skill_group_table.html' with skills=extra_skill_data summary=extra_summary %}
+                {% endif %}
+            </div>
+            {% endif %}
         {% else %}
             <div class="empty-state">
                 <i class="bi bi-clipboard-x"></i>
@@ -569,6 +560,17 @@
         // inside a tab that starts hidden (display: none) can render blank. Dispatching a
         // resize event once the tab becomes visible makes Chart.js re-measure and draw correctly.
         window.dispatchEvent(new Event('resize'));
+    }
+
+    // Same show/hide pattern as showTab() above, scoped to the General/Segment/Other
+    // sub-tabs nested inside the Skills Assessment tab -- a separate class namespace
+    // (.skill-subtab-*) so switching a sub-tab never touches the outer page tabs.
+    function showSkillSubTab(subtabId) {
+        document.querySelectorAll('.skill-subtab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.skill-subtab-btn').forEach(b => b.classList.remove('active'));
+
+        document.getElementById('skill-subtab-' + subtabId).classList.add('active');
+        event.target.closest('.skill-subtab-btn').classList.add('active');
     }
 
     // Rebuild the Gap and Status cells from a JSON response shared by both endpoints below

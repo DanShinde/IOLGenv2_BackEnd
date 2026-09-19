@@ -306,7 +306,12 @@
             {% for skill in skill_details %}
                 <div class="skill-row gap-{{ skill.status }}">
                     <div class="skill-info">
-                        <p class="skill-name">{{ skill.name }}</p>
+                        <p class="skill-name">
+                            {{ skill.name }}
+                            {% if skill.scope == 'segment' %}
+                                <span class="badge bg-warning text-dark" title="Segment-specific requirement">{{ skill.segment }}</span>
+                            {% endif %}
+                        </p>
                         <p class="skill-numbers">
                             <i class="bi bi-target"></i> Required: <strong>{{ skill.required }}/5</strong>
                             &nbsp;&nbsp;
