@@ -84,25 +84,43 @@ class Skill(models.Model):
 
     SCOPE_GENERAL = 'general'
     SCOPE_SEGMENT = 'segment'
+    SCOPE_OTHER = 'other'
+    # The stored value stays 'other' (no migration-worthy data change) -- only the label seen
+    # by staff is "Supplementary", chosen to not collide with the profile page's "Not
+    # Currently Required" tab, which used to also be called "Other Skills" and meant something
+    # unrelated (segment skills for a segment the employee isn't assigned to).
     SCOPE_CHOICES = [
         (SCOPE_GENERAL, 'General (every Automation Engineer)'),
         (SCOPE_SEGMENT, 'Segment-Specific'),
+        (SCOPE_OTHER, 'Supplementary (cross-segment, not tied to a specific segment)'),
     ]
+    # Scopes that never gate on Employee/SkillMatrix.segments -- once benchmarked for a role,
+    # required of everyone in that role regardless of which segments they're assigned.
+    UNCONDITIONAL_SCOPES = (SCOPE_GENERAL, SCOPE_OTHER)
 
-    name = models.CharField(max_length=100, unique=True)
+    # Not globally unique -- the same name can exist once per segment (e.g. "Commissioning"
+    # for ASRS-4D Robot AND a separate "Commissioning" for ASRS-HDPS), since they're distinct
+    # requirements that just happen to share a label. See Meta.unique_together and clean()
+    # below for how uniqueness is actually scoped.
+    name = models.CharField(max_length=100)
     category = models.CharField(max_length=100, choices=CATEGORY_CHOICES, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     scope = models.CharField(
         max_length=10, choices=SCOPE_CHOICES, default=SCOPE_GENERAL,
-        help_text="General skills are expected of every engineer. Segment-specific skills only apply to employees currently in the linked segment.",
+        help_text="General and Supplementary skills are required of everyone in a role that's benchmarked on them. Segment-specific skills only apply to employees currently assigned that segment.",
     )
     segment = models.ForeignKey(
         'planner.Segment', on_delete=models.PROTECT, null=True, blank=True, related_name='segment_skills',
-        help_text="Required when Scope is Segment-Specific; must be left blank for General skills.",
+        help_text="Required when Scope is Segment-Specific; must be left blank otherwise.",
     )
 
     class Meta:
         ordering = ['name']
+        # Covers the segment-specific case at the DB level (two rows can't share a name within
+        # the same segment). Doesn't cover General/Supplementary (segment IS NULL on both) --
+        # Postgres never treats two NULLs as equal for uniqueness, so that case is handled
+        # explicitly in clean() below instead.
+        unique_together = ('name', 'segment')
 
     def __str__(self):
         return f"{self.name} ({self.segment})" if self.scope == self.SCOPE_SEGMENT and self.segment_id else self.name
@@ -111,8 +129,13 @@ class Skill(models.Model):
         from django.core.exceptions import ValidationError
         if self.scope == self.SCOPE_SEGMENT and not self.segment_id:
             raise ValidationError({'segment': 'Segment-specific skills must specify a segment.'})
-        if self.scope == self.SCOPE_GENERAL and self.segment_id:
-            raise ValidationError({'segment': 'General skills must not have a segment set.'})
+        if self.scope != self.SCOPE_SEGMENT and self.segment_id:
+            raise ValidationError({'segment': 'Only Segment-Specific skills may have a segment set.'})
+
+        if not self.segment_id:
+            duplicate = Skill.objects.filter(name__iexact=self.name, segment__isnull=True).exclude(pk=self.pk)
+            if duplicate.exists():
+                raise ValidationError({'name': 'A skill with this name already exists.'})
 
 class SkillBenchmark(models.Model):
     role_matrix = models.ForeignKey(RoleMatrix, on_delete=models.CASCADE, related_name='benchmarks')
@@ -191,16 +214,17 @@ class SkillMatrix(models.Model):
         return self.skills.select_related('skill').all()
     
     def get_required_benchmarks(self):
-        """This employee's applicable skill set: their designation's General-skill benchmarks,
-        plus the benchmarks for any segment-specific skill matching ANY of this employee's
-        currently-assigned segments (they can work across more than one, e.g. both HDPS and
-        SRM). Computed live off self.segments rather than stored, so adding/removing a segment
-        here immediately changes what they're evaluated against.
+        """This employee's applicable skill set: their designation's General and Other-scope
+        benchmarks (unconditional -- required regardless of segment), plus the benchmarks for
+        any segment-specific skill matching ANY of this employee's currently-assigned segments
+        (they can work across more than one, e.g. both HDPS and SRM). Computed live off
+        self.segments rather than stored, so adding/removing a segment here immediately changes
+        what they're evaluated against.
         """
         if not self.role_matrix:
             return SkillBenchmark.objects.none()
         return self.role_matrix.benchmarks.select_related('skill', 'skill__segment').filter(
-            models.Q(skill__scope=Skill.SCOPE_GENERAL) |
+            models.Q(skill__scope__in=Skill.UNCONDITIONAL_SCOPES) |
             models.Q(skill__scope=Skill.SCOPE_SEGMENT, skill__segment__in=self.segments.all())
         )
 

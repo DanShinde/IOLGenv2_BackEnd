@@ -14,8 +14,7 @@ import json
 from planner.models import Segment
 
 from .forms import (
-    RoleMatrixForm, SkillBenchmarkForm, SkillMatrixForm, EmployeeSkillForm, SkillForm,
-    RoleMatrixBenchmarkForm, DevelopmentPlanForm,
+    RoleMatrixForm, SkillMatrixForm, EmployeeSkillForm, SkillForm, DevelopmentPlanForm,
 )
 from .mixins import StaffRequiredMixin, EmployeeSelfOrManagerRequiredMixin, CancelUrlMixin
 from .models import (
@@ -100,7 +99,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             applicable_skill_ids_by_emp[emp.id] = {
                 skill_id for (role_id, skill_id), bm in benchmark_map.items()
                 if role_id == emp.role_matrix_id and (
-                    bm.skill.scope == Skill.SCOPE_GENERAL or bm.skill.segment_id in emp_segment_ids
+                    bm.skill.scope in Skill.UNCONDITIONAL_SCOPES or bm.skill.segment_id in emp_segment_ids
                 )
             }
 
@@ -164,11 +163,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             role_gap_totals[role_id]['weight'] += weight
             role_gap_totals[role_id]['employees'].add(emp.id)
 
-            # A General skill's gap reflects on every segment this employee works in; a
-            # Segment-Specific skill's gap only reflects on its own segment (which is
-            # guaranteed to be one of the employee's, since the applicability check above
-            # already enforced that).
-            if bm.skill.scope == Skill.SCOPE_GENERAL:
+            # A General or Other skill's gap reflects on every segment this employee works in
+            # (unconditional, not tied to one segment); a Segment-Specific skill's gap only
+            # reflects on its own segment (which is guaranteed to be one of the employee's,
+            # since the applicability check above already enforced that).
+            if bm.skill.scope in Skill.UNCONDITIONAL_SCOPES:
                 target_segment_ids = emp_segment_ids_by_emp.get(emp.id, set())
             else:
                 target_segment_ids = {bm.skill.segment_id}
@@ -418,16 +417,6 @@ class RoleMatrixCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixi
     def get_success_url(self):
         return reverse('skillgap_designation_list')
 
-class SkillBenchmarkCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
-    model = SkillBenchmark
-    form_class = SkillBenchmarkForm
-    template_name = 'gap_analysis/add_form.html'
-    success_message = "Skill benchmark created successfully!"
-    extra_context = {'title': 'Add Skill Benchmark'}
-
-    def get_success_url(self):
-        return reverse('skillgap_benchmark_list')
-
 class SkillMatrixCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, CreateView):
     model = SkillMatrix
     form_class = SkillMatrixForm
@@ -490,29 +479,29 @@ class SkillCreateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, Su
         return reverse('skillgap_skill_list')
 
 # --- SKILL CRUD VIEWS ---
-class SkillListView(LoginRequiredMixin, ListView):
-    model = Skill
+class SkillListView(LoginRequiredMixin, TemplateView):
+    """The skill catalog, grouped into General / per-segment (alphabetical) / Supplementary --
+    the same category structure the Role Matrix page now uses to list every skill for every
+    role, so the catalog and the matrix read as the same three buckets everywhere."""
     template_name = 'gap_analysis/skill_list.html'
-    context_object_name = 'skills'
-    ordering = ['name']
-    paginate_by = 15
-
-    def get_queryset(self):
-        queryset = super().get_queryset().select_related('segment')
-        scope_filter = self.request.GET.get('scope')
-        segment_filter = self.request.GET.get('segment')
-        if scope_filter:
-            queryset = queryset.filter(scope=scope_filter)
-        if segment_filter:
-            queryset = queryset.filter(segment_id=segment_filter)
-        return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['segments'] = Segment.objects.all().order_by('name')
-        context['scope_choices'] = Skill.SCOPE_CHOICES
-        context['selected_scope'] = self.request.GET.get('scope')
-        context['selected_segment'] = self.request.GET.get('segment')
+        skills = list(Skill.objects.select_related('segment').prefetch_related('benchmarks').order_by('name'))
+
+        general_skills = [s for s in skills if s.scope == Skill.SCOPE_GENERAL]
+        other_skills = [s for s in skills if s.scope == Skill.SCOPE_OTHER]
+        segments_seen = {}
+        for s in skills:
+            if s.scope == Skill.SCOPE_SEGMENT and s.segment_id:
+                segments_seen.setdefault(s.segment_id, {'segment_name': s.segment.name, 'skills': []})
+                segments_seen[s.segment_id]['skills'].append(s)
+        segment_skill_groups = sorted(segments_seen.values(), key=lambda g: g['segment_name'])
+
+        context['general_skills'] = general_skills
+        context['segment_skill_groups'] = segment_skill_groups
+        context['other_skills'] = other_skills
+        context['total_skill_count'] = len(skills)
         return context
 
 class SkillUpdateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
@@ -880,8 +869,11 @@ class SkillMatrixProfileView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMi
                 'avg_gap': round(total_weighted_gap / total_weight, 1) if total_weight else 0,
             }
 
+        # Other-scope skills are unconditional (same as General -- not gated by segment), so
+        # they're folded into the General tab rather than getting a tab of their own; each row
+        # still carries skill_scope, and the template badges 'other' rows distinctly.
         general_skill_data = [
-            s for s in skill_data if s['status'] != 'extra' and s['skill_scope'] == Skill.SCOPE_GENERAL
+            s for s in skill_data if s['status'] != 'extra' and s['skill_scope'] in Skill.UNCONDITIONAL_SCOPES
         ]
         extra_skill_data = [s for s in skill_data if s['status'] == 'extra']
 
@@ -917,6 +909,17 @@ class SkillMatrixProfileView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMi
             })
         other_segment_groups.sort(key=lambda g: (not g['has_history'], g['segment_name']))
 
+        # Flattened for the "Not Currently Required" tab: one table instead of a sub-header per
+        # segment plus a separate leftover table. Each row already carries its own segment
+        # badge / status badge (see _skill_group_table.html), so nothing is lost by not
+        # grouping them visually -- this just removes a level of nesting the tab doesn't need.
+        # other_segment_groups' rows are already ordered (segments with some existing rating
+        # first, then alphabetical); the "not part of this role at all" rows go last.
+        not_required_skill_data = []
+        for group in other_segment_groups:
+            not_required_skill_data.extend(group['skills'])
+        not_required_skill_data.extend(extra_skill_data)
+
         context['general_skill_data'] = general_skill_data
         context['general_summary'] = summarize_group(general_skill_data)
         context['segment_skill_groups'] = segment_skill_groups
@@ -924,6 +927,8 @@ class SkillMatrixProfileView(LoginRequiredMixin, EmployeeSelfOrManagerRequiredMi
         context['other_skills_total_count'] = len(other_segment_rows) + len(extra_skill_data)
         context['extra_skill_data'] = extra_skill_data
         context['extra_summary'] = summarize_group(extra_skill_data)
+        context['not_required_skill_data'] = not_required_skill_data
+        context['not_required_summary'] = summarize_group(not_required_skill_data)
 
         return context
 
@@ -1061,79 +1066,81 @@ class SkillMatrixProfileUpdateView(LoginRequiredMixin, StaffRequiredMixin, Succe
 
 # --- DESIGNATION BENCHMARK MANAGEMENT ---
 class RoleMatrixBenchmarkView(LoginRequiredMixin, TemplateView):
+    """The Role Matrix for one designation: every catalog skill is always listed here (General
+    / per-segment, alphabetical / Supplementary), whether or not it's currently required for
+    this role. "Benchmarking" a skill just means giving it a required level, edited in place
+    (see designation_benchmark_level_update below) -- a blank level means not required. There's
+    no separate "add a skill to this role" step; a skill only needs to exist in the catalog
+    (Skill Catalog page) to show up here for leveling.
+    """
     template_name = 'gap_analysis/designation_benchmark.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         designation = get_object_or_404(RoleMatrix, pk=self.kwargs['pk'])
-        benchmarks = SkillBenchmark.objects.filter(role_matrix=designation).select_related('skill', 'skill__segment')
+        skills = list(Skill.objects.select_related('segment').order_by('name'))
+        existing_benchmarks = {
+            b.skill_id: b for b in SkillBenchmark.objects.filter(role_matrix=designation)
+        }
 
-        # Grouped by General / per-segment (alphabetical) for editing, mirroring how a
-        # person's profile groups their own required skills -- "add skills for this role's
-        # five segments" reads as five sections instead of one long name-sorted list.
-        general_benchmarks = [b for b in benchmarks if b.skill.scope == Skill.SCOPE_GENERAL]
+        def build_row(skill):
+            bm = existing_benchmarks.get(skill.id)
+            return {
+                'skill': skill,
+                'required_level': bm.required_level if bm else None,
+                'is_mandatory': bm.is_mandatory if bm else True,
+            }
+
+        general_rows = [build_row(s) for s in skills if s.scope == Skill.SCOPE_GENERAL]
+        other_rows = [build_row(s) for s in skills if s.scope == Skill.SCOPE_OTHER]
         segments_seen = {}
-        for b in benchmarks:
-            if b.skill.scope == Skill.SCOPE_SEGMENT and b.skill.segment_id:
-                segments_seen.setdefault(
-                    b.skill.segment_id,
-                    {'segment_id': b.skill.segment_id, 'segment_name': b.skill.segment.name, 'benchmarks': []},
-                )
-                segments_seen[b.skill.segment_id]['benchmarks'].append(b)
-        segment_benchmark_groups = sorted(segments_seen.values(), key=lambda g: g['segment_name'])
+        for s in skills:
+            if s.scope == Skill.SCOPE_SEGMENT and s.segment_id:
+                segments_seen.setdefault(s.segment_id, {'segment_name': s.segment.name, 'rows': []})
+                segments_seen[s.segment_id]['rows'].append(build_row(s))
+        segment_groups = sorted(segments_seen.values(), key=lambda g: g['segment_name'])
 
         context['designation'] = designation
-        context['benchmarks'] = benchmarks
-        context['benchmark_count'] = benchmarks.count()
-        context['general_benchmarks'] = general_benchmarks
-        context['segment_benchmark_groups'] = segment_benchmark_groups
+        context['general_rows'] = general_rows
+        context['segment_groups'] = segment_groups
+        context['other_rows'] = other_rows
+        context['total_skill_count'] = len(skills)
+        context['benchmark_count'] = len(existing_benchmarks)
         return context
 
 
-class RoleMatrixBenchmarkAddView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, CreateView):
-    model = SkillBenchmark
-    form_class = RoleMatrixBenchmarkForm
-    template_name = 'gap_analysis/add_form.html'
-    success_message = "Skill benchmark added successfully!"
+@login_required
+def designation_benchmark_level_update(request, pk, skill_id):
+    """AJAX: set or clear one skill's required level for this role, straight from the
+    always-show-every-skill Role Matrix grid. An empty level deletes the SkillBenchmark row
+    entirely (not required for this role) rather than storing a misleading 0."""
+    designation = get_object_or_404(RoleMatrix, pk=pk)
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    skill = get_object_or_404(Skill, pk=skill_id)
 
-    def get_success_url(self):
-        return reverse('skillgap_designation_benchmark', kwargs={'pk': self.kwargs['pk']})
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request'})
 
-    def get_initial(self):
-        # "Add Skill" links inside a segment's section on the designation_benchmark.html page
-        # pass ?segment=<id> so this form opens pre-set to that segment instead of making
-        # staff re-pick scope+segment for every skill they add within the same section.
-        initial = super().get_initial()
-        segment_id = self.request.GET.get('segment')
-        if segment_id:
-            initial['skill_scope'] = Skill.SCOPE_SEGMENT
-            initial['skill_segment'] = segment_id
-        return initial
+    level_raw = request.POST.get('required_level', '').strip()
+    is_mandatory = request.POST.get('is_mandatory') == 'true'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        designation = get_object_or_404(RoleMatrix, pk=self.kwargs['pk'])
-        context['title'] = f'Add Skill to {designation.title}'
-        context['designation'] = designation
-        context['existing_skills'] = Skill.objects.all()
-        return context
+    if level_raw == '':
+        SkillBenchmark.objects.filter(role_matrix=designation, skill=skill).delete()
+        return JsonResponse({'success': True, 'required_level': None})
 
-    def form_valid(self, form):
-        designation = get_object_or_404(RoleMatrix, pk=self.kwargs['pk'])
-        skill = form.cleaned_data.get('skill')
-        if skill:
-            form.instance.skill = skill
-        form.instance.role_matrix = designation
-        return super().form_valid(form)
+    try:
+        level = int(level_raw)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Required level must be a number'}, status=400)
+    if not (0 <= level <= 5):
+        return JsonResponse({'success': False, 'error': 'Required level must be between 0 and 5'}, status=400)
 
-
-class RoleMatrixBenchmarkDeleteView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, DeleteView):
-    model = SkillBenchmark
-    template_name = 'gap_analysis/benchmark_confirm_delete.html'
-    success_message = "Benchmark removed successfully!"
-
-    def get_success_url(self):
-        return reverse('skillgap_designation_benchmark', kwargs={'pk': self.object.role_matrix.pk})
+    benchmark, _ = SkillBenchmark.objects.update_or_create(
+        role_matrix=designation, skill=skill,
+        defaults={'required_level': level, 'is_mandatory': is_mandatory},
+    )
+    return JsonResponse({'success': True, 'required_level': benchmark.required_level, 'is_mandatory': benchmark.is_mandatory})
 
 
 # --- Development Plans ---

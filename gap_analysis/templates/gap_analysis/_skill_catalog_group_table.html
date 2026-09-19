@@ -1,0 +1,71 @@
+{% if total_skill_count %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 skill-catalog-table">
+                <colgroup>
+                    <col style="width: 40%;">
+                    <col style="width: 20%;">
+                    <col style="width: 20%;">
+                    <col style="width: 20%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Skill Name</th>
+                        <th>Category</th>
+                        <th>Used In Benchmarks</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="table-group-row">
+                        <td colspan="4">
+                            <i class="bi bi-diagram-3 me-2 text-secondary"></i>General Skills
+                            <span class="badge bg-secondary ms-2">{{ general_skills|length }} skill{{ general_skills|length|pluralize }}</span>
+                        </td>
+                    </tr>
+                    {% for skill in general_skills %}
+                        {% include 'gap_analysis/_skill_catalog_row.html' %}
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted small ps-4 py-2">No General skills yet.</td></tr>
+                    {% endfor %}
+
+                    {% for group in segment_skill_groups %}
+                    <tr class="table-group-row">
+                        <td colspan="4">
+                            <i class="bi bi-geo-alt me-2 text-warning"></i>{{ group.segment_name }}
+                            <span class="badge bg-warning text-dark ms-2">{{ group.skills|length }} skill{{ group.skills|length|pluralize }}</span>
+                        </td>
+                    </tr>
+                    {% for skill in group.skills %}
+                        {% include 'gap_analysis/_skill_catalog_row.html' %}
+                    {% endfor %}
+                    {% endfor %}
+
+                    <tr class="table-group-row">
+                        <td colspan="4">
+                            <i class="bi bi-dash-circle me-2 text-info"></i>Supplementary Skills
+                            <span class="badge bg-info text-dark ms-2">{{ other_skills|length }} skill{{ other_skills|length|pluralize }}</span>
+                        </td>
+                    </tr>
+                    {% for skill in other_skills %}
+                        {% include 'gap_analysis/_skill_catalog_row.html' %}
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted small ps-4 py-2">No Supplementary skills yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="empty-state py-5">
+    <i class="bi bi-lightning d-block"></i>
+    <p>No skills found yet.</p>
+    {% if user.is_staff %}
+    <a href="{% url 'skillgap_add_skill' %}" class="btn btn-primary mt-2">
+        <i class="bi bi-plus-circle me-2"></i>Add First Skill
+    </a>
+    {% endif %}
+</div>
+{% endif %}

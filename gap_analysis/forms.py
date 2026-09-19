@@ -1,6 +1,5 @@
 from django import forms
-from planner.models import Segment
-from .models import RoleMatrix, SkillBenchmark, SkillMatrix, EmployeeSkill, Skill, DevelopmentPlan
+from .models import RoleMatrix, SkillMatrix, EmployeeSkill, Skill, DevelopmentPlan
 
 class BootstrapFormMixin:
     def __init__(self, *args, **kwargs):
@@ -31,77 +30,6 @@ class RoleMatrixForm(BootstrapFormMixin, forms.ModelForm):
             'department': forms.TextInput(attrs={'placeholder': 'e.g., Engineering'}),
             'description': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional description'}),
         }
-
-class SkillBenchmarkForm(BootstrapFormMixin, forms.ModelForm):
-    class Meta:
-        model = SkillBenchmark
-        fields = ['role_matrix', 'skill', 'required_level', 'is_mandatory']
-        widgets = {
-            'required_level': forms.NumberInput(attrs={'min': 0, 'max': 5}),
-        }
-
-class RoleMatrixBenchmarkForm(BootstrapFormMixin, forms.ModelForm):
-    skill_name = forms.CharField(
-        label='Skill Name',
-        required=True,
-        widget=forms.TextInput(attrs={'placeholder': 'Enter or select skill name'})
-    )
-    skill_category = forms.ChoiceField(
-        label='Category',
-        required=False,
-        choices=[('', 'Select Category')] + list(Skill.CATEGORY_CHOICES)
-    )
-    skill_scope = forms.ChoiceField(
-        label='Scope',
-        required=False,
-        choices=Skill.SCOPE_CHOICES,
-        initial=Skill.SCOPE_GENERAL,
-        help_text="Only applied when this creates a brand-new skill; an existing skill's scope is left as-is.",
-    )
-    skill_segment = forms.ModelChoiceField(
-        label='Segment',
-        required=False,
-        queryset=Segment.objects.all(),
-        help_text="Required if Scope is Segment-Specific.",
-    )
-
-    class Meta:
-        model = SkillBenchmark
-        fields = ['skill_name', 'skill_category', 'skill_scope', 'skill_segment', 'required_level']
-        widgets = {
-            'required_level': forms.NumberInput(attrs={'min': 0, 'max': 5, 'class': 'form-control'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['skill_name'].widget.attrs['list'] = 'skill-suggestions'
-        # Set field order
-        self.order_fields(['skill_name', 'skill_category', 'skill_scope', 'skill_segment', 'required_level'])
-
-    def clean(self):
-        cleaned_data = super().clean()
-        skill_name = cleaned_data.get('skill_name', '').strip()
-        skill_category = cleaned_data.get('skill_category', '')
-        skill_scope = cleaned_data.get('skill_scope') or Skill.SCOPE_GENERAL
-        skill_segment = cleaned_data.get('skill_segment')
-
-        if skill_scope == Skill.SCOPE_SEGMENT and not skill_segment:
-            self.add_error('skill_segment', 'Select a segment for a segment-specific skill.')
-            return cleaned_data
-
-        if skill_name:
-            skill, created = Skill.objects.get_or_create(
-                name__iexact=skill_name,
-                defaults={
-                    'name': skill_name,
-                    'category': skill_category if skill_category else None,
-                    'scope': skill_scope,
-                    'segment': skill_segment if skill_scope == Skill.SCOPE_SEGMENT else None,
-                }
-            )
-            cleaned_data['skill'] = skill
-
-        return cleaned_data
 
 class DevelopmentPlanForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:

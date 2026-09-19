@@ -112,7 +112,7 @@
                             <select name="skill_id" class="form-select" required>
                                 <option value="">Select a skill...</option>
                                 {% for skill in skills %}
-                                <option value="{{ skill.id }}">{{ skill.name }} ({{ skill.category|default:"uncategorized" }}){% if skill.scope == 'segment' %} &mdash; {{ skill.segment.name }} only{% endif %}</option>
+                                <option value="{{ skill.id }}">{{ skill.name }} ({{ skill.category|default:"uncategorized" }}){% if skill.scope == 'segment' %} &mdash; {{ skill.segment.name }} only{% elif skill.scope == 'other' %} &mdash; Supplementary{% endif %}</option>
                                 {% endfor %}
                             </select>
                         </div>

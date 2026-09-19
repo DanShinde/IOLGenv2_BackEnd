@@ -351,9 +351,11 @@
                 </div>
             </div>
 
-            <!-- Skill group sub-tabs: General, then each assigned segment (alphabetical), then
-                 Other Skills (this role's skills for segments NOT assigned, plus anything
-                 recorded outside the role's benchmark entirely) -->
+            <!-- Skill group sub-tabs: General (includes Supplementary/cross-segment skills,
+                 badged individually), then each assigned segment (alphabetical), then Not
+                 Currently Required -- skills for segments not assigned, or not linked to this
+                 role's benchmark at all. Each row's own badges show which, so this is one flat
+                 table rather than sub-headed sections. -->
             <div class="skill-subtabs-nav">
                 <button class="skill-subtab-btn active" onclick="showSkillSubTab('general')">
                     <i class="bi bi-diagram-3 me-1"></i>General
@@ -365,10 +367,10 @@
                     <span class="badge bg-light text-dark">{{ group.skills|length }}</span>
                 </button>
                 {% endfor %}
-                {% if other_segment_groups or extra_skill_data %}
+                {% if not_required_skill_data %}
                 <button class="skill-subtab-btn" onclick="showSkillSubTab('other')">
-                    <i class="bi bi-dash-circle me-1"></i>Other Skills
-                    <span class="badge bg-light text-dark">{{ other_skills_total_count }}</span>
+                    <i class="bi bi-dash-circle me-1"></i>Not Currently Required
+                    <span class="badge bg-light text-dark">{{ not_required_skill_data|length }}</span>
                 </button>
                 {% endif %}
             </div>
@@ -381,25 +383,16 @@
                 {% include 'gap_analysis/_skill_group_table.html' with skills=group.skills summary=group.summary empty_message="No segment-specific skills are benchmarked for this role in this segment yet." %}
             </div>
             {% endfor %}
-            {% if other_segment_groups or extra_skill_data %}
+            {% if not_required_skill_data %}
             <div id="skill-subtab-other" class="skill-subtab-content">
-                {% if other_segment_groups %}
                 <p class="text-muted small mb-3">
-                    This role's skills for segments {{ employee.name }} isn't currently assigned to. Not required, not
-                    counted toward the gap/benchmark scores above -- but still viewable and ratable, so you can track
-                    readiness for a future segment move. Assigning a segment moves its skills into that segment's tab
-                    automatically, with whatever level is already recorded here intact.
+                    Skills not currently required for {{ employee.name }} -- either segment-specific skills for a
+                    segment they aren't assigned to yet, or skills recorded outside this role's benchmark entirely.
+                    Not counted toward the gap/benchmark scores above, but still viewable and ratable, so you can
+                    track readiness for a future segment move. Assigning a segment moves its skills into that
+                    segment's own tab automatically, with whatever level is already recorded here intact.
                 </p>
-                {% for group in other_segment_groups %}
-                <h6 class="mt-4 mb-2"><i class="bi bi-geo-alt me-1 text-muted"></i>{{ group.segment_name }}</h6>
-                {% include 'gap_analysis/_skill_group_table.html' with skills=group.skills summary=group.summary %}
-                {% endfor %}
-                {% endif %}
-                {% if extra_skill_data %}
-                <h6 class="mt-4 mb-2"><i class="bi bi-info-circle me-1 text-muted"></i>Not Part of This Role</h6>
-                <p class="text-muted small mb-3">Recorded for this employee but not part of this role's benchmark at all -- e.g. a skill recorded before a role change.</p>
-                {% include 'gap_analysis/_skill_group_table.html' with skills=extra_skill_data summary=extra_summary %}
-                {% endif %}
+                {% include 'gap_analysis/_skill_group_table.html' with skills=not_required_skill_data summary=not_required_summary %}
             </div>
             {% endif %}
         {% else %}

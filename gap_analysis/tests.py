@@ -13,7 +13,10 @@ from .models import (
     RoleMatrix, Skill, SkillBenchmark, SkillMatrix, EmployeeSkill, EmployeeSkillHistory,
     DevelopmentPlan, user_can_manage_employee,
 )
-from .views import DashboardView, RoleMatrixBenchmarkView, SkillMatrixProfileView, safe_json
+from .views import (
+    DashboardView, RoleMatrixBenchmarkView, SkillListView, SkillMatrixProfileView,
+    designation_benchmark_level_update, safe_json,
+)
 from .reports import build_team_report_data
 
 
@@ -582,6 +585,56 @@ class SkillScopeValidationTests(TestCase):
         skill = Skill(name='SRM Robotics', scope=Skill.SCOPE_SEGMENT, segment=self.srm)
         skill.full_clean()  # should not raise
 
+    def test_other_skill_with_segment_is_invalid(self):
+        skill = Skill(name='First Aid', scope=Skill.SCOPE_OTHER, segment=self.srm)
+        with self.assertRaises(ValidationError):
+            skill.full_clean()
+
+    def test_other_skill_without_segment_is_valid(self):
+        skill = Skill(name='First Aid', scope=Skill.SCOPE_OTHER)
+        skill.full_clean()  # should not raise
+
+
+class SkillNameUniquenessTests(TestCase):
+    """Skill.name is no longer globally unique -- the same name is allowed once per segment
+    (e.g. "Commissioning" for ASRS-4D Robot and a separate "Commissioning" for ASRS-HDPS),
+    but still can't be duplicated within the same segment, or duplicated across two
+    General/Supplementary skills (both have segment=None, which unique_together alone can't
+    catch since Postgres never treats two NULLs as equal)."""
+
+    def setUp(self):
+        self.hdps = Segment.objects.create(name='ASRS-HDPS')
+        self.robot = Segment.objects.create(name='ASRS-4D Robot')
+
+    def test_same_name_allowed_in_two_different_segments(self):
+        Skill.objects.create(name='Commissioning', scope=Skill.SCOPE_SEGMENT, segment=self.hdps)
+        second = Skill(name='Commissioning', scope=Skill.SCOPE_SEGMENT, segment=self.robot)
+        second.full_clean()  # should not raise
+        second.save()
+        self.assertEqual(Skill.objects.filter(name='Commissioning').count(), 2)
+
+    def test_same_name_rejected_within_the_same_segment(self):
+        Skill.objects.create(name='Commissioning', scope=Skill.SCOPE_SEGMENT, segment=self.hdps)
+        duplicate = Skill(name='Commissioning', scope=Skill.SCOPE_SEGMENT, segment=self.hdps)
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
+
+    def test_same_name_rejected_for_two_general_skills(self):
+        Skill.objects.create(name='Communication', scope=Skill.SCOPE_GENERAL)
+        duplicate = Skill(name='Communication', scope=Skill.SCOPE_GENERAL)
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
+
+    def test_same_name_allowed_for_general_and_a_segment_skill(self):
+        Skill.objects.create(name='Commissioning', scope=Skill.SCOPE_GENERAL)
+        segment_version = Skill(name='Commissioning', scope=Skill.SCOPE_SEGMENT, segment=self.hdps)
+        segment_version.full_clean()  # should not raise
+
+    def test_editing_a_skill_does_not_conflict_with_itself(self):
+        skill = Skill.objects.create(name='Commissioning', scope=Skill.SCOPE_GENERAL)
+        skill.description = 'Updated description'
+        skill.full_clean()  # should not raise -- excludes its own pk from the duplicate check
+
 
 class DevelopmentPlanFormForRoleLessEmployeeTests(TestCase):
     """Regression test: DevelopmentPlanCreateView/UpdateView crashed with AttributeError
@@ -631,11 +684,6 @@ class ConfirmDeletePageTests(TestCase):
 
     def test_benchmark_delete_confirm_renders_without_error(self):
         response = self.client.get(reverse('skillgap_benchmark_delete', args=[self.benchmark.id]))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Engineer')
-
-    def test_designation_benchmark_delete_confirm_renders_without_error(self):
-        response = self.client.get(reverse('skillgap_designation_benchmark_delete', args=[self.benchmark.id]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Engineer')
 
@@ -958,6 +1006,49 @@ class OtherSegmentBenchmarksModelTests(TestCase):
         self.assertEqual(list(no_role.get_other_segment_benchmarks()), [])
 
 
+class OtherScopeSkillTests(TestCase):
+    """Skill.scope='other' (cross-segment) behaves like General for required-set purposes --
+    unconditional, never gated by segment assignment -- but is never returned by
+    get_other_segment_benchmarks() (that method is specifically about Segment-Specific
+    skills for unassigned segments; an Other skill has no segment to be "unassigned" from)."""
+
+    def setUp(self):
+        self.hdps = Segment.objects.create(name='HDPS')
+        self.role = RoleMatrix.objects.create(title='Automation Engineer')
+        self.other_skill = Skill.objects.create(name='First Aid', scope=Skill.SCOPE_OTHER)
+        SkillBenchmark.objects.create(role_matrix=self.role, skill=self.other_skill, required_level=2)
+
+    def test_other_scope_skill_required_even_with_no_segments_assigned(self):
+        employee = make_skill_matrix('No Segments', segments=[], role_matrix=self.role)
+        self.assertIn(self.other_skill, [b.skill for b in employee.get_required_benchmarks()])
+
+    def test_other_scope_skill_required_regardless_of_which_segments_are_assigned(self):
+        employee = make_skill_matrix('Has HDPS', segments=[self.hdps], role_matrix=self.role)
+        self.assertIn(self.other_skill, [b.skill for b in employee.get_required_benchmarks()])
+
+    def test_other_scope_skill_never_appears_in_other_segment_benchmarks(self):
+        employee = make_skill_matrix('No Segments', segments=[], role_matrix=self.role)
+        self.assertNotIn(self.other_skill, [b.skill for b in employee.get_other_segment_benchmarks()])
+
+    def test_other_scope_skill_gap_counts_toward_overall_score(self):
+        employee = make_skill_matrix('No Segments', segments=[], role_matrix=self.role)
+        EmployeeSkill.objects.create(skill_matrix=employee, skill=self.other_skill, actual_level=0)
+        self.assertEqual(employee.get_overall_gap_score(), 2)  # required 2, actual 0
+
+    def test_profile_page_merges_other_scope_skill_into_general_group(self):
+        staff = User.objects.create_user('hr_admin_other_scope', password='pass12345', is_staff=True)
+        employee = make_skill_matrix('No Segments', segments=[], role_matrix=self.role)
+
+        request = RequestFactory().get(reverse('skillgap_employee_profile', args=[employee.pk]))
+        request.user = staff
+        response = SkillMatrixProfileView.as_view()(request, pk=employee.pk)
+
+        names = {s['skill_name'] for s in response.context_data['general_skill_data']}
+        self.assertIn('First Aid', names)
+        row = next(s for s in response.context_data['general_skill_data'] if s['skill_name'] == 'First Aid')
+        self.assertEqual(row['skill_scope'], Skill.SCOPE_OTHER)
+
+
 class ProfileOtherSkillsTests(TestCase):
     """The profile's "Other Skills" tab: this role's segment-specific skills for segments the
     employee ISN'T assigned to -- shown even at level 0 (never recorded), grouped by segment
@@ -1050,10 +1141,27 @@ class ProfileOtherSkillsTests(TestCase):
         self.assertEqual(row['actual_level'], 2)  # carried over, not reset
         self.assertEqual(row['gap'], 1)  # required 3 - actual 2, now counted
 
+    def test_not_required_skill_data_flattens_groups_preserving_their_sort_order(self):
+        """The "Not Currently Required" tab renders one table (not_required_skill_data)
+        instead of a sub-header per segment -- this must contain exactly the same rows as
+        other_segment_groups + extra_skill_data, in the same relative order, just flattened."""
+        context = self._get_profile_context(self.rahul)
+        flattened_names = [s['skill_name'] for s in context['not_required_skill_data']]
 
-class RoleMatrixBenchmarkGroupingTests(TestCase):
-    """designation_benchmark.html's editing view groups a role's benchmarks into General +
-    per-segment (alphabetical) sections."""
+        expected = []
+        for group in context['other_segment_groups']:
+            expected.extend(s['skill_name'] for s in group['skills'])
+        expected.extend(s['skill_name'] for s in context['extra_skill_data'])
+
+        self.assertEqual(flattened_names, expected)
+        # Robotic Palletizers/SRM (history) still come before Case Handling (no history).
+        self.assertEqual(flattened_names, ['Robotic Palletizing', 'SRM Robotics', 'Case Handling Logic'])
+
+
+class RoleMatrixBenchmarkViewTests(TestCase):
+    """The Role Matrix page now always lists every catalog skill for every role (General +
+    per-segment, alphabetical + Supplementary), whether or not it's currently benchmarked --
+    "benchmarking" is just giving a skill a required level, not a separate add step."""
 
     def setUp(self):
         self.staff_user = User.objects.create_user('hr_admin_matrix', password='pass12345', is_staff=True)
@@ -1062,12 +1170,15 @@ class RoleMatrixBenchmarkGroupingTests(TestCase):
         self.role = RoleMatrix.objects.create(title='Automation Engineer')
 
         self.general_skill = Skill.objects.create(name='PLC Programming', scope=Skill.SCOPE_GENERAL)
+        self.unbenchmarked_general_skill = Skill.objects.create(name='Documentation', scope=Skill.SCOPE_GENERAL)
         self.https_skill = Skill.objects.create(name='HTTPS Config', scope=Skill.SCOPE_SEGMENT, segment=self.https)
         self.case_skill = Skill.objects.create(name='Case Handling Logic', scope=Skill.SCOPE_SEGMENT, segment=self.case_handling)
+        self.other_skill = Skill.objects.create(name='First Aid', scope=Skill.SCOPE_OTHER)
 
         SkillBenchmark.objects.create(role_matrix=self.role, skill=self.general_skill, required_level=3)
         SkillBenchmark.objects.create(role_matrix=self.role, skill=self.https_skill, required_level=4)
-        SkillBenchmark.objects.create(role_matrix=self.role, skill=self.case_skill, required_level=3)
+        # Documentation, Case Handling Logic, and First Aid deliberately left unbenchmarked --
+        # they must still appear, just with required_level=None.
 
     def _get_matrix_context(self):
         request = RequestFactory().get(reverse('skillgap_designation_benchmark', args=[self.role.pk]))
@@ -1075,16 +1186,130 @@ class RoleMatrixBenchmarkGroupingTests(TestCase):
         response = RoleMatrixBenchmarkView.as_view()(request, pk=self.role.pk)
         return response.context_data
 
-    def test_general_and_segment_sections_split_correctly(self):
+    def test_every_general_skill_listed_even_if_unbenchmarked(self):
         context = self._get_matrix_context()
-        self.assertEqual([b.skill.name for b in context['general_benchmarks']], ['PLC Programming'])
-        segment_names = [g['segment_name'] for g in context['segment_benchmark_groups']]
+        names = {row['skill'].name for row in context['general_rows']}
+        self.assertEqual(names, {'PLC Programming', 'Documentation'})
+
+        doc_row = next(r for r in context['general_rows'] if r['skill'].name == 'Documentation')
+        self.assertIsNone(doc_row['required_level'])
+        plc_row = next(r for r in context['general_rows'] if r['skill'].name == 'PLC Programming')
+        self.assertEqual(plc_row['required_level'], 3)
+
+    def test_segment_groups_alphabetical_and_list_every_segment_skill(self):
+        context = self._get_matrix_context()
+        segment_names = [g['segment_name'] for g in context['segment_groups']]
         self.assertEqual(segment_names, ['Case Handling', 'HTTPS'])  # alphabetical
 
-    def test_each_segment_group_carries_its_own_id_for_the_add_skill_link(self):
+        case_group = context['segment_groups'][0]
+        self.assertEqual(case_group['rows'][0]['skill'].name, 'Case Handling Logic')
+        self.assertIsNone(case_group['rows'][0]['required_level'])  # unbenchmarked, still listed
+
+        https_group = context['segment_groups'][1]
+        self.assertEqual(https_group['rows'][0]['required_level'], 4)
+
+    def test_other_scope_skills_get_their_own_bucket(self):
         context = self._get_matrix_context()
-        https_group = next(g for g in context['segment_benchmark_groups'] if g['segment_name'] == 'HTTPS')
-        self.assertEqual(https_group['segment_id'], self.https.id)
+        self.assertEqual([r['skill'].name for r in context['other_rows']], ['First Aid'])
+        self.assertIsNone(context['other_rows'][0]['required_level'])
+
+    def test_benchmark_count_only_counts_actually_benchmarked_skills(self):
+        context = self._get_matrix_context()
+        self.assertEqual(context['benchmark_count'], 2)  # PLC Programming + HTTPS Config
+        self.assertEqual(context['total_skill_count'], 5)  # every catalog skill
+
+
+class DesignationBenchmarkLevelUpdateTests(TestCase):
+    """AJAX endpoint behind the Role Matrix page's inline Required Level inputs: setting a
+    level creates/updates the SkillBenchmark; clearing it (empty string) deletes it entirely
+    rather than storing a misleading 0."""
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user('hr_admin_level', password='pass12345', is_staff=True)
+        self.plain_user = User.objects.create_user('plain_level', password='pass12345')
+        self.role = RoleMatrix.objects.create(title='Automation Engineer')
+        self.skill = Skill.objects.create(name='PLC Programming', scope=Skill.SCOPE_GENERAL)
+
+    def _post(self, data, user=None):
+        request = RequestFactory().post(
+            reverse('skillgap_designation_benchmark_level_update', args=[self.role.pk, self.skill.pk]), data=data,
+        )
+        request.user = user or self.staff_user
+        return designation_benchmark_level_update(request, self.role.pk, self.skill.pk)
+
+    def test_setting_a_level_creates_a_benchmark(self):
+        response = self._post({'required_level': '4', 'is_mandatory': 'true'})
+        self.assertEqual(response.status_code, 200)
+        benchmark = SkillBenchmark.objects.get(role_matrix=self.role, skill=self.skill)
+        self.assertEqual(benchmark.required_level, 4)
+        self.assertTrue(benchmark.is_mandatory)
+
+    def test_setting_a_level_updates_an_existing_benchmark(self):
+        SkillBenchmark.objects.create(role_matrix=self.role, skill=self.skill, required_level=2, is_mandatory=False)
+        self._post({'required_level': '5', 'is_mandatory': 'true'})
+        benchmark = SkillBenchmark.objects.get(role_matrix=self.role, skill=self.skill)
+        self.assertEqual(benchmark.required_level, 5)
+        self.assertTrue(benchmark.is_mandatory)
+
+    def test_clearing_the_level_deletes_the_benchmark(self):
+        SkillBenchmark.objects.create(role_matrix=self.role, skill=self.skill, required_level=3)
+        response = self._post({'required_level': '', 'is_mandatory': 'true'})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(SkillBenchmark.objects.filter(role_matrix=self.role, skill=self.skill).exists())
+
+    def test_level_zero_is_a_real_value_not_treated_as_clearing(self):
+        response = self._post({'required_level': '0', 'is_mandatory': 'true'})
+        self.assertEqual(response.status_code, 200)
+        benchmark = SkillBenchmark.objects.get(role_matrix=self.role, skill=self.skill)
+        self.assertEqual(benchmark.required_level, 0)
+
+    def test_out_of_range_level_rejected(self):
+        response = self._post({'required_level': '9', 'is_mandatory': 'true'})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(SkillBenchmark.objects.filter(role_matrix=self.role, skill=self.skill).exists())
+
+    def test_non_numeric_level_rejected(self):
+        response = self._post({'required_level': 'abc', 'is_mandatory': 'true'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_non_staff_forbidden(self):
+        response = self._post({'required_level': '3', 'is_mandatory': 'true'}, user=self.plain_user)
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(SkillBenchmark.objects.filter(role_matrix=self.role, skill=self.skill).exists())
+
+
+class SkillCatalogGroupingTests(TestCase):
+    """The Skill Catalog page groups every skill into General / per-segment (alphabetical) /
+    Supplementary -- the same category structure the Role Matrix page uses."""
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user('hr_admin_catalog', password='pass12345', is_staff=True)
+        self.https = Segment.objects.create(name='HTTPS')
+        self.case_handling = Segment.objects.create(name='Case Handling')
+
+        self.general_skill = Skill.objects.create(name='PLC Programming', scope=Skill.SCOPE_GENERAL)
+        self.https_skill = Skill.objects.create(name='HTTPS Config', scope=Skill.SCOPE_SEGMENT, segment=self.https)
+        self.case_skill = Skill.objects.create(name='Case Handling Logic', scope=Skill.SCOPE_SEGMENT, segment=self.case_handling)
+        self.other_skill = Skill.objects.create(name='First Aid', scope=Skill.SCOPE_OTHER)
+
+    def _get_catalog_context(self):
+        request = RequestFactory().get(reverse('skillgap_skill_list'))
+        request.user = self.staff_user
+        response = SkillListView.as_view()(request)
+        return response.context_data
+
+    def test_skills_grouped_into_general_segment_and_other(self):
+        context = self._get_catalog_context()
+        self.assertEqual([s.name for s in context['general_skills']], ['PLC Programming'])
+        self.assertEqual([s.name for s in context['other_skills']], ['First Aid'])
+
+        segment_names = [g['segment_name'] for g in context['segment_skill_groups']]
+        self.assertEqual(segment_names, ['Case Handling', 'HTTPS'])  # alphabetical
+        self.assertEqual(context['segment_skill_groups'][1]['skills'][0].name, 'HTTPS Config')
+
+    def test_total_skill_count(self):
+        context = self._get_catalog_context()
+        self.assertEqual(context['total_skill_count'], 4)
 
 
 class TeamReportExportViewTests(TestCase):

@@ -32,6 +32,8 @@
                             <strong>{{ skill.skill_name }}</strong>
                             {% if skill.skill_scope == 'segment' %}
                                 <span class="badge bg-warning text-dark ms-1" title="Segment-specific requirement">{{ skill.skill_segment }}</span>
+                            {% elif skill.skill_scope == 'other' %}
+                                <span class="badge bg-info text-dark ms-1" title="Cross-segment skill -- required regardless of assigned segments">Supplementary</span>
                             {% endif %}
                         </td>
                         <td data-label="Category">
