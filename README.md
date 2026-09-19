@@ -59,3 +59,8 @@ git rebase origin/main
 git fetch origin 
 git checkout TrackerPlanner02
 git reset --hard origin/main
+
+# Documentation
+See [docs/](docs/) for deployment and operations runbooks:
+- [docs/AUTO_DEPLOY.md](docs/AUTO_DEPLOY.md) — auto-pull deployment on the Windows VM (GitHub webhook + scheduled task)
+- [docs/DEPLOY_ONEDESIGNER.md](docs/DEPLOY_ONEDESIGNER.md) — hosting OneDesigner as an IIS sub-application
