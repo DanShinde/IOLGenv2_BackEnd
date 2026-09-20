@@ -5,20 +5,20 @@
 {% block extra_css %}
 <style>
     .employee-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.85rem 1rem;
         margin-bottom: 0.5rem;
-        transition: all 0.2s;
+        transition: var(--transition);
     }
 
     .employee-card:hover {
-        background: #f8fafc;
+        background: var(--light);
     }
 
     .employee-card.selected {
-        border-color: #4f46e5;
-        background: rgba(79, 70, 229, 0.05);
+        border-color: var(--accent);
+        background: var(--accent-soft);
     }
 
     .skill-level-grid {
@@ -30,21 +30,43 @@
 
     .level-btn {
         padding: 0.5rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-sm);
         background: white;
         cursor: pointer;
         text-align: center;
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        transition: var(--transition);
     }
 
     .level-btn:hover {
-        border-color: #4f46e5;
+        border-color: var(--accent);
     }
 
     .level-btn.selected {
-        background: #4f46e5;
+        background: var(--accent);
         color: white;
-        border-color: #4f46e5;
+        border-color: var(--accent);
+    }
+
+    /* Sticky save bar: pinned to the bottom of the viewport while the form scrolls,
+       so the selection count and submit stay reachable on a long employee list. */
+    .bulk-save-bar {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        padding: 1rem 1.25rem;
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
     }
 </style>
 {% endblock %}
@@ -129,13 +151,9 @@
                                 <button type="button" class="level-btn" data-level="5">5</button>
                             </div>
                         </div>
-                        
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-check-circle me-2"></i>Update Selected Employees
-                        </button>
                     </div>
                 </div>
-                
+
                 <div class="card">
                     <div class="card-body bg-info bg-opacity-10">
                         <h6><i class="bi bi-info-circle me-2"></i>Instructions</h6>
@@ -149,22 +167,47 @@
                 </div>
             </div>
         </div>
+
+        <div class="bulk-save-bar">
+            <div class="small">
+                <strong id="selectedEmployeeCount">0</strong> employee(s) selected
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'skillgap_dashboard' %}" class="btn btn-light">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle me-2"></i>Update Selected Employees
+                </button>
+            </div>
+        </div>
     </form>
 </div>
 
 {% block extra_js %}
 <script>
+    function updateSelectedEmployeeCount() {
+        const checked = document.querySelectorAll('.employee-checkbox:checked');
+        document.getElementById('selectedEmployeeCount').textContent = checked.length;
+        document.querySelectorAll('.employee-checkbox').forEach(cb => {
+            cb.closest('.employee-card').classList.toggle('selected', cb.checked);
+        });
+    }
+
     document.getElementById('selectAllEmployees').addEventListener('change', function() {
         document.querySelectorAll('.employee-checkbox').forEach(cb => cb.checked = this.checked);
+        updateSelectedEmployeeCount();
     });
-    
+
+    document.querySelectorAll('.employee-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedEmployeeCount);
+    });
+
     document.getElementById('employeeSearch').addEventListener('input', function() {
         const query = this.value.toLowerCase();
         document.querySelectorAll('.employee-card').forEach(card => {
             card.style.display = card.dataset.name.includes(query) ? 'block' : 'none';
         });
     });
-    
+
     document.querySelectorAll('.level-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('selected'));

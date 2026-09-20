@@ -2,6 +2,87 @@
 
 {% block title %}Development Plans - Skill Gap Analyzer{% endblock %}
 
+{% block extra_css %}
+<style>
+    .kanban-col {
+        background: var(--light);
+        border-radius: var(--radius-lg);
+        padding: 1rem;
+        height: 100%;
+    }
+
+    .kanban-col-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted);
+        margin-bottom: 0.85rem;
+    }
+
+    .kanban-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        flex-shrink: 0;
+    }
+
+    .kanban-dot.not_started { background: #94A3B8; }
+    .kanban-dot.in_progress { background: var(--warning); }
+    .kanban-dot.completed { background: var(--success); }
+    .kanban-dot.cancelled { background: var(--danger); }
+
+    .kanban-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 0.85rem 1rem;
+        margin-bottom: 0.75rem;
+        transition: var(--transition);
+    }
+
+    .kanban-card:last-child { margin-bottom: 0; }
+
+    .kanban-card:hover {
+        box-shadow: var(--shadow-md);
+    }
+
+    .kanban-card-skill {
+        font-weight: 700;
+        font-size: 0.85rem;
+    }
+
+    .kanban-card-employee {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.2rem;
+    }
+
+    .kanban-card-meta {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-top: 0.6rem;
+    }
+
+    .kanban-card-actions {
+        display: flex;
+        gap: 0.4rem;
+        margin-top: 0.6rem;
+    }
+
+    .kanban-empty {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-align: center;
+        padding: 1rem 0;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="animate-fade-in">
     <div class="page-header">
@@ -40,74 +121,52 @@
     </div>
 
     {% if plans %}
-    <div class="card">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 mobile-cards">
-                    <thead>
-                        <tr>
-                            <th>Employee</th>
-                            <th>Skill</th>
-                            <th>Action</th>
-                            <th>Target Date</th>
-                            <th>Status</th>
-                            {% if user.is_staff %}<th class="text-end">Actions</th>{% endif %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for plan in plans %}
-                        <tr>
-                            <td data-label="Employee">
-                                <a href="{% url 'skillgap_employee_profile' plan.skill_matrix.id %}">{{ plan.skill_matrix.name }}</a>
-                            </td>
-                            <td data-label="Skill"><strong>{{ plan.skill.name }}</strong></td>
-                            <td data-label="Action">
-                                {{ plan.action }}
-                                {% if plan.resource_url %}
-                                    <a href="{{ plan.resource_url }}" target="_blank" rel="noopener" title="Open resource" class="ms-1">
-                                        <i class="bi bi-box-arrow-up-right"></i>
-                                    </a>
-                                {% endif %}
-                            </td>
-                            <td data-label="Target Date">
-                                {% if plan.target_date %}
-                                    <span class="{% if plan.is_overdue %}text-danger fw-bold{% endif %}">
-                                        {{ plan.target_date }}
-                                        {% if plan.is_overdue %}<i class="bi bi-exclamation-triangle ms-1" title="Overdue"></i>{% endif %}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Status">
-                                {% if plan.status == 'completed' %}
-                                    <span class="badge bg-success">Completed</span>
-                                {% elif plan.status == 'in_progress' %}
-                                    <span class="badge bg-warning">In Progress</span>
-                                {% elif plan.status == 'cancelled' %}
-                                    <span class="badge bg-secondary">Cancelled</span>
-                                {% else %}
-                                    <span class="badge bg-light text-dark">Not Started</span>
-                                {% endif %}
-                            </td>
-                            {% if user.is_staff %}
-                            <td data-label="Actions">
-                                <div class="d-flex justify-content-end gap-2">
-                                    <a href="{% url 'skillgap_development_plan_update' plan.id %}" class="btn btn-warning btn-icon" title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="{% url 'skillgap_development_plan_delete' plan.id %}" class="btn btn-danger btn-icon" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                            {% endif %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="row g-3">
+        {% for column in status_columns %}
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="kanban-col">
+                <div class="kanban-col-head">
+                    <span class="kanban-dot {{ column.value }}"></span>{{ column.label }} &middot; {{ column.plans|length }}
+                </div>
+                {% for plan in column.plans %}
+                <div class="kanban-card">
+                    <div class="kanban-card-skill">{{ plan.skill.name }}</div>
+                    <div class="kanban-card-employee">
+                        <a href="{% url 'skillgap_employee_profile' plan.skill_matrix.id %}">{{ plan.skill_matrix.name }}</a>
+                    </div>
+                    <div class="small mt-2">
+                        {{ plan.action }}
+                        {% if plan.resource_url %}
+                        <a href="{{ plan.resource_url }}" target="_blank" rel="noopener" title="Open resource" class="ms-1">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% if plan.target_date %}
+                    <div class="kanban-card-meta {% if plan.is_overdue %}text-danger{% endif %}">
+                        Due {{ plan.target_date }}
+                        {% if plan.is_overdue %}<i class="bi bi-exclamation-triangle ms-1" title="Overdue"></i>{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if user.is_staff %}
+                    <div class="kanban-card-actions">
+                        <a href="{% url 'skillgap_development_plan_update' plan.id %}" class="btn btn-outline-secondary btn-icon" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'skillgap_development_plan_delete' plan.id %}" class="btn btn-outline-secondary btn-icon" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="kanban-empty">No plans</div>
+                {% endfor %}
             </div>
         </div>
+        {% endfor %}
+    </div>
+    <div class="card mt-3">
         {% include 'gap_analysis/pagination.html' %}
     </div>
     {% else %}

@@ -3,22 +3,21 @@
 {% block title %}Confirm Deletion | Skill Gap Analyzer{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6">
-        <div class="card border-danger shadow">
-            <div class="card-header bg-danger text-white">
-                <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i> Confirm Deletion</h5>
-            </div>
-            <div class="card-body text-center py-5">
-                <p class="fs-5">
+<div class="animate-fade-in">
+    <div class="delete-card">
+        <div class="card">
+            <div class="card-body py-5">
+                <div class="delete-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <h2 class="delete-title">Delete Skill Record</h2>
+                <p class="delete-message">
                     Are you sure you want to permanently delete
                     <strong>{{ object.skill.name }}</strong> for
                     <strong>{{ object.skill_matrix.name }}</strong>?
                 </p>
-                <form method="POST" class="mt-4">
+                <form method="POST" class="btn-group-delete">
                     {% csrf_token %}
-                    <a href="javascript:history.back()" class="btn btn-outline-secondary me-2">Cancel</a>
-                    <button type="submit" class="btn btn-danger">Yes, Delete Record</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-2"></i>Yes, Delete Record</button>
+                    <a href="javascript:history.back()" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-2"></i>Cancel</a>
                 </form>
             </div>
         </div>

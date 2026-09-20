@@ -677,6 +677,11 @@ class RoleMatrixListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return super().get_queryset().prefetch_related('benchmarks')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['total_skill_count'] = Skill.objects.count()
+        return context
+
 class RoleMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
     model = RoleMatrix
     form_class = RoleMatrixForm
@@ -1226,6 +1231,11 @@ class DevelopmentPlanListView(LoginRequiredMixin, StaffRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['selected_status'] = self.request.GET.get('status')
         context['status_choices'] = DevelopmentPlan.STATUS_CHOICES
+        plans = context['plans']
+        context['status_columns'] = [
+            {'value': value, 'label': label, 'plans': [p for p in plans if p.status == value]}
+            for value, label in DevelopmentPlan.STATUS_CHOICES
+        ]
         return context
 
 
