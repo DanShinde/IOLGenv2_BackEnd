@@ -771,8 +771,8 @@
                         </a>
                     </li>
                     <li class="nav-item d-flex align-items-center ms-lg-2">
-                        <span class="text-white-50 small me-2">
-                            <i class="bi bi-person-circle me-1"></i>{{ user.get_username }}{% if user.is_staff %} <span class="badge bg-light text-dark ms-1">staff</span>{% endif %}
+                        <span class="nav-user-info me-2">
+                            <i class="bi bi-person-circle me-1"></i>{{ user.get_full_name|default:user.get_username }}{% if user.is_staff %} <span class="badge-staff ms-1">staff</span>{% endif %}
                         </span>
                         <form method="post" action="{% url 'logoutw' %}" class="d-inline">
                             {% csrf_token %}
