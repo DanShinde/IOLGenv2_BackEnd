@@ -10,7 +10,7 @@ class UserProfileAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
         'is_tracker', 'is_skillgap', 'is_estimator',
     )  # Display all fields
     list_filter = ('usertype', 'is_ac_approved', 'is_tracker', 'is_skillgap', 'is_estimator')
-    search_fields = ('user',)
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__email')
 
 admin.site.register(UserProfile, UserProfileAdmin)
 
