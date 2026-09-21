@@ -41,7 +41,9 @@ body, .wrapper { background-color: var(--av-surface-alt); }
   display: flex;
   align-items: center;
 }
-.brand-text { color: #fff !important; font-weight: 600; }
+/* The logo image already reads "Armstrong Dematic" — don't also print
+   site_brand ("Lives Made Easy") as text next to it in the sidebar header. */
+.brand-text { display: none !important; }
 
 /* Logo: a 300x36 wordmark, not an icon — undo AdminLTE's circular-avatar sizing */
 .brand-image {
