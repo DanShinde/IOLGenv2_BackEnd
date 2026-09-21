@@ -13,6 +13,7 @@ urlpatterns = [
     path('leave/<int:pk>/delete/', views.delete_leave_view, name='planner_delete_leave'), # New URL
     path('site/<int:pk>/delete/', views.delete_site_view, name='planner_delete_site'),
     path('site-allocation/<int:pk>/delete/', views.delete_site_allocation_view, name='planner_delete_site_allocation'),
+    path('site-allocation/<int:pk>/update/', views.update_site_allocation_view, name='planner_update_site_allocation'),
     path('site-allocation/<int:pk>/relieve/', views.relieve_site_allocation_view, name='planner_relieve_site_allocation'),
     path('project/<int:pk>/delete/', views.delete_project_view, name='planner_delete_project'),
     path('reports/site-history/', views.employee_site_history_report_view, name='planner_site_history_report'),

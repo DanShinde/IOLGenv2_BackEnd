@@ -11,7 +11,7 @@ from collections import OrderedDict, defaultdict
 from django.db.models import Min, Max, Q, Prefetch
 from .forms import ActivityForm, ProjectForm, LeaveForm, SiteForm, SiteAllocationForm
 from django.urls import reverse
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from django.http import JsonResponse, HttpResponse
 import json
 from .utils import calculate_end_date, count_working_days, calculate_effort_from_value, calculate_overlap_working_days
@@ -28,6 +28,19 @@ import csv
 
 # Define this constant at the top of the file to avoid "magic numbers"
 CR = 10_000_000
+
+# --- Helper to redirect back to whatever page/tab the user actually came from, instead of a
+# hardcoded destination. Relies on the client keeping the URL's query string (tab/subtab) in
+# sync with on-page navigation, so the Referer header reflects what's actually on screen. ---
+def _redirect_to_referer_or(request, fallback_url):
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        parsed = urlparse(referer)
+        same_origin = not parsed.netloc or parsed.netloc == request.get_host()
+        same_app = parsed.path.startswith(reverse('planner_workforce'))
+        if same_origin and same_app:
+            return redirect(referer)
+    return redirect(fallback_url)
 
 # --- Helper to shorten names ---
 def _shorten_name(name):
@@ -680,23 +693,23 @@ def workforce_view(request):
                     active_tab = 'employees'
                 else:
                     Employee.objects.create(name=name, designation=designation, is_active=is_active, segment=segment_obj)
-                    return redirect('planner_workforce')
-        
+                    return _redirect_to_referer_or(request, reverse('planner_workforce'))
+
         elif 'add_leave' in request.POST:
             leave_form_post = LeaveForm(request.POST)
             if leave_form_post.is_valid():
                 leave_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=leaves")
+                return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
             else:
                 error_message = "Error adding leave. Please check dates."
                 active_tab = 'leaves'
                 leave_form = leave_form_post
-        
+
         elif 'add_project_site' in request.POST:
             project_site_form_post = SiteForm(request.POST, prefix='project_site')
             if project_site_form_post.is_valid():
                 project_site_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+                return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
             else:
                 error_message = "Error adding project site. Please check the form for details."
                 active_tab = 'site_team'
@@ -707,7 +720,7 @@ def workforce_view(request):
             office_site_form_post = SiteForm(request.POST, prefix='office_site')
             if office_site_form_post.is_valid():
                 office_site_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+                return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
             else:
                 error_message = "Error adding office location. Please check the form for details."
                 active_tab = 'site_team'
@@ -718,7 +731,7 @@ def workforce_view(request):
             alloc_form_post = SiteAllocationForm(request.POST)
             if alloc_form_post.is_valid():
                 new_alloc = alloc_form_post.save(commit=False)
-                
+
                 # Check if employee is already allocated
                 active_allocation = SiteAllocation.objects.filter(
                     employee=new_alloc.employee,
@@ -731,13 +744,13 @@ def workforce_view(request):
                     active_subtab = 'allocations'
                 else:
                     new_alloc.save()
-                    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+                    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
             else:
                 error_message = "Error adding allocation."
                 active_tab = 'site_team'
                 active_subtab = 'allocations'
                 allocation_form = alloc_form_post
-        
+
         elif 'refresh_coordinates' in request.POST:
             # Attempt to geocode sites that are missing coordinates
             # We limit to 5 at a time to prevent browser timeout and respect API rate limits
@@ -748,7 +761,7 @@ def workforce_view(request):
                 site.save() # This triggers the geocoding logic in models.py
                 time.sleep(1.1) # Respect OpenStreetMap Nominatim rate limit (1 req/sec)
                 count += 1
-            return redirect(f"{reverse('planner_workforce')}?tab=map_view")
+            return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=map")
 
     context = _get_workforce_context()
     context.update({
@@ -814,8 +827,181 @@ def _get_site_history_data(request):
         })
     return report_data, start_date, end_date
 
+_PIE_PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e', '#0ea5e9', '#eab308']
+
+def _pie_colors(n):
+    return [_PIE_PALETTE[i % len(_PIE_PALETTE)] for i in range(n)]
+
+def _compute_employee_day_breakdown(employee, start_date, end_date):
+    """Day-by-day bucket for one employee over a period: On Leave beats On Site beats the
+    default In Office bucket (gap days with no allocation/leave record count as office)."""
+    leaves = Leave.objects.filter(employee=employee, start_date__lte=end_date).filter(end_date__gte=start_date)
+    leave_days = set()
+    for lv in leaves:
+        d, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
+        while d <= last:
+            leave_days.add(d)
+            d += timedelta(days=1)
+
+    allocations = SiteAllocation.objects.filter(
+        employee=employee, start_date__lte=end_date
+    ).filter(Q(end_date__gte=start_date) | Q(end_date__isnull=True)).select_related('site')
+
+    day_site = {}
+    for alloc in allocations:
+        d = max(alloc.start_date, start_date)
+        last = min(alloc.end_date, end_date) if alloc.end_date else end_date
+        while d <= last:
+            existing = day_site.get(d)
+            if existing is None or (existing.is_office and not alloc.site.is_office):
+                day_site[d] = alloc.site
+            d += timedelta(days=1)
+
+    site_days = defaultdict(int)
+    office_days = 0
+    on_leave_days = 0
+    d = start_date
+    while d <= end_date:
+        if d in leave_days:
+            on_leave_days += 1
+        else:
+            site = day_site.get(d)
+            if site and not site.is_office:
+                site_days[site.name] += 1
+            else:
+                office_days += 1
+        d += timedelta(days=1)
+
+    return {
+        'total_days': (end_date - start_date).days + 1,
+        'on_leave_days': on_leave_days,
+        'office_days': office_days,
+        'on_site_days': sum(site_days.values()),
+        'site_days': dict(site_days),
+    }
+
+def _compute_site_day_breakdown(site, start_date, end_date):
+    """Day-by-day presence at one site: coverage days, total person-days, and per-employee days.
+    A day an employee is on recorded leave does not count toward that employee's presence."""
+    allocations = SiteAllocation.objects.filter(
+        site=site, start_date__lte=end_date
+    ).filter(Q(end_date__gte=start_date) | Q(end_date__isnull=True)).select_related('employee')
+
+    employee_ids = {a.employee_id for a in allocations}
+    leave_by_employee = defaultdict(set)
+    if employee_ids:
+        leaves = Leave.objects.filter(
+            employee_id__in=employee_ids, start_date__lte=end_date
+        ).filter(end_date__gte=start_date)
+        for lv in leaves:
+            d, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
+            while d <= last:
+                leave_by_employee[lv.employee_id].add(d)
+                d += timedelta(days=1)
+
+    employee_days = defaultdict(int)
+    employees_map = {}
+    coverage_days = set()
+    for alloc in allocations:
+        emp = alloc.employee
+        employees_map[emp.id] = emp
+        d = max(alloc.start_date, start_date)
+        last = min(alloc.end_date, end_date) if alloc.end_date else end_date
+        emp_leave_days = leave_by_employee.get(emp.id, set())
+        while d <= last:
+            if d not in emp_leave_days:
+                employee_days[emp.id] += 1
+                coverage_days.add(d)
+            d += timedelta(days=1)
+
+    return {
+        'coverage_days': len(coverage_days),
+        'total_person_days': sum(employee_days.values()),
+        'employee_days': {employees_map[eid]: days for eid, days in employee_days.items()},
+    }
+
+def _get_site_wise_overview(request):
+    """Simple per-site summary (durations, not day-deduplicated) for the Site-wise tab
+    when no single site is selected yet — reuses the same filtered allocation set as the
+    employee-wise report so status/date/engineer filters stay consistent across tabs."""
+    report_data, start_date, end_date = _get_site_history_data(request)
+    site_summary = defaultdict(lambda: {'site': None, 'employees': set(), 'person_days': 0})
+    for employee, history in report_data.items():
+        for item in history:
+            entry = site_summary[item['site'].id]
+            entry['site'] = item['site']
+            entry['employees'].add(employee)
+            entry['person_days'] += item['duration']
+
+    overview = [
+        {'site': data['site'], 'engineer_count': len(data['employees']), 'person_days': data['person_days']}
+        for data in site_summary.values()
+    ]
+    overview.sort(key=lambda x: x['site'].name)
+    return overview
+
+def _get_employee_wise_overview(request):
+    """Simple per-employee summary (durations, not day-deduplicated) for the Employee-wise tab
+    when no single employee is selected yet — mirrors _get_site_wise_overview's shape/precision
+    so both tabs behave the same way before you drill into a specific employee or site."""
+    report_data, start_date, end_date = _get_site_history_data(request)
+    overview = []
+    for employee, history in report_data.items():
+        sites = {item['site'].name for item in history}
+        overview.append({
+            'employee': employee,
+            'site_count': len(sites),
+            'total_days': sum(item['duration'] for item in history),
+        })
+    overview.sort(key=lambda x: x['employee'].name)
+    return overview
+
 def employee_site_history_report_view(request):
     report_data, start_date, end_date = _get_site_history_data(request)
+
+    mode = request.GET.get('mode', 'employee')
+    if mode not in ('employee', 'site'):
+        mode = 'employee'
+
+    selected_engineer_id = int(request.GET.get('engineer')) if request.GET.get('engineer') else None
+    selected_site_id = int(request.GET.get('site')) if request.GET.get('site') else None
+
+    selected_employee_obj = None
+    selected_site_obj = None
+    employee_breakdown = None
+    employee_chart_json = None
+    employee_overview = None
+    site_breakdown = None
+    site_chart_json = None
+    site_overview = None
+
+    if mode == 'employee':
+        if selected_engineer_id:
+            selected_employee_obj = Employee.objects.filter(pk=selected_engineer_id).first()
+            if selected_employee_obj:
+                employee_breakdown = _compute_employee_day_breakdown(selected_employee_obj, start_date, end_date)
+                site_names = list(employee_breakdown['site_days'].keys())
+                chart_labels = site_names + ['In Office', 'On Leave']
+                chart_values = [employee_breakdown['site_days'][n] for n in site_names] + [
+                    employee_breakdown['office_days'], employee_breakdown['on_leave_days']
+                ]
+                chart_colors = _pie_colors(len(site_names)) + ['#94a3b8', '#f97316']
+                employee_chart_json = json.dumps({'labels': chart_labels, 'values': chart_values, 'colors': chart_colors})
+        else:
+            employee_overview = _get_employee_wise_overview(request)
+
+    if mode == 'site':
+        if selected_site_id:
+            selected_site_obj = Site.objects.filter(pk=selected_site_id).first()
+            if selected_site_obj:
+                site_breakdown = _compute_site_day_breakdown(selected_site_obj, start_date, end_date)
+                sorted_items = sorted(site_breakdown['employee_days'].items(), key=lambda kv: -kv[1])
+                chart_labels = [e.name for e, _ in sorted_items]
+                chart_values = [d for _, d in sorted_items]
+                chart_colors = _pie_colors(len(sorted_items))
+                site_chart_json = json.dumps({'labels': chart_labels, 'values': chart_values, 'colors': chart_colors})
+        else:
+            site_overview = _get_site_wise_overview(request)
 
     context = {
         'report_data': dict(report_data),
@@ -824,9 +1010,18 @@ def employee_site_history_report_view(request):
         'active_nav': 'workforce',
         'all_employees': Employee.objects.all().order_by('name'),
         'all_sites': Site.objects.all().order_by('name'),
-        'selected_engineer': int(request.GET.get('engineer')) if request.GET.get('engineer') else None,
-        'selected_site': int(request.GET.get('site')) if request.GET.get('site') else None,
+        'selected_engineer': selected_engineer_id,
+        'selected_site': selected_site_id,
         'selected_status': request.GET.get('status'),
+        'mode': mode,
+        'selected_employee_obj': selected_employee_obj,
+        'selected_site_obj': selected_site_obj,
+        'employee_breakdown': employee_breakdown,
+        'employee_chart_json': employee_chart_json,
+        'employee_overview': employee_overview,
+        'site_breakdown': site_breakdown,
+        'site_chart_json': site_chart_json,
+        'site_overview': site_overview,
     }
     return render(request, 'planner/site_history_report.html', context)
 
@@ -945,18 +1140,18 @@ def resource_availability_report_view(request):
         custom_start = None
         custom_end = None
         try:
-            days = int(request.GET.get('days', 30))
+            days = int(request.GET.get('days', 90))
         except (TypeError, ValueError):
-            days = 30
+            days = 90
         days = max(1, min(days, 365))
         period_start = today
         period_end = period_start + timedelta(days=days - 1)
 
     try:
-        top_n = int(request.GET.get('top_n', 10))
+        top_n = int(request.GET.get('top_n', 1000))
     except (TypeError, ValueError):
-        top_n = 10
-    top_n = max(1, min(top_n, 100))
+        top_n = 1000
+    top_n = max(1, min(top_n, 1000))
 
     selected_designation = request.GET.get('designation', '')
     selected_segment_id = request.GET.get('segment', '')
@@ -1127,7 +1322,7 @@ def resource_availability_report_view(request):
 
     has_active_filters = bool(
         selected_designation or selected_segment_id or selected_assignee_ids
-        or selected_free_bucket or use_custom_range or days != 30 or top_n != 10
+        or selected_free_bucket or use_custom_range or days != 90 or top_n != 1000
         or selected_sort != 'available'
     )
 
@@ -1179,15 +1374,15 @@ def update_employee_view(request, pk):
             employee.is_active = is_active
             employee.segment = segment_obj
             employee.save()
-            return redirect('planner_workforce')
-    return redirect('planner_workforce')
+            return _redirect_to_referer_or(request, reverse('planner_workforce'))
+    return _redirect_to_referer_or(request, reverse('planner_workforce'))
 
 def toggle_employee_status_view(request, pk):
     if request.method == 'POST':
         employee = get_object_or_404(Employee, pk=pk)
         employee.is_active = not employee.is_active
         employee.save()
-        return redirect('planner_workforce')
+        return _redirect_to_referer_or(request, reverse('planner_workforce'))
 
 def configuration_view(request):
     if request.method == 'POST':
@@ -1234,28 +1429,62 @@ def delete_project_view(request, pk):
 
 def delete_employee_view(request, pk):
     get_object_or_404(Employee, pk=pk).delete()
-    return redirect('planner_workforce')
+    return _redirect_to_referer_or(request, reverse('planner_workforce'))
 
 def delete_leave_view(request, pk):
     get_object_or_404(Leave, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=leaves")
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
 
 def delete_site_view(request, pk):
     get_object_or_404(Site, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
 
 def delete_site_allocation_view(request, pk):
     get_object_or_404(SiteAllocation, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+
+def update_site_allocation_view(request, pk):
+    allocation = get_object_or_404(SiteAllocation, pk=pk)
+    if request.method == 'POST':
+        employee_id = request.POST.get('employee')
+        site_id = request.POST.get('site')
+        start_date_str = request.POST.get('start_date')
+        end_date_str = request.POST.get('end_date')
+
+        if employee_id and site_id and start_date_str:
+            allocation.employee_id = employee_id
+            allocation.site_id = site_id
+            allocation.start_date = parse_date(start_date_str)
+            allocation.end_date = parse_date(end_date_str) if end_date_str else None
+            allocation.save()
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def relieve_site_allocation_view(request, pk):
     allocation = get_object_or_404(SiteAllocation, pk=pk)
     if request.method == 'POST':
         end_date_str = request.POST.get('end_date')
         if end_date_str:
-            allocation.end_date = parse_date(end_date_str)
+            relieve_date = parse_date(end_date_str)
+            allocation.end_date = relieve_date
             allocation.save()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+
+            next_start = relieve_date + timedelta(days=1)
+            next_step = request.POST.get('next_step')
+
+            if next_step == 'office':
+                office_site = Site.objects.filter(pk=request.POST.get('office_site'), is_office=True).first()
+                if office_site:
+                    SiteAllocation.objects.create(employee=allocation.employee, site=office_site, start_date=next_start)
+            elif next_step == 'leave':
+                leave_end = parse_date(request.POST.get('leave_end_date'))
+                if leave_end:
+                    Leave.objects.create(
+                        employee=allocation.employee,
+                        start_date=next_start,
+                        end_date=leave_end,
+                        reason=request.POST.get('leave_reason', '')
+                    )
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def delete_holiday_view(request, pk):
     get_object_or_404(Holiday, pk=pk).delete()
