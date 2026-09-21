@@ -1014,8 +1014,13 @@
         window.mapInstance = L.map('site-map').setView([20.5937, 78.9629], 5); // Default center on India
         const map = window.mapInstance;
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        // tile.openstreetmap.org blocks production/business traffic per its usage policy
+        // (https://operations.osmfoundation.org/policies/tiles/), and CARTO's basemaps now
+        // require a registered API key for non-anonymous use. Esri's ArcGIS Online raster
+        // basemap tiles are free and keyless for standard display use.
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, DeLorme, NAVTEQ',
+            maxZoom: 19
         }).addTo(map);
 
         const markers = [];
