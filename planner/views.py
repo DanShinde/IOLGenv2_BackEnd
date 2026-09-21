@@ -1130,6 +1130,7 @@ def employee_site_history_report_view(request):
         'consolidated': consolidated,
         'consolidated_chart_json': consolidated_chart_json,
         'site_dist_chart_json': site_dist_chart_json,
+        'clear_url': reverse('planner_site_history_report'),
     }
     return render(request, 'planner/site_history_report.html', context)
 

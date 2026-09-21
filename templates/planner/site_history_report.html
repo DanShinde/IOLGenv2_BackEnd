@@ -62,6 +62,10 @@
             <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mb-0.5">
                 Generate Report
             </button>
+            <a href="{{ clear_url }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-md inline-flex items-center mb-0.5">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                Clear Filter
+            </a>
 
             <div class="ml-auto flex space-x-2 mb-0.5">
                 <button type="submit" formaction="{% url 'planner_site_history_export_excel' %}" class="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex items-center">
@@ -76,6 +80,7 @@
         </form>
     </div>
 
+    {% if not selected_employee_obj and not selected_site_obj %}
     <div class="bg-white shadow rounded-lg p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
             <div>
@@ -130,6 +135,7 @@
         <div class="p-6 text-center text-gray-500 text-sm">No data for the selected period.</div>
         {% endif %}
     </div>
+    {% endif %}
 
     {% if mode == 'employee' %}
         {% if selected_employee_obj %}
