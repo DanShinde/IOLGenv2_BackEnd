@@ -38,8 +38,22 @@ body, .wrapper { background-color: var(--av-surface-alt); }
 .brand-link {
   background-color: var(--av-primary) !important;
   border-bottom: 3px solid var(--av-accent) !important;
+  display: flex;
+  align-items: center;
 }
 .brand-text { color: #fff !important; font-weight: 600; }
+
+/* Logo: a 300x36 wordmark, not an icon — undo AdminLTE's circular-avatar sizing */
+.brand-image {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  max-height: 30px;
+  max-width: 170px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
 
 /* Sidebar */
 .main-sidebar, .sidebar-light-navy .nav-sidebar { background-color: var(--av-surface) !important; }

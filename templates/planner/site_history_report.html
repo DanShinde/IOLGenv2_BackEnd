@@ -76,6 +76,73 @@
         </form>
     </div>
 
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <div class="mb-4">
+            <h2 class="text-lg font-bold text-gray-900">Consolidated Summary</h2>
+            <p class="text-sm text-gray-500">{{ consolidated.employee_count }} employee{{ consolidated.employee_count|pluralize }} &middot; {{ start_date|date:"d M Y" }} to {{ end_date|date:"d M Y" }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-50 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-gray-900">{{ consolidated.total_days }}</p>
+                <p class="text-xs text-gray-500 uppercase tracking-wide mt-1">Total Person-Days</p>
+            </div>
+            <div class="bg-indigo-50 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-indigo-700">{{ consolidated.on_site_days }}</p>
+                <p class="text-xs text-gray-500 uppercase tracking-wide mt-1">On Site{% if consolidated.total_days %} ({% widthratio consolidated.on_site_days consolidated.total_days 100 %}%){% endif %}</p>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-slate-600">{{ consolidated.office_days }}</p>
+                <p class="text-xs text-gray-500 uppercase tracking-wide mt-1">In Office{% if consolidated.total_days %} ({% widthratio consolidated.office_days consolidated.total_days 100 %}%){% endif %}</p>
+            </div>
+            <div class="bg-orange-50 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-orange-600">{{ consolidated.on_leave_days }}</p>
+                <p class="text-xs text-gray-500 uppercase tracking-wide mt-1">On Leave{% if consolidated.total_days %} ({% widthratio consolidated.on_leave_days consolidated.total_days 100 %}%){% endif %}</p>
+            </div>
+        </div>
+
+        {% if consolidated.total_days %}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div>
+                <p class="text-sm font-semibold text-gray-800 mb-2">Time Allocation &mdash; Site vs Office vs Leave</p>
+                <div class="relative h-64">
+                    <canvas id="consolidatedPieChart" class="w-full h-full"></canvas>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                        On Site: {{ consolidated.on_site_days }}d ({% widthratio consolidated.on_site_days consolidated.total_days 100 %}%)
+                    </span>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                        In Office: {{ consolidated.office_days }}d ({% widthratio consolidated.office_days consolidated.total_days 100 %}%)
+                    </span>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                        On Leave: {{ consolidated.on_leave_days }}d ({% widthratio consolidated.on_leave_days consolidated.total_days 100 %}%)
+                    </span>
+                </div>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-gray-800 mb-2">Site-wise Day Distribution</p>
+                {% if consolidated.site_days %}
+                <div class="relative h-64">
+                    <canvas id="siteDistPieChart" class="w-full h-full"></canvas>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    {% for site_name, days in consolidated.site_days.items %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                        {{ site_name }}: {{ days }}d ({% widthratio days consolidated.on_site_days 100 %}%)
+                    </span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="h-64 flex items-center justify-center text-sm text-gray-500">No on-site allocations in this period.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="p-6 text-center text-gray-500 text-sm">No data for the selected period.</div>
+        {% endif %}
+    </div>
+
     {% if mode == 'employee' %}
         {% if selected_employee_obj %}
             <div class="bg-white shadow rounded-lg p-6 mb-6">
@@ -331,68 +398,60 @@
     {% endif %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script>
 function setReportMode(m) {
     document.getElementById('mode-input').value = m;
     document.getElementById('site-history-filter-form').submit();
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    const empCtx = document.getElementById('employeePieChart');
-    if (empCtx) {
-        const data = {{ employee_chart_json|default:"null"|safe }};
-        if (data && data.values.some(v => v > 0)) {
-            new Chart(empCtx, {
-                type: 'pie',
-                data: {
-                    labels: data.labels,
-                    datasets: [{ data: data.values, backgroundColor: data.colors }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { font: { size: 11 } } },
-                        tooltip: {
-                            callbacks: {
-                                label: function (ctx) {
-                                    return ctx.label + ': ' + ctx.raw + ' day' + (ctx.raw === 1 ? '' : 's');
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    }
+function renderPieChart(canvasId, data) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx || !data || !data.values.some(v => v > 0)) return;
 
-    const siteCtx = document.getElementById('sitePieChart');
-    if (siteCtx) {
-        const data = {{ site_chart_json|default:"null"|safe }};
-        if (data && data.values.some(v => v > 0)) {
-            new Chart(siteCtx, {
-                type: 'pie',
-                data: {
-                    labels: data.labels,
-                    datasets: [{ data: data.values, backgroundColor: data.colors }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { font: { size: 11 } } },
-                        tooltip: {
-                            callbacks: {
-                                label: function (ctx) {
-                                    return ctx.label + ': ' + ctx.raw + ' day' + (ctx.raw === 1 ? '' : 's');
-                                }
-                            }
+    const total = data.values.reduce((a, b) => a + b, 0);
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: data.labels,
+            datasets: [{ data: data.values, backgroundColor: data.colors }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: function (ctx) {
+                            const pct = total ? Math.round((ctx.raw / total) * 100) : 0;
+                            return ctx.label + ': ' + ctx.raw + ' day' + (ctx.raw === 1 ? '' : 's') + ' (' + pct + '%)';
                         }
                     }
+                },
+                datalabels: {
+                    display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+                    color: '#fff',
+                    font: { weight: 'bold', size: 11 },
+                    formatter: (value) => {
+                        const pct = total ? Math.round((value / total) * 100) : 0;
+                        return value + 'd\n' + pct + '%';
+                    },
+                    textAlign: 'center'
                 }
-            });
+            }
         }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.ChartDataLabels) {
+        Chart.register(ChartDataLabels);
     }
+    renderPieChart('consolidatedPieChart', {{ consolidated_chart_json|default:"null"|safe }});
+    renderPieChart('siteDistPieChart', {{ site_dist_chart_json|default:"null"|safe }});
+    renderPieChart('employeePieChart', {{ employee_chart_json|default:"null"|safe }});
+    renderPieChart('sitePieChart', {{ site_chart_json|default:"null"|safe }});
 });
 </script>
 {% endblock %}

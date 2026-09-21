@@ -956,6 +956,31 @@ def _get_employee_wise_overview(request):
     overview.sort(key=lambda x: x['employee'].name)
     return overview
 
+def _compute_consolidated_breakdown(report_data, start_date, end_date):
+    """Aggregate the same day-level (Leave > Site > Office) breakdown used for a single employee's
+    pie, across every employee currently in report_data, for the report's top-of-page summary."""
+    total_days = 0
+    on_leave_days = 0
+    office_days = 0
+    site_days = defaultdict(int)
+
+    for employee in report_data.keys():
+        b = _compute_employee_day_breakdown(employee, start_date, end_date)
+        total_days += b['total_days']
+        on_leave_days += b['on_leave_days']
+        office_days += b['office_days']
+        for site_name, days in b['site_days'].items():
+            site_days[site_name] += days
+
+    return {
+        'employee_count': len(report_data),
+        'total_days': total_days,
+        'on_leave_days': on_leave_days,
+        'office_days': office_days,
+        'on_site_days': sum(site_days.values()),
+        'site_days': dict(site_days),
+    }
+
 def employee_site_history_report_view(request):
     report_data, start_date, end_date = _get_site_history_data(request)
 
@@ -1003,6 +1028,23 @@ def employee_site_history_report_view(request):
         else:
             site_overview = _get_site_wise_overview(request)
 
+    # Top-of-page consolidated summary: across every employee currently in report_data (i.e.
+    # respecting the engineer/site/status filters above), two pies —
+    #   1) time allocation: on-site (total, no per-site split) vs office vs leave
+    #   2) pure site-by-site day distribution (on-site time only), for comparing site workload
+    consolidated = _compute_consolidated_breakdown(report_data, start_date, end_date)
+    consolidated_chart_json = json.dumps({
+        'labels': ['On Site', 'In Office', 'On Leave'],
+        'values': [consolidated['on_site_days'], consolidated['office_days'], consolidated['on_leave_days']],
+        'colors': ['#6366f1', '#94a3b8', '#f97316'],
+    })
+    site_dist_sorted = sorted(consolidated['site_days'].items(), key=lambda kv: -kv[1])
+    site_dist_chart_json = json.dumps({
+        'labels': [n for n, _ in site_dist_sorted],
+        'values': [d for _, d in site_dist_sorted],
+        'colors': _pie_colors(len(site_dist_sorted)),
+    })
+
     context = {
         'report_data': dict(report_data),
         'start_date': start_date,
@@ -1022,6 +1064,9 @@ def employee_site_history_report_view(request):
         'site_breakdown': site_breakdown,
         'site_chart_json': site_chart_json,
         'site_overview': site_overview,
+        'consolidated': consolidated,
+        'consolidated_chart_json': consolidated_chart_json,
+        'site_dist_chart_json': site_dist_chart_json,
     }
     return render(request, 'planner/site_history_report.html', context)
 

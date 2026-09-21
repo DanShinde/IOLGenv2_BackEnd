@@ -409,6 +409,10 @@ JAZZMIN_SETTINGS = {
     'site_header': "Armstrong Dematic",
     'site_brand': "Lives Made Easy",
     'site_logo': "assets/imgs/logo.png",
+    # Jazzmin defaults this to "img-circle", which crops a wide wordmark logo
+    # (this one is 300x36px) down to a thin sliver. It's a lockup, not an icon.
+    'site_logo_classes': "",
+    'site_icon': "favicon.ico",
     'copyright':  "All Right Reserved 2025",
     "welcome_sign": "Welcome to Armstrong Automation All-In-One tool, Login Now.",
     "custom_css": "assets/css/admin-theme.css",
