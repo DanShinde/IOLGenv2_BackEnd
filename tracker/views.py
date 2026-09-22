@@ -211,6 +211,7 @@ def project_detail(request, project_id):
             stages_to_save = project.stages.filter(id=stage_id)
 
         success_message = "Changes saved successfully!"
+        skipped_stage_names = []
         for stage in stages_to_save:
 
             # Get new values from the form
@@ -221,18 +222,18 @@ def project_detail(request, project_id):
             new_status = request.POST.get(f'status_{stage.id}') or "Not started"
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             new_completion_percentage = request.POST.get(f'completion_percentage_{stage.id}')
-            
 
+            # A stage can only be marked Completed once it has a real finish date — no
+            # silent auto-fill to "today" (same rule as the inline AJAX autosave).
+            if new_status == 'Completed' and not actual_date_val:
+                skipped_stage_names.append(stage.name)
+                continue
 
             # Safely parse date strings
 
             new_planned_start = parse_date(new_planned_start_str) if new_planned_start_str else None
             new_planned = parse_date(new_planned_str) if new_planned_str else None
             new_actual = parse_date(actual_date_val) if new_status == 'Completed' and actual_date_val else None
-            
-            # Auto-fill actual date if Completed and missing (Consistency with AJAX)
-            if new_status == 'Completed' and not new_actual:
-                new_actual = timezone.now().date()
 
             if new_status == 'Completed':
                 new_completion = 100
@@ -274,6 +275,11 @@ def project_detail(request, project_id):
             success_message = f"Stage '{stage_name}' updated successfully!"
 
         cache.delete(f'project_detail_{project_id}')
+        if skipped_stage_names:
+            messages.error(
+                request,
+                "Not marked Completed (Actual Finish Date is required): " + ", ".join(skipped_stage_names)
+            )
         messages.success(request, success_message)
         base_url = reverse('tracker_project_detail', args=[project.id])
         redirect_url = f'{base_url}?active_tab={active_tab}'
@@ -2723,15 +2729,13 @@ def _prospective_stage_state(stage, field_name, new_value):
     planned_date = parsed_value if field_name == 'planned_date' else stage.planned_date
     status = parsed_value if field_name == 'status' else stage.status
 
+    # A status change to 'Completed' is only ever reached (by update_stage_ajax) once
+    # the stage already has a real actual_date — there's no more auto-fill-to-today, so
+    # this just carries the existing (or newly-cleared, if un-completing) date forward.
     if field_name == 'actual_date':
         actual_date = parsed_value
     elif field_name == 'status':
-        if parsed_value == 'Completed' and not stage.actual_date:
-            actual_date = timezone.now().date()
-        elif parsed_value != 'Completed':
-            actual_date = None
-        else:
-            actual_date = stage.actual_date
+        actual_date = stage.actual_date if parsed_value == 'Completed' else None
     else:
         actual_date = stage.actual_date
 
@@ -2777,6 +2781,16 @@ def update_stage_ajax(request, stage_id):
             # Prevent clearing actual date if status is Completed
             if field_name == 'actual_date' and not new_value and stage.status == 'Completed':
                  return JsonResponse({'status': 'error', 'message': 'Cannot remove Actual Date while status is Completed.'}, status=400)
+
+            # A stage can only be marked Completed once it has a real finish date — no
+            # more silently defaulting to "today", which let a delayed completion slip
+            # through with neither an explicit date nor a delay reason on record.
+            if field_name == 'status' and new_value == 'Completed' and not stage.actual_date:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Please enter the Actual Finish Date before marking this stage Completed.',
+                    'requires_actual_date': True,
+                }, status=400)
 
             parsed_value, planned_date, status, actual_date = _prospective_stage_state(stage, field_name, new_value)
             is_delayed = bool(status == 'Completed' and planned_date and actual_date and actual_date > planned_date)

@@ -1371,9 +1371,16 @@ document.addEventListener('DOMContentLoaded', function () {
             if (ok && data.status === 'success') {
                 delete window.__pendingDelayFieldUpdate[stageId];
 
+                if (pending) {
+                    const pendingInput = document.querySelector(`[data-stage-id="${stageId}"][data-field-name="${pending.field_name}"]`);
+                    if (pendingInput) pendingInput.dataset.previousValue = pending.new_value;
+                }
                 if (data.updated_actual_date !== undefined) {
                     const actualDateInput = document.querySelector(`input[name="actual_date_${stageId}"]`);
-                    if (actualDateInput) actualDateInput.value = data.updated_actual_date;
+                    if (actualDateInput) {
+                        actualDateInput.value = data.updated_actual_date;
+                        actualDateInput.dataset.previousValue = data.updated_actual_date;
+                    }
                 }
                 const indicator = document.getElementById(`autosave-indicator-${stageId}`);
                 if (indicator) {
@@ -1476,6 +1483,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const indicator = document.getElementById(`autosave-indicator-${stageId}`);
         indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
 
+        const previousValue = input.dataset.previousValue !== undefined ? input.dataset.previousValue : '';
         const url = "{% url 'update_stage_ajax' 0 %}".replace('0', stageId);
 
         try {
@@ -1496,12 +1504,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (response.ok && data.status === 'success') {
                 indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+                input.dataset.previousValue = newValue;
 
                 // Update actual date input if the backend auto-filled or cleared it
                 if (data.updated_actual_date !== undefined) {
                     const actualDateInput = document.querySelector(`input[name="actual_date_${stageId}"]`);
                     if (actualDateInput) {
                         actualDateInput.value = data.updated_actual_date;
+                        actualDateInput.dataset.previousValue = data.updated_actual_date;
                     }
                 }
             } else if (response.ok && data.status === 'pending_delay_reason') {
@@ -1514,6 +1524,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     window.openDelayReasonModal(stageId, true);
                 }
             } else {
+                // Rejected — nothing was saved, so put the field back to what's actually
+                // on record (e.g. marking Completed with no Actual Finish Date gets
+                // reverted rather than left showing an unsaved "Completed").
+                input.value = previousValue;
                 indicator.innerHTML = `<i class="fas fa-times-circle text-danger" title="${data.message || 'Unknown error'}"></i>`;
                 alert(`Error saving stage: ${data.message}`);
             }
@@ -1532,6 +1546,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Attach the event listener to all designated input fields
     const autosaveInputs = document.querySelectorAll('.autosave-input');
     autosaveInputs.forEach(input => {
+        // Tracks the last confirmed-saved value so a rejected change (e.g. marking a
+        // stage Completed without an Actual Finish Date) can be visually reverted
+        // instead of leaving the field showing a value that was never actually saved.
+        input.dataset.previousValue = input.value;
         input.addEventListener('change', handleStageUpdate);
 
         // Prevent form submission on Enter key
