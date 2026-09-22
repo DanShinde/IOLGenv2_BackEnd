@@ -1,0 +1,135 @@
+/*
+ * AutoVerse admin theme — "Steel & Amber" (same tokens as the Estimator app)
+ * layered on top of Jazzmin/AdminLTE + the "flatly" Bootswatch skin.
+ * Cosmetic only: no admin behaviour, permissions or data are touched here.
+ */
+
+:root {
+  --av-primary: #16283F;
+  --av-primary-light: #3B6EA5;
+  --av-primary-dark: #0D1F33;
+  --av-primary-tint: #EDF1F4;
+  --av-accent: #F59E0B;
+  --av-accent-tint: #FFF7ED;
+  --av-secondary: #5B6B7C;
+  --av-success: #15803D;
+  --av-success-tint: #F0FDF4;
+  --av-warning: #EA580C;
+  --av-warning-tint: #FFF3E8;
+  --av-danger: #B91C1C;
+  --av-danger-tint: #FEF2F2;
+  --av-surface: #FFFFFF;
+  --av-surface-alt: #F3F5F7;
+  --av-border: #DCE2E8;
+  --av-border-strong: #B7C2CC;
+  --av-text: #1A2634;
+}
+
+body, .wrapper { background-color: var(--av-surface-alt); }
+
+/* Top navbar */
+.main-header.navbar,
+.navbar-navy {
+  background-color: var(--av-primary) !important;
+  border-bottom: 1px solid var(--av-primary-dark);
+}
+.main-header.navbar .nav-link,
+.main-header.navbar .nav-link:hover { color: #EAF0F6 !important; }
+.brand-link {
+  background-color: var(--av-primary) !important;
+  border-bottom: 3px solid var(--av-accent) !important;
+  display: flex;
+  align-items: center;
+}
+/* The logo image already reads "Armstrong Dematic" — don't also print
+   site_brand ("Lives Made Easy") as text next to it in the sidebar header. */
+.brand-text { display: none !important; }
+
+/* Logo: a 300x36 wordmark, not an icon — undo AdminLTE's circular-avatar sizing */
+.brand-image {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  max-height: 30px;
+  max-width: 170px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Sidebar */
+.main-sidebar, .sidebar-light-navy .nav-sidebar { background-color: var(--av-surface) !important; }
+.sidebar-light-navy .nav-sidebar > .nav-item > .nav-link { color: #3D4A57; }
+.sidebar-light-navy .nav-sidebar > .nav-item > .nav-link.active,
+.sidebar-light-navy .nav-sidebar > .nav-item > .nav-link:hover {
+  background-color: var(--av-accent-tint) !important;
+  color: var(--av-primary) !important;
+  border-left: 3px solid var(--av-accent);
+  font-weight: 600;
+}
+.sidebar-light-navy .nav-sidebar > .nav-item > .nav-link.active i,
+.sidebar-light-navy .nav-sidebar > .nav-item > .nav-link:hover i { color: var(--av-accent) !important; }
+.sidebar-heading, .nav-header {
+  color: #9AA7B3 !important;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  font-weight: 700;
+}
+.user-panel .info a { color: var(--av-text) !important; }
+
+/* Buttons */
+.btn-primary { background-color: var(--av-primary) !important; border-color: var(--av-primary) !important; }
+.btn-primary:hover { background-color: var(--av-primary-dark) !important; border-color: var(--av-primary-dark) !important; }
+.btn-warning, .accent-orange .btn-warning {
+  background-color: var(--av-accent) !important;
+  border-color: var(--av-accent) !important;
+  color: var(--av-primary) !important;
+  font-weight: 600;
+}
+.btn-warning:hover { background-color: #D9860A !important; border-color: #D9860A !important; }
+.btn-success { background-color: var(--av-success) !important; border-color: var(--av-success) !important; }
+.btn-danger { background-color: var(--av-danger) !important; border-color: var(--av-danger) !important; }
+
+/* Links + focus */
+a { color: var(--av-accent); }
+a:hover { color: #D9860A; }
+.form-control:focus, .form-select:focus, select:focus {
+  border-color: var(--av-accent) !important;
+  box-shadow: 0 0 0 3px var(--av-accent-tint) !important;
+}
+
+/* Cards */
+.card { border: 1px solid var(--av-border); box-shadow: none; }
+.card-header { background-color: var(--av-primary-tint); border-bottom: 1px solid var(--av-border); font-weight: 600; }
+.small-box, .info-box { border: 1px solid var(--av-border); box-shadow: none; }
+
+/* Tables */
+.table thead th {
+  background-color: var(--av-primary-tint);
+  color: var(--av-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  border-bottom: 1px solid var(--av-border) !important;
+}
+.table-hover tbody tr:hover { background-color: var(--av-accent-tint); }
+.table-striped tbody tr:nth-of-type(odd) { background-color: var(--av-surface-alt); }
+#changelist-filter h3, #changelist-filter h2 { color: var(--av-primary); }
+
+/* Badges / status pills */
+.badge-success { background-color: var(--av-success) !important; }
+.badge-warning { background-color: var(--av-warning) !important; }
+.badge-danger { background-color: var(--av-danger) !important; }
+.badge-info { background-color: var(--av-primary-light) !important; }
+
+/* Pagination */
+.pagination .page-item.active .page-link {
+  background-color: var(--av-primary) !important;
+  border-color: var(--av-primary) !important;
+}
+.pagination .page-link { color: var(--av-primary); }
+
+/* Login screen */
+.login-page, .register-page { background-color: var(--av-primary) !important; }
+.login-box .card, .register-box .card { border-top: 3px solid var(--av-accent); }
+.login-logo, .register-logo { color: #fff; }

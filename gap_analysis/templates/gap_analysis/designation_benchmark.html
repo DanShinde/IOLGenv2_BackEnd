@@ -2,6 +2,26 @@
 
 {% block title %}Manage Benchmark - {{ designation.title }} - Skill Gap Analyzer{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* General / each segment / Supplementary render as group-divider rows inside ONE shared
+       <table> (see _benchmark_matrix_table.html) rather than separate tables per section --
+       that's what guarantees the Skill Name / Category / Required Level / Mandatory columns
+       stay aligned across every group, since they're literally the same table/colgroup. */
+    .benchmark-matrix-table {
+        table-layout: fixed;
+    }
+
+    .table-group-row td {
+        background: #F1F3F9;
+        font-weight: 600;
+        color: var(--text);
+        padding-top: 0.6rem;
+        padding-bottom: 0.6rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="animate-fade-in">
     <div class="page-header">
@@ -14,76 +34,56 @@
                     <i class="bi bi-bookmark-check me-2 text-info"></i>{{ designation.title }}
                 </h1>
             </div>
-            <p class="text-muted mt-1">Manage required skills and proficiency levels for this designation</p>
+            <p class="text-muted mt-1">
+                Every skill in the catalog is listed below. Set a Required Level to make it part of this role's
+                benchmark -- leave it blank if it doesn't apply to {{ designation.title }}.
+            </p>
         </div>
         {% if user.is_staff %}
-        <a href="{% url 'skillgap_designation_benchmark_add' designation.id %}" class="btn btn-primary">
-            <i class="bi bi-plus-circle me-2"></i>Add Skill
+        <a href="{% url 'skillgap_add_skill' %}" class="btn btn-outline-primary" title="A skill has to exist in the catalog before it can be leveled for a role">
+            <i class="bi bi-plus-circle me-2"></i>New Skill in Catalog
         </a>
         {% endif %}
     </div>
 
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Required Skills</h5>
-            <span class="badge bg-info">{{ benchmark_count }} skill{{ benchmark_count|pluralize }}</span>
+    {% if total_skill_count %}
+        <div class="d-flex align-items-center gap-2 mb-4">
+            <span class="badge bg-primary">{{ benchmark_count }} of {{ total_skill_count }} skill{{ total_skill_count|pluralize }} required</span>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 mobile-cards">
-                    <thead>
-                        <tr>
-                            <th>Skill Name</th>
-                            <th>Category</th>
-                            <th>Required Level</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for benchmark in benchmarks %}
-                        <tr>
-                            <td data-label="Skill Name">
-                                <strong>{{ benchmark.skill.name }}</strong>
-                            </td>
-                            <td data-label="Category">
-                                {% if benchmark.skill.category %}
-                                    <span class="badge bg-light text-muted">{{ benchmark.skill.category }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Required Level">
-                                <span class="level-badge level-{{ benchmark.required_level }}">{{ benchmark.required_level }}/5</span>
-                            </td>
-                            <td data-label="Actions">
-                                <div class="d-flex justify-content-end gap-2">
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_designation_benchmark_delete' benchmark.id %}" class="btn btn-danger btn-icon" title="Remove">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4">
-                                <div class="empty-state py-5">
-                                    <i class="bi bi-bookmark-check d-block"></i>
-                                    <p>No skills defined for this designation yet.</p>
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_designation_benchmark_add' designation.id %}" class="btn btn-primary mt-2">
-                                        <i class="bi bi-plus-circle me-2"></i>Add First Skill
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+    {% endif %}
+
+    <!-- One shared table for every category (General / each segment / Supplementary), each
+         marked off by a group-divider row -- keeps every column perfectly aligned across
+         groups, since it's literally the same table rather than several separate ones. -->
+    {% include 'gap_analysis/_benchmark_matrix_table.html' %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const SKILLGAP_BASE = '{% url "skillgap_dashboard" %}';
+
+    function updateBenchmarkLevel(designationId, skillId, level) {
+        const mandatoryEl = document.getElementById(`benchmark-mandatory-${skillId}`);
+        const mandatory = mandatoryEl ? mandatoryEl.checked : true;
+
+        fetch(`${SKILLGAP_BASE}designations/${designationId}/benchmarks/${skillId}/level-update/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: `required_level=${encodeURIComponent(level)}&is_mandatory=${mandatory}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(level === '' ? 'Skill no longer required for this role' : 'Required level updated', 'success');
+            } else {
+                showToast(data.error || 'Failed to update required level', 'danger');
+            }
+        })
+        .catch(() => showToast('Failed to update required level', 'danger'));
+    }
+</script>
 {% endblock %}

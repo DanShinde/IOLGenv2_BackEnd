@@ -5,7 +5,7 @@ from import_export.admin import ImportExportModelAdmin
 
 
 @admin.register(Project)
-class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+class ProjectAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
     list_display = ('id', 'code', 'customer_name', 'value', 'so_punch_date', 'segment_con', 'team_lead')
     search_fields = ('code', 'customer_name', 'segment_con__name', 'team_lead__name')
@@ -14,10 +14,10 @@ class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
 
 @admin.register(Stage)
-class ModuleAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+class StageAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     list_display = ('id', 'name', 'project', 'planned_date', 'actual_date', 'status', 'completion_percentage')
     search_fields = ('name', 'project__code')
-    # list_filter = ('status')
+    list_filter = ('status',)
 
 
 @admin.register(trackerSegment)

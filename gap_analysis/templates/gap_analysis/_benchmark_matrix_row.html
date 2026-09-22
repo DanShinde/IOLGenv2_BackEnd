@@ -1,0 +1,49 @@
+<tr>
+    <td>
+        <strong>{{ row.skill.name }}</strong>
+    </td>
+    <td>
+        {% if row.skill.category %}
+            <span class="badge bg-light text-muted">{{ row.skill.category }}</span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td class="text-center">
+        {% if user.is_staff %}
+        <input type="number"
+               class="form-control form-control-sm benchmark-level-input mx-auto"
+               id="benchmark-level-{{ row.skill.id }}"
+               min="0" max="5"
+               placeholder="&mdash;"
+               value="{{ row.required_level|default_if_none:'' }}"
+               style="width: 80px;"
+               title="Blank = not required for this role"
+               onchange="updateBenchmarkLevel({{ designation.id }}, {{ row.skill.id }}, this.value)">
+        {% else %}
+            {% if row.required_level is not None %}
+                <span class="level-badge level-{{ row.required_level }}">{{ row.required_level }}/5</span>
+            {% else %}
+                <span class="text-muted">Not required</span>
+            {% endif %}
+        {% endif %}
+    </td>
+    <td class="text-center">
+        {% if user.is_staff %}
+        <input type="checkbox"
+               class="form-check-input"
+               id="benchmark-mandatory-{{ row.skill.id }}"
+               {% if row.is_mandatory %}checked{% endif %}
+               title="Only applied once this skill has a required level"
+               onchange="updateBenchmarkLevel({{ designation.id }}, {{ row.skill.id }}, document.getElementById('benchmark-level-{{ row.skill.id }}').value)">
+        {% else %}
+            {% if row.required_level is not None %}
+                {% if row.is_mandatory %}
+                    <span class="badge bg-danger">Mandatory</span>
+                {% else %}
+                    <span class="badge bg-secondary">Optional</span>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    </td>
+</tr>

@@ -11,7 +11,7 @@ from collections import OrderedDict, defaultdict
 from django.db.models import Min, Max, Q, Prefetch
 from .forms import ActivityForm, ProjectForm, LeaveForm, SiteForm, SiteAllocationForm
 from django.urls import reverse
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from django.http import JsonResponse, HttpResponse
 import json
 from .utils import calculate_end_date, count_working_days, calculate_effort_from_value, calculate_overlap_working_days
@@ -24,10 +24,32 @@ from reportlab.pdfgen import canvas
 import math
 from reportlab.lib.pagesizes import A3, A4, landscape
 from reportlab.lib import colors
+from reportlab.lib.colors import HexColor
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.piecharts import Pie
+from reportlab.graphics.charts.legends import Legend
+from reportlab.graphics import renderPDF
 import csv
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.chart import PieChart, Reference
+from openpyxl.utils import get_column_letter
 
 # Define this constant at the top of the file to avoid "magic numbers"
 CR = 10_000_000
+
+# --- Helper to redirect back to whatever page/tab the user actually came from, instead of a
+# hardcoded destination. Relies on the client keeping the URL's query string (tab/subtab) in
+# sync with on-page navigation, so the Referer header reflects what's actually on screen. ---
+def _redirect_to_referer_or(request, fallback_url):
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        parsed = urlparse(referer)
+        same_origin = not parsed.netloc or parsed.netloc == request.get_host()
+        same_app = parsed.path.startswith(reverse('planner_workforce'))
+        if same_origin and same_app:
+            return redirect(referer)
+    return redirect(fallback_url)
 
 # --- Helper to shorten names ---
 def _shorten_name(name):
@@ -680,23 +702,23 @@ def workforce_view(request):
                     active_tab = 'employees'
                 else:
                     Employee.objects.create(name=name, designation=designation, is_active=is_active, segment=segment_obj)
-                    return redirect('planner_workforce')
-        
+                    return _redirect_to_referer_or(request, reverse('planner_workforce'))
+
         elif 'add_leave' in request.POST:
             leave_form_post = LeaveForm(request.POST)
             if leave_form_post.is_valid():
                 leave_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=leaves")
+                return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
             else:
                 error_message = "Error adding leave. Please check dates."
                 active_tab = 'leaves'
                 leave_form = leave_form_post
-        
+
         elif 'add_project_site' in request.POST:
             project_site_form_post = SiteForm(request.POST, prefix='project_site')
             if project_site_form_post.is_valid():
                 project_site_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+                return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
             else:
                 error_message = "Error adding project site. Please check the form for details."
                 active_tab = 'site_team'
@@ -707,7 +729,7 @@ def workforce_view(request):
             office_site_form_post = SiteForm(request.POST, prefix='office_site')
             if office_site_form_post.is_valid():
                 office_site_form_post.save()
-                return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+                return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
             else:
                 error_message = "Error adding office location. Please check the form for details."
                 active_tab = 'site_team'
@@ -718,7 +740,7 @@ def workforce_view(request):
             alloc_form_post = SiteAllocationForm(request.POST)
             if alloc_form_post.is_valid():
                 new_alloc = alloc_form_post.save(commit=False)
-                
+
                 # Check if employee is already allocated
                 active_allocation = SiteAllocation.objects.filter(
                     employee=new_alloc.employee,
@@ -731,13 +753,13 @@ def workforce_view(request):
                     active_subtab = 'allocations'
                 else:
                     new_alloc.save()
-                    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+                    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
             else:
                 error_message = "Error adding allocation."
                 active_tab = 'site_team'
                 active_subtab = 'allocations'
                 allocation_form = alloc_form_post
-        
+
         elif 'refresh_coordinates' in request.POST:
             # Attempt to geocode sites that are missing coordinates
             # We limit to 5 at a time to prevent browser timeout and respect API rate limits
@@ -748,7 +770,7 @@ def workforce_view(request):
                 site.save() # This triggers the geocoding logic in models.py
                 time.sleep(1.1) # Respect OpenStreetMap Nominatim rate limit (1 req/sec)
                 count += 1
-            return redirect(f"{reverse('planner_workforce')}?tab=map_view")
+            return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=map")
 
     context = _get_workforce_context()
     context.update({
@@ -814,8 +836,277 @@ def _get_site_history_data(request):
         })
     return report_data, start_date, end_date
 
+_PIE_PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#84cc16', '#f43f5e', '#0ea5e9', '#eab308']
+
+def _pie_colors(n):
+    return [_PIE_PALETTE[i % len(_PIE_PALETTE)] for i in range(n)]
+
+def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
+    """A reportlab vector Pie chart + legend, ready to place on a canvas page via
+    renderPDF.draw(drawing, canvas, x, y). Returns None if there's nothing to draw.
+
+    Reportlab's Legend does not wrap or clip its text to the Drawing's declared width —
+    long labels (site names especially) will just keep drawing past it. Guarded here with
+    a hard truncation plus a wide default width (full page content area, since these are
+    meant to be placed one per row, not side-by-side) rather than relying on callers to
+    size things correctly for whatever labels happen to be in the data.
+    """
+    triples = [(l, v, c) for l, v, c in zip(labels, values, hex_colors) if v > 0]
+    if not triples:
+        return None
+    labels, values, hex_colors = zip(*triples)
+    total = sum(values)
+
+    d = Drawing(width, height)
+    pie = Pie()
+    pie.x = 10
+    pie.y = 10
+    pie.width = 120
+    pie.height = 120
+    pie.data = list(values)
+    pie.labels = [f"{round(v / total * 100)}%" for v in values]
+    pie.simpleLabels = 1
+    pie.slices.strokeWidth = 0.75
+    pie.slices.strokeColor = colors.white
+    pie.slices.fontName = 'Helvetica-Bold'
+    pie.slices.fontSize = 7
+    pie.slices.fontColor = colors.white
+    for i, hexcol in enumerate(hex_colors):
+        pie.slices[i].fillColor = HexColor(hexcol)
+    d.add(pie)
+
+    def _short(label, max_len=34):
+        return label if len(label) <= max_len else label[:max_len - 1] + '…'
+
+    legend = Legend()
+    legend.x = 150
+    legend.y = 125
+    legend.dx = 7
+    legend.dy = 7
+    legend.dxTextSpace = 4
+    legend.fontName = 'Helvetica'
+    legend.fontSize = 7
+    legend.alignment = 'left'
+    legend.columnMaximum = 12
+    legend.colorNamePairs = [
+        (HexColor(hexcol), f"{_short(label)} - {value}d ({round(value / total * 100)}%)")
+        for label, value, hexcol in zip(labels, values, hex_colors)
+    ]
+    d.add(legend)
+    return d
+
+def _compute_employee_day_breakdown(employee, start_date, end_date):
+    """Day-by-day bucket for one employee over a period: On Leave beats On Site beats the
+    default In Office bucket (gap days with no allocation/leave record count as office)."""
+    leaves = Leave.objects.filter(employee=employee, start_date__lte=end_date).filter(end_date__gte=start_date)
+    leave_days = set()
+    for lv in leaves:
+        d, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
+        while d <= last:
+            leave_days.add(d)
+            d += timedelta(days=1)
+
+    allocations = SiteAllocation.objects.filter(
+        employee=employee, start_date__lte=end_date
+    ).filter(Q(end_date__gte=start_date) | Q(end_date__isnull=True)).select_related('site')
+
+    day_site = {}
+    for alloc in allocations:
+        d = max(alloc.start_date, start_date)
+        last = min(alloc.end_date, end_date) if alloc.end_date else end_date
+        while d <= last:
+            existing = day_site.get(d)
+            if existing is None or (existing.is_office and not alloc.site.is_office):
+                day_site[d] = alloc.site
+            d += timedelta(days=1)
+
+    site_days = defaultdict(int)
+    office_days = 0
+    on_leave_days = 0
+    d = start_date
+    while d <= end_date:
+        if d in leave_days:
+            on_leave_days += 1
+        else:
+            site = day_site.get(d)
+            if site and not site.is_office:
+                site_days[site.name] += 1
+            else:
+                office_days += 1
+        d += timedelta(days=1)
+
+    return {
+        'total_days': (end_date - start_date).days + 1,
+        'on_leave_days': on_leave_days,
+        'office_days': office_days,
+        'on_site_days': sum(site_days.values()),
+        'site_days': dict(site_days),
+    }
+
+def _compute_site_day_breakdown(site, start_date, end_date):
+    """Day-by-day presence at one site: coverage days, total person-days, and per-employee days.
+    A day an employee is on recorded leave does not count toward that employee's presence."""
+    allocations = SiteAllocation.objects.filter(
+        site=site, start_date__lte=end_date
+    ).filter(Q(end_date__gte=start_date) | Q(end_date__isnull=True)).select_related('employee')
+
+    employee_ids = {a.employee_id for a in allocations}
+    leave_by_employee = defaultdict(set)
+    if employee_ids:
+        leaves = Leave.objects.filter(
+            employee_id__in=employee_ids, start_date__lte=end_date
+        ).filter(end_date__gte=start_date)
+        for lv in leaves:
+            d, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
+            while d <= last:
+                leave_by_employee[lv.employee_id].add(d)
+                d += timedelta(days=1)
+
+    employee_days = defaultdict(int)
+    employees_map = {}
+    coverage_days = set()
+    for alloc in allocations:
+        emp = alloc.employee
+        employees_map[emp.id] = emp
+        d = max(alloc.start_date, start_date)
+        last = min(alloc.end_date, end_date) if alloc.end_date else end_date
+        emp_leave_days = leave_by_employee.get(emp.id, set())
+        while d <= last:
+            if d not in emp_leave_days:
+                employee_days[emp.id] += 1
+                coverage_days.add(d)
+            d += timedelta(days=1)
+
+    return {
+        'coverage_days': len(coverage_days),
+        'total_person_days': sum(employee_days.values()),
+        'employee_days': {employees_map[eid]: days for eid, days in employee_days.items()},
+    }
+
+def _get_site_wise_overview(request):
+    """Simple per-site summary (durations, not day-deduplicated) for the Site-wise tab
+    when no single site is selected yet — reuses the same filtered allocation set as the
+    employee-wise report so status/date/engineer filters stay consistent across tabs."""
+    report_data, start_date, end_date = _get_site_history_data(request)
+    site_summary = defaultdict(lambda: {'site': None, 'employees': set(), 'person_days': 0})
+    for employee, history in report_data.items():
+        for item in history:
+            entry = site_summary[item['site'].id]
+            entry['site'] = item['site']
+            entry['employees'].add(employee)
+            entry['person_days'] += item['duration']
+
+    overview = [
+        {'site': data['site'], 'engineer_count': len(data['employees']), 'person_days': data['person_days']}
+        for data in site_summary.values()
+    ]
+    overview.sort(key=lambda x: x['site'].name)
+    return overview
+
+def _get_employee_wise_overview(request):
+    """Simple per-employee summary (durations, not day-deduplicated) for the Employee-wise tab
+    when no single employee is selected yet — mirrors _get_site_wise_overview's shape/precision
+    so both tabs behave the same way before you drill into a specific employee or site."""
+    report_data, start_date, end_date = _get_site_history_data(request)
+    overview = []
+    for employee, history in report_data.items():
+        sites = {item['site'].name for item in history}
+        overview.append({
+            'employee': employee,
+            'site_count': len(sites),
+            'total_days': sum(item['duration'] for item in history),
+        })
+    overview.sort(key=lambda x: x['employee'].name)
+    return overview
+
+def _compute_consolidated_breakdown(report_data, start_date, end_date):
+    """Aggregate the same day-level (Leave > Site > Office) breakdown used for a single employee's
+    pie, across every employee currently in report_data, for the report's top-of-page summary."""
+    total_days = 0
+    on_leave_days = 0
+    office_days = 0
+    site_days = defaultdict(int)
+
+    for employee in report_data.keys():
+        b = _compute_employee_day_breakdown(employee, start_date, end_date)
+        total_days += b['total_days']
+        on_leave_days += b['on_leave_days']
+        office_days += b['office_days']
+        for site_name, days in b['site_days'].items():
+            site_days[site_name] += days
+
+    return {
+        'employee_count': len(report_data),
+        'total_days': total_days,
+        'on_leave_days': on_leave_days,
+        'office_days': office_days,
+        'on_site_days': sum(site_days.values()),
+        'site_days': dict(site_days),
+    }
+
 def employee_site_history_report_view(request):
     report_data, start_date, end_date = _get_site_history_data(request)
+
+    mode = request.GET.get('mode', 'employee')
+    if mode not in ('employee', 'site'):
+        mode = 'employee'
+
+    selected_engineer_id = int(request.GET.get('engineer')) if request.GET.get('engineer') else None
+    selected_site_id = int(request.GET.get('site')) if request.GET.get('site') else None
+
+    selected_employee_obj = None
+    selected_site_obj = None
+    employee_breakdown = None
+    employee_chart_json = None
+    employee_overview = None
+    site_breakdown = None
+    site_chart_json = None
+    site_overview = None
+
+    if mode == 'employee':
+        if selected_engineer_id:
+            selected_employee_obj = Employee.objects.filter(pk=selected_engineer_id).first()
+            if selected_employee_obj:
+                employee_breakdown = _compute_employee_day_breakdown(selected_employee_obj, start_date, end_date)
+                site_names = list(employee_breakdown['site_days'].keys())
+                chart_labels = site_names + ['In Office', 'On Leave']
+                chart_values = [employee_breakdown['site_days'][n] for n in site_names] + [
+                    employee_breakdown['office_days'], employee_breakdown['on_leave_days']
+                ]
+                chart_colors = _pie_colors(len(site_names)) + ['#94a3b8', '#f97316']
+                employee_chart_json = json.dumps({'labels': chart_labels, 'values': chart_values, 'colors': chart_colors})
+        else:
+            employee_overview = _get_employee_wise_overview(request)
+
+    if mode == 'site':
+        if selected_site_id:
+            selected_site_obj = Site.objects.filter(pk=selected_site_id).first()
+            if selected_site_obj:
+                site_breakdown = _compute_site_day_breakdown(selected_site_obj, start_date, end_date)
+                sorted_items = sorted(site_breakdown['employee_days'].items(), key=lambda kv: -kv[1])
+                chart_labels = [e.name for e, _ in sorted_items]
+                chart_values = [d for _, d in sorted_items]
+                chart_colors = _pie_colors(len(sorted_items))
+                site_chart_json = json.dumps({'labels': chart_labels, 'values': chart_values, 'colors': chart_colors})
+        else:
+            site_overview = _get_site_wise_overview(request)
+
+    # Top-of-page consolidated summary: across every employee currently in report_data (i.e.
+    # respecting the engineer/site/status filters above), two pies —
+    #   1) time allocation: on-site (total, no per-site split) vs office vs leave
+    #   2) pure site-by-site day distribution (on-site time only), for comparing site workload
+    consolidated = _compute_consolidated_breakdown(report_data, start_date, end_date)
+    consolidated_chart_json = json.dumps({
+        'labels': ['On Site', 'In Office', 'On Leave'],
+        'values': [consolidated['on_site_days'], consolidated['office_days'], consolidated['on_leave_days']],
+        'colors': ['#6366f1', '#94a3b8', '#f97316'],
+    })
+    site_dist_sorted = sorted(consolidated['site_days'].items(), key=lambda kv: -kv[1])
+    site_dist_chart_json = json.dumps({
+        'labels': [n for n, _ in site_dist_sorted],
+        'values': [d for _, d in site_dist_sorted],
+        'colors': _pie_colors(len(site_dist_sorted)),
+    })
 
     context = {
         'report_data': dict(report_data),
@@ -824,25 +1115,190 @@ def employee_site_history_report_view(request):
         'active_nav': 'workforce',
         'all_employees': Employee.objects.all().order_by('name'),
         'all_sites': Site.objects.all().order_by('name'),
-        'selected_engineer': int(request.GET.get('engineer')) if request.GET.get('engineer') else None,
-        'selected_site': int(request.GET.get('site')) if request.GET.get('site') else None,
+        'selected_engineer': selected_engineer_id,
+        'selected_site': selected_site_id,
         'selected_status': request.GET.get('status'),
+        'mode': mode,
+        'selected_employee_obj': selected_employee_obj,
+        'selected_site_obj': selected_site_obj,
+        'employee_breakdown': employee_breakdown,
+        'employee_chart_json': employee_chart_json,
+        'employee_overview': employee_overview,
+        'site_breakdown': site_breakdown,
+        'site_chart_json': site_chart_json,
+        'site_overview': site_overview,
+        'consolidated': consolidated,
+        'consolidated_chart_json': consolidated_chart_json,
+        'site_dist_chart_json': site_dist_chart_json,
+        'clear_url': reverse('planner_site_history_report'),
     }
     return render(request, 'planner/site_history_report.html', context)
 
-def export_site_history_csv(request):
+def _export_common_context(request):
+    """Shared filter/mode resolution + aggregates for both exports, so their numbers always
+    match exactly what's on screen (same helpers the report view itself uses)."""
     report_data, start_date, end_date = _get_site_history_data(request)
-    
-    response = HttpResponse(content_type='text/csv')
-    filename = f"Site_History_Report_{start_date}_{end_date}.csv"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    writer = csv.writer(response)
-    writer.writerow(['Employee', 'Designation', 'Site/Project', 'Location', 'Start Date', 'End Date', 'Duration (Days)', 'Status'])
-    
+    mode = request.GET.get('mode', 'employee')
+    if mode not in ('employee', 'site'):
+        mode = 'employee'
+    selected_engineer_id = int(request.GET.get('engineer')) if request.GET.get('engineer') else None
+    selected_site_id = int(request.GET.get('site')) if request.GET.get('site') else None
+    selected_employee_obj = Employee.objects.filter(pk=selected_engineer_id).first() if selected_engineer_id else None
+    selected_site_obj = Site.objects.filter(pk=selected_site_id).first() if selected_site_id else None
+    consolidated = _compute_consolidated_breakdown(report_data, start_date, end_date)
+    return {
+        'report_data': report_data,
+        'start_date': start_date,
+        'end_date': end_date,
+        'mode': mode,
+        'selected_employee_obj': selected_employee_obj,
+        'selected_site_obj': selected_site_obj,
+        'selected_status': request.GET.get('status'),
+        'consolidated': consolidated,
+    }
+
+def export_site_history_excel(request):
+    ctx = _export_common_context(request)
+    report_data, start_date, end_date = ctx['report_data'], ctx['start_date'], ctx['end_date']
+    consolidated = ctx['consolidated']
+
+    wb = Workbook()
+
+    # ---- Summary sheet: KPIs + native, live pie charts ----
+    ws = wb.active
+    ws.title = "Summary"
+    title_font = Font(bold=True, size=14)
+    header_font = Font(bold=True, size=10, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="4F46E5")
+    bold = Font(bold=True)
+
+    ws['A1'] = "Employee Site History Report"
+    ws['A1'].font = title_font
+    ws['A2'] = f"Period: {start_date:%d %b %Y} to {end_date:%d %b %Y}"
+    filt_bits = []
+    if ctx['selected_employee_obj']:
+        filt_bits.append(f"Engineer: {ctx['selected_employee_obj'].name}")
+    if ctx['selected_site_obj']:
+        filt_bits.append(f"Site: {ctx['selected_site_obj'].name}")
+    if ctx['selected_status']:
+        filt_bits.append(f"Status: {ctx['selected_status']}")
+    ws['A3'] = "Filters: " + (", ".join(filt_bits) if filt_bits else "None")
+    ws['A4'] = f"Generated: {datetime.now():%d %b %Y %H:%M}"
+
+    ws['A6'] = "Consolidated Summary"
+    ws['A6'].font = Font(bold=True, size=12)
+    kpi_rows = [
+        ("Employees", consolidated['employee_count']),
+        ("Total Person-Days", consolidated['total_days']),
+        ("On Site", consolidated['on_site_days']),
+        ("In Office", consolidated['office_days']),
+        ("On Leave", consolidated['on_leave_days']),
+    ]
+    for i, (label, value) in enumerate(kpi_rows):
+        r = 7 + i
+        ws.cell(row=r, column=1, value=label).font = bold
+        ws.cell(row=r, column=2, value=value)
+
+    # Hidden-ish data tables the two pie charts reference (openpyxl charts must point at real cells)
+    chart_data_row = 14
+    ws.cell(row=chart_data_row, column=1, value="Time Allocation").font = bold
+    ws.cell(row=chart_data_row + 1, column=1, value="Category")
+    ws.cell(row=chart_data_row + 1, column=2, value="Days")
+    time_alloc = [('On Site', consolidated['on_site_days']), ('In Office', consolidated['office_days']), ('On Leave', consolidated['on_leave_days'])]
+    for i, (label, value) in enumerate(time_alloc):
+        ws.cell(row=chart_data_row + 2 + i, column=1, value=label)
+        ws.cell(row=chart_data_row + 2 + i, column=2, value=value)
+
+    site_sorted = sorted(consolidated['site_days'].items(), key=lambda kv: -kv[1])
+    site_data_row = chart_data_row
+    site_data_col = 5
+    ws.cell(row=site_data_row, column=site_data_col, value="Site-wise Day Distribution").font = bold
+    ws.cell(row=site_data_row + 1, column=site_data_col, value="Site")
+    ws.cell(row=site_data_row + 1, column=site_data_col + 1, value="Days")
+    for i, (name, days) in enumerate(site_sorted):
+        ws.cell(row=site_data_row + 2 + i, column=site_data_col, value=name)
+        ws.cell(row=site_data_row + 2 + i, column=site_data_col + 1, value=days)
+
+    def _style_pie_chart(chart, title):
+        """Consistent sizing/legend for every pie chart on this sheet. Excel's own renderer
+        won't wrap or shrink a right-side legend to fit long labels (site names especially) —
+        overlay=False + a bottom legend + a generously-sized chart gives it enough room to lay
+        out the plot and legend without them overlapping."""
+        chart.title = title
+        chart.height = 10
+        chart.width = 16
+        chart.legend.position = 'b'
+        chart.legend.overlay = False
+        return chart
+
+    # Charts are stacked one above the other (not side-by-side): a chart's width/height here
+    # is in centimeters, not related to the column widths below, so two charts anchored in
+    # the same row on different columns can visually overlap if the first is wider than the
+    # column gap — stacking with a generous row gap avoids that regardless of chart size.
+    ROWS_PER_CHART = 24
+    chart_anchor_row = chart_data_row + 3 + max(len(time_alloc), len(site_sorted)) + 2
+
+    if any(v for _, v in time_alloc):
+        pie1 = PieChart()
+        data = Reference(ws, min_col=2, min_row=chart_data_row + 1, max_row=chart_data_row + 1 + len(time_alloc))
+        cats = Reference(ws, min_col=1, min_row=chart_data_row + 2, max_row=chart_data_row + 1 + len(time_alloc))
+        pie1.add_data(data, titles_from_data=True)
+        pie1.set_categories(cats)
+        _style_pie_chart(pie1, "Time Allocation")
+        ws.add_chart(pie1, f"A{chart_anchor_row}")
+
+    if site_sorted:
+        pie2 = PieChart()
+        data = Reference(ws, min_col=site_data_col + 1, min_row=site_data_row + 1, max_row=site_data_row + 1 + len(site_sorted))
+        cats = Reference(ws, min_col=site_data_col, min_row=site_data_row + 2, max_row=site_data_row + 1 + len(site_sorted))
+        pie2.add_data(data, titles_from_data=True)
+        pie2.set_categories(cats)
+        _style_pie_chart(pie2, "Site-wise Day Distribution")
+        ws.add_chart(pie2, f"A{chart_anchor_row + ROWS_PER_CHART}")
+
+    for col, width in (('A', 22), ('B', 14), ('C', 4), ('D', 4), ('E', 4), ('F', 26), ('G', 10)):
+        ws.column_dimensions[col].width = width
+
+    # If a specific employee or site is selected, add their own breakdown block below the charts
+    detail_row = chart_anchor_row + (ROWS_PER_CHART * 2) + 2
+    if ctx['mode'] == 'employee' and ctx['selected_employee_obj']:
+        emp = ctx['selected_employee_obj']
+        b = _compute_employee_day_breakdown(emp, start_date, end_date)
+        ws.cell(row=detail_row, column=1, value=f"Employee: {emp.name} ({emp.get_designation_display()})").font = Font(bold=True, size=12)
+        rows = [("Total Days", b['total_days']), ("On Site", b['on_site_days']), ("In Office", b['office_days']), ("On Leave", b['on_leave_days'])]
+        for i, (label, value) in enumerate(rows):
+            ws.cell(row=detail_row + 1 + i, column=1, value=label).font = bold
+            ws.cell(row=detail_row + 1 + i, column=2, value=value)
+        for i, (site_name, days) in enumerate(sorted(b['site_days'].items(), key=lambda kv: -kv[1])):
+            ws.cell(row=detail_row + 1 + i, column=4, value=site_name)
+            ws.cell(row=detail_row + 1 + i, column=5, value=days)
+    elif ctx['mode'] == 'site' and ctx['selected_site_obj']:
+        site = ctx['selected_site_obj']
+        b = _compute_site_day_breakdown(site, start_date, end_date)
+        ws.cell(row=detail_row, column=1, value=f"Site: {site.name} ({site.location})").font = Font(bold=True, size=12)
+        rows = [("Distinct Engineers", len(b['employee_days'])), ("Total Person-Days", b['total_person_days']), ("Coverage Days", b['coverage_days'])]
+        for i, (label, value) in enumerate(rows):
+            ws.cell(row=detail_row + 1 + i, column=1, value=label).font = bold
+            ws.cell(row=detail_row + 1 + i, column=2, value=value)
+        for i, (emp, days) in enumerate(sorted(b['employee_days'].items(), key=lambda kv: -kv[1])):
+            ws.cell(row=detail_row + 1 + i, column=4, value=emp.name)
+            ws.cell(row=detail_row + 1 + i, column=5, value=days)
+
+    # ---- Detail sheet: full allocation log (appendix) ----
+    ws2 = wb.create_sheet("Detail")
+    headers = ['Employee', 'Designation', 'Site/Project', 'Location', 'Start Date', 'End Date', 'Duration (Days)', 'Status']
+    for col, header in enumerate(headers, start=1):
+        cell = ws2.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    active_fill = PatternFill("solid", fgColor="ECFDF5")
+    relieved_fill = PatternFill("solid", fgColor="F3F4F6")
+    row_num = 2
     for employee, history in report_data.items():
         for item in history:
-            writer.writerow([
+            row = [
                 employee.name,
                 employee.get_designation_display(),
                 item['site'].name,
@@ -850,72 +1306,213 @@ def export_site_history_csv(request):
                 item['start_date'],
                 item['end_date'] if item['end_date'] else 'Present',
                 item['duration'],
-                item['status']
-            ])
-            
+                item['status'],
+            ]
+            fill = active_fill if item['status'] == 'Active' else relieved_fill
+            for col, value in enumerate(row, start=1):
+                cell = ws2.cell(row=row_num, column=col, value=value)
+                cell.fill = fill
+            row_num += 1
+
+    ws2.auto_filter.ref = f"A1:H{max(row_num - 1, 1)}"
+    ws2.freeze_panes = "A2"
+    for col, width in (('A', 24), ('B', 14), ('C', 26), ('D', 22), ('E', 12), ('F', 12), ('G', 14), ('H', 10)):
+        ws2.column_dimensions[col].width = width
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    filename = f"Site_History_Report_{start_date}_{end_date}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
     return response
 
 def export_site_history_pdf(request):
-    report_data, start_date, end_date = _get_site_history_data(request)
-    
+    ctx = _export_common_context(request)
+    report_data, start_date, end_date = ctx['report_data'], ctx['start_date'], ctx['end_date']
+    consolidated = ctx['consolidated']
+    mode, selected_employee_obj, selected_site_obj = ctx['mode'], ctx['selected_employee_obj'], ctx['selected_site_obj']
+
     response = HttpResponse(content_type='application/pdf')
     filename = f"Site_History_Report_{start_date}_{end_date}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
+
     c = canvas.Canvas(response, pagesize=A4)
     width, height = A4
     margin = 50
+
+    def ensure_space(y, needed):
+        if y - needed < 60:
+            c.showPage()
+            return height - margin
+        return y
+
+    # ---- Cover / header ----
     y = height - margin
-    
-    c.setFont("Helvetica-Bold", 16)
+    c.setFont("Helvetica-Bold", 18)
     c.drawString(margin, y, "Employee Site History Report")
     y -= 20
-    c.setFont("Helvetica", 10)
-    c.drawString(margin, y, f"Period: {start_date} to {end_date}")
-    y -= 30
-    
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.grey)
+    filt_bits = [f"Period: {start_date:%d %b %Y} - {end_date:%d %b %Y}"]
+    if selected_employee_obj:
+        filt_bits.append(f"Engineer: {selected_employee_obj.name}")
+    if selected_site_obj:
+        filt_bits.append(f"Site: {selected_site_obj.name}")
+    if ctx['selected_status']:
+        filt_bits.append(f"Status: {ctx['selected_status']}")
+    c.drawString(margin, y, "   |   ".join(filt_bits))
+    y -= 13
+    c.drawString(margin, y, f"Generated: {datetime.now():%d %b %Y %H:%M}")
+    c.setFillColor(colors.black)
+    y -= 26
+
+    # ---- Consolidated Summary ----
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(margin, y, "Consolidated Summary")
+    y -= 16
+    c.setFont("Helvetica", 9)
+    if consolidated['total_days']:
+        def pct(n):
+            return round(n / consolidated['total_days'] * 100)
+        c.drawString(margin, y, f"{consolidated['employee_count']} employees   |   Total Person-Days: {consolidated['total_days']}")
+        y -= 14
+        c.drawString(margin, y, (
+            f"On Site: {consolidated['on_site_days']} ({pct(consolidated['on_site_days'])}%)   |   "
+            f"In Office: {consolidated['office_days']} ({pct(consolidated['office_days'])}%)   |   "
+            f"On Leave: {consolidated['on_leave_days']} ({pct(consolidated['on_leave_days'])}%)"
+        ))
+        y -= 16
+
+        pie1 = _build_pie_drawing(
+            ['On Site', 'In Office', 'On Leave'],
+            [consolidated['on_site_days'], consolidated['office_days'], consolidated['on_leave_days']],
+            ['#6366f1', '#94a3b8', '#f97316']
+        )
+        site_sorted = sorted(consolidated['site_days'].items(), key=lambda kv: -kv[1])
+        pie2 = _build_pie_drawing([n for n, _ in site_sorted], [d for _, d in site_sorted], _pie_colors(len(site_sorted))) if site_sorted else None
+
+        # Stacked one per row (not side-by-side) so each legend gets the full page width —
+        # site names vary too much in length to safely share a row with another chart.
+        chart_h = 155
+        if pie1:
+            y = ensure_space(y, chart_h)
+            renderPDF.draw(pie1, c, margin, y - chart_h)
+            y -= chart_h + 5
+        if pie2:
+            y = ensure_space(y, chart_h)
+            renderPDF.draw(pie2, c, margin, y - chart_h)
+            y -= chart_h + 5
+        y -= 10
+    else:
+        c.drawString(margin, y, "No data for the selected period.")
+        y -= 16
+
+    # ---- Mode-specific detail ----
+    y = ensure_space(y, 40)
+
+    if mode == 'employee' and selected_employee_obj:
+        b = _compute_employee_day_breakdown(selected_employee_obj, start_date, end_date)
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(margin, y, f"Employee: {selected_employee_obj.name} ({selected_employee_obj.get_designation_display()})")
+        y -= 16
+        c.setFont("Helvetica", 9)
+        if b['total_days']:
+            def pct2(n):
+                return round(n / b['total_days'] * 100)
+            c.drawString(margin, y, (
+                f"Total Days: {b['total_days']}   |   On Site: {b['on_site_days']} ({pct2(b['on_site_days'])}%)   |   "
+                f"In Office: {b['office_days']} ({pct2(b['office_days'])}%)   |   On Leave: {b['on_leave_days']} ({pct2(b['on_leave_days'])}%)"
+            ))
+        y -= 18
+        site_items = sorted(b['site_days'].items(), key=lambda kv: -kv[1])
+        emp_pie = _build_pie_drawing(
+            [n for n, _ in site_items] + ['In Office', 'On Leave'],
+            [d for _, d in site_items] + [b['office_days'], b['on_leave_days']],
+            _pie_colors(len(site_items)) + ['#94a3b8', '#f97316']
+        )
+        if emp_pie:
+            y = ensure_space(y, 155)
+            renderPDF.draw(emp_pie, c, margin, y - 155)
+            y -= 170
+
+    elif mode == 'site' and selected_site_obj:
+        b = _compute_site_day_breakdown(selected_site_obj, start_date, end_date)
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(margin, y, f"Site: {selected_site_obj.name} ({selected_site_obj.location})")
+        y -= 16
+        c.setFont("Helvetica", 9)
+        c.drawString(margin, y, f"Distinct Engineers: {len(b['employee_days'])}   |   Total Person-Days: {b['total_person_days']}   |   Coverage Days: {b['coverage_days']}")
+        y -= 18
+        sorted_items = sorted(b['employee_days'].items(), key=lambda kv: -kv[1])
+        site_pie = _build_pie_drawing([e.name for e, _ in sorted_items], [d for _, d in sorted_items], _pie_colors(len(sorted_items)))
+        if site_pie:
+            y = ensure_space(y, 155)
+            renderPDF.draw(site_pie, c, margin, y - 155)
+            y -= 170
+
+    else:
+        overview_rows = _get_employee_wise_overview(request) if mode == 'employee' else _get_site_wise_overview(request)
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(margin, y, "Employee Overview" if mode == 'employee' else "Site Overview")
+        y -= 18
+        c.setFont("Helvetica-Bold", 9)
+        if mode == 'employee':
+            c.drawString(margin, y, "Employee"); c.drawString(margin + 200, y, "Designation")
+            c.drawString(margin + 330, y, "Sites"); c.drawString(margin + 400, y, "Total Days")
+        else:
+            c.drawString(margin, y, "Site"); c.drawString(margin + 220, y, "Location")
+            c.drawString(margin + 380, y, "Engineers"); c.drawString(margin + 450, y, "Person-Days")
+        c.line(margin, y - 4, width - margin, y - 4)
+        y -= 16
+        c.setFont("Helvetica", 9)
+        for row in overview_rows:
+            y = ensure_space(y, 14)
+            if mode == 'employee':
+                c.drawString(margin, y, row['employee'].name[:28])
+                c.drawString(margin + 200, y, row['employee'].get_designation_display())
+                c.drawString(margin + 330, y, str(row['site_count']))
+                c.drawString(margin + 400, y, f"{row['total_days']} days")
+            else:
+                c.drawString(margin, y, row['site'].name[:28])
+                c.drawString(margin + 220, y, row['site'].location[:22])
+                c.drawString(margin + 380, y, str(row['engineer_count']))
+                c.drawString(margin + 450, y, f"{row['person_days']} days")
+            y -= 14
+
+    # ---- Appendix: full allocation log ----
+    c.showPage()
+    y = height - margin
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(margin, y, "Appendix: Full Allocation Log")
+    y -= 24
+
     c.setFont("Helvetica-Bold", 9)
-    # Columns: Employee, Site, Duration, Status
     col_emp = margin
     col_site = margin + 120
     col_dur = margin + 350
     col_stat = margin + 430
-    
     c.drawString(col_emp, y, "Employee")
     c.drawString(col_site, y, "Site / Project")
     c.drawString(col_dur, y, "Duration")
     c.drawString(col_stat, y, "Status")
-    c.line(margin, y-5, width-margin, y-5)
+    c.line(margin, y - 5, width - margin, y - 5)
     y -= 20
-    
     c.setFont("Helvetica", 9)
-    
+
     for employee, history in report_data.items():
-        if y < 50:
-            c.showPage()
-            y = height - margin
-            c.setFont("Helvetica", 9)
-            
+        y = ensure_space(y, 15)
         c.setFont("Helvetica-Bold", 9)
         c.drawString(col_emp, y, employee.name)
         c.setFont("Helvetica", 9)
-        
+
         for item in history:
-            if y < 50:
-                c.showPage()
-                y = height - margin
-                c.setFont("Helvetica", 9)
-            
+            y = ensure_space(y, 15)
             site_str = f"{item['site'].name} ({item['site'].location})"
             c.drawString(col_site, y, site_str[:45])
-            
-            dur_str = f"{item['duration']} days"
-            c.drawString(col_dur, y, dur_str)
-            
+            c.drawString(col_dur, y, f"{item['duration']} days")
             c.drawString(col_stat, y, item['status'])
             y -= 15
-        y -= 5 # Extra space between employees
-        
+        y -= 5
+
     c.save()
     return response
 
@@ -945,18 +1542,18 @@ def resource_availability_report_view(request):
         custom_start = None
         custom_end = None
         try:
-            days = int(request.GET.get('days', 30))
+            days = int(request.GET.get('days', 90))
         except (TypeError, ValueError):
-            days = 30
+            days = 90
         days = max(1, min(days, 365))
         period_start = today
         period_end = period_start + timedelta(days=days - 1)
 
     try:
-        top_n = int(request.GET.get('top_n', 10))
+        top_n = int(request.GET.get('top_n', 1000))
     except (TypeError, ValueError):
-        top_n = 10
-    top_n = max(1, min(top_n, 100))
+        top_n = 1000
+    top_n = max(1, min(top_n, 1000))
 
     selected_designation = request.GET.get('designation', '')
     selected_segment_id = request.GET.get('segment', '')
@@ -1127,7 +1724,7 @@ def resource_availability_report_view(request):
 
     has_active_filters = bool(
         selected_designation or selected_segment_id or selected_assignee_ids
-        or selected_free_bucket or use_custom_range or days != 30 or top_n != 10
+        or selected_free_bucket or use_custom_range or days != 90 or top_n != 1000
         or selected_sort != 'available'
     )
 
@@ -1179,15 +1776,15 @@ def update_employee_view(request, pk):
             employee.is_active = is_active
             employee.segment = segment_obj
             employee.save()
-            return redirect('planner_workforce')
-    return redirect('planner_workforce')
+            return _redirect_to_referer_or(request, reverse('planner_workforce'))
+    return _redirect_to_referer_or(request, reverse('planner_workforce'))
 
 def toggle_employee_status_view(request, pk):
     if request.method == 'POST':
         employee = get_object_or_404(Employee, pk=pk)
         employee.is_active = not employee.is_active
         employee.save()
-        return redirect('planner_workforce')
+        return _redirect_to_referer_or(request, reverse('planner_workforce'))
 
 def configuration_view(request):
     if request.method == 'POST':
@@ -1234,28 +1831,62 @@ def delete_project_view(request, pk):
 
 def delete_employee_view(request, pk):
     get_object_or_404(Employee, pk=pk).delete()
-    return redirect('planner_workforce')
+    return _redirect_to_referer_or(request, reverse('planner_workforce'))
 
 def delete_leave_view(request, pk):
     get_object_or_404(Leave, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=leaves")
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
 
 def delete_site_view(request, pk):
     get_object_or_404(Site, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
 
 def delete_site_allocation_view(request, pk):
     get_object_or_404(SiteAllocation, pk=pk).delete()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+
+def update_site_allocation_view(request, pk):
+    allocation = get_object_or_404(SiteAllocation, pk=pk)
+    if request.method == 'POST':
+        employee_id = request.POST.get('employee')
+        site_id = request.POST.get('site')
+        start_date_str = request.POST.get('start_date')
+        end_date_str = request.POST.get('end_date')
+
+        if employee_id and site_id and start_date_str:
+            allocation.employee_id = employee_id
+            allocation.site_id = site_id
+            allocation.start_date = parse_date(start_date_str)
+            allocation.end_date = parse_date(end_date_str) if end_date_str else None
+            allocation.save()
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def relieve_site_allocation_view(request, pk):
     allocation = get_object_or_404(SiteAllocation, pk=pk)
     if request.method == 'POST':
         end_date_str = request.POST.get('end_date')
         if end_date_str:
-            allocation.end_date = parse_date(end_date_str)
+            relieve_date = parse_date(end_date_str)
+            allocation.end_date = relieve_date
             allocation.save()
-    return redirect(f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+
+            next_start = relieve_date + timedelta(days=1)
+            next_step = request.POST.get('next_step')
+
+            if next_step == 'office':
+                office_site = Site.objects.filter(pk=request.POST.get('office_site'), is_office=True).first()
+                if office_site:
+                    SiteAllocation.objects.create(employee=allocation.employee, site=office_site, start_date=next_start)
+            elif next_step == 'leave':
+                leave_end = parse_date(request.POST.get('leave_end_date'))
+                if leave_end:
+                    Leave.objects.create(
+                        employee=allocation.employee,
+                        start_date=next_start,
+                        end_date=leave_end,
+                        reason=request.POST.get('leave_reason', '')
+                    )
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def delete_holiday_view(request, pk):
     get_object_or_404(Holiday, pk=pk).delete()

@@ -1,5 +1,5 @@
 from django import forms
-from .models import RoleMatrix, SkillBenchmark, SkillMatrix, EmployeeSkill, Skill, DevelopmentPlan
+from .models import RoleMatrix, SkillMatrix, EmployeeSkill, Skill, DevelopmentPlan
 
 class BootstrapFormMixin:
     def __init__(self, *args, **kwargs):
@@ -15,7 +15,7 @@ class BootstrapFormMixin:
 class SkillForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Skill
-        fields = ['name', 'category', 'description']
+        fields = ['name', 'category', 'scope', 'segment', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Enter skill name'}),
             'description': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional description'}),
@@ -31,53 +31,6 @@ class RoleMatrixForm(BootstrapFormMixin, forms.ModelForm):
             'description': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional description'}),
         }
 
-class SkillBenchmarkForm(BootstrapFormMixin, forms.ModelForm):
-    class Meta:
-        model = SkillBenchmark
-        fields = ['role_matrix', 'skill', 'required_level', 'is_mandatory']
-        widgets = {
-            'required_level': forms.NumberInput(attrs={'min': 0, 'max': 5}),
-        }
-
-class RoleMatrixBenchmarkForm(BootstrapFormMixin, forms.ModelForm):
-    skill_name = forms.CharField(
-        label='Skill Name',
-        required=True,
-        widget=forms.TextInput(attrs={'placeholder': 'Enter or select skill name'})
-    )
-    skill_category = forms.ChoiceField(
-        label='Category',
-        required=False,
-        choices=[('', 'Select Category')] + list(Skill.CATEGORY_CHOICES)
-    )
-    
-    class Meta:
-        model = SkillBenchmark
-        fields = ['skill_name', 'skill_category', 'required_level']
-        widgets = {
-            'required_level': forms.NumberInput(attrs={'min': 0, 'max': 5, 'class': 'form-control'}),
-        }
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['skill_name'].widget.attrs['list'] = 'skill-suggestions'
-        # Set field order
-        self.order_fields(['skill_name', 'skill_category', 'required_level'])
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        skill_name = cleaned_data.get('skill_name', '').strip()
-        skill_category = cleaned_data.get('skill_category', '')
-        
-        if skill_name:
-            skill, created = Skill.objects.get_or_create(
-                name__iexact=skill_name,
-                defaults={'name': skill_name, 'category': skill_category if skill_category else None}
-            )
-            cleaned_data['skill'] = skill
-        
-        return cleaned_data
-
 class DevelopmentPlanForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = DevelopmentPlan
@@ -92,12 +45,13 @@ class DevelopmentPlanForm(BootstrapFormMixin, forms.ModelForm):
 class SkillMatrixForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = SkillMatrix
-        fields = ['employee', 'role_matrix', 'manager', 'status', 'user']
+        fields = ['employee', 'role_matrix', 'manager', 'status', 'user', 'segments']
         labels = {
             'employee': 'Employee',
             'role_matrix': 'Designation',
             'manager': 'Manager (for self-rating approval)',
             'user': 'Linked Login (for self-service rating)',
+            'segments': 'Segments (Ctrl/Cmd-click to select more than one)',
         }
 
     def __init__(self, *args, **kwargs):

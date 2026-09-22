@@ -5,25 +5,8 @@
 {% block extra_css %}
 <style>
     .page-subtitle {
-        color: #64748b;
+        color: var(--text-muted);
         margin-top: 0.25rem;
-    }
-
-    .search-box {
-        position: relative;
-        max-width: 300px;
-    }
-
-    .search-box input {
-        padding-left: 2.5rem;
-    }
-
-    .search-box i {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #94a3b8;
     }
 
     .action-buttons {
@@ -32,21 +15,48 @@
     }
 
     .avatar {
-        width: 40px;
-        height: 40px;
+        width: 44px;
+        height: 44px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        background: var(--accent);
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 600;
-        font-size: 0.875rem;
+        font-weight: 700;
+        font-size: 0.95rem;
+        flex-shrink: 0;
     }
 
-    .table-hover tbody tr:hover {
-        background-color: #f8fafc;
-        transform: scale(1.01);
+    .employee-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        height: 100%;
+        transition: var(--transition);
+    }
+
+    .employee-card:hover {
+        box-shadow: var(--shadow-md);
+    }
+
+    .employee-stat-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .employee-card-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: auto;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border);
     }
 </style>
 {% endblock %}
@@ -115,160 +125,110 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 mobile-cards">
-                    <thead>
-                        <tr>
-                            <th>Employee</th>
-                            <th>Designation</th>
-                            <th>Status</th>
-                            <th>Total Skills</th>
-                            <th>Avg Gap</th>
-                            <th>Skills Met %</th>
-                            <th>Training Req.</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for employee in employees %}
-                        <tr>
-                            <td data-label="Employee">
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar me-3">
-                                        {{ employee.name|make_list|first|upper }}
-                                    </div>
-                                    <div>
-                                        <strong>{{ employee.name }}</strong>
-                                        {% if employee.email %}
-                                        <br><small class="text-muted">{{ employee.email }}</small>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </td>
-                            <td data-label="Designation">
-                                {% if employee.role_matrix %}
-                                    <span class="badge bg-light text-dark">
-                                        <i class="bi bi-briefcase me-1"></i>{{ employee.role_matrix.title }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Status">
-                                {% if employee.status == 'active' %}
-                                    <span class="badge bg-success">
-                                        <i class="bi bi-check-circle me-1"></i>Active
-                                    </span>
-                                {% elif employee.status == 'on_leave' %}
-                                    <span class="badge bg-warning">
-                                        <i class="bi bi-clock me-1"></i>On Leave
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-danger">
-                                        <i class="bi bi-x-circle me-1"></i>Inactive
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Total Skills">
-                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
-                                    {% with employee.role_matrix.benchmarks.count as total %}
-                                    <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: #4f46e5;">
-                                        {{ total }}
-                                    </span>
-                                    {% endwith %}
-                                {% else %}
-                                <span class="badge bg-warning">No role</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Avg Gap">
-                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
-                                {% with employee.get_overall_gap_score as gap %}
-                                    {% if gap > 1.5 %}
-                                        <span class="badge bg-danger">{{ gap|floatformat:1 }}</span>
-                                    {% elif gap > 0.5 %}
-                                        <span class="badge bg-warning">{{ gap|floatformat:1 }}</span>
-                                    {% elif gap > 0 %}
-                                        <span class="badge bg-info">{{ gap|floatformat:1 }}</span>
-                                    {% else %}
-                                        <span class="badge bg-success">0.0</span>
-                                    {% endif %}
-                                {% endwith %}
-                                {% else %}
-                                <span class="badge bg-secondary">N/A</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Skills Met %">
-                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
-                                {% with employee.get_skills_met_percentage as met_pct %}
-                                    {% if met_pct >= 80 %}
-                                        <span class="badge bg-success">{{ met_pct }}%</span>
-                                    {% elif met_pct >= 50 %}
-                                        <span class="badge bg-warning">{{ met_pct }}%</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">{{ met_pct }}%</span>
-                                    {% endif %}
-                                {% endwith %}
-                                {% else %}
-                                <span class="badge bg-secondary">-</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Training Req.">
-                                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
-                                    {% with employee.get_skills_needing_training as training_gaps %}
-                                        {% if training_gaps %}
-                                        <button type="button" class="btn btn-sm btn-outline-primary"
-                                                data-bs-toggle="modal" data-bs-target="#trainingReqModal"
-                                                data-employee-name="{{ employee.name }}"
-                                                data-skills="{% for g in training_gaps %}{{ g.skill.name }}{% if not forloop.last %}|{% endif %}{% endfor %}">
-                                            <i class="bi bi-list-check me-1"></i>{{ training_gaps|length }} skill{{ training_gaps|length|pluralize }}
-                                        </button>
-                                        {% else %}
-                                        <span class="badge bg-success">All skills met</span>
-                                        {% endif %}
-                                    {% endwith %}
-                                {% else %}
-                                <span class="badge bg-warning">No benchmarks</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Actions">
-                                <div class="action-buttons justify-content-end">
-                                    <a href="{% url 'skillgap_employee_profile' employee.id %}" class="btn btn-primary btn-icon" title="View Profile">
-                                        <i class="bi bi-person"></i>
-                                    </a>
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_employee_update' employee.id %}" class="btn btn-warning btn-icon" title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="{% url 'skillgap_employee_delete' employee.id %}" class="btn btn-danger btn-icon" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="8">
-                                <div class="empty-state py-5">
-                                    <i class="bi bi-people d-block"></i>
-                                    <p>No employees found yet.</p>
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_add_employee' %}" class="btn btn-primary mt-2">
-                                        <i class="bi bi-plus-circle me-2"></i>Add First Employee
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    {% if employees %}
+    <div class="row g-3">
+        {% for employee in employees %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="employee-card">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar">{{ employee.name|make_list|first|upper }}</div>
+                    <div class="flex-grow-1 overflow-hidden">
+                        <div class="fw-bold text-truncate">{{ employee.name }}</div>
+                        {% if employee.email %}
+                        <div class="small text-muted text-truncate">{{ employee.email }}</div>
+                        {% endif %}
+                    </div>
+                    {% if employee.status == 'active' %}
+                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Active</span>
+                    {% elif employee.status == 'on_leave' %}
+                        <span class="badge bg-warning"><i class="bi bi-clock me-1"></i>On Leave</span>
+                    {% else %}
+                        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Inactive</span>
+                    {% endif %}
+                </div>
+
+                <div class="employee-stat-row">
+                    {% if employee.role_matrix %}
+                    <span class="badge bg-primary"><i class="bi bi-briefcase me-1"></i>{{ employee.role_matrix.title }}</span>
+                    {% else %}
+                    <span class="badge bg-secondary">No role</span>
+                    {% endif %}
+                    {% for segment in employee.segments.all %}
+                    <span class="badge bg-secondary"><i class="bi bi-geo-alt me-1"></i>{{ segment.name }}</span>
+                    {% endfor %}
+                </div>
+
+                {% if employee.role_matrix and employee.role_matrix.benchmarks.exists %}
+                <div class="employee-stat-row">
+                    <span class="badge bg-primary">{{ employee.role_matrix.benchmarks.count }} skills</span>
+                    {% with employee.get_overall_gap_score as gap %}
+                        {% if gap > 1.5 %}
+                            <span class="badge bg-danger">Gap {{ gap|floatformat:1 }}</span>
+                        {% elif gap > 0.5 %}
+                            <span class="badge bg-warning">Gap {{ gap|floatformat:1 }}</span>
+                        {% elif gap > 0 %}
+                            <span class="badge bg-info">Gap {{ gap|floatformat:1 }}</span>
+                        {% else %}
+                            <span class="badge bg-success">Gap 0.0</span>
+                        {% endif %}
+                    {% endwith %}
+                    {% with employee.get_skills_met_percentage as met_pct %}
+                        {% if met_pct >= 80 %}
+                            <span class="badge bg-success">{{ met_pct }}% met</span>
+                        {% elif met_pct >= 50 %}
+                            <span class="badge bg-warning">{{ met_pct }}% met</span>
+                        {% else %}
+                            <span class="badge bg-danger">{{ met_pct }}% met</span>
+                        {% endif %}
+                    {% endwith %}
+                    {% with employee.get_skills_needing_training as training_gaps %}
+                        {% if training_gaps %}
+                        <button type="button" class="badge bg-warning border-0" style="cursor: pointer;"
+                                data-bs-toggle="modal" data-bs-target="#trainingReqModal"
+                                data-employee-name="{{ employee.name }}"
+                                data-skills="{% for g in training_gaps %}{{ g.skill.name }}{% if not forloop.last %}|{% endif %}{% endfor %}">
+                            <i class="bi bi-list-check me-1"></i>{{ training_gaps|length }} training
+                        </button>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                {% endif %}
+
+                <div class="employee-card-actions">
+                    <a href="{% url 'skillgap_employee_profile' employee.id %}" class="fw-semibold" style="font-size: 0.85rem;">
+                        View Profile <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                    {% if user.is_staff %}
+                    <div class="d-flex gap-1">
+                        <a href="{% url 'skillgap_employee_update' employee.id %}" class="btn btn-outline-secondary btn-icon" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'skillgap_employee_delete' employee.id %}" class="btn btn-outline-secondary btn-icon" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
+        {% endfor %}
+    </div>
+    <div class="card mt-3">
         {% include 'gap_analysis/pagination.html' %}
     </div>
+    {% else %}
+    <div class="card">
+        <div class="empty-state py-5">
+            <i class="bi bi-people d-block"></i>
+            <p>No employees found yet.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'skillgap_add_employee' %}" class="btn btn-primary mt-2">
+                <i class="bi bi-plus-circle me-2"></i>Add First Employee
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Shared modal for the Training Req. button, populated per-row via data attributes -->

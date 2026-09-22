@@ -409,46 +409,48 @@ JAZZMIN_SETTINGS = {
     'site_header': "Armstrong Dematic",
     'site_brand': "Lives Made Easy",
     'site_logo': "assets/imgs/logo.png",
+    # Jazzmin defaults this to "img-circle", which crops a wide wordmark logo
+    # (this one is 300x36px) down to a thin sliver. It's a lockup, not an icon.
+    'site_logo_classes': "",
+    'site_icon': "favicon.ico",
     'copyright':  "All Right Reserved 2025",
     "welcome_sign": "Welcome to Armstrong Automation All-In-One tool, Login Now.",
-    
+    "custom_css": "assets/css/admin-theme.css",
+
     "topmenu_links": [
         {"name": "Home",  "url": "home", "permissions": ["auth.view_user"]},
         {"name": "Clear Cache", "url": "/cacheclear/"},
     ],
 
-
+    # Sidebar app order, top to bottom.
     "order_with_respect_to": [
-        # replace with your own models
-        "store",
-        "store.product",
-        "store.cartorder",
-        "store.cartorderitem",
-        "store.category",
-        "store.brand",
-        "store.productfaq",
-        "store.productoffers",
-        "store.productbidders",
-        "store.review",
-        "vendor",
-        "userauths"
-        "addons",
-        "addons.Company",
-        "addons.BasicAddon"
+        "accounts", "home", "employees", "gap_analysis", "planner",
+        "tracker", "estimator", "inventory", "testvault", "ACGen", "IOLGen",
+        "auth",
     ],
-    
-    "icons": {
-        # replace with your own model & icon 
-        "admin.LogEntry": "fas fa-file",
 
+    "icons": {
+        "admin.LogEntry": "fas fa-file",
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
+        "auth.group": "fas fa-users",
 
-        "userauths.User": "fas fa-user",
-        "userauths.Profile":"fas fa-address-card",
-
+        "accounts": "fas fa-user-shield",
+        "home": "fas fa-house",
+        "employees": "fas fa-id-badge",
+        "gap_analysis": "fas fa-graduation-cap",
+        "planner": "fas fa-calendar-days",
+        "tracker": "fas fa-diagram-project",
+        "estimator": "fas fa-calculator",
+        "inventory": "fas fa-boxes-stacked",
+        "testvault": "fas fa-vial",
+        "ACGen": "fas fa-microchip",
+        "IOLGen": "fas fa-layer-group",
     },
-    "show_ui_builder" : True
+
+    "changeform_format": "horizontal_tabs",
+    "related_modal_active": True,
+    "show_ui_builder": False,
 }
 
 
@@ -458,22 +460,22 @@ JAZZMIN_UI_TWEAKS = {
     "footer_small_text": False,
     "body_small_text": False,
     "brand_small_text": False,
-    "brand_colour": "navbar-success",
-    "accent": "accent-teal",
-    "navbar": "navbar-dark",
-    "no_navbar_border": False,
-    "navbar_fixed": False,
+    "brand_colour": "navbar-navy",
+    "accent": "accent-orange",
+    "navbar": "navbar-navy navbar-dark",
+    "no_navbar_border": True,
+    "navbar_fixed": True,
     "layout_boxed": False,
     "footer_fixed": False,
-    "sidebar_fixed": False,
-    "sidebar": "sidebar-dark-info",
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-light-navy",
     "sidebar_nav_small_text": False,
     "sidebar_disable_expand": False,
     "sidebar_nav_child_indent": False,
     "sidebar_nav_compact_style": False,
     "sidebar_nav_legacy_style": False,
-    "sidebar_nav_flat_style": False,
-    "theme": "cyborg",
+    "sidebar_nav_flat_style": True,
+    "theme": "flatly",
     "dark_mode_theme": None,
     "button_classes": {
         "primary": "btn-primary",

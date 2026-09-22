@@ -1,0 +1,71 @@
+{% if total_skill_count %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 benchmark-matrix-table">
+                <colgroup>
+                    <col style="width: 40%;">
+                    <col style="width: 20%;">
+                    <col style="width: 20%;">
+                    <col style="width: 20%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Skill Name</th>
+                        <th>Category</th>
+                        <th class="text-center">Required Level</th>
+                        <th class="text-center">Mandatory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="table-group-row">
+                        <td colspan="4">
+                            <i class="bi bi-diagram-3 me-2 text-secondary"></i>General Skills
+                            <span class="badge bg-secondary ms-2">{{ general_rows|length }} skill{{ general_rows|length|pluralize }}</span>
+                        </td>
+                    </tr>
+                    {% for row in general_rows %}
+                        {% include 'gap_analysis/_benchmark_matrix_row.html' %}
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted small ps-4 py-2">No General skills in the catalog yet.</td></tr>
+                    {% endfor %}
+
+                    {% for group in segment_groups %}
+                    <tr class="table-group-row">
+                        <td colspan="4">
+                            <i class="bi bi-geo-alt me-2 text-warning"></i>{{ group.segment_name }}
+                            <span class="badge bg-warning text-dark ms-2">{{ group.rows|length }} skill{{ group.rows|length|pluralize }}</span>
+                        </td>
+                    </tr>
+                    {% for row in group.rows %}
+                        {% include 'gap_analysis/_benchmark_matrix_row.html' %}
+                    {% endfor %}
+                    {% endfor %}
+
+                    <tr class="table-group-row">
+                        <td colspan="4">
+                            <i class="bi bi-dash-circle me-2 text-info"></i>Supplementary Skills
+                            <span class="badge bg-info text-dark ms-2">{{ other_rows|length }} skill{{ other_rows|length|pluralize }}</span>
+                        </td>
+                    </tr>
+                    {% for row in other_rows %}
+                        {% include 'gap_analysis/_benchmark_matrix_row.html' %}
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted small ps-4 py-2">No Supplementary skills in the catalog yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="empty-state py-5">
+    <i class="bi bi-bookmark-check d-block"></i>
+    <p>The skill catalog is empty -- add skills there first, then come back here to set required levels.</p>
+    {% if user.is_staff %}
+    <a href="{% url 'skillgap_add_skill' %}" class="btn btn-primary mt-2">
+        <i class="bi bi-plus-circle me-2"></i>Add a Skill to the Catalog
+    </a>
+    {% endif %}
+</div>
+{% endif %}

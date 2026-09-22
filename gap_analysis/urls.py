@@ -7,7 +7,6 @@ urlpatterns = [
     
     # Create URLs
     path('add-designation/', views.RoleMatrixCreateView.as_view(), name='skillgap_add_designation'),
-    path('add-benchmark/', views.SkillBenchmarkCreateView.as_view(), name='skillgap_add_benchmark'),
     path('add-employee/', views.SkillMatrixCreateView.as_view(), name='skillgap_add_employee'),
     path('create-skill/', views.SkillCreateView.as_view(), name='skillgap_add_skill'),
     path('add-skill/', views.EmployeeSkillCreateView.as_view(), name='skillgap_add_employee_skill'),
@@ -42,10 +41,10 @@ urlpatterns = [
     path('employee-skills/', views.EmployeeSkillListView.as_view(), name='skillgap_employee_skill_list'),
     path('employee-skills/<int:pk>/delete/', views.EmployeeSkillDeleteView.as_view(), name='skillgap_employee_skill_delete'),
     
-    # Designation Benchmark Management
+    # Designation Benchmark Management -- every catalog skill is always listed for every role;
+    # this AJAX endpoint is the sole way a level gets set/cleared, in place, from that page.
     path('designations/<int:pk>/benchmarks/', views.RoleMatrixBenchmarkView.as_view(), name='skillgap_designation_benchmark'),
-    path('designations/<int:pk>/benchmarks/add/', views.RoleMatrixBenchmarkAddView.as_view(), name='skillgap_designation_benchmark_add'),
-    path('designations/benchmark/<int:pk>/delete/', views.RoleMatrixBenchmarkDeleteView.as_view(), name='skillgap_designation_benchmark_delete'),
+    path('designations/<int:pk>/benchmarks/<int:skill_id>/level-update/', views.designation_benchmark_level_update, name='skillgap_designation_benchmark_level_update'),
     
     # Employee Skill Search
     path('search-skills/', views.EmployeeSkillSearchView.as_view(), name='skillgap_employee_skill_search'),

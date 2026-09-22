@@ -91,6 +91,21 @@
         width: 3rem;
         height: 3rem;
     }
+    .wf-nav-item {
+        color: #4b5563;
+        transition: all 0.15s ease;
+    }
+    .wf-nav-item:hover {
+        background-color: #f3f4f6;
+        color: #1f2937;
+    }
+    .wf-nav-item.wf-nav-active {
+        background-color: #eef2ff;
+        color: #4338ca;
+    }
+    .wf-nav-item.wf-nav-active:hover {
+        background-color: #eef2ff;
+    }
 </style>
 
 <!-- Load Leaflet here to ensure it works even if head_extra block is missing in base template -->
@@ -102,7 +117,7 @@
      crossorigin=""></script>
 
 <header class="header-gradient shadow-xl">
-    <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+    <div class="w-full py-4 px-4 sm:px-6 lg:px-8">
         <div class="flex items-center">
             <svg class="large-icon text-white mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -115,8 +130,52 @@
     </div>
 </header>
 
-<main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-    
+<main class="w-full py-6 px-4 sm:px-6 lg:px-8">
+
+    <div class="flex flex-col lg:flex-row gap-6 items-start">
+
+        <!-- Sidebar Navigation -->
+        <aside class="w-full lg:w-56 flex-shrink-0 bg-white rounded-xl shadow-lg lg:sticky lg:top-6 overflow-hidden">
+            <div class="p-2">
+                <p class="px-3 pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Team</p>
+                <button id="nav-employees" onclick="switchTab('employees')" class="wf-nav-item wf-nav-active w-full text-left flex items-center px-3 py-2 rounded-lg text-sm font-medium mb-0.5">
+                    <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    Employees
+                </button>
+                <button id="nav-leaves" onclick="switchTab('leaves')" class="wf-nav-item w-full text-left flex items-center px-3 py-2 rounded-lg text-sm font-medium mb-0.5">
+                    <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Leave Management
+                </button>
+
+                <p class="px-3 pt-3 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Site Team</p>
+                <button id="nav-sites" onclick="selectSiteTeamView('sites')" class="wf-nav-item w-full text-left flex items-center px-3 py-2 rounded-lg text-sm font-medium mb-0.5">
+                    <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                    Manage Sites
+                </button>
+                <button id="nav-allocations" onclick="selectSiteTeamView('allocations')" class="wf-nav-item w-full text-left flex items-center px-3 py-2 rounded-lg text-sm font-medium mb-0.5">
+                    <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    Team Allocations
+                </button>
+                <button id="nav-map" onclick="selectSiteTeamView('map')" class="wf-nav-item w-full text-left flex items-center px-3 py-2 rounded-lg text-sm font-medium mb-0.5">
+                    <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 16.382V5.618a1 1 0 00-1.447-.894L15 7m-6 0l6-3m0 0l-6-3m6 3L9 4"></path></svg>
+                    Map View
+                </button>
+
+                <p class="px-3 pt-3 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Reports</p>
+                <a href="{% url 'planner_site_history_report' %}" class="wf-nav-item w-full text-left flex items-center px-3 py-2 rounded-lg text-sm font-medium mb-0.5">
+                    <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Site History Report
+                </a>
+                <a href="{% url 'planner_resource_availability_report' %}" class="wf-nav-item w-full text-left flex items-center px-3 py-2 rounded-lg text-sm font-medium">
+                    <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Resource Availability
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 min-w-0 w-full">
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="stats-engineer text-white p-4 rounded-xl shadow-lg workforce-card">
             <div class="flex items-center justify-between">
@@ -130,7 +189,7 @@
                 </svg>
             </div>
         </div>
-        
+
         <div class="stats-teamlead text-white p-4 rounded-xl shadow-lg workforce-card">
             <div class="flex items-center justify-between">
                 <div>
@@ -143,7 +202,7 @@
                 </svg>
             </div>
         </div>
-        
+
         <div class="stats-manager text-white p-4 rounded-xl shadow-lg workforce-card">
             <div class="flex items-center justify-between">
                 <div>
@@ -156,12 +215,6 @@
                 </svg>
             </div>
         </div>
-    </div>
-
-    <div class="mb-6 flex space-x-2 border-b border-gray-200">
-        <button class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none" onclick="switchTab('employees')">Employees</button>
-        <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchTab('leaves')">Leave Management</button>
-        <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchTab('site_team')">Site Team</button>
     </div>
 
     <div id="employees-tab">
@@ -452,13 +505,6 @@
     </div>
 
     <div id="site_team-tab" class="hidden">
-        <!-- Sub-tabs for Site Team -->
-        <div class="mb-6 flex space-x-2 border-b border-gray-200">
-            <button id="btn-subtab-sites" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none" onclick="switchSiteSubTab('sites')">Manage Sites</button>
-            <button id="btn-subtab-allocations" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchSiteSubTab('allocations')">Team Allocations</button>
-            <button id="btn-subtab-map" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none" onclick="switchSiteSubTab('map')">Map View</button>
-        </div>
-
         <div id="subtab-sites">
             <!-- Section 1: Manage Sites -->
             <div class="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -648,7 +694,11 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100" id="allocations-table-body">
                             {% for alloc in all_allocations %}
-                            <tr class="employee-row allocation-row">
+                            <tr class="employee-row allocation-row"
+                                data-employee="{{ alloc.employee.pk }}"
+                                data-site="{{ alloc.site.pk }}"
+                                data-start-date="{{ alloc.start_date|date:'Y-m-d' }}"
+                                data-end-date="{{ alloc.end_date|date:'Y-m-d'|default:'' }}">
                                 <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ alloc.employee.name }}</td>
                                 <td class="px-4 py-2 text-sm text-gray-500">{{ alloc.site.name }} <span class="text-xs text-gray-400">({% if alloc.site.project %}{{ alloc.site.project.project_id }}{% else %}Office{% endif %})</span></td>
                                 <td class="px-4 py-2 text-xs text-gray-600">
@@ -656,8 +706,8 @@
                                     {% if alloc.end_date %}{{ alloc.end_date|date:"d M Y" }}<span class="block text-gray-400">({{ alloc.duration_days }} days)</span>{% else %}Present<span class="block text-gray-400">({{ alloc.duration_days }} days so far)</span>{% endif %}
                                 </td>
                                 <td class="px-4 py-2 text-xs">
-                                    <a href="{% url 'planner_delete_site_allocation' alloc.pk %}" class="text-red-600 hover:text-red-800 font-medium" onclick="return confirm('Are you sure?')">Remove</a>
-                                    {% if not alloc.end_date %}
+                                    <button onclick="openEditAllocationModal('{% url 'planner_update_site_allocation' alloc.pk %}', this)" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
+                                    {% if not alloc.end_date and not alloc.site.is_office %}
                                     <button onclick="openRelieveModal('{% url 'planner_relieve_site_allocation' alloc.pk %}', '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.name|escapejs }}')" class="ml-3 text-amber-600 hover:text-amber-800 font-medium">Relieve</button>
                                     {% endif %}
                                 </td>
@@ -729,6 +779,10 @@
             </div>
         </div>
         </div>
+    </div>
+
+        </div>
+        <!-- /Main Content -->
     </div>
 
     {% if all_employees %}
@@ -831,13 +885,87 @@
                     <p class="text-sm text-gray-600">Select the last working day for <span id="relieve_employee_name" class="font-semibold"></span> at <span id="relieve_site_name" class="font-semibold"></span>.</p>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Relieving Date</label>
-                        <input type="date" name="end_date" class="form-input w-full px-3 py-2 rounded-lg text-sm" required value="{% now 'Y-m-d' %}">
+                        <input type="date" name="end_date" id="relieve_end_date" class="form-input w-full px-3 py-2 rounded-lg text-sm" required value="{% now 'Y-m-d' %}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">After relieving, where will they be?</label>
+                        <select name="next_step" id="relieve_next_step" class="form-input w-full px-3 py-2 rounded-lg text-sm" required onchange="toggleRelieveNextStepFields()">
+                            <option value="office">Office</option>
+                            <option value="leave">On Leave</option>
+                        </select>
+                    </div>
+                    <div id="relieve_office_field">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Office Location</label>
+                        <select name="office_site" id="relieve_office_site" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                            <option value="">Select an office...</option>
+                            {% for site in all_sites %}
+                                {% if site.is_office %}
+                                <option value="{{ site.pk }}">{{ site.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="relieve_leave_fields" class="hidden space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Leave Until</label>
+                            <input type="date" name="leave_end_date" id="relieve_leave_end_date" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Reason (Optional)</label>
+                            <input type="text" name="leave_reason" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                        </div>
                     </div>
                 </div>
-                
+
                 <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
                     <button type="button" onclick="closeRelieveModal()" class="bg-gray-200 text-gray-700 py-1.5 px-4 rounded-md hover:bg-gray-300 text-xs font-medium">Cancel</button>
                     <button type="submit" class="bg-red-600 text-white py-1.5 px-4 rounded-md hover:bg-red-700 text-xs font-medium">Relieve</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Allocation Modal -->
+<div id="editAllocationModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+    <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center pb-3 border-b">
+            <h3 class="text-lg font-semibold text-gray-800">Edit Allocation</h3>
+            <button onclick="closeEditAllocationModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+        </div>
+        <div class="mt-4">
+            <form id="editAllocationForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Employee</label>
+                        <select id="edit_alloc_employee" name="employee" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                            {% for emp in all_employees %}
+                            <option value="{{ emp.pk }}">{{ emp.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Site / Office</label>
+                        <select id="edit_alloc_site" name="site" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                            {% for site in all_sites %}
+                            <option value="{{ site.pk }}">{{ site.name }}{% if site.is_office %} (Office){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
+                        <input type="date" id="edit_alloc_start_date" name="start_date" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">End Date (leave blank if still active)</label>
+                        <input type="date" id="edit_alloc_end_date" name="end_date" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                    </div>
+                </div>
+
+                <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
+                    <button type="button" onclick="closeEditAllocationModal()" class="bg-gray-200 text-gray-700 py-1.5 px-4 rounded-md hover:bg-gray-300 text-xs font-medium">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 text-white py-1.5 px-4 rounded-md hover:bg-indigo-700 text-xs font-medium">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -851,38 +979,59 @@
 {% endif %}
 
 <script>
-    function switchTab(tab) {
+    function setActiveNavItem(activeId) {
+        document.querySelectorAll('.wf-nav-item').forEach(function (el) {
+            el.classList.toggle('wf-nav-active', el.id === activeId);
+        });
+    }
+
+    function switchTab(tab, skipUrlSync) {
         document.getElementById('employees-tab').classList.toggle('hidden', tab !== 'employees');
         document.getElementById('leaves-tab').classList.toggle('hidden', tab !== 'leaves');
         document.getElementById('site_team-tab').classList.toggle('hidden', tab !== 'site_team');
-        
-        // Update styling for tabs
-        const buttons = document.querySelectorAll('div.mb-6.flex.space-x-2 button');
-        const activeClasses = 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none';
-        const inactiveClasses = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none';
 
-        buttons[0].className = tab === 'employees' ? activeClasses : inactiveClasses;
-        buttons[1].className = tab === 'leaves' ? activeClasses : inactiveClasses;
-        if (buttons.length > 2) {
-            buttons[2].className = tab === 'site_team' ? activeClasses : inactiveClasses;
+        if (tab === 'employees') {
+            setActiveNavItem('nav-employees');
+        } else if (tab === 'leaves') {
+            setActiveNavItem('nav-leaves');
+        }
+        // For 'site_team', the active sidebar item is set by selectSiteTeamView/switchSiteSubTab instead,
+        // since that's the item that actually identifies which of the 3 views is showing.
+
+        // Keep the URL's ?tab= (and, for site_team, ?subtab=) in sync with what's on screen,
+        // without a page reload. This is what lets a form submitted from here redirect back
+        // to the exact tab the user was looking at, via the browser's Referer header.
+        if (!skipUrlSync) {
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tab);
+            if (tab !== 'site_team') {
+                url.searchParams.delete('subtab');
+            }
+            history.replaceState({}, '', url);
         }
     }
 
-    function switchSiteSubTab(subtab) {
+    // Sidebar entry point for the 3 Site Team views: shows the site_team tab and picks
+    // the right view within it in one click (no more click-tab-then-click-subtab).
+    function selectSiteTeamView(subtab) {
+        switchTab('site_team');
+        switchSiteSubTab(subtab);
+    }
+
+    function switchSiteSubTab(subtab, skipUrlSync) {
         document.getElementById('subtab-sites').classList.toggle('hidden', subtab !== 'sites');
         document.getElementById('subtab-allocations').classList.toggle('hidden', subtab !== 'allocations');
         document.getElementById('subtab-map').classList.toggle('hidden', subtab !== 'map');
-        
-        const btnSites = document.getElementById('btn-subtab-sites');
-        const btnAllocations = document.getElementById('btn-subtab-allocations');
-        const btnMap = document.getElementById('btn-subtab-map');
-        
-        const activeClass = 'px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 focus:outline-none';
-        const inactiveClass = 'px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none';
-        
-        btnSites.className = subtab === 'sites' ? activeClass : inactiveClass;
-        btnAllocations.className = subtab === 'allocations' ? activeClass : inactiveClass;
-        btnMap.className = subtab === 'map' ? activeClass : inactiveClass;
+
+        const navIds = { sites: 'nav-sites', allocations: 'nav-allocations', map: 'nav-map' };
+        setActiveNavItem(navIds[subtab]);
+
+        if (!skipUrlSync) {
+            const url = new URL(window.location);
+            url.searchParams.set('tab', 'site_team');
+            url.searchParams.set('subtab', subtab);
+            history.replaceState({}, '', url);
+        }
 
         // Handle map rendering/resizing when subtab is shown
         if (subtab === 'map') {
@@ -942,6 +1091,10 @@
         document.getElementById('relieve_site_name').textContent = siteName;
         const form = document.getElementById('relieveForm');
         form.action = url;
+        document.getElementById('relieve_next_step').value = 'office';
+        document.getElementById('relieve_office_site').value = '';
+        document.getElementById('relieve_leave_end_date').value = '';
+        toggleRelieveNextStepFields();
         document.getElementById('relieveModal').classList.remove('hidden');
     }
 
@@ -949,14 +1102,42 @@
         document.getElementById('relieveModal').classList.add('hidden');
     }
 
+    function toggleRelieveNextStepFields() {
+        const nextStep = document.getElementById('relieve_next_step').value;
+        const officeField = document.getElementById('relieve_office_field');
+        const officeSelect = document.getElementById('relieve_office_site');
+        const leaveFields = document.getElementById('relieve_leave_fields');
+        const leaveEndDate = document.getElementById('relieve_leave_end_date');
+
+        const isOffice = nextStep === 'office';
+        officeField.classList.toggle('hidden', !isOffice);
+        leaveFields.classList.toggle('hidden', isOffice);
+        officeSelect.required = isOffice;
+        leaveEndDate.required = !isOffice;
+    }
+
+    function openEditAllocationModal(url, button) {
+        const row = button.closest('tr');
+        document.getElementById('edit_alloc_employee').value = row.dataset.employee;
+        document.getElementById('edit_alloc_site').value = row.dataset.site;
+        document.getElementById('edit_alloc_start_date').value = row.dataset.startDate;
+        document.getElementById('edit_alloc_end_date').value = row.dataset.endDate;
+        document.getElementById('editAllocationForm').action = url;
+        document.getElementById('editAllocationModal').classList.remove('hidden');
+    }
+
+    function closeEditAllocationModal() {
+        document.getElementById('editAllocationModal').classList.add('hidden');
+    }
+
     // NEW: Automatically switch to the active tab on load
     document.addEventListener('DOMContentLoaded', () => {
         const activeTab = "{{ active_tab|default:'employees' }}";
-        switchTab(activeTab);
-        
+        switchTab(activeTab, true);
+
         if (activeTab === 'site_team') {
             const activeSubTab = "{{ active_subtab|default:'sites' }}";
-            switchSiteSubTab(activeSubTab);
+            switchSiteSubTab(activeSubTab, true);
         }
         
         const addDesignation = document.querySelector('select[name="designation"]');
@@ -1014,8 +1195,13 @@
         window.mapInstance = L.map('site-map').setView([20.5937, 78.9629], 5); // Default center on India
         const map = window.mapInstance;
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        // tile.openstreetmap.org blocks production/business traffic per its usage policy
+        // (https://operations.osmfoundation.org/policies/tiles/), and CARTO's basemaps now
+        // require a registered API key for non-anonymous use. Esri's ArcGIS Online raster
+        // basemap tiles are free and keyless for standard display use.
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, DeLorme, NAVTEQ',
+            maxZoom: 19
         }).addTo(map);
 
         const markers = [];

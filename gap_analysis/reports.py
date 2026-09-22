@@ -20,6 +20,15 @@ def build_team_report_data(employees):
     )
     benchmark_map = {(b.role_matrix_id, b.skill_id): b for b in benchmarks}
 
+    # Which of a role's benchmarked skills actually apply to a given employee -- General
+    # skills always do, Segment-Specific ones only if the employee is assigned that segment.
+    # Reuses SkillMatrix.get_required_benchmarks() rather than re-deriving the scoping rule
+    # here, so this report can never drift out of sync with the profile page's own gap data.
+    applicable_skill_ids_by_emp = {
+        emp.id: set(emp.get_required_benchmarks().values_list('skill_id', flat=True))
+        for emp in employees
+    }
+
     skill_by_id = {b.skill_id: b.skill for b in benchmarks}
     skills = sorted(skill_by_id.values(), key=lambda s: s.name)
 
@@ -38,9 +47,10 @@ def build_team_report_data(employees):
     role_gap_totals = defaultdict(lambda: {'weighted_gap': 0, 'weight': 0, 'employee_ids': set()})
 
     for emp in employees:
+        applicable_skill_ids = applicable_skill_ids_by_emp[emp.id]
         for skill in skills:
             bm = benchmark_map.get((emp.role_matrix_id, skill.id))
-            if bm is None:
+            if bm is None or skill.id not in applicable_skill_ids:
                 matrix[(emp.id, skill.id)] = {'applicable': False}
                 continue
 

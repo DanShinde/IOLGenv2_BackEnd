@@ -2,6 +2,60 @@
 
 {% block title %}Manage Designations - Skill Gap Analyzer{% endblock %}
 
+{% block extra_css %}
+<style>
+    .role-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        transition: var(--transition);
+    }
+
+    .role-card:hover {
+        box-shadow: var(--shadow-md);
+    }
+
+    .role-card-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: var(--radius-md);
+        background: var(--accent-soft);
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+    }
+
+    .role-card-progress {
+        height: 6px;
+        border-radius: 999px;
+        background: var(--light);
+        overflow: hidden;
+    }
+
+    .role-card-progress-bar {
+        height: 100%;
+        border-radius: 999px;
+        background: var(--accent);
+    }
+
+    .role-card-progress-bar.low { background: var(--warning); }
+    .role-card-progress-bar.full { background: var(--success); }
+
+    .role-card-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="animate-fade-in">
     <div class="page-header">
@@ -18,74 +72,65 @@
         {% endif %}
     </div>
 
-    <div class="card">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 mobile-cards">
-                    <thead>
-                        <tr>
-                            <th>Designation</th>
-                            <th>Department</th>
-                            <th>Required Skills</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for designation in designations %}
-                        <tr>
-                            <td data-label="Designation">
-                                <strong>{{ designation.title }}</strong>
-                            </td>
-                            <td data-label="Department">
-                                {% if designation.department %}
-                                    <span class="badge bg-light text-dark">
-                                        <i class="bi bi-building me-1"></i>{{ designation.department }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td data-label="Required Skills">
-                                <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: #4f46e5;">
-                                    {{ designation.benchmarks.count }}
-                                </span>
-                            </td>
-                            <td data-label="Actions">
-                                <div class="d-flex justify-content-end gap-2">
-                                    <a href="{% url 'skillgap_designation_benchmark' designation.id %}" class="btn btn-info btn-icon" title="Manage Benchmark">
-                                        <i class="bi bi-bookmark-check"></i>
-                                    </a>
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_designation_update' designation.id %}" class="btn btn-warning btn-icon" title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="{% url 'skillgap_designation_delete' designation.id %}" class="btn btn-danger btn-icon" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4">
-                                <div class="empty-state py-5">
-                                    <i class="bi bi-briefcase d-block"></i>
-                                    <p>No designations found yet.</p>
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'skillgap_add_designation' %}" class="btn btn-primary mt-2">
-                                        <i class="bi bi-plus-circle me-2"></i>Add First Designation
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    {% if designations %}
+    <div class="row g-3">
+        {% for designation in designations %}
+        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+            <div class="role-card">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="role-card-icon">
+                        <i class="bi bi-briefcase-fill"></i>
+                    </div>
+                    {% if designation.department %}
+                    <span class="badge bg-secondary">{{ designation.department }}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="fw-bold" style="font-size: 1.05rem;">{{ designation.title }}</div>
+                    <div class="small text-muted mt-1">
+                        {{ designation.benchmarks.count }} of {{ total_skill_count }} skills benchmarked
+                    </div>
+                </div>
+                {% if total_skill_count %}
+                {% widthratio designation.benchmarks.count total_skill_count 100 as coverage_pct %}
+                <div class="role-card-progress">
+                    <div class="role-card-progress-bar{% if coverage_pct >= 100 %} full{% elif coverage_pct < 50 %} low{% endif %}" style="width: {{ coverage_pct }}%;"></div>
+                </div>
+                {% endif %}
+                <div class="role-card-actions">
+                    <a href="{% url 'skillgap_designation_benchmark' designation.id %}" class="fw-semibold" style="font-size: 0.85rem;">
+                        View Benchmarks <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                    {% if user.is_staff %}
+                    <div class="d-flex gap-1">
+                        <a href="{% url 'skillgap_designation_update' designation.id %}" class="btn btn-outline-secondary btn-icon" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'skillgap_designation_delete' designation.id %}" class="btn btn-outline-secondary btn-icon" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
+        {% endfor %}
+    </div>
+    <div class="card mt-3">
         {% include 'gap_analysis/pagination.html' %}
     </div>
+    {% else %}
+    <div class="card">
+        <div class="empty-state py-5">
+            <i class="bi bi-briefcase d-block"></i>
+            <p>No designations found yet.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'skillgap_add_designation' %}" class="btn btn-primary mt-2">
+                <i class="bi bi-plus-circle me-2"></i>Add First Designation
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

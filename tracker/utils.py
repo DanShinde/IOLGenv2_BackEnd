@@ -9,7 +9,9 @@ def get_completion_percentage(stages):
     return round(total_progress / total)
 
 def get_otif_percentage(stages):
-    completed = [s for s in stages if s.status == 'Completed']
+    # Dispatch is excluded: not counted in OTIF, only used for the separate
+    # Emulation Timing Analysis on the report page.
+    completed = [s for s in stages if s.status == 'Completed' and s.name != 'Dispatch']
     if not completed:
         return None
     on_time = [s for s in completed if s.actual_date and s.planned_date and s.actual_date <= s.planned_date]

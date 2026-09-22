@@ -12,15 +12,15 @@
     .toc-card a {
         display: block;
         padding: 0.4rem 0.75rem;
-        border-radius: 8px;
-        color: #475569;
+        border-radius: var(--radius-sm);
+        color: var(--text-muted);
         text-decoration: none;
         font-size: 0.9rem;
     }
 
     .toc-card a:hover {
-        background: #f1f5f9;
-        color: #4f46e5;
+        background: var(--accent-soft);
+        color: var(--accent);
     }
 
     .help-section {
@@ -28,22 +28,22 @@
     }
 
     .feature-card {
-        border-left: 3px solid #e2e8f0;
+        border-left: 3px solid var(--border);
         padding: 0.75rem 1rem;
         margin-bottom: 0.75rem;
-        background: #f8fafc;
-        border-radius: 0 10px 10px 0;
+        background: var(--light);
+        border-radius: 0 var(--radius-md) var(--radius-md) 0;
     }
 
     .feature-card h6 {
         font-weight: 700;
         margin-bottom: 0.35rem;
-        color: #1e293b;
+        color: var(--text);
     }
 
     .feature-card p {
         margin: 0;
-        color: #475569;
+        color: var(--text-muted);
         font-size: 0.9rem;
     }
 
@@ -57,17 +57,30 @@
         margin-right: 0.35rem;
     }
 
-    .role-staff { background: rgba(79, 70, 229, 0.12); color: #4f46e5; }
-    .role-manager { background: rgba(245, 158, 11, 0.15); color: #b45309; }
-    .role-everyone { background: rgba(16, 185, 129, 0.12); color: #059669; }
+    .role-staff { background: var(--accent-soft); color: var(--accent); }
+    .role-manager { background: var(--warning-soft); color: #B45309; }
+    .role-everyone { background: var(--success-soft); color: var(--success); }
+
+    /* Top-level accordion (one item per help section) */
+    #helpAccordion > .accordion-item {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg) !important;
+        overflow: hidden;
+        margin-bottom: 0.85rem;
+    }
+
+    #helpAccordion > .accordion-item .accordion-button {
+        font-weight: 700;
+        font-size: 1rem;
+    }
 
     .accordion-button:not(.collapsed) {
-        background-color: rgba(79, 70, 229, 0.06);
-        color: #4338ca;
+        background-color: var(--accent-soft);
+        color: var(--accent);
     }
 
     .accordion-button:focus {
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        box-shadow: 0 0 0 3px var(--accent-soft);
     }
 
     .step-list {
@@ -91,7 +104,7 @@
         width: 1.75rem;
         height: 1.75rem;
         border-radius: 50%;
-        background: #4f46e5;
+        background: var(--accent);
         color: white;
         font-size: 0.8rem;
         font-weight: 700;
@@ -119,26 +132,31 @@
             <div class="card toc-card">
                 <div class="card-header"><i class="bi bi-list-ul me-2"></i>On this page</div>
                 <div class="card-body py-2">
-                    <a href="#roles"><i class="bi bi-shield-lock me-2"></i>Who can do what</a>
-                    <a href="#dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
-                    <a href="#people"><i class="bi bi-people me-2"></i>People menu</a>
-                    <a href="#skills-menu"><i class="bi bi-award me-2"></i>Skills menu</a>
-                    <a href="#plans-menu"><i class="bi bi-clipboard2-check me-2"></i>Plans menu</a>
-                    <a href="#profile"><i class="bi bi-person-badge me-2"></i>Employee profile</a>
-                    <a href="#self-rating"><i class="bi bi-arrow-left-right me-2"></i>Self vs. manager rating</a>
-                    <a href="#faq"><i class="bi bi-patch-question me-2"></i>Tips &amp; FAQ</a>
+                    <a href="#rolesCollapse" data-bs-toggle="collapse" data-bs-target="#rolesCollapse"><i class="bi bi-shield-lock me-2"></i>Who can do what</a>
+                    <a href="#dashboardCollapse" data-bs-toggle="collapse" data-bs-target="#dashboardCollapse"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                    <a href="#peopleCollapse" data-bs-toggle="collapse" data-bs-target="#peopleCollapse"><i class="bi bi-people me-2"></i>People menu</a>
+                    <a href="#skills-menuCollapse" data-bs-toggle="collapse" data-bs-target="#skills-menuCollapse"><i class="bi bi-award me-2"></i>Skills menu</a>
+                    <a href="#plans-menuCollapse" data-bs-toggle="collapse" data-bs-target="#plans-menuCollapse"><i class="bi bi-clipboard2-check me-2"></i>Plans menu</a>
+                    <a href="#profileCollapse" data-bs-toggle="collapse" data-bs-target="#profileCollapse"><i class="bi bi-person-badge me-2"></i>Employee profile</a>
+                    <a href="#self-ratingCollapse" data-bs-toggle="collapse" data-bs-target="#self-ratingCollapse"><i class="bi bi-arrow-left-right me-2"></i>Self vs. manager rating</a>
+                    <a href="#faqCollapse" data-bs-toggle="collapse" data-bs-target="#faqCollapse"><i class="bi bi-patch-question me-2"></i>Tips &amp; FAQ</a>
                 </div>
             </div>
         </div>
 
         <!-- Content -->
         <div class="col-lg-9">
+            <div class="accordion" id="helpAccordion">
 
             <!-- Roles -->
-            <section id="roles" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-shield-lock me-2"></i>Who can do what</div>
-                    <div class="card-body">
+            <section id="roles" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#rolesCollapse">
+                        <i class="bi bi-shield-lock me-2"></i>Who can do what
+                    </button>
+                </h2>
+                <div id="rolesCollapse" class="accordion-collapse collapse show">
+                    <div class="accordion-body">
                         <p class="text-muted">Every page requires logging in. Beyond that, what you can do depends on your account:</p>
                         <div class="table-responsive">
                             <table class="table table-bordered mb-0">
@@ -177,10 +195,14 @@
             </section>
 
             <!-- Dashboard -->
-            <section id="dashboard" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-speedometer2 me-2"></i>Dashboard</div>
-                    <div class="card-body">
+            <section id="dashboard" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#dashboardCollapse">
+                        <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                    </button>
+                </h2>
+                <div id="dashboardCollapse" class="accordion-collapse collapse">
+                    <div class="accordion-body">
                         <p class="text-muted">The homepage. Organized into four tabs so the one number that matters most loads first.</p>
 
                         <div class="feature-card">
@@ -207,10 +229,14 @@
             </section>
 
             <!-- People menu -->
-            <section id="people" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-people me-2"></i>People menu</div>
-                    <div class="card-body">
+            <section id="people" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#peopleCollapse">
+                        <i class="bi bi-people me-2"></i>People menu
+                    </button>
+                </h2>
+                <div id="peopleCollapse" class="accordion-collapse collapse">
+                    <div class="accordion-body">
                         <div class="accordion" id="peopleAccordion">
                             <div class="accordion-item">
                                 <h2 class="accordion-header">
@@ -232,7 +258,7 @@
                                 </h2>
                                 <div id="peopleRoleMatrix" class="accordion-collapse collapse" data-bs-parent="#peopleAccordion">
                                     <div class="accordion-body">
-                                        <p>The list of job roles/designations. Click a role's "Manage Benchmark" icon to open its required-skills page, where <span class="role-badge role-staff">Staff</span> can add or remove which skills that role requires, at what level (0&ndash;5), and whether each one is <strong>Mandatory</strong> (counts double in gap scoring) or optional.</p>
+                                        <p>The list of job roles/designations. Click a role's "Manage Benchmark" icon to open its Role Matrix page: every skill in the catalog is listed there already, grouped into General / Segment / Supplementary. <span class="role-badge role-staff">Staff</span> type a Required Level (0&ndash;5) directly next to any skill to make it part of that role's benchmark, and tick <strong>Mandatory</strong> if it should count double in gap scoring &mdash; clearing the level removes the requirement. A skill only needs to exist in the Skill Catalog to show up here; there's no separate "add skill to role" step.</p>
                                     </div>
                                 </div>
                             </div>
@@ -254,10 +280,14 @@
             </section>
 
             <!-- Skills menu -->
-            <section id="skills-menu" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-award me-2"></i>Skills menu</div>
-                    <div class="card-body">
+            <section id="skills-menu" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#skills-menuCollapse">
+                        <i class="bi bi-award me-2"></i>Skills menu
+                    </button>
+                </h2>
+                <div id="skills-menuCollapse" class="accordion-collapse collapse">
+                    <div class="accordion-body">
                         <div class="feature-card">
                             <h6><i class="bi bi-search me-1"></i>Skill Search &mdash; "Find Experts by Skill"</h6>
                             <p>Pick any skill from the dropdown to see everyone who's been rated on it, ranked from the highest level down &mdash; the top scorer gets a trophy badge. Useful for finding who to ask for help, or who could mentor others, on a specific skill.</p>
@@ -267,18 +297,22 @@
                             <p>Your own view of the skills your role requires. Enter how you'd rate yourself (0&ndash;5) per skill; it's saved as <strong>Pending Review</strong> until your manager or staff approves or corrects it. This page only works if your login is linked to an employee record &mdash; see <a href="#self-rating">Self vs. manager rating</a>.</p>
                         </div>
                         <div class="feature-card mb-0">
-                            <h6><i class="bi bi-lightning me-1"></i>Manage Skills &amp; Benchmarks <span class="role-badge role-staff ms-1">Staff only</span></h6>
-                            <p>The master list of every skill that exists in the system (name, category, description) and the raw list of every role&ndash;skill benchmark. This is where new skills get created before they can be attached to a role.</p>
+                            <h6><i class="bi bi-lightning me-1"></i>Skill Catalog <span class="role-badge role-staff ms-1">Staff only</span></h6>
+                            <p>Every skill that exists in the system, grouped into General / Segment (one section per segment) / Supplementary. This is where skills get created and categorized. Required levels per role aren't set here &mdash; open a role's <strong>Role Matrix</strong> page instead: every catalog skill is listed there automatically, and you set (or clear) its required level in place.</p>
                         </div>
                     </div>
                 </div>
             </section>
 
             <!-- Plans menu -->
-            <section id="plans-menu" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-clipboard2-check me-2"></i>Plans menu</div>
-                    <div class="card-body">
+            <section id="plans-menu" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plans-menuCollapse">
+                        <i class="bi bi-clipboard2-check me-2"></i>Plans menu
+                    </button>
+                </h2>
+                <div id="plans-menuCollapse" class="accordion-collapse collapse">
+                    <div class="accordion-body">
                         <div class="feature-card">
                             <h6><i class="bi bi-clipboard2-check me-1"></i>Development Plans</h6>
                             <p>Every gap-closing action recorded across the whole organization, in one filterable list &mdash; who it's for, which skill, the action (e.g. "Complete Django REST course"), an optional resource link, a target date (flagged red if overdue), and status (Not Started / In Progress / Completed / Cancelled). <span class="role-badge role-staff">Staff</span> create, edit, and delete plans, usually from an employee's own profile.</p>
@@ -292,10 +326,14 @@
             </section>
 
             <!-- Employee profile -->
-            <section id="profile" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-person-badge me-2"></i>Employee profile</div>
-                    <div class="card-body">
+            <section id="profile" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#profileCollapse">
+                        <i class="bi bi-person-badge me-2"></i>Employee profile
+                    </button>
+                </h2>
+                <div id="profileCollapse" class="accordion-collapse collapse">
+                    <div class="accordion-body">
                         <p class="text-muted">Click any employee's name (from Skill Matrix, Skill Search, or a dashboard table) to open their profile. It has four tabs:</p>
 
                         <div class="feature-card">
@@ -323,10 +361,14 @@
             </section>
 
             <!-- Self vs manager rating -->
-            <section id="self-rating" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-arrow-left-right me-2"></i>Self vs. manager rating &mdash; how it fits together</div>
-                    <div class="card-body">
+            <section id="self-rating" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#self-ratingCollapse">
+                        <i class="bi bi-arrow-left-right me-2"></i>Self vs. manager rating &mdash; how it fits together
+                    </button>
+                </h2>
+                <div id="self-ratingCollapse" class="accordion-collapse collapse">
+                    <div class="accordion-body">
                         <p class="text-muted">This is the most connected feature in the app, so here's the full loop end to end:</p>
                         <ol class="step-list">
                             <li><strong>Link the employee to a login.</strong> <span class="role-badge role-staff">Staff</span> open the employee's Edit page (People &rarr; Skill Matrix &rarr; Edit) and set <em>Linked Login</em> to their Django user account. Without this, that person can't use My Skills at all.</li>
@@ -343,10 +385,14 @@
             </section>
 
             <!-- FAQ -->
-            <section id="faq" class="help-section mb-4">
-                <div class="card">
-                    <div class="card-header"><i class="bi bi-patch-question me-2"></i>Tips &amp; FAQ</div>
-                    <div class="card-body">
+            <section id="faq" class="help-section accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse">
+                        <i class="bi bi-patch-question me-2"></i>Tips &amp; FAQ
+                    </button>
+                </h2>
+                <div id="faqCollapse" class="accordion-collapse collapse">
+                    <div class="accordion-body">
                         <div class="accordion" id="faqAccordion">
                             <div class="accordion-item">
                                 <h2 class="accordion-header">
@@ -401,7 +447,38 @@
                 </div>
             </section>
 
+            </div>
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+    // In-page links (TOC and cross-references like "See Self vs. manager rating above")
+    // point at a section id (#self-rating). Since each section is now a collapsed
+    // accordion item, opening it -- not just scrolling to it -- is needed for the link
+    // to actually reveal the content.
+    const helpSectionIds = ['roles', 'dashboard', 'people', 'skills-menu', 'plans-menu', 'profile', 'self-rating', 'faq'];
+
+    function openHelpSection(sectionId) {
+        const collapseEl = document.getElementById(sectionId + 'Collapse');
+        if (collapseEl && !collapseEl.classList.contains('show')) {
+            new bootstrap.Collapse(collapseEl, { show: true });
+        }
+    }
+
+    document.addEventListener('click', function (event) {
+        const link = event.target.closest('a[href^="#"]');
+        if (!link) return;
+        const id = link.getAttribute('href').slice(1).replace(/Collapse$/, '');
+        if (helpSectionIds.includes(id)) {
+            openHelpSection(id);
+        }
+    });
+
+    if (window.location.hash) {
+        openHelpSection(window.location.hash.slice(1).replace(/Collapse$/, ''));
+    }
+</script>
+{% endblock %}
 {% endblock %}

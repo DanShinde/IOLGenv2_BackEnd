@@ -1,0 +1,33 @@
+<tr>
+    <td>
+        <strong>{{ skill.name }}</strong>
+    </td>
+    <td>
+        {% if skill.category %}
+            <span class="skill-category">
+                <i class="bi bi-tag"></i>{{ skill.category }}
+            </span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>
+        {% with skill.benchmarks.count as benchmark_count %}
+            <span class="badge bg-success">
+                {{ benchmark_count }} role{{ benchmark_count|pluralize }}
+            </span>
+        {% endwith %}
+    </td>
+    <td class="text-end">
+        <div class="d-flex justify-content-end gap-2">
+            {% if user.is_staff %}
+            <a href="{% url 'skillgap_skill_update' skill.id %}" class="btn btn-warning btn-icon" title="Edit">
+                <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'skillgap_skill_delete' skill.id %}" class="btn btn-danger btn-icon" title="Delete">
+                <i class="bi bi-trash"></i>
+            </a>
+            {% endif %}
+        </div>
+    </td>
+</tr>
