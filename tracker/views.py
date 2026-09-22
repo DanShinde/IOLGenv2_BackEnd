@@ -485,7 +485,7 @@ def dashboard(request):
     ).select_related('segment_con').order_by('so_punch_date')
     # --- END OF CORRECTION ---
 
-    completed_stages = Stage.objects.filter(project__in=live_projects, status='Completed')
+    completed_stages = Stage.objects.filter(project__in=live_projects, status='Completed').exclude(name='Dispatch')
     if period != 'all' or (custom_start and custom_end):
         completed_stages = completed_stages.filter(actual_date__range=[start_date, end_date])
     total_completed_stages = completed_stages.count()
@@ -776,11 +776,14 @@ def project_reports(request):
             projects_qs = projects_qs.filter(value__lte=float(max_value))
         except (ValueError, TypeError): pass
 
-    # Which stages the rest of the report (summary table, charts, cross-tab) covers
+    # Which stages the rest of the report (summary table, charts, cross-tab) covers.
+    # Dispatch is excluded here: it's not counted in OTIF or the Planned vs Actual
+    # summary table — it's only used for the separate Emulation Timing Analysis.
     if selected_stage_keys:
         stage_names_to_report = [(k, v) for k, v in Stage.STAGE_NAMES if k in selected_stage_keys]
     else:
         stage_names_to_report = Stage.STAGE_NAMES
+    stage_names_to_report = [(k, v) for k, v in stage_names_to_report if k != 'Dispatch']
     stage_keys_to_report = [k for k, _ in stage_names_to_report]
 
     # --- Check for the 'hide_completed' filter ---
@@ -960,7 +963,7 @@ def project_reports(request):
         project_id__in=chart_project_ids,
         planned_date__isnull=False,
         planned_date__gte=plausible_planned_date_floor,
-    ).exclude(status='Not Applicable')
+    ).exclude(status='Not Applicable').exclude(name='Dispatch')
     if selected_stage_keys:
         otif_qs = otif_qs.filter(name__in=stage_keys_to_report)
     if has_explicit_period:
@@ -1167,7 +1170,7 @@ def project_reports(request):
             project_id__in=chart_project_ids,
             status='Completed',
             actual_date__range=[prev_period_start, prev_period_end]
-        )
+        ).exclude(name='Dispatch')
         prev_overall_actual = prev_overall_qs.count()
         if prev_overall_actual:
             prev_overall_on_time = prev_overall_qs.filter(actual_date__lte=F('planned_date')).count()
@@ -1595,7 +1598,7 @@ def get_filtered_stages(filter_type):
         start, end = date_ranges[filter_type]
         return Stage.objects.filter(
             project__is_archived=False,
-            status__in=["Not started", "In Progress"],
+            status__in=["Not started", "In Progress", "Completed"],
             planned_date__range=(start, end)
         ).order_by('planned_date')
     elif filter_type == 'all':
@@ -1787,6 +1790,9 @@ def _build_filtered_report_projects(request):
         [(k, v) for k, v in Stage.STAGE_NAMES if k in selected_stage_keys] if selected_stage_keys
         else Stage.STAGE_NAMES
     )
+    # Dispatch is excluded: not counted in OTIF or the Planned vs Actual summary
+    # table — it's only used for the separate Emulation Timing Analysis.
+    stage_names_to_report = [(k, v) for k, v in stage_names_to_report if k != 'Dispatch']
 
     return {
         'projects_qs': projects_qs.distinct(),

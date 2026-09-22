@@ -54,7 +54,9 @@ class Project(models.Model):
     from datetime import timedelta
 
     def get_otif_percentage(self):
-        completed_stages = self.stages.filter(status='Completed')
+        # Dispatch is excluded: not counted in OTIF, only used for the separate
+        # Emulation Timing Analysis on the report page.
+        completed_stages = self.stages.filter(status='Completed').exclude(name='Dispatch')
         if not completed_stages.exists():
             return None
         on_time = completed_stages.filter(actual_date__lte=F('planned_date')).count()
