@@ -223,8 +223,12 @@ def project_detail(request, project_id):
             actual_date_val = request.POST.get(f'actual_date_{stage.id}')
             new_completion_percentage = request.POST.get(f'completion_percentage_{stage.id}')
 
-            # A stage can only be marked Completed once it has a real finish date — no
-            # silent auto-fill to "today" (same rule as the inline AJAX autosave).
+            # actual_date and status='Completed' are a package deal (same rule as the
+            # inline AJAX autosave): entering a finish date is itself the completion
+            # action, and a stage can only be Completed once it has a real finish date —
+            # no silent auto-fill to "today".
+            if actual_date_val and new_status != 'Completed':
+                new_status = 'Completed'
             if new_status == 'Completed' and not actual_date_val:
                 skipped_stage_names.append(stage.name)
                 continue
@@ -2396,14 +2400,15 @@ def save_stage_delay_reason_ajax(request, stage_id):
         return JsonResponse({'status': 'error', 'message': 'At least one reason is required.'}, status=400)
 
     updated_actual_date = None
+    updated_status = None
 
     with transaction.atomic():
         # A pending field edit (the one that triggered this delay in the first place)
         # is only ever committed here, together with the reason — see update_stage_ajax,
         # which withholds the save until this point instead of persisting it up front.
         if field_name in DELAY_GATE_FIELDS:
-            parsed_value, _, _, actual_date = _prospective_stage_state(stage, field_name, new_value)
-            updated_actual_date = _apply_stage_field(stage, field_name, new_value, parsed_value, actual_date, request.user)
+            parsed_value, _, status, actual_date = _prospective_stage_state(stage, field_name, new_value)
+            updated_actual_date, updated_status = _apply_stage_field(stage, field_name, new_value, parsed_value, status, actual_date, request.user)
 
         delay_reason, _ = StageDelayReason.objects.update_or_create(
             stage=stage,
@@ -2418,6 +2423,8 @@ def save_stage_delay_reason_ajax(request, stage_id):
     }
     if updated_actual_date is not None:
         response_data['updated_actual_date'] = updated_actual_date
+    if updated_status is not None:
+        response_data['updated_status'] = updated_status
 
     return JsonResponse(response_data)
 
@@ -2727,34 +2734,50 @@ def _prospective_stage_state(stage, field_name, new_value):
         parsed_value = new_value
 
     planned_date = parsed_value if field_name == 'planned_date' else stage.planned_date
-    status = parsed_value if field_name == 'status' else stage.status
 
-    # A status change to 'Completed' is only ever reached (by update_stage_ajax) once
-    # the stage already has a real actual_date — there's no more auto-fill-to-today, so
-    # this just carries the existing (or newly-cleared, if un-completing) date forward.
-    if field_name == 'actual_date':
-        actual_date = parsed_value
-    elif field_name == 'status':
+    # actual_date and status='Completed' are a package deal — a finish date never
+    # persists on a stage that isn't Completed, and vice versa:
+    #  - setting status to 'Completed' requires (and keeps) an existing actual_date
+    #    (see update_stage_ajax's explicit-date check; un-completing clears it)
+    #  - entering an actual_date directly *is* the completion action, so it also
+    #    flips status to 'Completed'; clearing it leaves status as-is
+    if field_name == 'status':
+        status = parsed_value
         actual_date = stage.actual_date if parsed_value == 'Completed' else None
+    elif field_name == 'actual_date':
+        actual_date = parsed_value
+        status = 'Completed' if parsed_value else stage.status
     else:
+        status = stage.status
         actual_date = stage.actual_date
 
     return parsed_value, planned_date, status, actual_date
 
 
-def _apply_stage_field(stage, field_name, new_value, parsed_value, actual_date, user):
-    """Actually applies and saves a field change (plus the status-driven actual_date
-    side effect and the history record). Only ever called once a delay, if any, has
+def _apply_stage_field(stage, field_name, new_value, parsed_value, status, actual_date, user):
+    """Actually applies and saves a field change (plus the status<->actual_date paired
+    side effect and its history record). Only ever called once a delay, if any, has
     a reason attached — see update_stage_ajax / save_stage_delay_reason_ajax."""
     old_value = getattr(stage, field_name)
     fields_to_update = [field_name]
     setattr(stage, field_name, parsed_value)
 
     updated_actual_date = None
+    updated_status = None
+
     if field_name == 'status':
         stage.actual_date = actual_date
         fields_to_update.append('actual_date')
         updated_actual_date = actual_date.strftime('%Y-%m-%d') if actual_date else ''
+    elif field_name == 'actual_date' and stage.status != status:
+        old_status = stage.status
+        stage.status = status
+        fields_to_update.append('status')
+        updated_status = status
+        StageHistory.objects.create(
+            stage=stage, changed_by=user, field_name='Status',
+            old_value=old_status, new_value=status,
+        )
 
     stage.save(update_fields=fields_to_update)
 
@@ -2765,7 +2788,7 @@ def _apply_stage_field(stage, field_name, new_value, parsed_value, actual_date, 
         old_value=str(old_value),
         new_value=str(new_value),
     )
-    return updated_actual_date
+    return updated_actual_date, updated_status
 
 
 @login_required
@@ -2807,7 +2830,7 @@ def update_stage_ajax(request, stage_id):
                     'has_delay_reason': has_delay_reason,
                 })
 
-            updated_actual_date = _apply_stage_field(stage, field_name, new_value, parsed_value, actual_date, request.user)
+            updated_actual_date, updated_status = _apply_stage_field(stage, field_name, new_value, parsed_value, status, actual_date, request.user)
 
             response_data = {
                 'status': 'success',
@@ -2817,12 +2840,14 @@ def update_stage_ajax(request, stage_id):
             }
             if updated_actual_date is not None:
                 response_data['updated_actual_date'] = updated_actual_date
+            if updated_status is not None:
+                response_data['updated_status'] = updated_status
 
             return JsonResponse(response_data)
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-    
+
     return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
 
 @login_required

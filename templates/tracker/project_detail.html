@@ -1308,26 +1308,32 @@ document.addEventListener('DOMContentLoaded', function () {
     // keyed by stage id. Nothing is written to the server for that field until the
     // delay reason is saved alongside it in the same request — see saveDelayReason.
     window.__pendingDelayFieldUpdate = window.__pendingDelayFieldUpdate || {};
+    // Snapshot of the reason picker's state when the modal was opened, so Cancel can
+    // put it back exactly as it was (discarding any un-saved tag/description edits).
+    window.__delayReasonSnapshot = window.__delayReasonSnapshot || {};
 
     window.setPendingDelayFieldUpdate = function(stageId, fieldName, newValue) {
         window.__pendingDelayFieldUpdate[stageId] = { field_name: fieldName, new_value: newValue };
     };
 
     // Opens the Delay Reason modal for a stage.
-    // mandatory=true (auto-triggered after a delayed, not-yet-saved edit) removes
-    // Cancel/Close so a reason must be picked before it can close; mandatory=false
-    // (Actions dropdown) is a normal dismissible modal for reviewing/backfilling
-    // reasons at any time, and clears any stale pending edit for this stage.
+    // mandatory=true (auto-triggered after a delayed, not-yet-saved edit) disables the
+    // backdrop/Escape shortcuts so it can't be dismissed by accident — only the explicit
+    // Cancel/close button, which discards the pending change, closes it. mandatory=false
+    // (Actions dropdown) is a normal dismissible modal for reviewing/backfilling reasons
+    // at any time, and clears any stale pending edit for this stage.
     window.openDelayReasonModal = function(stageId, mandatory) {
         const modalEl = document.getElementById('delayReasonModal' + stageId);
         if (!modalEl) return;
         if (!mandatory) {
             delete window.__pendingDelayFieldUpdate[stageId];
         }
-        const closeBtn = modalEl.querySelector('.delay-reason-close');
-        const cancelBtn = modalEl.querySelector('.delay-reason-cancel');
-        if (closeBtn) closeBtn.style.display = mandatory ? 'none' : '';
-        if (cancelBtn) cancelBtn.style.display = mandatory ? 'none' : '';
+        window.__delayReasonSnapshot[stageId] = {
+            activeIds: $(modalEl).find('.delay-reason-tag-btn.active').map(function() {
+                return $(this).data('tag-id').toString();
+            }).get(),
+            description: $(modalEl).find('textarea').val()
+        };
         modalEl.querySelector('.delay-reason-error').style.display = 'none';
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl, {
             backdrop: mandatory ? 'static' : true,
@@ -1335,6 +1341,42 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         modal.show();
     };
+
+    // Cancel: discards the pending (unsaved) field edit and reason-picker changes, puts
+    // the triggering input back to its last actually-saved value, and closes the modal —
+    // the user has to re-enter the date (and go through this again) if they want it saved.
+    window.cancelDelayReason = function(stageId) {
+        const modalEl = document.getElementById('delayReasonModal' + stageId);
+        if (!modalEl) return;
+
+        const pending = window.__pendingDelayFieldUpdate[stageId];
+        if (pending) {
+            const pendingInput = document.querySelector(`[data-stage-id="${stageId}"][data-field-name="${pending.field_name}"]`);
+            if (pendingInput) {
+                pendingInput.value = pendingInput.dataset.previousValue !== undefined ? pendingInput.dataset.previousValue : '';
+            }
+        }
+        delete window.__pendingDelayFieldUpdate[stageId];
+
+        const snapshot = window.__delayReasonSnapshot[stageId];
+        if (snapshot) {
+            $(modalEl).find('.delay-reason-tag-btn').each(function() {
+                const isActive = snapshot.activeIds.includes($(this).data('tag-id').toString());
+                $(this).toggleClass('active btn-primary', isActive).toggleClass('btn-outline-secondary', !isActive);
+            });
+            $(modalEl).find('textarea').val(snapshot.description);
+        }
+        $(modalEl).find('.delay-reason-error').hide();
+
+        const indicator = document.getElementById(`autosave-indicator-${stageId}`);
+        if (indicator) indicator.innerHTML = '';
+
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    };
+
+    $(document).on('click', '.delay-reason-cancel, .delay-reason-close', function() {
+        window.cancelDelayReason($(this).data('stage-id'));
+    });
 
     window.saveDelayReason = function(stageId) {
         const modalEl = document.getElementById('delayReasonModal' + stageId);
@@ -1380,6 +1422,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (actualDateInput) {
                         actualDateInput.value = data.updated_actual_date;
                         actualDateInput.dataset.previousValue = data.updated_actual_date;
+                    }
+                }
+                if (data.updated_status !== undefined) {
+                    const statusSelect = document.querySelector(`select[name="status_${stageId}"]`);
+                    if (statusSelect) {
+                        statusSelect.value = data.updated_status;
+                        statusSelect.dataset.previousValue = data.updated_status;
                     }
                 }
                 const indicator = document.getElementById(`autosave-indicator-${stageId}`);
@@ -1512,6 +1561,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (actualDateInput) {
                         actualDateInput.value = data.updated_actual_date;
                         actualDateInput.dataset.previousValue = data.updated_actual_date;
+                    }
+                }
+                // Entering a finish date also completes the stage server-side — reflect
+                // that in the status dropdown too, since it wasn't the field the user touched.
+                if (data.updated_status !== undefined) {
+                    const statusSelect = document.querySelector(`select[name="status_${stageId}"]`);
+                    if (statusSelect) {
+                        statusSelect.value = data.updated_status;
+                        statusSelect.dataset.previousValue = data.updated_status;
                     }
                 }
             } else if (response.ok && data.status === 'pending_delay_reason') {
