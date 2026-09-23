@@ -246,10 +246,48 @@ def project_list_view(request):
             form = ProjectForm(request.POST, instance=instance)
         else:
             form = ProjectForm(request.POST)
-            
+
         if form.is_valid():
-            form.save()
-            return redirect('planner_project_list')
+            if project_id:
+                # Editing an existing planner project: unchanged from before -- the
+                # linked tracker.Project's Value/SO Punch Date/Description (if any)
+                # are not touched here.
+                form.save()
+                return redirect('planner_project_list')
+
+            # Creating a new project from Planner now creates the real tracker.Project
+            # too (Tracker is the single source of truth for project data), instead of
+            # a standalone planner.Project with no Tracker counterpart and none of
+            # Tracker's required fields. The linked planner.Project is then auto-created
+            # by planner/signals.py's post_save handler on tracker.Project.
+            from tracker.models import Project as TrackerProject, Stage as TrackerStage, trackerSegment
+
+            if not form.cleaned_data.get('value') or not form.cleaned_data.get('so_punch_date'):
+                form.add_error(None, "Project Value and SO Punch Date are required to create a new project.")
+            elif TrackerProject.objects.filter(code=form.cleaned_data['project_id']).exists():
+                form.add_error('project_id', 'A Tracker project with this code already exists.')
+            else:
+                segment_con = None
+                if form.cleaned_data.get('segment'):
+                    segment_con, _ = trackerSegment.objects.get_or_create(name=form.cleaned_data['segment'].name)
+
+                tracker_project = TrackerProject.objects.create(
+                    code=form.cleaned_data['project_id'],
+                    customer_name=form.cleaned_data['customer_name'],
+                    value=form.cleaned_data['value'],
+                    so_punch_date=form.cleaned_data['so_punch_date'],
+                    segment_con=segment_con,
+                    team_lead=form.cleaned_data.get('team_lead'),
+                    description=form.cleaned_data.get('description', ''),
+                )
+                # Same stage checklist a project gets when created directly in Tracker,
+                # so it's not missing its automation/emulation stages.
+                for stage_name, _ in TrackerStage.AUTOMATION_STAGES:
+                    TrackerStage.objects.create(project=tracker_project, name=stage_name, stage_type='Automation')
+                for stage_name, _ in TrackerStage.EMULATION_STAGES:
+                    TrackerStage.objects.create(project=tracker_project, name=stage_name, stage_type='Emulation')
+
+                return redirect('planner_project_list')
     
     projects = Project.objects.select_related('segment', 'team_lead').prefetch_related('activities').all()
     

@@ -255,7 +255,11 @@
             <form method="POST" id="projectForm" class="space-y-3">
                 {% csrf_token %}
                 <input type="hidden" id="projectId" name="project_id_hidden" value="{{ request.POST.project_id_hidden }}">
-                
+
+                {% if form.non_field_errors %}
+                    <div class="text-red-500 text-xs">{{ form.non_field_errors.0 }}</div>
+                {% endif %}
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Project Code *</label>
@@ -280,8 +284,27 @@
                         {{ form.team_lead }}
                         <div class="text-red-500 text-xs mt-1" id="team_lead_error"></div>
                     </div>
+                    <div class="add-only-field">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Project Value *</label>
+                        {{ form.value }}
+                        {% if form.value.errors %}
+                            <div class="text-red-500 text-xs mt-1">{{ form.value.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="add-only-field">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">SO Punch Date *</label>
+                        {{ form.so_punch_date }}
+                        {% if form.so_punch_date.errors %}
+                            <div class="text-red-500 text-xs mt-1">{{ form.so_punch_date.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="add-only-field md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Description</label>
+                        {{ form.description }}
+                    </div>
                 </div>
-                
+                <p class="add-only-field text-xs text-gray-500">This creates a matching Tracker project too, with the same details.</p>
+
                 <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
                     <button id="cancelModalBtn" type="button" class="bg-gray-100 text-gray-700 py-1.5 px-4 rounded-md hover:bg-gray-200 text-xs font-medium transition-colors">Cancel</button>
                     <button type="submit" class="bg-indigo-600 text-white py-1.5 px-4 rounded-md hover:bg-indigo-700 text-xs font-medium transition-colors" id="saveProjectBtn">Save</button>
@@ -309,7 +332,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelBtn = document.getElementById('cancelModalBtn');
     const searchInput = document.getElementById('searchInput');
     const clearFiltersBtn = document.getElementById('clearFilters');
-    
+
+    // Value/SO Punch Date/Description only apply when creating a brand-new project
+    // (they're what gets used to also create the linked tracker.Project); editing an
+    // existing project leaves them out of this form, same as before it grew these fields.
+    window.setAddOnlyFieldsVisible = function(visible) {
+        document.querySelectorAll('.add-only-field').forEach(el => {
+            el.classList.toggle('hidden', !visible);
+        });
+        const valueInput = document.getElementById('id_value');
+        const dateInput = document.getElementById('id_so_punch_date');
+        if (valueInput) valueInput.required = visible;
+        if (dateInput) dateInput.required = visible;
+    };
+
     // Auto-open modal if there are form errors (server-side validation)
     {% if form.errors %}
         modal.classList.remove('hidden');
@@ -317,8 +353,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hiddenId) {
             document.getElementById('modalTitle').textContent = 'Edit Project';
             document.getElementById('saveProjectBtn').textContent = 'Update';
+            setAddOnlyFieldsVisible(false);
         } else {
             document.getElementById('modalTitle').textContent = 'Add New Project';
+            setAddOnlyFieldsVisible(true);
         }
         {% if form.project_id.errors %}
             setTimeout(() => {
@@ -328,8 +366,9 @@ document.addEventListener('DOMContentLoaded', () => {
     {% endif %}
 
     if (modal && openBtn && closeBtn && cancelBtn) {
-        openBtn.onclick = function() { 
+        openBtn.onclick = function() {
             resetForm();
+            setAddOnlyFieldsVisible(true);
             document.getElementById('modalTitle').textContent = 'Add New Project';
             document.getElementById('saveProjectBtn').textContent = 'Save';
             modal.classList.remove('hidden'); 
@@ -429,6 +468,7 @@ function editProject(id, projectId, customerName, teamLeadId, segmentId) {
     const segmentSelect = document.getElementById('id_segment');
     if (segmentSelect && segmentId) segmentSelect.value = segmentId;
     else if (segmentSelect) segmentSelect.value = '';
+    if (window.setAddOnlyFieldsVisible) window.setAddOnlyFieldsVisible(false);
     document.getElementById('projectModal').classList.remove('hidden');
 }
 
