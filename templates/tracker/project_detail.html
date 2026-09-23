@@ -674,6 +674,7 @@
                                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
                                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
                                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
+                                            <li><button type="button" class="dropdown-item" onclick="openDelayReasonModal({{ stage.id }}, false)"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Delay Reason</button></li>
                                         </ul>
                                     </div>
                                 </div>
@@ -739,6 +740,7 @@
                                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
                                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
                                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
+                                            <li><button type="button" class="dropdown-item" onclick="openDelayReasonModal({{ stage.id }}, false)"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Delay Reason</button></li>
                                         </ul>
                                     </div>
                                 </div>
@@ -1244,6 +1246,214 @@
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Delay Reason: standard tags are shown as always-visible toggle pills (no dropdown) —
+    // click to select/deselect, multiple at once.
+    $(document).on('click', '.delay-reason-tag-btn', function() {
+        const $btn = $(this);
+        const nowActive = !$btn.hasClass('active');
+        $btn.toggleClass('active', nowActive);
+        $btn.toggleClass('btn-primary', nowActive).toggleClass('btn-outline-secondary', !nowActive);
+    });
+
+    // New reason tags are created server-side immediately so only real tag IDs are ever
+    // saved, then appended as an already-selected pill next to the standard ones.
+    function addNewDelayReasonTag(stageId) {
+        const $container = $(`.delay-reason-tags[data-stage-id="${stageId}"]`);
+        const $input = $container.siblings('.input-group').find('.delay-reason-new-input');
+        const name = $.trim($input.val());
+        if (!name) return;
+
+        const isExisting = $container.find('.delay-reason-tag-btn').filter(function() {
+            return $.trim($(this).text()).toLowerCase() === name.toLowerCase();
+        });
+        if (isExisting.length) {
+            isExisting.addClass('active btn-primary').removeClass('btn-outline-secondary');
+            $input.val('');
+            return;
+        }
+
+        $.ajax({
+            url: "{% url 'add_delay_reason_tag_ajax' %}",
+            method: 'POST',
+            data: { name: name, csrfmiddlewaretoken: '{{ csrf_token }}' },
+            success: function(response) {
+                if (response.status === 'success') {
+                    const $btn = $('<button type="button" class="btn btn-sm delay-reason-tag-btn active btn-primary"></button>')
+                        .attr('data-tag-id', response.id)
+                        .text(response.name);
+                    $container.append($btn);
+                    $input.val('');
+                } else {
+                    alert('Error creating new reason.');
+                }
+            },
+            error: function() {
+                alert('Error creating new reason.');
+            }
+        });
+    }
+
+    $(document).on('click', '.delay-reason-add-btn', function() {
+        addNewDelayReasonTag($(this).data('stage-id'));
+    });
+    $(document).on('keydown', '.delay-reason-new-input', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const stageId = $(this).closest('.mb-3').find('.delay-reason-tags').data('stage-id');
+            addNewDelayReasonTag(stageId);
+        }
+    });
+
+    // Holds the not-yet-saved field edit that triggered the mandatory popup (if any),
+    // keyed by stage id. Nothing is written to the server for that field until the
+    // delay reason is saved alongside it in the same request — see saveDelayReason.
+    window.__pendingDelayFieldUpdate = window.__pendingDelayFieldUpdate || {};
+    // Snapshot of the reason picker's state when the modal was opened, so Cancel can
+    // put it back exactly as it was (discarding any un-saved tag/description edits).
+    window.__delayReasonSnapshot = window.__delayReasonSnapshot || {};
+
+    window.setPendingDelayFieldUpdate = function(stageId, fieldName, newValue) {
+        window.__pendingDelayFieldUpdate[stageId] = { field_name: fieldName, new_value: newValue };
+    };
+
+    // Opens the Delay Reason modal for a stage.
+    // mandatory=true (auto-triggered after a delayed, not-yet-saved edit) disables the
+    // backdrop/Escape shortcuts so it can't be dismissed by accident — only the explicit
+    // Cancel/close button, which discards the pending change, closes it. mandatory=false
+    // (Actions dropdown) is a normal dismissible modal for reviewing/backfilling reasons
+    // at any time, and clears any stale pending edit for this stage.
+    window.openDelayReasonModal = function(stageId, mandatory) {
+        const modalEl = document.getElementById('delayReasonModal' + stageId);
+        if (!modalEl) return;
+        if (!mandatory) {
+            delete window.__pendingDelayFieldUpdate[stageId];
+        }
+        window.__delayReasonSnapshot[stageId] = {
+            activeIds: $(modalEl).find('.delay-reason-tag-btn.active').map(function() {
+                return $(this).data('tag-id').toString();
+            }).get(),
+            description: $(modalEl).find('textarea').val()
+        };
+        modalEl.querySelector('.delay-reason-error').style.display = 'none';
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl, {
+            backdrop: mandatory ? 'static' : true,
+            keyboard: !mandatory
+        });
+        modal.show();
+    };
+
+    // Cancel: discards the pending (unsaved) field edit and reason-picker changes, puts
+    // the triggering input back to its last actually-saved value, and closes the modal —
+    // the user has to re-enter the date (and go through this again) if they want it saved.
+    window.cancelDelayReason = function(stageId) {
+        const modalEl = document.getElementById('delayReasonModal' + stageId);
+        if (!modalEl) return;
+
+        const pending = window.__pendingDelayFieldUpdate[stageId];
+        if (pending) {
+            const pendingInput = document.querySelector(`[data-stage-id="${stageId}"][data-field-name="${pending.field_name}"]`);
+            if (pendingInput) {
+                pendingInput.value = pendingInput.dataset.previousValue !== undefined ? pendingInput.dataset.previousValue : '';
+            }
+        }
+        delete window.__pendingDelayFieldUpdate[stageId];
+
+        const snapshot = window.__delayReasonSnapshot[stageId];
+        if (snapshot) {
+            $(modalEl).find('.delay-reason-tag-btn').each(function() {
+                const isActive = snapshot.activeIds.includes($(this).data('tag-id').toString());
+                $(this).toggleClass('active btn-primary', isActive).toggleClass('btn-outline-secondary', !isActive);
+            });
+            $(modalEl).find('textarea').val(snapshot.description);
+        }
+        $(modalEl).find('.delay-reason-error').hide();
+
+        const indicator = document.getElementById(`autosave-indicator-${stageId}`);
+        if (indicator) indicator.innerHTML = '';
+
+        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    };
+
+    $(document).on('click', '.delay-reason-cancel, .delay-reason-close', function() {
+        window.cancelDelayReason($(this).data('stage-id'));
+    });
+
+    window.saveDelayReason = function(stageId) {
+        const modalEl = document.getElementById('delayReasonModal' + stageId);
+        const reasonIds = $(modalEl).find('.delay-reason-tag-btn.active').map(function() {
+            return $(this).data('tag-id').toString();
+        }).get();
+        const description = $(modalEl).find('textarea').val();
+        const $error = $(modalEl).find('.delay-reason-error');
+
+        if (reasonIds.length === 0) {
+            $error.text('Please select at least one reason.').show();
+            return;
+        }
+        $error.hide();
+
+        const pending = window.__pendingDelayFieldUpdate[stageId];
+        const payload = { reason_ids: reasonIds, description: description };
+        if (pending) {
+            payload.field_name = pending.field_name;
+            payload.new_value = pending.new_value;
+        }
+
+        fetch("{% url 'save_stage_delay_reason_ajax' 0 %}".replace('0', stageId), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+            if (ok && data.status === 'success') {
+                delete window.__pendingDelayFieldUpdate[stageId];
+
+                if (pending) {
+                    const pendingInput = document.querySelector(`[data-stage-id="${stageId}"][data-field-name="${pending.field_name}"]`);
+                    if (pendingInput) pendingInput.dataset.previousValue = pending.new_value;
+                }
+                if (data.updated_actual_date !== undefined) {
+                    const actualDateInput = document.querySelector(`input[name="actual_date_${stageId}"]`);
+                    if (actualDateInput) {
+                        actualDateInput.value = data.updated_actual_date;
+                        actualDateInput.dataset.previousValue = data.updated_actual_date;
+                    }
+                }
+                if (data.updated_status !== undefined) {
+                    const statusSelect = document.querySelector(`select[name="status_${stageId}"]`);
+                    if (statusSelect) {
+                        statusSelect.value = data.updated_status;
+                        statusSelect.dataset.previousValue = data.updated_status;
+                    }
+                }
+                const indicator = document.getElementById(`autosave-indicator-${stageId}`);
+                if (indicator) {
+                    indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+                    setTimeout(() => { indicator.innerHTML = ''; }, 3000);
+                }
+
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            } else {
+                $error.text((data && data.message) || 'Error saving delay reason.').show();
+            }
+        })
+        .catch(() => {
+            $error.text('An unexpected network error occurred.').show();
+        });
+    };
+
+    $(document).on('click', '.delay-reason-save', function() {
+        window.saveDelayReason($(this).data('stage-id'));
+    });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
     // Helper function to get the CSRF token from cookies
     function getCookie(name) {
         let cookieValue = null;
@@ -1322,6 +1532,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const indicator = document.getElementById(`autosave-indicator-${stageId}`);
         indicator.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
 
+        const previousValue = input.dataset.previousValue !== undefined ? input.dataset.previousValue : '';
         const url = "{% url 'update_stage_ajax' 0 %}".replace('0', stageId);
 
         try {
@@ -1342,15 +1553,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (response.ok && data.status === 'success') {
                 indicator.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
-                
+                input.dataset.previousValue = newValue;
+
                 // Update actual date input if the backend auto-filled or cleared it
                 if (data.updated_actual_date !== undefined) {
                     const actualDateInput = document.querySelector(`input[name="actual_date_${stageId}"]`);
                     if (actualDateInput) {
                         actualDateInput.value = data.updated_actual_date;
+                        actualDateInput.dataset.previousValue = data.updated_actual_date;
                     }
                 }
+                // Entering a finish date also completes the stage server-side — reflect
+                // that in the status dropdown too, since it wasn't the field the user touched.
+                if (data.updated_status !== undefined) {
+                    const statusSelect = document.querySelector(`select[name="status_${stageId}"]`);
+                    if (statusSelect) {
+                        statusSelect.value = data.updated_status;
+                        statusSelect.dataset.previousValue = data.updated_status;
+                    }
+                }
+            } else if (response.ok && data.status === 'pending_delay_reason') {
+                // Nothing has been saved — the backend withheld this change because it
+                // would mark the stage delayed. It's only committed once a reason is
+                // supplied and saved via the modal (see saveDelayReason).
+                indicator.innerHTML = '<i class="fas fa-exclamation-triangle text-warning" title="Delay reason required to save"></i>';
+                if (window.openDelayReasonModal && window.setPendingDelayFieldUpdate) {
+                    window.setPendingDelayFieldUpdate(stageId, fieldName, newValue);
+                    window.openDelayReasonModal(stageId, true);
+                }
             } else {
+                // Rejected — nothing was saved, so put the field back to what's actually
+                // on record (e.g. marking Completed with no Actual Finish Date gets
+                // reverted rather than left showing an unsaved "Completed").
+                input.value = previousValue;
                 indicator.innerHTML = `<i class="fas fa-times-circle text-danger" title="${data.message || 'Unknown error'}"></i>`;
                 alert(`Error saving stage: ${data.message}`);
             }
@@ -1369,6 +1604,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Attach the event listener to all designated input fields
     const autosaveInputs = document.querySelectorAll('.autosave-input');
     autosaveInputs.forEach(input => {
+        // Tracks the last confirmed-saved value so a rejected change (e.g. marking a
+        // stage Completed without an Actual Finish Date) can be visually reverted
+        // instead of leaving the field showing a value that was never actually saved.
+        input.dataset.previousValue = input.value;
         input.addEventListener('change', handleStageUpdate);
 
         // Prevent form submission on Enter key

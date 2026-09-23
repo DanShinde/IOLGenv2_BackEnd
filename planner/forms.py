@@ -5,6 +5,15 @@ from employees.models import Employee
 from .models import Project, Activity, Leave, Site, SiteAllocation
 
 class ProjectForm(forms.ModelForm):
+    # Not columns on planner.Project -- these live on the linked tracker.Project.
+    # Required (enforced in the view) only when creating a brand-new project, since
+    # that's when this form is used to also create the tracker.Project counterpart;
+    # editing an existing project leaves the linked tracker.Project's copy of these
+    # untouched, same as before this form grew these fields.
+    value = forms.DecimalField(max_digits=12, decimal_places=2, required=False, label="Project Value")
+    so_punch_date = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}), label="SO Punch Date")
+    description = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 2}), label="Description")
+
     class Meta:
         model = Project
         fields = ['project_id', 'customer_name', 'segment', 'team_lead']
@@ -15,7 +24,7 @@ class ProjectForm(forms.ModelForm):
             field.widget.attrs.update({
                 'class': 'form-input w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all duration-200'
             })
-        
+
         self.fields['project_id'].widget.attrs.update({
             'placeholder': 'Enter unique project code (e.g., PROJ-001)'
         })

@@ -189,6 +189,27 @@ class StageRemark(models.Model):
     def __str__(self):
         return f"Remark for {self.stage.name} at {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
+class DelayReasonTag(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+class StageDelayReason(models.Model):
+    stage = models.OneToOneField(Stage, on_delete=models.CASCADE, related_name='delay_reason')
+    reasons = models.ManyToManyField(DelayReasonTag, related_name='stage_delays', blank=True)
+    description = models.TextField(blank=True)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Delay reason for {self.stage}"
+
 # General project-level comments/chat
 class ProjectComment(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='comments')

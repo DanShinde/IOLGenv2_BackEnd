@@ -61,6 +61,41 @@
     </div>
 </div>
 
+<div class="modal fade" id="delayReasonModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Delay Reason - {{ stage.name }}</h5>
+                <button type="button" class="btn-close delay-reason-close" data-stage-id="{{ stage.id }}" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">This stage's actual finish date is later than its planned date. Please select at least one reason for the delay, or cancel to re-enter the date later.</p>
+                <div class="mb-3">
+                    <label class="form-label">Reason(s) for Delay <span class="text-danger">*</span></label>
+                    <div class="delay-reason-tags d-flex flex-wrap gap-2 mb-2" data-stage-id="{{ stage.id }}">
+                        {% for tag in all_delay_reason_tags %}
+                        <button type="button" class="btn btn-sm delay-reason-tag-btn {% if tag in stage.delay_reason.reasons.all %}btn-primary active{% else %}btn-outline-secondary{% endif %}" data-tag-id="{{ tag.id }}">{{ tag.name }}</button>
+                        {% endfor %}
+                    </div>
+                    <div class="input-group input-group-sm" style="max-width: 320px;">
+                        <input type="text" class="form-control delay-reason-new-input" placeholder="Add a new reason...">
+                        <button type="button" class="btn btn-outline-primary delay-reason-add-btn" data-stage-id="{{ stage.id }}"><i class="fas fa-plus me-1"></i>Add</button>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label for="delay-reason-description-{{ stage.id }}" class="form-label">Description (optional)</label>
+                    <textarea class="form-control" id="delay-reason-description-{{ stage.id }}" rows="3" placeholder="Add any additional detail...">{{ stage.delay_reason.description|default:'' }}</textarea>
+                </div>
+                <div class="delay-reason-error text-danger small" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary delay-reason-cancel" data-stage-id="{{ stage.id }}">Cancel</button>
+                <button type="button" class="btn btn-primary delay-reason-save" data-stage-id="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="historyModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
