@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Project, Stage, trackerSegment, ContactPerson, ProjectComment
+from django.db.models import Count
+from .models import Project, Stage, trackerSegment, ContactPerson, ProjectComment, DelayReasonTag
 from import_export.admin import ImportExportModelAdmin
 
 
@@ -32,6 +33,19 @@ class ContactPersonAdmin(admin.ModelAdmin):
     list_display = ('first_name', 'last_name', 'email')
     search_fields = ('first_name', 'last_name', 'email', 'name')
     fields = ('first_name', 'last_name', 'email') # 'name' is hidden and auto-calculated
+
+@admin.register(DelayReasonTag)
+class DelayReasonTagAdmin(admin.ModelAdmin):
+    list_display = ('name', 'used_in_stages', 'created_at')
+    search_fields = ('name',)
+    ordering = ('name',)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_stage_count=Count('stage_delays'))
+
+    @admin.display(description='Used in stages', ordering='_stage_count')
+    def used_in_stages(self, obj):
+        return obj._stage_count
 
 @admin.register(ProjectComment)
 class ProjectCommentAdmin(admin.ModelAdmin):
