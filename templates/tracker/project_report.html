@@ -319,23 +319,23 @@
                                             </div>
                                             <div class="detail-item">
                                                 <h6>Automation Schedule</h6>
-                                                <p>
+                                                {% if item.phase_schedules %}<div>{% for ps in item.phase_schedules %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ ps.label }}</span> {% include 'tracker/partials/schedule_badge.html' with value=ps.auto %}</div>{% endfor %}{% if item.handover_schedule is not None %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">Handover</span> {% include 'tracker/partials/schedule_badge.html' with value=item.handover_schedule %}</div>{% endif %}</div>{% else %}<p>
                                                     {% if item.auto_schedule is not None %}
                                                         {% if item.auto_schedule > 0 %}<span class="badge bg-danger">Delayed by {{ item.auto_schedule }} day{{ item.auto_schedule|pluralize }}</span>
                                                         {% elif item.auto_schedule < 0 %}<span class="badge bg-success">Ahead by {{ item.auto_schedule|abs }} day{{ item.auto_schedule|abs|pluralize }}</span>
                                                         {% else %}<span class="badge bg-primary">On Time</span>{% endif %}
                                                     {% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                                                </p>
+                                                </p>{% endif %}
                                             </div>
                                             <div class="detail-item">
                                                 <h6>Emulation Schedule</h6>
-                                                 <p>
+                                                 {% if item.phase_schedules %}<div>{% for ps in item.phase_schedules %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ ps.label }}</span> {% include 'tracker/partials/schedule_badge.html' with value=ps.emu %}</div>{% endfor %}</div>{% else %}<p>
                                                     {% if item.emu_schedule is not None %}
                                                         {% if item.emu_schedule > 0 %}<span class="badge bg-danger">Delayed by {{ item.emu_schedule }} day{{ item.emu_schedule|pluralize }}</span>
                                                         {% elif item.emu_schedule < 0 %}<span class="badge bg-success">Ahead by {{ item.emu_schedule|abs }} day{{ item.emu_schedule|abs|pluralize }}</span>
                                                         {% else %}<span class="badge bg-primary">On Time</span>{% endif %}
                                                     {% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                                                </p>
+                                                </p>{% endif %}
                                             </div>
                                             <div class="detail-item">
                                                 <h6>Next Automation Milestone</h6>
@@ -634,13 +634,14 @@
                             <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
                                 <table class="table table-sm table-custom mb-0">
                                     <thead class="table-light">
-                                        <tr><th>Code</th><th>Customer</th><th>Stage</th><th>Reason(s)</th><th>Description</th><th>Planned Date</th><th>Actual Date</th><th class="text-center">Delay (days)</th></tr>
+                                        <tr><th>Code</th><th>Customer</th>{% if show_delay_phase_column %}<th>Phase</th>{% endif %}<th>Stage</th><th>Reason(s)</th><th>Description</th><th>Planned Date</th><th>Actual Date</th><th class="text-center">Delay (days)</th></tr>
                                     </thead>
                                     <tbody id="delayDetailBody">
                                         {% for d in delay_details %}
                                         <tr data-reasons="{{ d.reasons_display }}">
                                             <td>{{ d.code }}</td>
                                             <td>{{ d.customer }}</td>
+                                            {% if show_delay_phase_column %}<td>{{ d.phase|default:"-" }}</td>{% endif %}
                                             <td>{{ d.stage }}</td>
                                             <td>{{ d.reasons_display }}</td>
                                             <td>{{ d.description|default:"-" }}</td>

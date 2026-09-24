@@ -1,0 +1,64 @@
+{# One stage table (compact=1 renders just the rows, as a continuation row under the phase tabs) + its save form. Expects: project, stages, form_id, tab_value ('automation'|'emulation'), save_name, save_label, remarks_modal, phase_id_value (blank when the project has a single phase) #}
+<form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="{{ form_id }}">
+    {% csrf_token %}<input type="hidden" name="active_tab" value="{{ tab_value }}">
+    {% if phase_id_value %}<input type="hidden" name="phase_id" value="{{ phase_id_value }}">{% endif %}
+    {% if compact %}<input type="hidden" name="current_phase" class="current-phase-input" value="{{ active_phase_key }}">{% endif %}
+    {% if not compact %}<div class="d-flex justify-content-end align-items-center mb-3 d-print-none">
+        <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#{{ remarks_modal }}">
+            <i class="fas fa-comments me-1"></i> View All Remarks
+        </button>
+        <button type="submit" name="{{ save_name }}" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> {{ save_label }}</button>
+    </div>{% endif %}
+
+    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0">{% if compact %}<colgroup><col style="width:20%"><col style="width:12%"><col style="width:15%"><col style="width:15%"><col style="width:12%"><col style="width:12%"><col style="width:14%"></colgroup><tbody>{% else %}<thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%" class="d-print-none">Actions</th></tr></thead><tbody>{% endif %}
+
+        {% for stage in stages %}
+        <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="table-status-icon status-{{ stage.status|slugify }}">
+                        {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
+                        {% elif stage.status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
+                        {% elif stage.status == 'Hold' %}<i class="fas fa-pause"></i>
+                        {% elif stage.status == "Not Applicable" %}<i class="fas fa-ban"></i>
+                        {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
+                        {% endif %}
+                    </div>
+                    <strong>{{ stage.name }}</strong>{% if compact %}<span class="text-muted small ms-2">(whole project)</span>{% endif %}
+                </div>
+            </td>
+
+            <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
+            <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;" {% if stage.status != 'In Progress' %}disabled{% endif %}>
+                    <span class="text-muted small">%</span>
+                </div>
+                <div class="progress mt-1" style="height: 4px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ stage.completion_percentage|default:0 }}%;" aria-valuenow="{{ stage.completion_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </td>
+            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
+
+            <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
+            <td class="d-print-none">
+                <div class="d-flex align-items-center">
+                    <span class="autosave-indicator" id="autosave-indicator-{{ stage.id }}"></span>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
+                        <ul class="dropdown-menu">
+                            <li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
+                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
+                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
+                            <li><button type="button" class="dropdown-item" onclick="openDelayReasonModal({{ stage.id }}, false)"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Delay Reason</button></li>
+                        </ul>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody></table></div>
+</form>

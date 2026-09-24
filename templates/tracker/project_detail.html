@@ -519,7 +519,21 @@
         <div class="row mb-3">
             <div class="col-md-6 border-end">
                 <h6 class="text-muted">Next Automation Milestone</h6>
-                {% if next_automation_milestone %}
+                {% if multi_phase %}
+                    {% for pm in phase_milestones %}
+                    <div class="mb-1">
+                        <span class="badge bg-light text-dark border me-1">{{ pm.label }}</span>
+                        {% if pm.auto %}<strong>{{ pm.auto.name }}</strong> <span class="text-muted small">Planned: {{ pm.auto.planned_date|date:"M d, Y"|default:"-" }}</span>
+                        {% else %}<span class="text-muted small">Complete</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if next_handover_milestone %}
+                    <div class="mb-1">
+                        <span class="badge bg-light text-dark border me-1">Handover</span>
+                        <strong>{{ next_handover_milestone.name }}</strong> <span class="text-muted small">Planned: {{ next_handover_milestone.planned_date|date:"M d, Y"|default:"-" }}</span>
+                    </div>
+                    {% endif %}
+                {% elif next_automation_milestone %}
                     <strong>{{ next_automation_milestone.name }}</strong>
                     <div class="text-muted small mt-1">Planned: {{ next_automation_milestone.planned_date|date:"M d, Y" }}</div>
                 {% else %}
@@ -528,7 +542,15 @@
             </div>
             <div class="col-md-6">
                 <h6 class="text-muted">Next Emulation Milestone</h6>
-                {% if next_emulation_milestone %}
+                {% if multi_phase %}
+                    {% for pm in phase_milestones %}
+                    <div class="mb-1">
+                        <span class="badge bg-light text-dark border me-1">{{ pm.label }}</span>
+                        {% if pm.emu %}<strong>{{ pm.emu.name }}</strong> <span class="text-muted small">Planned: {{ pm.emu.planned_date|date:"M d, Y"|default:"-" }}</span>
+                        {% else %}<span class="text-muted small">Complete</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                {% elif next_emulation_milestone %}
                     <strong>{{ next_emulation_milestone.name }}</strong>
                     <div class="text-muted small mt-1">Planned: {{ next_emulation_milestone.planned_date|date:"M d, Y" }}</div>
                 {% else %}
@@ -540,219 +562,107 @@
         <div class="row">
             <div class="col-md-6 border-end">
                  <h6 class="text-muted">Automation Schedule</h6>
-                 {% with schedule_status=automation_schedule_status %}
+                 {% if multi_phase %}
+                    {% for pm in phase_milestones %}
+                    <div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ pm.label }}</span> {% include 'tracker/partials/schedule_badge.html' with value=pm.auto_schedule %}</div>
+                    {% endfor %}
+                    {% if handover_schedule is not None %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">Handover</span> {% include 'tracker/partials/schedule_badge.html' with value=handover_schedule %}</div>{% endif %}
+                {% else %}
+                {% with schedule_status=automation_schedule_status %}
                     {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
                  {% endwith %}
+                {% endif %}
             </div>
              <div class="col-md-6">
                 <h6 class="text-muted">Emulation Schedule</h6>
+                {% if multi_phase %}
+                    {% for pm in phase_milestones %}
+                    <div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ pm.label }}</span> {% include 'tracker/partials/schedule_badge.html' with value=pm.emu_schedule %}</div>
+                    {% endfor %}
+                {% else %}
                 {% with schedule_status=emulation_schedule_status %}
                    {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
                 {% endwith %}
+                {% endif %}
            </div>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header"><h5 class="card-header-title mb-0"><i class="fas fa-cogs"></i>Automation Timeline</h5></div>
-            <div class="card-body">
-                <div class="roadmap">
-                    <div class="roadmap-line"></div>
-                    <div class="roadmap-progress" style="width: {{ timeline_progress_auto }}%;"></div>
-                    {% for stage in automation_stages %}
-                        {% with status=stage.status|default:"Not started" %}
-                        <div class="roadmap-step">
-                            <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
-
-                                {% if status == "Completed" %}<i class="fas fa-check"></i>
-                                {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
-                                {% elif status == "Hold" %}<i class="fas fa-pause"></i>
-                                {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
-                                {% else %}<i class="far fa-circle"></i>
-                                {% endif %}
-                            </div>
-                            <div class="roadmap-label">{{ stage.name }}</div>
-                        </div>
-                        {% endwith %}
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header"><h5 class="card-header-title mb-0"><i class="fas fa-gamepad"></i>Emulation Timeline</h5></div>
-            <div class="card-body">
-                <div class="roadmap">
-                    <div class="roadmap-line"></div>
-                    <div class="roadmap-progress" style="width: {{ timeline_progress_emu }}%;"></div>
-                    {% for stage in emulation_stages %}
-                        {% with status=stage.status|default:"Not started" %}
-                        <div class="roadmap-step">
-                            <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
-
-                                {% if status == "Completed" %}<i class="fas fa-check"></i>
-                                {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
-                                {% elif status == "Hold" %}<i class="fas fa-pause"></i>
-                                {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
-                                {% else %}<i class="far fa-circle"></i>
-                                {% endif %}
-                            </div>
-                            <div class="roadmap-label">{{ stage.name }}</div>
-                        </div>
-                        {% endwith %}
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
+{% if multi_phase %}
 <div class="card mb-4">
-    <div class="card-body">
-        <ul class="nav nav-tabs mb-3" id="stageTabs" role="tablist">
-            <li class="nav-item" role="presentation"><button class="nav-link {% if request.GET.active_tab != 'emulation' %}active{% endif %}" id="automation-tab" data-bs-toggle="tab" data-bs-target="#automation-content" type="button" role="tab"><i class="fas fa-cogs me-2"></i>Automation</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link {% if request.GET.active_tab == 'emulation' %}active{% endif %}" id="emulation-tab" data-bs-toggle="tab" data-bs-target="#emulation-content" type="button" role="tab"><i class="fas fa-gamepad me-2"></i>Emulation</button></li>
-        </ul>
-        <div class="tab-content" id="stageTabsContent">
-            <div class="tab-pane fade {% if request.GET.active_tab != 'emulation' %}show active{% endif %}" id="automation-content" role="tabpanel">
-                <h4 class="d-none d-print-block mb-3">Automation Stages</h4>
-                <form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="automationStagesForm">
-                    {% csrf_token %}<input type="hidden" name="active_tab" value="automation">
-                    <div class="d-flex justify-content-end align-items-center mb-3 d-print-none">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-header-title mb-0"><i class="fas fa-layer-group"></i>Phases</h5>
+        {% if can_add_phase %}
+        <button type="button" class="btn btn-sm btn-primary d-print-none" data-bs-toggle="modal" data-bs-target="#addPhaseModal"><i class="fas fa-plus me-1"></i>Add Phase</button>
+        {% else %}<span class="text-muted small d-print-none">Completed projects can't get new phases</span>{% endif %}
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Phase</th><th>Zone Description</th><th>Status</th><th style="min-width:160px;">% Complete</th><th class="text-center">OTIF %</th><th class="d-print-none"></th></tr>
+            </thead>
+            <tbody>
+                {% for ps in phase_summaries %}
+                <tr>
+                    <td><strong>{{ ps.phase.label }}</strong></td>
+                    <td class="small text-muted" style="max-width:260px;">{{ ps.phase.zone_description|default:"-"|truncatechars:90 }}</td>
+                    <td><span class="badge {% if ps.status == 'Completed' %}bg-success{% elif ps.status == 'In Progress' %}bg-warning text-dark{% elif ps.status == 'Hold' %}bg-danger{% else %}bg-secondary{% endif %}">{{ ps.status }}</span></td>
+                    <td>
+                        <div class="progress" style="height: 8px;"><div class="progress-bar bg-primary" style="width: {{ ps.completion }}%;"></div></div>
+                        <small class="text-muted">{{ ps.completion }}%</small>
+                    </td>
+                    <td class="text-center">{% if ps.otif is not None %}{{ ps.otif }}%{% else %}-{% endif %}</td>
+                    <td class="text-end d-print-none text-nowrap">
+                        <button type="button" class="btn btn-sm btn-outline-secondary edit-phase-btn" title="Edit zone description" data-action="{% url 'tracker_edit_phase' ps.phase.id %}" data-label="{{ ps.phase.label }}" data-zone="{{ ps.phase.zone_description }}"><i class="fas fa-pen"></i></button>
+                        {% if can_delete_phases %}
+                        <form method="POST" action="{% url 'tracker_delete_phase' ps.phase.id %}" class="d-inline" onsubmit="return confirm('Delete {{ ps.phase.label }} and its stages? This only works if none of its stages has progress.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete phase"><i class="fas fa-trash"></i></button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer text-muted small">Handover is a single project-level stage: it can only be completed once every phase is done, and the project shows as Completed only then.</div>
+</div>
+{% endif %}
 
-                            <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#allRemarksModalAutomation">
-                                <i class="fas fa-comments me-1"></i> View All Remarks
-                            </button>
-
-                        <button type="submit" name="save_all_automation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Automation</button>
-                    </div>
-
-                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%" class="d-print-none">Actions</th></tr></thead><tbody>
-
-                        {% for stage in automation_stages %}
-                        <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="table-status-icon status-{{ stage.status|slugify }}">
-                                        {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
-                                        {% elif stage.status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
-                                        {% elif stage.status == 'Hold' %}<i class="fas fa-pause"></i>
-                                        {% elif stage.status == "Not Applicable" %}<i class="fas fa-ban"></i>
-                                        {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
-                                        {% endif %}
-                                    </div>
-                                    <strong>{{ stage.name }}</strong>
-                                </div>
-                            </td>
-
-                            <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
-                            <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;" {% if stage.status != 'In Progress' %}disabled{% endif %}>
-                                    <span class="text-muted small">%</span>
-                                </div>
-                                <div class="progress mt-1" style="height: 4px;">
-                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ stage.completion_percentage|default:0 }}%;" aria-valuenow="{{ stage.completion_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                            </td>
-                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
-
-                            <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
-                            <td class="d-print-none">
-                                <div class="d-flex align-items-center">
-                                    <span class="autosave-indicator" id="autosave-indicator-{{ stage.id }}"></span>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
-                                        <ul class="dropdown-menu">
-                                            <li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
-                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
-                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
-                                            <li><button type="button" class="dropdown-item" onclick="openDelayReasonModal({{ stage.id }}, false)"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Delay Reason</button></li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody></table></div>
-                </form>
-            </div>
-            <div class="tab-pane fade {% if request.GET.active_tab == 'emulation' %}show active{% endif %}" id="emulation-content" role="tabpanel">
-                <h4 class="d-none d-print-block mb-3">Emulation Stages</h4>
-                <form method="POST" action="{% url 'tracker_project_detail' project.id %}" id="emulationStagesForm">
-                    {% csrf_token %}<input type="hidden" name="active_tab" value="emulation">
-                    <div class="d-flex justify-content-end align-items-center mb-3 d-print-none">
-
-                            <button type="button" class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#allRemarksModalEmulation">
-                                <i class="fas fa-comments me-1"></i> View All Remarks
-                            </button>
-
-                        <button type="submit" name="save_all_emulation" value="1" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save All Emulation</button>
-                    </div>
-
-                    <div class="table-responsive table-card"><table class="table stage-table align-middle mb-0"><thead><tr><th style="width:20%">Stage</th><th style="width:12%">Planned Finish Date</th><th style="width:15%">Status</th><th style="width:15%">% Completion</th><th style="width:12%">Start Date</th><th style="width:12%">Finish Date</th><th style="width:14%" class="d-print-none">Actions</th></tr></thead><tbody>
-
-                        {% for stage in emulation_stages %}
-                        <tr class="{% if stage.status == 'Not Applicable' %}stage-not-applicable{% endif %}">
-                           <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="table-status-icon status-{{ stage.status|slugify }}">
-                                        {% if stage.status == 'Completed' %}<i class="fas fa-check"></i>
-                                        {% elif status == 'In Progress' %}<i class="fas fa-ellipsis-h"></i>
-                                        {% elif status == 'Hold' %}<i class="fas fa-pause"></i>
-                                        {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
-                                        {% else %}{% comment %} Empty for Not Started to show the outline circle {% endcomment %}
-                                        {% endif %}
-                                    </div>
-                                    <strong>{{ stage.name }}</strong>
-                                </div>
-                            </td>
-
-                            <td><input type="date" name="planned_date_{{ stage.id }}" class="form-control form-control-sm planned-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_date" value="{{ stage.planned_date|date:'Y-m-d' }}"></td>
-                            <td><select name="status_{{ stage.id }}" class="form-select form-select-sm status-select autosave-input" data-stage-id="{{ stage.id }}" data-field-name="status">{% for val, label in stage.STATUS_CHOICES %}<option value="{{ val }}" {% if stage.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <input type="number" name="completion_percentage_{{ stage.id }}" class="form-control form-control-sm autosave-input me-1" data-stage-id="{{ stage.id }}" data-field-name="completion_percentage" value="{{ stage.completion_percentage|default:0 }}" min="0" max="100" style="width: 65px;" {% if stage.status != 'In Progress' %}disabled{% endif %}>
-                                    <span class="text-muted small">%</span>
-                                </div>
-                                <div class="progress mt-1" style="height: 4px;">
-                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ stage.completion_percentage|default:0 }}%;" aria-valuenow="{{ stage.completion_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                            </td>
-                            <td><input type="date" name="planned_start_date_{{ stage.id }}" class="form-control form-control-sm autosave-input" data-stage-id="{{ stage.id }}" data-field-name="planned_start_date" value="{{ stage.planned_start_date|date:'Y-m-d' }}"></td>
-
-                            <td><input type="date" name="actual_date_{{ stage.id }}" class="form-control form-control-sm actual-date autosave-input" data-stage-id="{{ stage.id }}" data-field-name="actual_date" value="{{ stage.actual_date|date:'Y-m-d' }}"></td>
-                            <td class="d-print-none">
-                                <div class="d-flex align-items-center">
-                                    <span class="autosave-indicator" id="autosave-indicator-{{ stage.id }}"></span>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Actions</button>
-                                        <ul class="dropdown-menu">
-                                            <li><button type="submit" class="dropdown-item" name="stage_id" value="{{ stage.id }}"><i class="fas fa-save me-2"></i>Save Stage</button></li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
-                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
-                                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
-                                            <li><button type="button" class="dropdown-item" onclick="openDelayReasonModal({{ stage.id }}, false)"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Delay Reason</button></li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody></table></div>
-                </form>
-            </div>
-        </div>
+{% if multi_phase %}
+<ul class="nav nav-pills mb-3 d-print-none" id="phaseTabs" role="tablist">
+    {% for panel in panels %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if panel.key == active_phase_key %}active{% endif %}" id="phase-tab-{{ panel.uid }}" data-phase-key="{{ panel.key }}" data-bs-toggle="pill" data-bs-target="#phase-pane-{{ panel.uid }}" type="button" role="tab">{{ panel.title }}</button>
+    </li>
+    {% endfor %}
+</ul>
+<div class="tab-content" id="phaseTabsContent">
+    {% for panel in panels %}
+    <div class="tab-pane fade {% if panel.key == active_phase_key %}show active{% endif %}" id="phase-pane-{{ panel.uid }}" role="tabpanel">
+        <h4 class="d-none d-print-block mb-3">{{ panel.title }}</h4>
+        {% if panel.zone_description %}<p class="text-muted small mb-3"><i class="fas fa-map-marker-alt me-1"></i><strong>Zone:</strong> {{ panel.zone_description|linebreaksbr }}</p>{% endif %}
+        {% include 'tracker/partials/stage_panel.html' with panel=panel %}
+    </div>
+    {% endfor %}
+</div>
+{% if handover_stages %}
+<div class="card mb-4 border-2" id="handover-row">
+    <div class="card-body pb-2">
+        {% include 'tracker/partials/stage_table.html' with stages=handover_stages form_id='handoverStageForm' tab_value='automation' save_name='save_all_automation' save_label='Save' remarks_modal='allRemarksModalAutomation' phase_id_value='none' compact=1 %}
     </div>
 </div>
+{% endif %}
+{% else %}
+<div class="d-flex justify-content-end mb-2 d-print-none">
+    {% if can_add_phase %}
+    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPhaseModal"><i class="fas fa-plus me-1"></i>Add Phase</button>
+    {% endif %}
+</div>
+{% include 'tracker/partials/stage_panel.html' with panel=panels.0 %}
+{% endif %}
 
 <div class="card mb-4" id="project-notes">
     <div class="card-header">
@@ -945,6 +855,7 @@
 </div>
 
 
+{% include 'tracker/partials/phase_modals.html' %}
 {% for stage in automation_stages %}{% include 'tracker/partials/stage_modals.html' with stage=stage %}{% endfor %}
 {% for stage in emulation_stages %}{% include 'tracker/partials/stage_modals.html' with stage=stage %}{% endfor %}
 {% include 'tracker/partials/project_update_modals.html' with updates=updates contact_persons=contact_persons %}
@@ -1246,6 +1157,16 @@
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Keep the Handover row's form aware of which phase tab is open, so saving it lands
+    // back on that tab (Handover belongs to no phase of its own).
+    document.querySelectorAll('#phaseTabs [data-phase-key]').forEach(function (tab) {
+        tab.addEventListener('shown.bs.tab', function () {
+            document.querySelectorAll('.current-phase-input').forEach(function (input) {
+                input.value = tab.dataset.phaseKey;
+            });
+        });
+    });
+
     // Delay Reason: standard tags are shown as always-visible toggle pills (no dropdown) —
     // click to select/deselect, multiple at once.
     $(document).on('click', '.delay-reason-tag-btn', function() {

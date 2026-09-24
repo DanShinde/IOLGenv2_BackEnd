@@ -77,6 +77,10 @@
                     <a href="#projects-list" class="list-group-item list-group-item-action"><i class="fas fa-list-ul fa-fw me-2"></i>Projects List</a>
                     <a href="#project-detail" class="list-group-item list-group-item-action"><i class="fas fa-info-circle fa-fw me-2"></i>Project Detail Page</a>
                     <a href="#project-reports" class="list-group-item list-group-item-action"><i class="fas fa-chart-bar fa-fw me-2"></i>Reports & Analysis</a>
+                    <a href="#stage-rules" class="list-group-item list-group-item-action"><i class="fas fa-clipboard-check fa-fw me-2"></i>Stage Dates & Handover</a>
+                    <a href="#delay-reasons" class="list-group-item list-group-item-action"><i class="fas fa-exclamation-triangle fa-fw me-2"></i>Delay Reasons</a>
+                    <a href="#phases" class="list-group-item list-group-item-action"><i class="fas fa-layer-group fa-fw me-2"></i>Phases</a>
+                    <a href="#upcoming-milestones" class="list-group-item list-group-item-action"><i class="fas fa-calendar-alt fa-fw me-2"></i>Upcoming Milestones</a>
                 </div>
             </div>
         </div>
@@ -89,10 +93,10 @@
                 <p>Welcome to the Project Tracker! This application is designed to bring clarity, accountability, and real-time insights to your project management process. This guide will walk you through a typical project lifecycle from creation to analysis.</p>
                 
                 <h5>Step 1: Create a New Project</h5>
-                <p>All work is organized by project. To begin, navigate to the <strong><a href="{% url 'tracker_new_project' %}">Add New Project</a></strong> page. You will be asked to fill in a few key details that form the foundation of your project record: the <strong>Project Code</strong> (a unique ID), the <strong>Customer Name</strong>, its financial <strong>Value</strong>, the <strong>SO Punch Date</strong> (the official start date), and the business <strong>Segment</strong> it belongs to.</p>
+                <p>All work is organized by project. To begin, navigate to the <strong><a href="{% url 'tracker_new_project' %}">Add New Project</a></strong> page. You will be asked to fill in a few key details that form the foundation of your project record: the <strong>Project Code</strong> (a unique ID), the <strong>Customer Name</strong>, its financial <strong>Value</strong>, the <strong>SO Punch Date</strong> (the official start date), and the business <strong>Segment</strong> it belongs to. A project created from the Planner's <em>Add Project</em> form collects the same details and creates the matching Tracker project too, so a project always exists in both places.</p>
 
                 <h5>Step 2: Update Progress on the Detail Page</h5>
-                <p>The <strong>Project Detail Page</strong> is your primary workspace for managing a project's progress. Here, you'll find lists of predefined stages. The core workflow is to set a <code>Planned Date</code> for each stage, update its <code>Status</code> as work progresses, and critically, enter the <code>Actual Date</code> of completion. This data is the engine that drives all the performance metrics and reports in the application.</p>
+                <p>The <strong>Project Detail Page</strong> is your primary workspace for managing a project's progress. Here, you'll find lists of predefined stages. The core workflow is to set a <code>Planned Date</code> for each stage, update its <code>Status</code> as work progresses, and critically, enter the <code>Actual Date</code> of completion. This data is the engine that drives all the performance metrics and reports in the application. A few rules keep that data trustworthy &mdash; see <a href="#stage-rules">Stage Dates &amp; Handover</a>, <a href="#delay-reasons">Delay Reasons</a> and <a href="#phases">Phases</a>.</p>
                 
                 <h5>Step 3: Monitor with the Dashboard</h5>
                 <p>The <strong>Dashboard</strong> offers a high-level "mission control" view of your entire portfolio. It's designed for daily check-ins to monitor key health indicators, spot long-running "chronic" projects that may need attention, and review the pipeline of recently created work.</p>
@@ -135,13 +139,13 @@
                 <p>This is the central hub where all detailed work on a single project is managed and tracked.</p>
                 
                 <h5>Project Timelines & Stages</h5>
-                <p>The graphical roadmaps provide a quick visual summary of a project's progress. The solid green progress line is a key indicator, as it only advances to the last <strong>consecutively completed</strong> stage, giving you a true picture of committed progress. Below the timeline, the tabs for <strong>Automation</strong> and <strong>Emulation</strong> are where you perform the actual updates.</p>
+                <p>The graphical roadmaps provide a quick visual summary of a project's progress. The solid green progress line is a key indicator, as it only advances to the last <strong>consecutively completed</strong> stage, giving you a true picture of committed progress. Below the timeline, the tabs for <strong>Automation</strong> and <strong>Emulation</strong> are where you perform the actual updates. If the project has several phases, each phase has its own tab with its own timelines and stage tables &mdash; see <a href="#phases">Phases</a>.</p>
                  <img src="{% static 'tracker_static/project_stages_timeline.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project Stages Screenshot">
 
                 <h5>Project Summary & Key Metrics</h5>
                 <p>This card gives you a vital snapshot of the project's health. It includes schedule variance and two distinct OTIF (On-Time In-Full) metrics:</p>
                 <ul>
-                    <li><code>Overall OTIF % (All Stages)</code>: Think of this as the project's "term grade." It looks at every stage completed so far and calculates the percentage that met their planned deadline.</li>
+                    <li><code>Overall OTIF % (All Stages)</code>: Think of this as the project's "term grade." It looks at every stage completed so far and calculates the percentage that met their planned deadline. The <strong>Dispatch</strong> and <strong>Handover</strong> stages are deliberately left out of this figure (and of every other OTIF % in the app): Dispatch is only used for the Emulation Timing Analysis on the Reports page, and Handover is judged separately by <em>Project OTIF (Handover)</em>, which is unaffected. With several phases, the stages of all phases are counted together.</li>
                     <li><code>Project OTIF (Handover)</code>: Think of this as the project's "final exam." This metric focuses only on the final delivery and answers one question: was the project handed over on or before the promised date?</li>
                 </ul>
                 <img src="{% static 'tracker_static/project_summary.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project Summary Screenshot">
@@ -169,6 +173,110 @@
                     <li>Finally, you can click on any project row to expand its <strong>Collapsible Summary</strong> and view its key stats without leaving the page.</li>
                 </ol>
                  <img src="{% static 'tracker_static/report_filter.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Filter In Reports Screenshot">
+
+                <h5>Good to Know</h5>
+                <ul>
+                    <li><strong>Dispatch</strong> and <strong>Handover</strong> are not rows of the Stage-wise Planned vs Actual Summary, so they are not in its totals either, and neither is counted in any OTIF % (the Overall OTIF %, the OTIF trend and the dashboard's Department OTIF %). Dispatch is used only by the <em>Emulation Timing Analysis</em> chart at the bottom; Handover is judged by <em>Project OTIF (Handover)</em>.</li>
+                    <li>The <strong>Delay Reasons</strong> section at the bottom of the page explains <em>why</em> stages finished late &mdash; see <a href="#delay-reasons">Delay Reasons</a>.</li>
+                    <li>In projects with several phases, every phase's stage is counted separately in the stage tables and charts, so a two-phase project contributes two Offline Development stages. The Emulation Timing Analysis treats each phase as its own data point.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="stage-rules" class="help-section card mb-4">
+            <div class="card-body">
+                <h3><i class="fas fa-clipboard-check text-primary me-2"></i>Stage Dates &amp; Handover</h3>
+                <p>A few rules keep stage data consistent. They apply on the Project Detail page whether you edit a field directly (it saves automatically) or use <strong>Save Stage</strong> / <strong>Save All</strong>.</p>
+
+                <h5>Finish date and "Completed" go together</h5>
+                <ul>
+                    <li><strong>Entering an Actual Finish Date marks the stage Completed</strong> automatically. There is no separate step.</li>
+                    <li><strong>You can't mark a stage Completed without a finish date.</strong> The system will ask you to enter the date first; it no longer fills in today's date for you.</li>
+                    <li>Changing a stage away from Completed (for example back to In Progress) clears its finish date.</li>
+                    <li>You can't clear the finish date of a Completed stage. Change the status instead.</li>
+                    <li>With <strong>Save All</strong>, any row marked Completed without a finish date is skipped and named in the message; the other rows still save.</li>
+                </ul>
+
+                <h5>A late finish needs a reason</h5>
+                <p>If the finish date is later than the planned date, you are asked for a delay reason before anything is saved. See <a href="#delay-reasons">Delay Reasons</a>.</p>
+
+                <h5>Handover closes the project</h5>
+                <ul>
+                    <li>Handover is the project's single closing stage. <strong>It can only be completed once every other stage is Completed or Not Applicable</strong> &mdash; in every phase. If something is still open, the message lists what.</li>
+                    <li>The project shows as <strong>Completed</strong> when its Handover is Completed. Completed projects can't get new phases.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="delay-reasons" class="help-section card mb-4">
+            <div class="card-body">
+                <h3><i class="fas fa-exclamation-triangle text-primary me-2"></i>Delay Reasons</h3>
+                <p>Whenever a stage is finished later than planned, the team records <em>why</em>. This turns delay dates into a picture of what is actually costing us time.</p>
+
+                <h5>Recording a reason</h5>
+                <ol>
+                    <li>Enter the Actual Finish Date (or change the planned date) so that the stage ends up late. A <strong>Delay Reason</strong> popup opens.</li>
+                    <li>Click one or more reason tags. The standard ones are: Automation Resource Unavailability, Customer Dependency, Internal Dependencies (AD), Design Issues (Mech.), Design Issues (Elect.), Material Shortage and Incomplete IQ.</li>
+                    <li>Not listed? Type a new reason into <em>Add a new reason&hellip;</em> and click Add &mdash; it becomes a tag everyone can use.</li>
+                    <li>Optionally add a description, then click <strong>Save</strong>.</li>
+                </ol>
+                <ul>
+                    <li><strong>Nothing is saved until you save the reason.</strong> The finish date and Completed status are committed together with it. Refreshing the page mid-popup loses nothing that was on record.</li>
+                    <li><strong>Cancel</strong> throws the change away: the field goes back to what was saved and you re-enter it if you still want to.</li>
+                    <li>At least one reason is required to save.</li>
+                </ul>
+
+                <h5>Adding or editing a reason later</h5>
+                <p>Open a stage's <strong>Actions</strong> menu and choose <strong>Delay Reason</strong> at any time to add, review or change its reasons &mdash; handy for older delays that were recorded before this feature existed.</p>
+
+                <h5>In the reports</h5>
+                <p>At the bottom of the <strong>Reports</strong> page, the <em>Delay Reasons</em> section has a pie chart and table by reason: <strong>total delay days</strong>, number of stages and share. Click a slice, or <strong>View Detailed Delay Report</strong>, to see each delayed stage with its project, reasons and description. It follows the report's filters and date range.</p>
+
+                <h5>Managing the reason list</h5>
+                <p>Staff can rename or delete reasons in the admin site under <em>Tracker &rarr; Delay reason tags</em>, which also shows how many stages use each one. Renaming updates every past record; deleting removes that reason from the stages that used it, so prefer renaming.</p>
+            </div>
+        </div>
+
+        <div id="phases" class="help-section card mb-4">
+            <div class="card-body">
+                <h3><i class="fas fa-layer-group text-primary me-2"></i>Phases</h3>
+                <p>A project delivered in stages over time &mdash; for example Zone A in January and Zone B in September &mdash; can be split into <strong>phases</strong>. Each phase has its own copy of the stage list, so finishing Phase 1's Offline Development doesn't wait for Phase 2's.</p>
+                <p>A project with a single phase looks exactly as it always did: phases are never mentioned until you add a second one.</p>
+
+                <h5>Adding a phase</h5>
+                <ul>
+                    <li>Click <strong>Add Phase</strong> on the Project Detail page and describe the zone the new phase covers (optional). The first time you split a project you can also describe the existing scope, which becomes Phase 1.</li>
+                    <li>The new phase gets a fresh copy of every stage with blank dates. <strong>Handover is not repeated</strong>: it stays a single project-level stage.</li>
+                    <li>A project that is already <strong>Completed</strong> can't get a new phase.</li>
+                </ul>
+
+                <h5>The Project Detail page with phases</h5>
+                <ul>
+                    <li>The <strong>Phases</strong> table shows each phase's zone description, status, % complete and OTIF %. Use the pencil to edit a zone description at any time.</li>
+                    <li>Each phase has its own <strong>tab</strong> with its own Automation and Emulation timelines and stage tables. <strong>Save All</strong> inside a tab only saves that phase.</li>
+                    <li>The <strong>Handover</strong> row sits under the tabs, so it stays visible whichever phase you're viewing.</li>
+                    <li><strong>Next Automation / Emulation Milestone</strong> and the <strong>Automation / Emulation Schedule</strong> (days ahead or delayed) are shown phase by phase, with Handover on its own line. The same per-phase schedule appears in the Reports project rows, and a phase label is added to stage names in report drill-down lists, the Project Activity log and the milestone exports.</li>
+                    <li>A phase can be deleted with the bin icon only if it isn't the last phase and none of its stages has progress. Deleting it also removes those stages' history, remarks and delay reasons.</li>
+                </ul>
+
+                <h5>How the numbers behave</h5>
+                <ul>
+                    <li><strong>Completion %</strong> is still the average over all applicable stages, so adding a phase lowers it straight away (its new stages start at 0%). Dashboard and report health colours follow that figure.</li>
+                    <li><strong>Project status</strong> becomes Completed only when Handover is completed, which in turn needs every phase's stages done.</li>
+                    <li><strong>OTIF</strong> is judged per stage, so each phase's stages count on their own; the project-level OTIF blends all phases. <em>Project OTIF (Handover)</em> still looks only at Handover.</li>
+                    <li>The Dashboard and Reports count <strong>each phase's stage separately</strong> (counts can exceed the number of projects), and a phase's dates land in its own months. A project stays "live" until Handover, even if an early phase was delivered long ago.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="upcoming-milestones" class="help-section card mb-4">
+            <div class="card-body">
+                <h3><i class="fas fa-calendar-alt text-primary me-2"></i>Upcoming Milestones</h3>
+                <p>A single list of stages by planned date, with filters for Overdue, Today, Tomorrow, This/Next Week and This/Next Month, plus Team Lead and Segment.</p>
+                <ul>
+                    <li>The date-range filters (Today through Next Month) show <strong>every stage planned in that range, including ones already completed</strong>, so you can see the full plan for the period. <em>Overdue</em> and <em>All</em> list only open stages.</li>
+                    <li>For projects with several phases, each stage carries its <strong>phase</strong> badge.</li>
+                </ul>
             </div>
         </div>
     </div>

@@ -101,7 +101,7 @@
                         </tr>
                         {% for stage in group.stages %}
                         <tr>    
-                            <td><i class="fa fa-angle-right me-2 text-muted"></i>{{ stage.name }}</td>
+                            <td><i class="fa fa-angle-right me-2 text-muted"></i>{{ stage.name }}{% if stage.phase and stage.project_id in multi_phase_project_ids %} <span class="badge bg-light text-dark border ms-1">{{ stage.phase.label }}</span>{% endif %}</td>
                             <td><span class="status-badge bg-{{ stage.status|slugify }}">{{ stage.status }}</span></td>
                             <td>{{ stage.planned_date|date:"M d, Y" }}</td>
                             <td>

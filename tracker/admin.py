@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.db.models import Count
-from .models import Project, Stage, trackerSegment, ContactPerson, ProjectComment, DelayReasonTag
+from .models import Project, Stage, Phase, trackerSegment, ContactPerson, ProjectComment, DelayReasonTag
 from import_export.admin import ImportExportModelAdmin
 
 
@@ -16,10 +16,17 @@ class ProjectAdmin(ImportExportModelAdmin, admin.ModelAdmin):
 
 @admin.register(Stage)
 class StageAdmin(ImportExportModelAdmin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'project', 'planned_date', 'actual_date', 'status', 'completion_percentage')
+    list_display = ('id', 'name', 'project', 'phase', 'planned_date', 'actual_date', 'status', 'completion_percentage')
     search_fields = ('name', 'project__code')
+    list_select_related = ('project', 'phase')
     list_filter = ('status',)
 
+
+@admin.register(Phase)
+class PhaseAdmin(admin.ModelAdmin):
+    list_display = ('project', 'number', 'name', 'zone_description')
+    search_fields = ('project__code', 'name', 'zone_description')
+    list_select_related = ('project',)
 
 @admin.register(trackerSegment)
 class SegmentAdmin(admin.ModelAdmin):

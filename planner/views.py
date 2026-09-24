@@ -260,7 +260,7 @@ def project_list_view(request):
             # a standalone planner.Project with no Tracker counterpart and none of
             # Tracker's required fields. The linked planner.Project is then auto-created
             # by planner/signals.py's post_save handler on tracker.Project.
-            from tracker.models import Project as TrackerProject, Stage as TrackerStage, trackerSegment
+            from tracker.models import Project as TrackerProject, trackerSegment
 
             if not form.cleaned_data.get('value') or not form.cleaned_data.get('so_punch_date'):
                 form.add_error(None, "Project Value and SO Punch Date are required to create a new project.")
@@ -282,10 +282,7 @@ def project_list_view(request):
                 )
                 # Same stage checklist a project gets when created directly in Tracker,
                 # so it's not missing its automation/emulation stages.
-                for stage_name, _ in TrackerStage.AUTOMATION_STAGES:
-                    TrackerStage.objects.create(project=tracker_project, name=stage_name, stage_type='Automation')
-                for stage_name, _ in TrackerStage.EMULATION_STAGES:
-                    TrackerStage.objects.create(project=tracker_project, name=stage_name, stage_type='Emulation')
+                tracker_project.seed_stages()
 
                 return redirect('planner_project_list')
     
