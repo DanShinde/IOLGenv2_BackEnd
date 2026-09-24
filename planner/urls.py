@@ -17,6 +17,7 @@ urlpatterns = [
     path('site-allocation/<int:pk>/update/', views.update_site_allocation_view, name='planner_update_site_allocation'),
     path('site-allocation/<int:pk>/relieve/', views.relieve_site_allocation_view, name='planner_relieve_site_allocation'),
     path('project/<int:pk>/delete/', views.delete_project_view, name='planner_delete_project'),
+    path('project/<int:pk>/archive/', views.toggle_archive_project_view, name='planner_toggle_archive_project'),
     path('reports/site-history/', views.employee_site_history_report_view, name='planner_site_history_report'),
     path('reports/resource-availability/', views.resource_availability_report_view, name='planner_resource_availability_report'),
     path('reports/site-history/export/excel/', views.export_site_history_excel, name='planner_site_history_export_excel'),
