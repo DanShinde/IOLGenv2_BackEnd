@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Log | AutoVerse{% endblock %}
+
+{% block styles %}
+<style>
+    .log-card { background:#fff; border-radius:12px; box-shadow:var(--card-shadow); }
+    .log-stat { padding:1rem 1.25rem; }
+    .log-stat .value { font-size:1.6rem; font-weight:700; line-height:1.1; }
+    .log-stat .label { color:var(--gray); font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; }
+    .log-table th { white-space:nowrap; font-size:.8rem; text-transform:uppercase; color:var(--gray); }
+    .log-table td { vertical-align:middle; font-size:.88rem; }
+    .log-path { color:var(--gray); font-size:.78rem; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ev-badge { font-size:.72rem; font-weight:600; padding:.3em .6em; border-radius:6px; }
+    .ev-LOGIN { background:#d1f2dd; color:#146c2e; }
+    .ev-LOGOUT { background:#e2e6ea; color:#495057; }
+    .ev-LOGIN_FAILED, .ev-DENIED { background:#fbd5d9; color:#a11d2c; }
+    .ev-VIEW { background:#dde6fd; color:#2a45b8; }
+    .ev-ACTION { background:#ffe9b8; color:#8a5a00; }
+    .ev-DOWNLOAD { background:#e4d9fb; color:#5a32b3; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h2 class="mb-0"><i class="bi bi-journal-text me-2"></i>Log</h2>
+            <div class="text-muted small">Who signed in and what they did, across every software in AutoVerse. Visible to administrators only.</div>
+        </div>
+        <a class="btn btn-outline-success btn-sm" href="?{{ filter_query }}{% if filter_query %}&{% endif %}export=1">
+            <i class="bi bi-file-earmark-excel me-1"></i>Export to Excel
+        </a>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.total }}</div><div class="label">Events</div></div></div>
+        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.users }}</div><div class="label">People active</div></div></div>
+        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.logins }}</div><div class="label">Logins</div></div></div>
+        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.actions }}</div><div class="label">Changes made</div></div></div>
+        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value {% if totals.failed or totals.denied %}text-danger{% endif %}">{{ totals.failed }} / {{ totals.denied }}</div><div class="label">Failed logins / denied</div></div></div>
+    </div>
+
+    <form method="get" class="log-card p-3 mb-3">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">From</label>
+                <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">To</label>
+                <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Person</label>
+                <select name="user" class="form-select form-select-sm">
+                    <option value="">Everyone</option>
+                    {% for name in usernames %}<option value="{{ name }}" {% if filters.user == name %}selected{% endif %}>{{ name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Software</label>
+                <select name="app" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for a in apps %}<option value="{{ a }}" {% if filters.app == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Event</label>
+                <select name="event" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for value, label in event_choices %}<option value="{{ value }}" {% if filters.event == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1">Search</label>
+                <input type="text" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Activity, page, person">
+            </div>
+        </div>
+        <div class="mt-2 d-flex gap-2">
+            <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+            <a class="btn btn-outline-secondary btn-sm" href="?tab={{ tab }}">Reset (last 7 days)</a>
+        </div>
+    </form>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a class="nav-link {% if tab == 'activity' %}active{% endif %}" href="?{{ filter_query }}">Activity</a></li>
+        <li class="nav-item"><a class="nav-link {% if tab == 'users' %}active{% endif %}" href="?tab=users{% if filter_query %}&{{ filter_query }}{% endif %}">People summary</a></li>
+    </ul>
+
+    {% if tab == 'users' %}
+    <div class="log-card">
+        <div class="table-responsive">
+            <table class="table table-hover log-table mb-0">
+                <thead><tr><th>Person</th><th>Last active</th><th class="text-center">Logins</th><th class="text-center">Failed</th><th class="text-center">Page views</th><th class="text-center">Changes</th><th class="text-center">Downloads</th><th>Software used</th></tr></thead>
+                <tbody>
+                    {% for r in user_rows %}
+                    <tr>
+                        <td><a href="?user={{ r.username|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}"><strong>{{ r.username }}</strong></a></td>
+                        <td>{{ r.last_seen|date:"d M Y, H:i" }}</td>
+                        <td class="text-center">{{ r.logins }}</td>
+                        <td class="text-center {% if r.failed %}text-danger fw-bold{% endif %}">{{ r.failed }}</td>
+                        <td class="text-center">{{ r.views }}</td>
+                        <td class="text-center">{{ r.actions }}</td>
+                        <td class="text-center">{{ r.downloads }}</td>
+                        <td class="small text-muted">{{ r.apps }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="8" class="text-center text-muted py-4">No activity in this period.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="log-card">
+        <div class="table-responsive">
+            <table class="table table-hover log-table mb-0">
+                <thead><tr><th>Time</th><th>Person</th><th>Event</th><th>Software</th><th>Activity</th><th>Page</th><th>IP address</th></tr></thead>
+                <tbody>
+                    {% for e in page %}
+                    <tr>
+                        <td class="text-nowrap">{{ e.timestamp|date:"d M Y, H:i:s" }}</td>
+                        <td>{{ e.username|default:"-" }}</td>
+                        <td><span class="ev-badge ev-{{ e.event }}">{{ e.get_event_display }}</span></td>
+                        <td>{{ e.app|default:"-" }}</td>
+                        <td>{{ e.description }}{% if e.status_code and e.status_code >= 400 %} <span class="text-danger small">({{ e.status_code }})</span>{% endif %}</td>
+                        <td><div class="log-path" title="{{ e.method }} {{ e.path }}">{{ e.method }} {{ e.path }}</div></td>
+                        <td class="text-nowrap small text-muted">{{ e.ip_address|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">No activity matches these filters.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page.paginator.num_pages > 1 %}
+        <div class="d-flex justify-content-between align-items-center p-3 border-top">
+            <div class="small text-muted">Page {{ page.number }} of {{ page.paginator.num_pages }} &middot; {{ page.paginator.count }} entries</div>
+            <div class="btn-group btn-group-sm">
+                {% if page.has_previous %}<a class="btn btn-outline-secondary" href="?{{ filter_query }}{% if filter_query %}&{% endif %}page={{ page.previous_page_number }}">Previous</a>{% endif %}
+                {% if page.has_next %}<a class="btn btn-outline-secondary" href="?{{ filter_query }}{% if filter_query %}&{% endif %}page={{ page.next_page_number }}">Next</a>{% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

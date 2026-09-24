@@ -90,12 +90,16 @@ class LoginViewA(APIView):
         username = data.get('username')
         password = data.get('password')
         user = User.objects.filter(username= username).first()
+        from activitylog.models import ActivityLog
+        from activitylog.services import record_event
         if user and  user.check_password(password):
+            record_event(ActivityLog.Event.LOGIN, request=request._request, user=user, description='Signed in (API / desktop app)')
             refresh = RefreshToken.for_user(user)
             return Response({
                 "access_token": str(refresh.access_token),
                 "refresh_token": str(refresh)
             })
+        record_event(ActivityLog.Event.LOGIN_FAILED, request=request._request, username=str(username or ''), description='Failed sign-in attempt (API / desktop app)')
         return Response({"message": "Invalid Credentials"}, status=status.HTTP_400_BAD_REQUEST)
 
 class LogoutViewA(APIView):

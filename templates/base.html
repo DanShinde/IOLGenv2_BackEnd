@@ -564,6 +564,13 @@
               <i class="bi bi-cloud-arrow-down-fill"></i><span class="nav-label sidebar-text">Downloads</span>
             </a>
           </li>
+          {% if user.is_staff or user.is_superuser %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'activity_log' %}active{% endif %}" href="{% url 'activity_log' %}" title="Log">
+              <i class="bi bi-journal-text"></i><span class="nav-label sidebar-text">Log</span>
+            </a>
+          </li>
+          {% endif %}
         </ul>
       </div>
 
