@@ -12,6 +12,7 @@ urlpatterns = [
     path('employee/<int:pk>/delete/', views.delete_employee_view, name='planner_delete_employee'),
     path('leave/<int:pk>/delete/', views.delete_leave_view, name='planner_delete_leave'), # New URL
     path('site/<int:pk>/delete/', views.delete_site_view, name='planner_delete_site'),
+    path('site/<int:pk>/update/', views.update_site_view, name='planner_update_site'),
     path('site-allocation/<int:pk>/delete/', views.delete_site_allocation_view, name='planner_delete_site_allocation'),
     path('site-allocation/<int:pk>/update/', views.update_site_allocation_view, name='planner_update_site_allocation'),
     path('site-allocation/<int:pk>/relieve/', views.relieve_site_allocation_view, name='planner_relieve_site_allocation'),

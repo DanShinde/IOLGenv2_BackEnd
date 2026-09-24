@@ -1879,6 +1879,27 @@ def delete_site_view(request, pk):
     get_object_or_404(Site, pk=pk).delete()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
 
+def update_site_view(request, pk):
+    site = get_object_or_404(Site, pk=pk)
+    fallback = f"{reverse('planner_workforce')}?tab=site_team&subtab=sites"
+    if request.method == 'POST':
+        location = (request.POST.get('location') or '').strip()
+        if location:
+            if site.is_office:
+                name = (request.POST.get('name') or '').strip()
+                if name:
+                    site.name = name
+                    site.location = location
+                    site.save()
+            else:
+                project = Project.objects.filter(pk=request.POST.get('project')).first()
+                project_taken = project and Site.objects.filter(project=project).exclude(pk=site.pk).exists()
+                if project and not project_taken:
+                    site.project = project
+                    site.location = location
+                    site.save()
+    return _redirect_to_referer_or(request, fallback)
+
 def delete_site_allocation_view(request, pk):
     get_object_or_404(SiteAllocation, pk=pk).delete()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
