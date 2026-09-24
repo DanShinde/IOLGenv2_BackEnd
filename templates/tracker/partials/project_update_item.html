@@ -16,7 +16,7 @@
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <span class="fw-bold">{{ update.author.get_full_name|default:update.author.username|default:"System" }}</span>
+                            <span class="fw-bold">{% firstof update.author.get_full_name update.author.username "System" %}</span>
                             <small class="text-muted ms-2">{% if update.created_at %}{{ update.created_at|naturaltime }}{% endif %}</small>
                         </div>
                         <div class="d-flex align-items-center">

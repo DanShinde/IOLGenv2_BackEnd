@@ -234,7 +234,7 @@
                                 </div>
                             {% endif %}
                             <div class="text-muted mt-1" style="font-size: 0.75rem;">
-                                By {{ update.author.get_full_name|default:update.author.username }} • {{ update.created_at|naturaltime }}
+                                By {% firstof update.author.get_full_name update.author.username "System" %} • {{ update.created_at|naturaltime }}
                             </div>
                         </td>
 

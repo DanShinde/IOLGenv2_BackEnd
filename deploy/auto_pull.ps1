@@ -11,7 +11,8 @@
       2. Exits quietly when there is nothing new (the common case).
       3. Refuses to touch a dirty working tree - it never force-resets local work.
       4. Fast-forwards, then runs only the follow-up steps the diff actually needs:
-         pip install (requirements.txt changed), migrate (migrations changed),
+         pip install (requirements.txt changed), migrate (migrations changed -
+         currently PAUSED, see the follow-up steps below),
          collectstatic (static assets changed).
       5. Recycles the app so IIS/wfastcgi picks up the new code.
 
@@ -391,9 +392,14 @@ try {
         if (-not (Update-Dependencies)) { $failed = $true }
     }
 
+    # Auto-migrate is PAUSED - run `manage.py migrate` by hand on the VM for now.
+    # To resume, uncomment the block below and delete the warning after it.
+    # if ($needsMigrate) {
+    #     Write-Log 'Migrations changed - applying'
+    #     if (-not (Invoke-ManagePy -Arguments @('migrate', '--noinput') -Description 'migrate')) { $failed = $true }
+    # }
     if ($needsMigrate) {
-        Write-Log 'Migrations changed - applying'
-        if (-not (Invoke-ManagePy -Arguments @('migrate', '--noinput') -Description 'migrate')) { $failed = $true }
+        Write-Log 'Migrations changed but auto-migrate is paused - run manage.py migrate manually' -Level WARN
     }
 
     if ($needsStatic -and -not $SkipCollectStatic) {

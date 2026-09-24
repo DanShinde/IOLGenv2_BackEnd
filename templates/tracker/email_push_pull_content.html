@@ -92,7 +92,7 @@
                                     </td>
                                     <td>
                                         {% for remark in update.remarks.all %}
-                                            <div class="remark-item"><span class="remark-author">{{ remark.added_by.get_full_name|default:remark.added_by.username }}:</span> {{ remark.text }}</div>
+                                            <div class="remark-item"><span class="remark-author">{% firstof remark.added_by.get_full_name remark.added_by.username "System" %}:</span> {{ remark.text }}</div>
                                         {% endfor %}
                                     </td>
                                 </tr>

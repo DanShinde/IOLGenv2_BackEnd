@@ -15,7 +15,7 @@
                     <div class="remark-content">
                         <div class="remark-header">
                             <div>
-                                <strong class="remark-author">{{ remark.added_by.get_full_name|default:remark.added_by.username }}</strong>
+                                <strong class="remark-author">{% firstof remark.added_by.get_full_name remark.added_by.username "System" %}</strong>
                                 <span class="badge bg-light text-dark ms-2">{{ remark.stage.name }}</span>
                             </div>
                             <small class="remark-timestamp">{{ remark.created_at|naturaltime }}</small>
@@ -58,7 +58,7 @@
                     <div class="remark-content">
                         <div class="remark-header">
                             <div>
-                                <strong class="remark-author">{{ remark.added_by.get_full_name|default:remark.added_by.username }}</strong>
+                                <strong class="remark-author">{% firstof remark.added_by.get_full_name remark.added_by.username "System" %}</strong>
                                 <span class="badge bg-light text-dark ms-2">{{ remark.stage.name }}</span>
                             </div>
                             <small class="remark-timestamp">{{ remark.created_at|naturaltime }}</small>

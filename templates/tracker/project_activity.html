@@ -83,7 +83,7 @@
                         <i class="fas fa-long-arrow-alt-right text-muted mx-2"></i>
                         <span class="badge bg-primary-soft text-primary">{{ log.new_value|default:"(empty)" }}</span>
                     </div>
-                    <small class="text-muted d-block mt-2">By {{ log.changed_by.get_full_name|default:log.changed_by.username|default:"System" }} on {{ log.changed_at|date:"M d, Y, H:i" }}</small>
+                    <small class="text-muted d-block mt-2">By {% firstof log.changed_by.get_full_name log.changed_by.username "System" %} on {{ log.changed_at|date:"M d, Y, H:i" }}</small>
                 </div>
             </div>
             {% endfor %}
