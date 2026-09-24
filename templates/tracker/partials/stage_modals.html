@@ -38,7 +38,7 @@
                         </div>
                         <div class="remark-content">
                             <div class="remark-header">
-                                <strong class="remark-author">{{ remark.added_by.get_full_name|default:remark.added_by.username|default:"System" }}</strong>
+                                <strong class="remark-author">{% firstof remark.added_by.get_full_name remark.added_by.username "System" %}</strong>
                                 <small class="remark-timestamp">{{ remark.created_at|date:"M d, Y, H:i" }}</small>
                             </div>
                             <div class="remark-text">
