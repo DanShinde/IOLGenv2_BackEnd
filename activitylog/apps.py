@@ -7,5 +7,5 @@ class ActivityLogConfig(AppConfig):
     verbose_name = 'Log'
 
     def ready(self):
-        # Connects the login / logout / failed-login signal handlers
-        from . import signals  # noqa: F401
+        # Connects the login / logout / failed-login handlers and the record-change tracking
+        from . import changes, signals  # noqa: F401

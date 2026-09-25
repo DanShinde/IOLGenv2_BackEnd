@@ -68,36 +68,6 @@ def _sync_missing_employee_logins():
         sm.save(update_fields=['user'])
 
 
-def _sync_user_active_status():
-    """
-    Keep User.is_active aligned with the Planner/skill-gap employee roster: anyone
-    linked to a currently-active employee gets their login enabled; everyone else
-    (never an employee, or an employee who's since left) gets it disabled. This is
-    deliberately project-wide, not inventory-scoped, because auth.User itself is
-    shared by every app in this project - there's no such thing as "inactive in
-    inventory only".
-
-    Hard safety rail: superuser accounts are NEVER auto-deactivated here, no matter
-    what. This function runs unattended (including in production) every time the
-    active-employee list is read, so it must be structurally incapable of locking
-    out platform administration - that's not a decision an automated sync gets to
-    make, even if the superuser isn't in the employee roster.
-    """
-    active_employee_user_ids = list(
-        User.objects.filter(
-            skillmatrix__isnull=False, skillmatrix__employee__is_active=True
-        ).values_list('id', flat=True)
-    )
-
-    User.objects.filter(
-        is_superuser=False, is_active=False, id__in=active_employee_user_ids
-    ).update(is_active=True)
-
-    User.objects.filter(is_superuser=False, is_active=True).exclude(
-        id__in=active_employee_user_ids
-    ).update(is_active=False)
-
-
 def preview_employee_sync():
     """
     Read-only preview of exactly what sync_employee_users() would change, without
@@ -105,41 +75,28 @@ def preview_employee_sync():
     """
     from employees.models import Employee
 
-    employees_needing_login = list(
-        Employee.objects.filter(is_active=True).exclude(skill_matrix__user__isnull=False)
-    )
-
-    active_employee_user_ids = set(
-        User.objects.filter(
-            skillmatrix__isnull=False, skillmatrix__employee__is_active=True
-        ).values_list('id', flat=True)
-    )
-
     return {
-        'employees_needing_login': employees_needing_login,
-        'users_to_activate': list(
-            User.objects.filter(is_superuser=False, is_active=False, id__in=active_employee_user_ids)
-        ),
-        'users_to_deactivate': list(
-            User.objects.filter(is_superuser=False, is_active=True).exclude(id__in=active_employee_user_ids)
-        ),
-        'protected_superusers': list(
-            User.objects.filter(is_superuser=True).exclude(id__in=active_employee_user_ids)
+        'employees_needing_login': list(
+            Employee.objects.filter(is_active=True).exclude(skill_matrix__user__isnull=False)
         ),
     }
 
 
 def sync_employee_users():
     """
-    Full sync: link every active employee to a login (creating a placeholder if
-    truly none exists), then align is_active for every user in the project with
-    the current employee roster. Safe to call repeatedly (idempotent) - this is
-    what the `sync_employee_users` management command runs, and what the
-    assign/dispatch/reservation views call explicitly before reading
-    get_active_employee_users() (see that function's docstring).
+    Links every active employee to a login (creating a placeholder if truly none
+    exists), so they can be picked in inventory's dropdowns. Safe to call repeatedly
+    (idempotent) - this is what the `sync_employee_users` management command runs, and
+    what the assign/dispatch/reservation views call before reading
+    get_active_employee_users().
+
+    It never changes User.is_active. Whether an account can sign in is decided only by
+    administrators (Django admin > Users > Active): auth.User is shared by every app,
+    and plenty of real users (Tracker, ACGen, ...) are not on the employee roster.
+    Leavers drop out of inventory's dropdowns anyway, because get_active_employee_users()
+    checks Employee.is_active.
     """
     _sync_missing_employee_logins()
-    _sync_user_active_status()
 
 
 def get_active_employee_users():

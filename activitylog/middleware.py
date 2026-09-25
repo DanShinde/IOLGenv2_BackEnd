@@ -1,7 +1,8 @@
 import logging
 
+from .changes import collect_changes
 from .models import ActivityLog
-from .services import describe, record_event
+from .services import denied_title, describe, record_event, title_for_changes
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +23,30 @@ class ActivityLogMiddleware:
     middleware -- so a refused request (403) is still seen. Logged: page views (full HTML
     pages, not background/HTMX fetches), every change (POST/PUT/PATCH/DELETE, including
     inline autosaves), file downloads, and access-denied responses.
+
+    While a change request runs, the records it saves are compared field by field (see
+    changes.py), so the entry can say "Planned date changed, 12 Oct -> 19 Oct" instead of
+    naming the URL.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        response = self.get_response(request)
+        path = request.path_info
+        if request.method in WRITE_METHODS and not path.startswith(SKIP_PREFIXES):
+            with collect_changes() as records:
+                response = self.get_response(request)
+        else:
+            records = []
+            response = self.get_response(request)
         try:
-            self._log(request, response)
+            self._log(request, response, records)
         except Exception:
             logger.exception('Activity logging failed')
         return response
 
-    def _log(self, request, response):
+    def _log(self, request, response, records):
         path = request.path_info
         if path.startswith(SKIP_PREFIXES):
             return
@@ -66,4 +77,15 @@ class ActivityLogMiddleware:
         else:
             return
 
-        record_event(event, request=request, user=user, description=describe(request), status_code=status)
+        title, target = describe(request)
+        changes = []
+        # A refused or failed change saved nothing worth reporting as done.
+        if event == ActivityLog.Event.ACTION and records and status < 400:
+            title, event = title_for_changes(records)
+            target = records[0]['object']
+            changes = records
+        elif event == ActivityLog.Event.DENIED:
+            title = denied_title(title)
+
+        record_event(event, request=request, user=user, description=title,
+                     target=target, changes=changes, status_code=status)

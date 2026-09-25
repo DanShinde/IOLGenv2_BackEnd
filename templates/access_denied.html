@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}No access to {{ software }} | AutoVerse{% endblock %}
+
+{% block styles %}
+<style>
+    .ad-wrap { min-height:calc(100vh - 12rem); display:grid; place-items:center; padding:1rem 0 2rem; }
+    .ad-card { width:100%; max-width:620px; background:#fff; border:1px solid #e3e7f0; border-radius:18px; box-shadow:0 10px 40px rgba(27,38,59,.08); overflow:hidden; }
+    .ad-top { background:linear-gradient(160deg, #eef2ff 0%, #f7f8fc 70%); padding:2.2rem 2rem 1.6rem; text-align:center; border-bottom:1px solid #eef1f6; }
+    .ad-icon { position:relative; width:112px; height:112px; margin:0 auto 1.1rem; border-radius:50%; background:#fff; display:grid; place-items:center; font-size:3.6rem; line-height:1; box-shadow:0 6px 20px rgba(67,97,238,.18), inset 0 0 0 6px #e7ecfd; }
+    .ad-lock { position:absolute; right:-4px; bottom:-2px; width:44px; height:44px; border-radius:50%; background:#fff; display:grid; place-items:center; font-size:1.45rem; box-shadow:0 3px 10px rgba(27,38,59,.15); animation:ad-wiggle 1.6s ease-in-out .4s 2; transform-origin:50% 20%; }
+    @keyframes ad-wiggle { 0%,100% { transform:rotate(0); } 20% { transform:rotate(-14deg); } 40% { transform:rotate(12deg); } 60% { transform:rotate(-8deg); } 80% { transform:rotate(5deg); } }
+    @media (prefers-reduced-motion:reduce) { .ad-lock { animation:none; } }
+    .ad-top h1 { font-size:1.55rem; font-weight:700; color:#1b263b; margin:0 0 .5rem; text-wrap:balance; }
+    .ad-top p { color:#5b6680; margin:0 auto; max-width:46ch; }
+    .ad-reason { display:inline-block; margin-top:.9rem; font-size:.82rem; color:#8a5a00; background:#fff4d6; border:1px solid #f5e1a8; border-radius:8px; padding:.3rem .7rem; }
+    .ad-body { padding:1.4rem 2rem 1.8rem; display:flex; flex-direction:column; gap:1.1rem; }
+    .ad-steps { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.75rem; }
+    .ad-steps li { text-align:left; display:grid; grid-template-columns:36px 1fr; gap:.8rem; align-items:start; }
+    .ad-steps .n { width:36px; height:36px; border-radius:10px; background:#f2f4fa; display:grid; place-items:center; font-size:1.15rem; }
+    .ad-steps b { display:block; color:#1b263b; font-size:.93rem; }
+    .ad-steps span { color:#6b7690; font-size:.86rem; }
+    .ad-admins { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.35rem; }
+    .ad-admins span { background:#e7ecfd; color:#2a45b8; border-radius:99px; padding:.15rem .65rem; font-size:.8rem; font-weight:600; }
+    .ad-actions { display:flex; flex-wrap:wrap; gap:.6rem; }
+    .ad-actions .btn { border-radius:10px; padding:.5rem 1rem; font-weight:600; }
+    .ad-who { font-size:.8rem; color:#8d99ae; text-align:center; border-top:1px solid #eef1f6; padding-top:1rem; }
+    .ad-who code { color:#5b6680; background:#f6f8fb; padding:.05rem .35rem; border-radius:4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ad-wrap">
+    <div class="ad-card" role="main" aria-labelledby="ad-title">
+        <div class="ad-top">
+            <div class="ad-icon" aria-hidden="true">{{ emoji }}<span class="ad-lock">🔒</span></div>
+            <h1 id="ad-title">You don't have access to {{ software }} yet</h1>
+            <p>Your account is signed in, but it hasn't been given permission to open {% if software == 'this page' %}this page{% else %}{{ software }}{% endif %}. An administrator can switch it on for you.</p>
+            {% if reason %}<div class="ad-reason">ℹ️ {{ reason }}</div>{% endif %}
+        </div>
+
+        <div class="ad-body">
+            <ol class="ad-steps">
+                <li>
+                    <span class="n" aria-hidden="true">🙋</span>
+                    <div>
+                        <b>Ask an administrator for access</b>
+                        <span>{% if how_to_get %}They need to {{ how_to_get }}.{% else %}Tell them which software you need and why.{% endif %}</span>
+                        {% if admins %}<div class="ad-admins">{% for a in admins %}<span>{{ a.name }}</span>{% endfor %}</div>{% endif %}
+                    </div>
+                </li>
+                <li>
+                    <span class="n" aria-hidden="true">🔄</span>
+                    <div>
+                        <b>Reload once it's switched on</b>
+                        <span>There's no need to sign out. This page opens as soon as access is given.</span>
+                    </div>
+                </li>
+            </ol>
+
+            <div class="ad-actions">
+                {% if contact %}
+                <a class="btn btn-primary" href="mailto:{{ contact.email }}?subject={{ 'AutoVerse access request: '|add:software|urlencode }}&body={{ 'Hi, please give me access to '|add:software|add:' in AutoVerse. My username is '|add:user.username|add:'.'|urlencode }}">
+                    ✉️ Email {{ contact.name }}
+                </a>
+                {% endif %}
+                <a class="btn btn-outline-primary" href="{% url 'home' %}">🏠 Go to Home</a>
+                <button type="button" class="btn btn-outline-secondary" onclick="history.length > 1 ? history.back() : location.assign('{% url 'home' %}')">← Go back</button>
+            </div>
+
+            {% if user.is_authenticated %}
+            <div class="ad-who">
+                Signed in as <strong>{{ user.get_full_name|default:user.username }}</strong> <code>{{ user.username }}</code> · Page: <code>{{ requested_path|truncatechars:60 }}</code>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
