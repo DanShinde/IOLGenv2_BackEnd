@@ -2,149 +2,584 @@
 
 {% block title %}Log | AutoVerse{% endblock %}
 
+{% block main_class %}container-fluid px-3 px-lg-4 py-3{% endblock %}
+
 {% block styles %}
 <style>
-    .log-card { background:#fff; border-radius:12px; box-shadow:var(--card-shadow); }
-    .log-stat { padding:1rem 1.25rem; }
-    .log-stat .value { font-size:1.6rem; font-weight:700; line-height:1.1; }
-    .log-stat .label { color:var(--gray); font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; }
-    .log-table th { white-space:nowrap; font-size:.8rem; text-transform:uppercase; color:var(--gray); }
-    .log-table td { vertical-align:middle; font-size:.88rem; }
-    .log-path { color:var(--gray); font-size:.78rem; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .ev-badge { font-size:.72rem; font-weight:600; padding:.3em .6em; border-radius:6px; }
-    .ev-LOGIN { background:#d1f2dd; color:#146c2e; }
-    .ev-LOGOUT { background:#e2e6ea; color:#495057; }
-    .ev-LOGIN_FAILED, .ev-DENIED { background:#fbd5d9; color:#a11d2c; }
-    .ev-VIEW { background:#dde6fd; color:#2a45b8; }
-    .ev-ACTION { background:#ffe9b8; color:#8a5a00; }
-    .ev-DOWNLOAD { background:#e4d9fb; color:#5a32b3; }
+    .lg-card { background:#fff; border:1px solid #e3e7f0; border-radius:12px; box-shadow:0 1px 2px rgba(27,38,59,.04); }
+    .lg-muted { color:#6b7690; }
+    .lg-mono { font-family:ui-monospace,'Cascadia Mono',Consolas,monospace; font-size:.76rem; color:#6b7690; }
+    .lg-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:#6b7690; font-weight:700; }
+
+    /* Overview strip */
+    .lg-strip-head { display:flex; align-items:center; justify-content:space-between; padding:.6rem 1rem; cursor:pointer; user-select:none; border:0; background:none; width:100%; text-align:left; }
+    .lg-strip-head .caret { transition:transform .2s; color:#6b7690; }
+    .lg-strip.collapsed .caret { transform:rotate(-90deg); }
+    .lg-strip.collapsed .lg-strip-body { display:none; }
+    .lg-strip-body { padding:0 1rem 1rem; display:flex; flex-direction:column; gap:.9rem; }
+    .lg-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.75rem; }
+    .lg-kpi { border:1px solid #e3e7f0; border-radius:10px; padding:.7rem .9rem; background:#fafbfd; }
+    .lg-kpi .v { font-size:1.55rem; font-weight:700; line-height:1.15; font-variant-numeric:tabular-nums; color:#1b263b; }
+    .lg-kpi .s { font-size:.76rem; color:#6b7690; }
+    .lg-kpi.warn { border-color:#f3c2c7; background:#fdf1f2; }
+    .lg-kpi.warn .v { color:#b4232f; }
+    .lg-panels { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr); gap:.9rem; }
+    @media (max-width:1300px) { .lg-panels { grid-template-columns:minmax(0,1fr) minmax(0,1fr); } .lg-panels .heat-panel { grid-column:1 / -1; } }
+    @media (max-width:760px) { .lg-panels { grid-template-columns:minmax(0,1fr); } }
+    .lg-panel { border:1px solid #e3e7f0; border-radius:10px; padding:.75rem .9rem; }
+    .lg-panel h6 { font-size:.82rem; font-weight:700; margin:0 0 .6rem; display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
+    .lg-panel h6 span { font-weight:400; font-size:.72rem; color:#6b7690; }
+    .lg-heat-wrap { overflow-x:auto; }
+    .lg-heat { display:grid; grid-template-columns:34px repeat(24,minmax(14px,1fr)); gap:3px; min-width:460px; }
+    .lg-heat .hl { font-size:.68rem; color:#6b7690; display:flex; align-items:center; }
+    .lg-heat .hx { font-size:.62rem; color:#6b7690; text-align:center; }
+    .lg-heat .c { height:14px; border-radius:3px; }
+    .lg-heat .c:hover { outline:2px solid #1b263b; outline-offset:-1px; }
+    .lg-h0 { background:#eef1f8; } .lg-h1 { background:#c9d4fb; } .lg-h2 { background:#93a8f5; } .lg-h3 { background:#5f7ef0; } .lg-h4 { background:#3450d6; }
+    .lg-legend { display:flex; align-items:center; gap:4px; justify-content:flex-end; font-size:.68rem; color:#6b7690; margin-top:.4rem; }
+    .lg-legend i { width:13px; height:9px; border-radius:2px; display:inline-block; }
+    .lg-hbar { display:grid; grid-template-columns:minmax(70px,110px) 1fr 34px; gap:.5rem; align-items:center; font-size:.8rem; padding:3px 4px; border-radius:6px; color:inherit; text-decoration:none; }
+    a.lg-hbar:hover { background:#f2f4fa; color:inherit; }
+    .lg-hbar .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lg-hbar .tr { height:9px; background:#eef1f6; border-radius:5px; overflow:hidden; display:flex; }
+    .lg-hbar .tr i { display:block; height:100%; }
+    .lg-hbar .n { text-align:right; font-variant-numeric:tabular-nums; color:#6b7690; }
+    .lg-stack-legend { display:flex; flex-wrap:wrap; gap:.8rem; font-size:.7rem; color:#6b7690; margin-top:.4rem; }
+    .lg-stack-legend i { width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:4px; }
+    .bg-create { background:#1f8a4c; } .bg-update { background:#d99a00; } .bg-delete { background:#c9303c; } .bg-action { background:#98a2b8; }
+    .lg-person-bar { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:.1rem .5rem; align-items:center; padding:3px 4px; border-radius:6px; color:inherit; text-decoration:none; font-size:.82rem; }
+    a.lg-person-bar:hover { background:#f2f4fa; color:inherit; }
+    .lg-person-bar .meter { grid-column:2 / 4; height:4px; background:#eef1f6; border-radius:2px; overflow:hidden; }
+    .lg-person-bar .meter i { display:block; height:100%; background:var(--primary); }
+    .lg-person-bar .n { font-variant-numeric:tabular-nums; color:#6b7690; font-size:.78rem; }
+
+    /* Opening an overview card in full view */
+    .lg-expand { cursor:zoom-in; transition:border-color .15s, box-shadow .15s; }
+    .lg-expand:hover { border-color:var(--primary); box-shadow:0 0 0 3px #e7ecfd; }
+    .lg-expand a { cursor:pointer; }
+    .lg-expand-btn { border:0; background:none; color:#6b7690; padding:0 .2rem; line-height:1; border-radius:5px; font-size:.85rem; }
+    .lg-expand-btn:hover, .lg-expand:hover .lg-expand-btn { color:var(--primary); }
+    .lg-full { background:#f5f7fb; padding:1.25rem 1.5rem; }
+    .lg-full-stats { display:flex; flex-wrap:wrap; gap:.75rem; margin-bottom:1rem; }
+    .lg-full-stats > div { background:#fff; border:1px solid #e3e7f0; border-radius:10px; padding:.6rem 1rem; display:flex; flex-direction:column; min-width:180px; }
+    .lg-full-stats b { font-size:1.15rem; color:#1b263b; }
+    .lg-heat-full { display:grid; grid-template-columns:60px repeat(24,minmax(34px,1fr)) 64px; gap:4px; min-width:1100px; background:#fff; border:1px solid #e3e7f0; border-radius:12px; padding:1rem; }
+    .lg-heat-full .hl { font-size:.85rem; color:#3b4660; display:flex; align-items:center; font-weight:600; }
+    .lg-heat-full .hx { font-size:.72rem; color:#6b7690; text-align:center; }
+    .lg-heat-full .c { height:44px; border-radius:6px; display:grid; place-items:center; font-size:.8rem; font-weight:600; color:#1b263b; font-variant-numeric:tabular-nums; }
+    .lg-heat-full .c.dark { color:#fff; }
+    .lg-heat-full .c:hover { outline:2px solid #1b263b; outline-offset:-1px; }
+    .lg-heat-full .tot { display:grid; place-items:center; font-size:.8rem; color:#3b4660; font-variant-numeric:tabular-nums; background:#f6f8fb; border-radius:6px; min-height:28px; }
+    .lg-full-table { background:#fff; border:1px solid #e3e7f0; border-radius:12px; overflow:hidden; min-width:900px; }
+    .lg-full-table td { padding:.7rem .9rem; }
+    .lg-full-table .num { font-variant-numeric:tabular-nums; }
+    .lg-full-bar { height:14px; background:#eef1f6; border-radius:7px; overflow:hidden; display:flex; }
+    .lg-full-bar i { display:block; height:100%; }
+
+    /* Avatars */
+    .lg-av { width:24px; height:24px; border-radius:50%; display:inline-grid; place-items:center; font-size:.6rem; font-weight:700; color:#fff; flex:none; }
+
+    /* Filters */
+    .lg-filters .form-label { font-size:.75rem; margin-bottom:.2rem; color:#6b7690; }
+    .lg-chips { display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
+    .lg-chip { position:relative; display:inline-flex; align-items:center; gap:.4rem; border:1px solid #e3e7f0; background:#fff; border-radius:99px; padding:.2rem .7rem .2rem .55rem; font-size:.8rem; cursor:pointer; user-select:none; margin:0; }
+    .lg-chip input { position:absolute; opacity:0; pointer-events:none; }
+    .lg-chip .dot { width:8px; height:8px; border-radius:50%; }
+    .lg-chip .ct { color:#6b7690; font-size:.72rem; font-variant-numeric:tabular-nums; }
+    .lg-chip.off { opacity:.45; }
+    .lg-chip.off .dot { background:#d5dae5 !important; }
+    .lg-chip:has(input:focus-visible) { outline:2px solid var(--primary); outline-offset:2px; }
+
+    /* Event badges */
+    .ev { display:inline-flex; align-items:center; gap:.3rem; font-size:.7rem; font-weight:700; padding:.2em .55em; border-radius:6px; white-space:nowrap; }
+    .ev-CREATE { background:#dcf3e5; color:#1f8a4c; }
+    .ev-UPDATE { background:#fff0cc; color:#8a5a00; }
+    .ev-DELETE, .ev-LOGIN_FAILED, .ev-DENIED { background:#fbdde0; color:#a11d2c; }
+    .ev-ACTION { background:#eceff5; color:#4a556e; }
+    .ev-VIEW { background:#e7ecfd; color:#2a45b8; }
+    .ev-LOGIN, .ev-LOGOUT { background:#d6f1f3; color:#0e6b73; }
+    .ev-DOWNLOAD { background:#ebe2fc; color:#5a32b3; }
+    .dot-CREATE { background:#1f8a4c; } .dot-UPDATE { background:#d99a00; } .dot-DELETE { background:#c9303c; }
+    .dot-ACTION { background:#98a2b8; } .dot-VIEW { background:#4361ee; } .dot-LOGIN, .dot-LOGOUT { background:#0e8a94; }
+    .dot-LOGIN_FAILED, .dot-DENIED { background:#c9303c; } .dot-DOWNLOAD { background:#6a3fc4; }
+
+    /* Table + detail panel */
+    .lg-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; align-items:start; }
+    .lg-layout.open { grid-template-columns:minmax(0,1fr) 400px; }
+    @media (max-width:1200px) { .lg-layout.open { grid-template-columns:minmax(0,1fr); } }
+    .lg-table { width:100%; border-collapse:separate; border-spacing:0; min-width:960px; margin:0; }
+    .lg-table th { position:sticky; top:0; z-index:1; background:#f6f8fb; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:#6b7690; padding:.55rem .75rem; border-bottom:1px solid #e3e7f0; white-space:nowrap; font-weight:700; }
+    .lg-table td { padding:.55rem .75rem; border-bottom:1px solid #eef1f6; vertical-align:middle; font-size:.86rem; }
+    .lg-table tr.lg-row { cursor:pointer; }
+    .lg-table tr.lg-row:hover td { background:#f6f8fb; }
+    .lg-table tr.lg-row.sel td { background:#e9eefe; }
+    .lg-table tr.lg-row td:first-child { border-left:3px solid transparent; }
+    .lg-table tr.lg-row.sel td:first-child { border-left-color:var(--primary); }
+    .lg-table tr.lg-row:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+    .lg-table .day td { background:#fff; font-size:.72rem; font-weight:700; color:#6b7690; text-transform:uppercase; letter-spacing:.06em; padding:.8rem .75rem .35rem; }
+    .lg-time { font-variant-numeric:tabular-nums; color:#6b7690; white-space:nowrap; }
+    .lg-who { display:flex; align-items:center; gap:.5rem; white-space:nowrap; }
+    .lg-what { font-weight:600; color:#1b263b; }
+    .lg-crumbs { display:flex; flex-wrap:wrap; gap:.3rem; align-items:center; font-size:.77rem; color:#6b7690; margin-top:.1rem; }
+    .lg-app { font-size:.7rem; font-weight:600; color:#2a45b8; background:#e7ecfd; padding:0 .45rem; border-radius:5px; white-space:nowrap; }
+    .lg-diff { display:inline-flex; flex-wrap:wrap; align-items:center; gap:.35rem; font-size:.79rem; font-variant-numeric:tabular-nums; }
+    .lg-diff .from { text-decoration:line-through; color:#6b7690; background:#f6f8fb; border:1px solid #e3e7f0; border-radius:5px; padding:0 .4rem; }
+    .lg-diff .to { font-weight:700; color:#1b263b; background:#f6f8fb; border:1px solid #e3e7f0; border-radius:5px; padding:0 .4rem; }
+    .lg-diff .fld { color:#6b7690; }
+    .lg-more { font-size:.72rem; color:var(--primary); font-weight:600; }
+
+    .lg-drawer { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow-y:auto; }
+    .lg-drawer .sec { padding:.85rem 1rem; border-bottom:1px solid #eef1f6; display:flex; flex-direction:column; gap:.45rem; }
+    .lg-drawer .sec:last-child { border-bottom:0; }
+    .lg-drawer .dt { font-size:1.05rem; font-weight:700; color:#1b263b; }
+    .lg-drawer .x { border:0; background:none; color:#6b7690; font-size:1.3rem; line-height:1; padding:0 .35rem; border-radius:6px; }
+    .lg-drawer .x:hover { background:#f2f4fa; }
+    .lg-kv { display:grid; grid-template-columns:100px minmax(0,1fr); gap:.2rem .6rem; font-size:.83rem; margin:0; }
+    .lg-kv dt { color:#6b7690; font-weight:400; }
+    .lg-kv dd { margin:0; overflow-wrap:anywhere; }
+    .lg-big { display:grid; grid-template-columns:1fr auto 1fr; gap:.5rem; align-items:center; }
+    .lg-big div { border:1px solid #e3e7f0; border-radius:8px; padding:.45rem .6rem; text-align:center; overflow-wrap:anywhere; }
+    .lg-big .b-from { color:#6b7690; text-decoration:line-through; }
+    .lg-big .b-to { font-weight:700; border-color:var(--primary); background:#e9eefe; }
+    .lg-big small { display:block; font-size:.64rem; text-transform:uppercase; letter-spacing:.06em; color:#6b7690; font-weight:600; text-decoration:none; }
+    .lg-rec { border:1px solid #eef1f6; border-radius:8px; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.3rem; }
+    .lg-rec .obj { font-size:.8rem; font-weight:600; }
+    .lg-fields { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.2rem .6rem; font-size:.8rem; }
+    .lg-fields .f { color:#6b7690; }
+    .lg-around button { display:grid; grid-template-columns:44px minmax(0,1fr); gap:.5rem; width:100%; text-align:left; border:0; background:none; padding:.25rem .3rem; border-radius:6px; font-size:.8rem; }
+    .lg-around button:hover { background:#f2f4fa; }
+    .lg-around button.cur { background:#e9eefe; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+<div class="d-flex flex-column gap-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
             <h2 class="mb-0"><i class="bi bi-journal-text me-2"></i>Log</h2>
-            <div class="text-muted small">Who signed in and what they did, across every software in AutoVerse. Visible to administrators only.</div>
+            <div class="lg-muted small">Who signed in and what they did, across every software in AutoVerse. Visible to administrators only.</div>
         </div>
-        <a class="btn btn-outline-success btn-sm" href="?{{ filter_query }}{% if filter_query %}&{% endif %}export=1">
+        <a class="btn btn-outline-success btn-sm" href="?{{ filter_query }}&export=1">
             <i class="bi bi-file-earmark-excel me-1"></i>Export to Excel
         </a>
     </div>
 
-    <div class="row g-3 mb-3">
-        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.total }}</div><div class="label">Events</div></div></div>
-        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.users }}</div><div class="label">People active</div></div></div>
-        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.logins }}</div><div class="label">Logins</div></div></div>
-        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value">{{ totals.actions }}</div><div class="label">Changes made</div></div></div>
-        <div class="col-6 col-md"><div class="log-card log-stat"><div class="value {% if totals.failed or totals.denied %}text-danger{% endif %}">{{ totals.failed }} / {{ totals.denied }}</div><div class="label">Failed logins / denied</div></div></div>
+    {# ---------- Overview strip (collapsible) ---------- #}
+    <section class="lg-card lg-strip" id="lg-strip">
+        <button type="button" class="lg-strip-head" id="lg-strip-toggle" aria-expanded="true" aria-controls="lg-strip-body">
+            <span class="fw-bold"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Overview <span class="lg-muted fw-normal small ms-1">{{ start|date:"d M" }} – {{ end|date:"d M Y" }}</span></span>
+            <i class="bi bi-chevron-down caret"></i>
+        </button>
+        <div class="lg-strip-body" id="lg-strip-body">
+            <div class="lg-kpis">
+                <div class="lg-kpi"><div class="lg-label">Changes made</div><div class="v">{{ totals.changes }}</div><div class="s">{{ totals.created }} created · {{ totals.updated }} changed · {{ totals.deleted }} deleted</div></div>
+                <div class="lg-kpi"><div class="lg-label">People active</div><div class="v">{{ totals.users }}</div><div class="s">Signed-in people in this period</div></div>
+                <div class="lg-kpi"><div class="lg-label">Downloads</div><div class="v">{{ totals.downloads }}</div><div class="s">Reports and exports</div></div>
+                <div class="lg-kpi {% if totals.failed or totals.denied %}warn{% endif %}"><div class="lg-label">Needs a look</div><div class="v">{{ totals.failed|add:totals.denied }}</div><div class="s">{{ totals.failed }} failed sign-in{{ totals.failed|pluralize }} · {{ totals.denied }} access denied</div></div>
+            </div>
+            <div class="lg-panels">
+                <div class="lg-panel lg-expand heat-panel" data-full="lg-full-heat" title="Click to open in full view">
+                    <h6>When people work <span class="d-inline-flex align-items-center gap-2"><span>all entries, by weekday and hour</span><button type="button" class="lg-expand-btn" data-bs-toggle="modal" data-bs-target="#lg-full-heat" aria-label="Open When people work in full view"><i class="bi bi-arrows-angle-expand"></i></button></span></h6>
+                    <div class="lg-heat-wrap">
+                        <div class="lg-heat">
+                            <span></span>{% for h in hours %}<span class="hx">{% if h|divisibleby:3 %}{{ h|stringformat:"02d" }}{% endif %}</span>{% endfor %}
+                            {% for row in heatmap.rows %}
+                                <span class="hl">{{ row.day }}</span>{% for c in row.cells %}<span class="c lg-h{{ c.level }}" title="{{ row.day }} {{ c.hour|stringformat:'02d' }}:00 · {{ c.n }} entr{{ c.n|pluralize:'y,ies' }}"></span>{% endfor %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="lg-legend">Fewer <i class="lg-h0"></i><i class="lg-h1"></i><i class="lg-h2"></i><i class="lg-h3"></i><i class="lg-h4"></i> More</div>
+                </div>
+                <div class="lg-panel lg-expand" data-full="lg-full-software" title="Click to open in full view">
+                    <h6>Changes by software <span class="d-inline-flex align-items-center gap-2"><span>click a bar to filter</span><button type="button" class="lg-expand-btn" data-bs-toggle="modal" data-bs-target="#lg-full-software" aria-label="Open Changes by software in full view"><i class="bi bi-arrows-angle-expand"></i></button></span></h6>
+                    {% for r in by_software|slice:":8" %}
+                    <a class="lg-hbar" href="?{{ filter_query }}&app={{ r.app|urlencode }}" title="{{ r.CREATE }} created · {{ r.UPDATE }} changed · {{ r.DELETE }} deleted · {{ r.ACTION }} other">
+                        <span class="name">{{ r.app }}</span>
+                        <span class="tr"><i class="bg-create" style="width:{{ r.CREATE_pct }}%"></i><i class="bg-update" style="width:{{ r.UPDATE_pct }}%"></i><i class="bg-delete" style="width:{{ r.DELETE_pct }}%"></i><i class="bg-action" style="width:{{ r.ACTION_pct }}%"></i></span>
+                        <span class="n">{{ r.total }}</span>
+                    </a>
+                    {% empty %}<div class="lg-muted small">No changes in this period.</div>{% endfor %}
+                    {% if by_software|length > 8 %}<div class="lg-more mt-1">+{{ by_software|length|add:"-8" }} more in full view</div>{% endif %}
+                    <div class="lg-stack-legend"><span><i class="bg-create"></i>Created</span><span><i class="bg-update"></i>Changed</span><span><i class="bg-delete"></i>Deleted</span><span><i class="bg-action"></i>Other</span></div>
+                </div>
+                <div class="lg-panel lg-expand" data-full="lg-full-people" title="Click to open in full view">
+                    <h6>Most changes made <span class="d-inline-flex align-items-center gap-2"><span>click a name to filter</span><button type="button" class="lg-expand-btn" data-bs-toggle="modal" data-bs-target="#lg-full-people" aria-label="Open Most changes made in full view"><i class="bi bi-arrows-angle-expand"></i></button></span></h6>
+                    {% for p in top_people|slice:":6" %}
+                    <a class="lg-person-bar" href="?{{ filter_query }}&user={{ p.username|urlencode }}" title="{{ p.username }}">
+                        <span class="lg-av" data-seed="{{ p.username }}">{{ p.name|slice:":1"|upper }}</span>
+                        <span class="text-truncate">{{ p.name }}</span>
+                        <span class="n">{{ p.n }}</span>
+                        <span class="meter"><i style="width:{{ p.pct }}%"></i></span>
+                    </a>
+                    {% empty %}<div class="lg-muted small">No changes in this period.</div>{% endfor %}
+                    {% if top_people|length > 6 %}<div class="lg-more mt-1">+{{ top_people|length|add:"-6" }} more in full view</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ---------- Full views of the overview cards ---------- #}
+    <div class="modal fade" id="lg-full-heat" tabindex="-1" aria-labelledby="lg-full-heat-title" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="lg-full-heat-title"><i class="bi bi-grid-3x3-gap me-2 text-primary"></i>When people work <span class="lg-muted fw-normal fs-6 ms-2">{{ start|date:"d M" }} – {{ end|date:"d M Y" }}</span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body lg-full">
+                    <div class="lg-full-stats">
+                        <div><span class="lg-label">Entries</span><b>{{ heatmap.total }}</b></div>
+                        <div><span class="lg-label">Busiest hour</span><b>{{ heatmap.busiest|default:"-" }}</b></div>
+                        <div><span class="lg-label">What is counted</span><b class="fw-normal small lg-muted">Every entry matching the filters, whatever its type</b></div>
+                    </div>
+                    <div class="lg-heat-wrap">
+                        <div class="lg-heat-full">
+                            <span></span>{% for h in hours %}<span class="hx">{{ h|stringformat:"02d" }}</span>{% endfor %}<span class="hx fw-bold">Total</span>
+                            {% for row in heatmap.rows %}
+                                <span class="hl">{{ row.day }}</span>{% for c in row.cells %}<span class="c lg-h{{ c.level }}{% if c.level >= 3 %} dark{% endif %}" title="{{ row.day }} {{ c.hour|stringformat:'02d' }}:00 · {{ c.n }} entr{{ c.n|pluralize:'y,ies' }}">{% if c.n %}{{ c.n }}{% endif %}</span>{% endfor %}<span class="tot">{{ row.total }}</span>
+                            {% endfor %}
+                            <span class="hl">Total</span>{% for n in heatmap.hour_totals %}<span class="tot">{% if n %}{{ n }}{% endif %}</span>{% endfor %}<span class="tot fw-bold">{{ heatmap.total }}</span>
+                        </div>
+                    </div>
+                    <div class="lg-legend">Fewer <i class="lg-h0"></i><i class="lg-h1"></i><i class="lg-h2"></i><i class="lg-h3"></i><i class="lg-h4"></i> More</div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <form method="get" class="log-card p-3 mb-3">
+    <div class="modal fade" id="lg-full-software" tabindex="-1" aria-labelledby="lg-full-software-title" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="lg-full-software-title"><i class="bi bi-bar-chart-steps me-2 text-primary"></i>Changes by software <span class="lg-muted fw-normal fs-6 ms-2">{{ start|date:"d M" }} – {{ end|date:"d M Y" }}</span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body lg-full">
+                    <div class="lg-stack-legend mb-2"><span><i class="bg-create"></i>Created</span><span><i class="bg-update"></i>Changed</span><span><i class="bg-delete"></i>Deleted</span><span><i class="bg-action"></i>Other</span></div>
+                    <div class="table-responsive">
+                        <table class="lg-table lg-full-table">
+                            <thead><tr><th>Software</th><th style="width:40%"></th><th class="text-end">Created</th><th class="text-end">Changed</th><th class="text-end">Deleted</th><th class="text-end">Other</th><th class="text-end">Total</th><th></th></tr></thead>
+                            <tbody>
+                                {% for r in by_software %}
+                                <tr>
+                                    <td class="fw-semibold">{{ r.app }}</td>
+                                    <td><div class="lg-full-bar"><i class="bg-create" style="width:{{ r.CREATE_pct }}%"></i><i class="bg-update" style="width:{{ r.UPDATE_pct }}%"></i><i class="bg-delete" style="width:{{ r.DELETE_pct }}%"></i><i class="bg-action" style="width:{{ r.ACTION_pct }}%"></i></div></td>
+                                    <td class="text-end num">{{ r.CREATE }}</td><td class="text-end num">{{ r.UPDATE }}</td><td class="text-end num">{{ r.DELETE }}</td><td class="text-end num">{{ r.ACTION }}</td>
+                                    <td class="text-end num fw-bold">{{ r.total }}</td>
+                                    <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="?{{ filter_query }}&app={{ r.app|urlencode }}">View entries</a></td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="8" class="text-center lg-muted py-5">No changes in this period.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="lg-full-people" tabindex="-1" aria-labelledby="lg-full-people-title" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="lg-full-people-title"><i class="bi bi-people me-2 text-primary"></i>Most changes made <span class="lg-muted fw-normal fs-6 ms-2">{{ start|date:"d M" }} – {{ end|date:"d M Y" }} · {{ top_people|length }} {{ top_people|length|pluralize:"person,people" }}</span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body lg-full">
+                    <div class="lg-stack-legend mb-2"><span><i class="bg-create"></i>Created</span><span><i class="bg-update"></i>Changed</span><span><i class="bg-delete"></i>Deleted</span><span><i class="bg-action"></i>Other</span></div>
+                    <div class="table-responsive">
+                        <table class="lg-table lg-full-table">
+                            <thead><tr><th>#</th><th>Person</th><th>Username</th><th style="width:28%"></th><th class="text-end">Created</th><th class="text-end">Changed</th><th class="text-end">Deleted</th><th class="text-end">Other</th><th class="text-end">Total</th><th>Last change</th><th></th></tr></thead>
+                            <tbody>
+                                {% for p in top_people %}
+                                <tr>
+                                    <td class="lg-muted num">{{ forloop.counter }}</td>
+                                    <td><div class="lg-who"><span class="lg-av" data-seed="{{ p.username }}">{{ p.name|slice:":1"|upper }}</span>{{ p.name }}</div></td>
+                                    <td class="lg-mono">{{ p.username }}</td>
+                                    <td><div class="lg-full-bar"><i class="bg-create" style="width:{{ p.created_pct }}%"></i><i class="bg-update" style="width:{{ p.updated_pct }}%"></i><i class="bg-delete" style="width:{{ p.deleted_pct }}%"></i><i class="bg-action" style="width:{{ p.other_pct }}%"></i></div></td>
+                                    <td class="text-end num">{{ p.created }}</td><td class="text-end num">{{ p.updated }}</td><td class="text-end num">{{ p.deleted }}</td><td class="text-end num">{{ p.other }}</td>
+                                    <td class="text-end num fw-bold">{{ p.n }}</td>
+                                    <td class="lg-time">{{ p.last|date:"d M Y, H:i" }}</td>
+                                    <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="?{{ filter_query }}&user={{ p.username|urlencode }}">View entries</a></td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="11" class="text-center lg-muted py-5">No changes in this period.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---------- Filters ---------- #}
+    <form method="get" class="lg-card p-3 lg-filters" id="lg-filters">
         <input type="hidden" name="tab" value="{{ tab }}">
+        <input type="hidden" name="f" value="1">
         <div class="row g-2 align-items-end">
-            <div class="col-6 col-md-2">
-                <label class="form-label small mb-1">From</label>
-                <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="form-control form-control-sm">
+            <div class="col-12 col-lg-4">
+                <label class="form-label" for="lg-q">Search</label>
+                <input type="search" id="lg-q" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Project code, stage, person, “planned date”…">
             </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label small mb-1">To</label>
-                <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="form-control form-control-sm">
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label small mb-1">Person</label>
-                <select name="user" class="form-select form-select-sm">
+            <div class="col-6 col-lg-2">
+                <label class="form-label" for="lg-user">Person</label>
+                <select id="lg-user" name="user" class="form-select form-select-sm">
                     <option value="">Everyone</option>
-                    {% for name in usernames %}<option value="{{ name }}" {% if filters.user == name %}selected{% endif %}>{{ name }}</option>{% endfor %}
+                    {% for p in people %}<option value="{{ p.username }}" {% if filters.user == p.username %}selected{% endif %}>{% if p.name %}{{ p.name }} ({{ p.username }}){% else %}{{ p.username }}{% endif %}</option>{% endfor %}
                 </select>
             </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label small mb-1">Software</label>
-                <select name="app" class="form-select form-select-sm">
+            <div class="col-6 col-lg-2">
+                <label class="form-label" for="lg-app">Software</label>
+                <select id="lg-app" name="app" class="form-select form-select-sm">
                     <option value="">All</option>
                     {% for a in apps %}<option value="{{ a }}" {% if filters.app == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
                 </select>
             </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label small mb-1">Event</label>
-                <select name="event" class="form-select form-select-sm">
-                    <option value="">All</option>
-                    {% for value, label in event_choices %}<option value="{{ value }}" {% if filters.event == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-                </select>
+            <div class="col-6 col-lg-1">
+                <label class="form-label" for="lg-start">From</label>
+                <input type="date" id="lg-start" name="start" value="{{ start|date:'Y-m-d' }}" class="form-control form-control-sm">
             </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label small mb-1">Search</label>
-                <input type="text" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Activity, page, person">
+            <div class="col-6 col-lg-1">
+                <label class="form-label" for="lg-end">To</label>
+                <input type="date" id="lg-end" name="end" value="{{ end|date:'Y-m-d' }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-lg-2 d-flex gap-2">
+                <button class="btn btn-primary btn-sm flex-fill" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+                <a class="btn btn-outline-secondary btn-sm flex-fill" href="?tab={{ tab }}">Reset</a>
             </div>
         </div>
-        <div class="mt-2 d-flex gap-2">
-            <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
-            <a class="btn btn-outline-secondary btn-sm" href="?tab={{ tab }}">Reset (last 7 days)</a>
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+            <div class="lg-chips" role="group" aria-label="Types of activity">
+                {% for c in chips %}
+                <label class="lg-chip {% if not c.on %}off{% endif %}">
+                    <input type="checkbox" name="event" value="{{ c.value }}" {% if c.on %}checked{% endif %} class="lg-autosubmit">
+                    <span class="dot dot-{{ c.value }}"></span>{{ c.label }}<span class="ct">{{ c.count }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <div class="form-check form-switch ms-lg-auto mb-0">
+                <input class="form-check-input lg-autosubmit" type="checkbox" role="switch" id="lg-views" name="event" value="VIEW" {% if views_on %}checked{% endif %}>
+                <label class="form-check-label small" for="lg-views">Show page visits <span class="lg-muted">({{ view_count }})</span></label>
+            </div>
         </div>
     </form>
 
-    <ul class="nav nav-tabs mb-3">
+    <ul class="nav nav-tabs">
         <li class="nav-item"><a class="nav-link {% if tab == 'activity' %}active{% endif %}" href="?{{ filter_query }}">Activity</a></li>
-        <li class="nav-item"><a class="nav-link {% if tab == 'users' %}active{% endif %}" href="?tab=users{% if filter_query %}&{{ filter_query }}{% endif %}">People summary</a></li>
+        <li class="nav-item"><a class="nav-link {% if tab == 'users' %}active{% endif %}" href="?tab=users&{{ filter_query }}">People summary</a></li>
     </ul>
 
     {% if tab == 'users' %}
-    <div class="log-card">
+    <div class="lg-card">
         <div class="table-responsive">
-            <table class="table table-hover log-table mb-0">
-                <thead><tr><th>Person</th><th>Last active</th><th class="text-center">Logins</th><th class="text-center">Failed</th><th class="text-center">Page views</th><th class="text-center">Changes</th><th class="text-center">Downloads</th><th>Software used</th></tr></thead>
+            <table class="lg-table" style="min-width:900px">
+                <thead><tr><th>Person</th><th>Username</th><th>Last active</th><th class="text-center">Sign-ins</th><th class="text-center">Failed</th><th class="text-center">Page visits</th><th class="text-center">Changes</th><th class="text-center">Downloads</th><th>Software used</th></tr></thead>
                 <tbody>
                     {% for r in user_rows %}
                     <tr>
-                        <td><a href="?user={{ r.username|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}"><strong>{{ r.username }}</strong></a></td>
-                        <td>{{ r.last_seen|date:"d M Y, H:i" }}</td>
+                        <td><a href="?user={{ r.username|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}"><strong>{{ r.name|default:"Unknown person" }}</strong></a></td>
+                        <td class="lg-mono">{{ r.username }}</td>
+                        <td class="lg-time">{{ r.last_seen|date:"d M Y, H:i" }}</td>
                         <td class="text-center">{{ r.logins }}</td>
                         <td class="text-center {% if r.failed %}text-danger fw-bold{% endif %}">{{ r.failed }}</td>
                         <td class="text-center">{{ r.views }}</td>
-                        <td class="text-center">{{ r.actions }}</td>
+                        <td class="text-center">{{ r.changes }}</td>
                         <td class="text-center">{{ r.downloads }}</td>
-                        <td class="small text-muted">{{ r.apps }}</td>
+                        <td class="small lg-muted">{{ r.apps }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="8" class="text-center text-muted py-4">No activity in this period.</td></tr>
+                    <tr><td colspan="9" class="text-center lg-muted py-4">No activity in this period.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
     {% else %}
-    <div class="log-card">
-        <div class="table-responsive">
-            <table class="table table-hover log-table mb-0">
-                <thead><tr><th>Time</th><th>Person</th><th>Event</th><th>Software</th><th>Activity</th><th>Page</th><th>IP address</th></tr></thead>
-                <tbody>
-                    {% for e in page %}
-                    <tr>
-                        <td class="text-nowrap">{{ e.timestamp|date:"d M Y, H:i:s" }}</td>
-                        <td>{{ e.username|default:"-" }}</td>
-                        <td><span class="ev-badge ev-{{ e.event }}">{{ e.get_event_display }}</span></td>
-                        <td>{{ e.app|default:"-" }}</td>
-                        <td>{{ e.description }}{% if e.status_code and e.status_code >= 400 %} <span class="text-danger small">({{ e.status_code }})</span>{% endif %}</td>
-                        <td><div class="log-path" title="{{ e.method }} {{ e.path }}">{{ e.method }} {{ e.path }}</div></td>
-                        <td class="text-nowrap small text-muted">{{ e.ip_address|default:"-" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="7" class="text-center text-muted py-4">No activity matches these filters.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% if page.paginator.num_pages > 1 %}
-        <div class="d-flex justify-content-between align-items-center p-3 border-top">
-            <div class="small text-muted">Page {{ page.number }} of {{ page.paginator.num_pages }} &middot; {{ page.paginator.count }} entries</div>
-            <div class="btn-group btn-group-sm">
-                {% if page.has_previous %}<a class="btn btn-outline-secondary" href="?{{ filter_query }}{% if filter_query %}&{% endif %}page={{ page.previous_page_number }}">Previous</a>{% endif %}
-                {% if page.has_next %}<a class="btn btn-outline-secondary" href="?{{ filter_query }}{% if filter_query %}&{% endif %}page={{ page.next_page_number }}">Next</a>{% endif %}
+    <div class="lg-layout" id="lg-layout">
+        <div class="lg-card overflow-hidden">
+            <div class="table-responsive">
+                <table class="lg-table">
+                    <thead><tr><th>Time</th><th>Person</th><th>Username</th><th>Type</th><th>What happened</th><th>Change</th></tr></thead>
+                    <tbody>
+                        {% for r in rows %}
+                        {% ifchanged r.date %}<tr class="day"><td colspan="6">{{ r.day_label }}</td></tr>{% endifchanged %}
+                        <tr class="lg-row" data-id="{{ r.id }}" tabindex="0">
+                            <td class="lg-time">{{ r.time }}</td>
+                            <td><div class="lg-who"><span class="lg-av" data-seed="{{ r.username }}">{{ r.person|default:r.username|slice:":1"|upper }}</span>{{ r.person|default:"Unknown person" }}</div></td>
+                            <td class="lg-mono">{{ r.username|default:"-" }}</td>
+                            <td><span class="ev ev-{{ r.event }}">{{ r.event_label }}</span></td>
+                            <td>
+                                <div class="lg-what">{{ r.title }}{% if r.status and r.status >= 400 and r.event != 'DENIED' %} <span class="text-danger small fw-normal">(failed, {{ r.status }})</span>{% endif %}</div>
+                                <div class="lg-crumbs">{% if r.app %}<span class="lg-app">{{ r.app }}</span>{% endif %}{% if r.target %}<span>{{ r.target }}</span>{% endif %}</div>
+                            </td>
+                            <td>
+                                {% if r.first_change %}
+                                <span class="lg-diff"><span class="fld">{{ r.first_change.field }}:</span><span class="from">{{ r.first_change.old }}</span>→<span class="to">{{ r.first_change.new }}</span></span>
+                                {% endif %}
+                                {% if r.more %}<div class="lg-more">+{{ r.more }} more</div>{% endif %}
+                                {% if not r.first_change and not r.more %}<span class="lg-muted">-</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center lg-muted py-5">No activity matches these filters.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+            {% if page.paginator.num_pages > 1 %}
+            <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                <div class="small lg-muted">Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} entries</div>
+                <div class="btn-group btn-group-sm">
+                    {% if page.has_previous %}<a class="btn btn-outline-secondary" href="?{{ filter_query }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
+                    {% if page.has_next %}<a class="btn btn-outline-secondary" href="?{{ filter_query }}&page={{ page.next_page_number }}">Next</a>{% endif %}
+                </div>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
+        <aside class="lg-card lg-drawer" id="lg-drawer" aria-label="Entry details" hidden></aside>
     </div>
+    {{ rows|json_script:"lg-rows" }}
     {% endif %}
 </div>
+
+<script>
+(function () {
+    // Overview strip: remember collapsed / open per browser.
+    var strip = document.getElementById('lg-strip');
+    var toggle = document.getElementById('lg-strip-toggle');
+    function setStrip(collapsed) {
+        strip.classList.toggle('collapsed', collapsed);
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+    }
+    try { setStrip(localStorage.getItem('av-log-strip') === 'collapsed'); } catch (e) {}
+    toggle.addEventListener('click', function () {
+        var collapsed = !strip.classList.contains('collapsed');
+        setStrip(collapsed);
+        try { localStorage.setItem('av-log-strip', collapsed ? 'collapsed' : 'open'); } catch (e) {}
+    });
+
+    // Clicking an overview card anywhere except its filter links opens it in full view.
+    document.querySelectorAll('.lg-expand').forEach(function (card) {
+        card.addEventListener('click', function (e) {
+            if (e.target.closest('a, button')) return;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById(card.dataset.full)).show();
+        });
+    });
+
+    // Type chips and the page-visits switch apply as soon as they're clicked.
+    document.querySelectorAll('.lg-autosubmit').forEach(function (box) {
+        box.addEventListener('change', function () { document.getElementById('lg-filters').submit(); });
+    });
+
+    // One colour per person, stable across pages.
+    var palette = ['#4361ee', '#c2410c', '#0f766e', '#9333ea', '#b45309', '#be185d', '#0369a1', '#4d7c0f'];
+    document.querySelectorAll('.lg-av').forEach(function (el) {
+        var s = el.dataset.seed || '', h = 0;
+        for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        el.style.background = palette[h % palette.length];
+    });
+
+    // Detail panel
+    var dataEl = document.getElementById('lg-rows');
+    if (!dataEl) return;
+    var rows = JSON.parse(dataEl.textContent);
+    var byId = {};
+    rows.forEach(function (r) { byId[r.id] = r; });
+    var layout = document.getElementById('lg-layout');
+    var drawer = document.getElementById('lg-drawer');
+    var selected = null;
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+    }
+    var ACTION_WORD = { create: 'Created', update: 'Changed', delete: 'Deleted' };
+
+    function changesHtml(r) {
+        var recs = r.changes || [];
+        if (!recs.length) return '';
+        var first = recs[0];
+        var html = '<div class="sec"><span class="lg-label">What changed</span>';
+        if (recs.length === 1 && first.action === 'update' && first.fields.length === 1) {
+            var f = first.fields[0];
+            html += '<div class="small lg-muted">' + esc(f.field) + '</div>' +
+                '<div class="lg-big"><div class="b-from"><small>Before</small>' + esc(f.old) + '</div><span>→</span>' +
+                '<div class="b-to"><small>After</small>' + esc(f.new) + '</div></div>';
+        } else {
+            recs.forEach(function (rec) {
+                if (rec.action === 'more') {
+                    html += '<div class="small lg-muted">…and ' + esc(rec.count) + ' more records</div>';
+                    return;
+                }
+                html += '<div class="lg-rec"><div class="obj"><span class="ev ev-' + (rec.action === 'create' ? 'CREATE' : rec.action === 'delete' ? 'DELETE' : 'UPDATE') + ' me-1">' +
+                    ACTION_WORD[rec.action] + '</span>' + esc(rec.object) + '</div>';
+                if (rec.fields && rec.fields.length) {
+                    html += '<div class="lg-fields">' + rec.fields.map(function (f) {
+                        return '<span class="f">' + esc(f.field) + '</span><span class="lg-diff"><span class="from">' + esc(f.old) +
+                            '</span>→<span class="to">' + esc(f.new) + '</span></span>';
+                    }).join('') + '</div>';
+                }
+                html += '</div>';
+            });
+        }
+        return html + '</div>';
+    }
+
+    function render(r) {
+        var around = rows.filter(function (x) { return x.username === r.username && x.date === r.date; }).slice(0, 12);
+        drawer.innerHTML =
+            '<div class="sec"><div class="d-flex justify-content-between align-items-center">' +
+                '<span class="ev ev-' + esc(r.event) + '">' + esc(r.event_label) + '</span>' +
+                '<button type="button" class="x" id="lg-close" aria-label="Close details">×</button></div>' +
+                '<div class="dt">' + esc(r.title) + '</div>' +
+                '<div class="lg-crumbs">' + (r.app ? '<span class="lg-app">' + esc(r.app) + '</span>' : '') + (r.target ? '<span>' + esc(r.target) + '</span>' : '') + '</div></div>' +
+            changesHtml(r) +
+            '<div class="sec"><span class="lg-label">Who and when</span><dl class="lg-kv">' +
+                '<dt>Person</dt><dd>' + esc(r.person || 'Unknown person') + '</dd>' +
+                '<dt>Username</dt><dd class="lg-mono">' + esc(r.username || '-') + '</dd>' +
+                '<dt>Time</dt><dd>' + esc(r.when) + '</dd>' +
+                '<dt>Software</dt><dd>' + esc(r.app || '-') + '</dd></dl></div>' +
+            (around.length > 1 ? '<div class="sec"><span class="lg-label">Same person, same day (this page)</span><div class="lg-around">' +
+                around.map(function (a) {
+                    return '<button type="button" data-id="' + a.id + '" class="' + (a.id === r.id ? 'cur' : '') + '"><span class="lg-time">' +
+                        esc(a.time) + '</span><span>' + esc(a.title) + '</span></button>';
+                }).join('') + '</div></div>' : '') +
+            '<div class="sec"><span class="lg-label">Details</span><dl class="lg-kv lg-mono">' +
+                '<dt>Request</dt><dd>' + esc(r.method) + ' ' + esc(r.path) + '</dd>' +
+                '<dt>Status</dt><dd>' + esc(r.status || '-') + '</dd>' +
+                '<dt>IP address</dt><dd>' + esc(r.ip || '-') + '</dd>' +
+                '<dt>Browser</dt><dd>' + esc(r.agent || '-') + '</dd></dl></div>';
+        drawer.querySelector('#lg-close').addEventListener('click', close);
+        drawer.querySelectorAll('.lg-around button').forEach(function (b) {
+            b.addEventListener('click', function () { select(+b.dataset.id); });
+        });
+    }
+
+    function select(id) {
+        var r = byId[id];
+        if (!r) return;
+        selected = id;
+        document.querySelectorAll('tr.lg-row').forEach(function (tr) { tr.classList.toggle('sel', +tr.dataset.id === id); });
+        render(r);
+        drawer.hidden = false;
+        layout.classList.add('open');
+        if (window.innerWidth <= 1200) drawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function close() {
+        selected = null;
+        drawer.hidden = true;
+        layout.classList.remove('open');
+        document.querySelectorAll('tr.lg-row.sel').forEach(function (tr) { tr.classList.remove('sel'); });
+    }
+
+    document.querySelectorAll('tr.lg-row').forEach(function (tr) {
+        tr.addEventListener('click', function () { select(+tr.dataset.id); });
+        tr.addEventListener('keydown', function (e) { if (e.key === 'Enter') select(+tr.dataset.id); });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && selected !== null) close(); });
+})();
+</script>
 {% endblock %}

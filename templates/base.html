@@ -655,7 +655,8 @@
       </header>
 
       {# ========== MAIN CONTENT ========== #}
-      <main class="container py-5">
+      {# Pages that need the whole width (e.g. the Log) override main_class #}
+      <main class="{% block main_class %}container py-5{% endblock %}">
         {% if user.is_authenticated and request.resolver_match.url_name == 'home' %}
         <div class="home-logo-wrap">
             <img src="{% static 'base/ADLogo_color.png' %}" alt="Armstrong Dematic" class="home-logo">
