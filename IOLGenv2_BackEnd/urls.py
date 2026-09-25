@@ -38,6 +38,3 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-# PermissionDenied anywhere -> the friendly access-denied page
-handler403 = 'IOLGenv2_BackEnd.access.permission_denied_view'

@@ -7,9 +7,9 @@ from .models import ActivityLog
 class ActivityLogAdmin(admin.ModelAdmin):
     """Read-only: the log is a record, not something to edit. Only superusers may delete
     rows (or use the prune_activity_log command to trim old ones)."""
-    list_display = ('timestamp', 'full_name', 'username', 'event', 'app', 'description', 'target', 'status_code', 'ip_address')
+    list_display = ('timestamp', 'username', 'event', 'app', 'description', 'status_code', 'ip_address')
     list_filter = ('event', 'app')
-    search_fields = ('username', 'full_name', 'description', 'target', 'path')
+    search_fields = ('username', 'description', 'path')
     date_hierarchy = 'timestamp'
     list_per_page = 100
 

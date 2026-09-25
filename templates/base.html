@@ -564,7 +564,7 @@
               <i class="bi bi-cloud-arrow-down-fill"></i><span class="nav-label sidebar-text">Downloads</span>
             </a>
           </li>
-          {% if user.is_superuser or user.profile.is_log_viewer %}
+          {% if user.is_staff or user.is_superuser %}
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'activity_log' %}active{% endif %}" href="{% url 'activity_log' %}" title="Log">
               <i class="bi bi-journal-text"></i><span class="nav-label sidebar-text">Log</span>
@@ -655,8 +655,7 @@
       </header>
 
       {# ========== MAIN CONTENT ========== #}
-      {# Pages that need the whole width (e.g. the Log) override main_class #}
-      <main class="{% block main_class %}container py-5{% endblock %}">
+      <main class="container py-5">
         {% if user.is_authenticated and request.resolver_match.url_name == 'home' %}
         <div class="home-logo-wrap">
             <img src="{% static 'base/ADLogo_color.png' %}" alt="Armstrong Dematic" class="home-logo">

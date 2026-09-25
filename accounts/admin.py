@@ -7,9 +7,9 @@ class UserProfileAdmin(ImportExportModelAdmin,admin.ModelAdmin) :
     list_display = (
         'id', 'user', 'usertype',  'is_ac_approved', 'is_ac_cluster_create_allowed',
         'is_ac_cluster_edit_allowed', 'is_ac_cluster_delete_allowed',
-        'is_tracker', 'is_skillgap', 'is_estimator', 'is_log_viewer',
+        'is_tracker', 'is_skillgap', 'is_estimator',
     )  # Display all fields
-    list_filter = ('usertype', 'is_ac_approved', 'is_tracker', 'is_skillgap', 'is_estimator', 'is_log_viewer')
+    list_filter = ('usertype', 'is_ac_approved', 'is_tracker', 'is_skillgap', 'is_estimator')
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__email')
 
 admin.site.register(UserProfile, UserProfileAdmin)
