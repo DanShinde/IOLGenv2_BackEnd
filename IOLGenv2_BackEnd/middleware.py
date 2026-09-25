@@ -1,8 +1,9 @@
 # IOLGenv2_BackEnd/middleware.py
 
 from django.shortcuts import redirect
-from django.http import HttpResponseForbidden
-from accounts.models import UserProfile 
+from accounts.models import UserProfile
+
+from .access import access_denied
 
 class TrackerGroupRequiredMiddleware:
     """
@@ -25,11 +26,8 @@ class TrackerGroupRequiredMiddleware:
                 return redirect('loginw')  
             # logged in but not in Trackers group → 403
             userprofile = UserProfile.objects.filter(user=request.user).first()
-            try :
-                if userprofile and not userprofile.is_tracker:
-                    return HttpResponseForbidden("Access denied. User Not a Tracker.")
-            except UserProfile.DoesNotExist:
-                return HttpResponseForbidden("Access denied. User Profile Not Found.")
+            if userprofile and not userprofile.is_tracker:
+                return access_denied(request, 'Tracker', how_to_get='tick “Is tracker” on your user profile')
             # if not request.user.groups.filter(name='Trackers').exists():
             #     return HttpResponseForbidden("Access denied. User Not in Trackers group.")
         return self.get_response(request)
@@ -92,11 +90,8 @@ class EstimatorGroupRequiredMiddleware:
             if not request.user.is_authenticated:
                 return redirect('loginw')
             userprofile = UserProfile.objects.filter(user=request.user).first()
-            try:
-                if userprofile and not userprofile.is_estimator:
-                    return HttpResponseForbidden("Access denied. User not allowed to access Estimator.")
-            except UserProfile.DoesNotExist:
-                return HttpResponseForbidden("Access denied. User Profile Not Found.")
+            if userprofile and not userprofile.is_estimator:
+                return access_denied(request, 'Estimator', how_to_get='tick “Is estimator” on your user profile')
         return self.get_response(request)
 
 class KnowledgeBaseGroupRequiredMiddleware:
@@ -113,7 +108,7 @@ class KnowledgeBaseGroupRequiredMiddleware:
             if not request.user.is_authenticated:
                 return redirect('loginw')
             if not (request.user.is_staff or request.user.groups.filter(name='Knowledge Base').exists()):
-                return HttpResponseForbidden("Access denied. User not in Knowledge Base group.")
+                return access_denied(request, 'Knowledge Base', how_to_get='add you to the “Knowledge Base” group')
         return self.get_response(request)
 
 class SkillGapGroupRequiredMiddleware:
@@ -130,9 +125,6 @@ class SkillGapGroupRequiredMiddleware:
             if not request.user.is_authenticated:
                 return redirect('loginw')
             userprofile = UserProfile.objects.filter(user=request.user).first()
-            try:
-                if userprofile and not userprofile.is_skillgap:
-                    return HttpResponseForbidden("Access denied. User not allowed to access Skill Gap Analyzer.")
-            except UserProfile.DoesNotExist:
-                return HttpResponseForbidden("Access denied. User Profile Not Found.")
+            if userprofile and not userprofile.is_skillgap:
+                return access_denied(request, 'Skill Gap', how_to_get='tick “Is skillgap” on your user profile')
         return self.get_response(request)

@@ -6,12 +6,14 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
 from django.db.models.functions import ExtractHour, ExtractIsoWeekDay
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from openpyxl import Workbook
 from openpyxl.styles import Font
+
+from IOLGenv2_BackEnd.access import access_denied
 
 from .models import ActivityLog
 
@@ -24,6 +26,14 @@ DEFAULT_EVENTS = [value for value, _ in E.choices if value != E.VIEW]
 EVENT_ORDER = [E.CREATE, E.UPDATE, E.DELETE, E.ACTION, E.DOWNLOAD, E.LOGIN, E.LOGOUT,
                E.LOGIN_FAILED, E.DENIED]
 WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+
+def can_view_log(user):
+    """Superusers, and people whose profile has "Can view Log" ticked."""
+    if user.is_superuser:
+        return True
+    profile = getattr(user, 'profile', None)  # None when the account has no profile
+    return bool(profile and profile.is_log_viewer)
 
 
 def _filtered_entries(params):
@@ -204,8 +214,8 @@ def _row(e, names):
 
 @login_required
 def log_list(request):
-    if not (request.user.is_staff or request.user.is_superuser):
-        return HttpResponseForbidden('Access denied. The Log is for administrators only.')
+    if not can_view_log(request.user):
+        return access_denied(request, 'Log', how_to_get='tick “Can view Log” on your user profile')
 
     entries, base, selected, start, end, filters, window = _filtered_entries(request.GET)
 

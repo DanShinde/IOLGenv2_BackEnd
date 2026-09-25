@@ -55,6 +55,8 @@ class UserProfile(models.Model):
     is_tracker = models.BooleanField(default=False, help_text="Is this user a tracker?")
     is_skillgap = models.BooleanField(default=False, help_text="Can this user access Skill Gap Analyzer?")
     is_estimator = models.BooleanField(default=False, help_text="Can this user access the Estimator module?")
+    is_log_viewer = models.BooleanField(default=False, verbose_name="Can view Log",
+                                        help_text="Can this user open the Log (who signed in and what they changed)? Superusers always can.")
     def __str__(self):
         return f"{self.user.username}'s Profile - {self.get_usertype_display()}"
 
