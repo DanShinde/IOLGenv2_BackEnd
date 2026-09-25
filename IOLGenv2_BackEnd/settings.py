@@ -78,8 +78,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    # Turns bare 403s on page visits into the friendly access-denied page
-    'IOLGenv2_BackEnd.access.ForbiddenPageMiddleware',
     'activitylog.middleware.ActivityLogMiddleware',
     'IOLGenv2_BackEnd.middleware.TrackerGroupRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.PlannerAuthRequiredMiddleware',
