@@ -260,7 +260,7 @@ def project_list_view(request):
             # a standalone planner.Project with no Tracker counterpart and none of
             # Tracker's required fields. The linked planner.Project is then auto-created
             # by planner/signals.py's post_save handler on tracker.Project.
-            from tracker.models import Project as TrackerProject, Stage as TrackerStage, trackerSegment
+            from tracker.models import Project as TrackerProject, trackerSegment
 
             if not form.cleaned_data.get('value') or not form.cleaned_data.get('so_punch_date'):
                 form.add_error(None, "Project Value and SO Punch Date are required to create a new project.")
@@ -282,26 +282,25 @@ def project_list_view(request):
                 )
                 # Same stage checklist a project gets when created directly in Tracker,
                 # so it's not missing its automation/emulation stages.
-                for stage_name, _ in TrackerStage.AUTOMATION_STAGES:
-                    TrackerStage.objects.create(project=tracker_project, name=stage_name, stage_type='Automation')
-                for stage_name, _ in TrackerStage.EMULATION_STAGES:
-                    TrackerStage.objects.create(project=tracker_project, name=stage_name, stage_type='Emulation')
+                tracker_project.seed_stages()
 
                 return redirect('planner_project_list')
     
-    projects = Project.objects.select_related('segment', 'team_lead').prefetch_related('activities').all()
-    
+    show_archived = request.GET.get('archived') == '1'
+    projects = Project.objects.filter(is_archived=show_archived).select_related('segment', 'team_lead').prefetch_related('activities').all()
+
     segments = Segment.objects.filter(project__in=projects).distinct().order_by('name')
     team_leads = Employee.objects.filter(led_projects__in=projects).distinct().order_by('name')
 
-    total_activities_count = Activity.objects.count()
+    total_activities_count = Activity.objects.filter(project__is_archived=show_archived).count()
     today = date.today()
-    pending_activities_count = Activity.objects.filter(start_date__gt=today).count()
+    pending_activities_count = Activity.objects.filter(project__is_archived=show_archived, start_date__gt=today).count()
     active_projects_count = projects.filter(activities__isnull=False).distinct().count()
-    
+
     context = {
-        'form': form, 
-        'projects': projects, 
+        'form': form,
+        'projects': projects,
+        'show_archived': show_archived,
         'active_nav': 'projects',
         'total_activities_count': total_activities_count,
         'pending_activities_count': pending_activities_count,
@@ -314,6 +313,8 @@ def project_list_view(request):
 def export_planner_gantt_pdf(request, project_pk=None):
     # Base QuerySet
     activities = Activity.objects.select_related('project__segment', 'project__team_lead', 'assignee').all()
+    if not project_pk:
+        activities = activities.filter(project__is_archived=False)
     
     project_obj = None
     
@@ -509,11 +510,11 @@ def consolidated_planner_view(request):
             if sort_order: query_params['sort'] = sort_order
             return redirect(f"{reverse('planner_consolidated_planner')}?{urlencode(query_params)}")
 
-    all_activities_qs = Activity.objects.select_related('project__segment', 'project__team_lead', 'project_type__category', 'assignee').all()
+    all_activities_qs = Activity.objects.select_related('project__segment', 'project__team_lead', 'project_type__category', 'assignee').filter(project__is_archived=False)
     context = _prepare_gantt_context(all_activities_qs)
 
     # Fetch filter options
-    all_projects = Project.objects.all()
+    all_projects = Project.objects.filter(is_archived=False)
     segments = Segment.objects.filter(project__in=all_projects).distinct().order_by('name')
     team_leads = Employee.objects.filter(led_projects__in=all_projects).distinct().order_by('name')
     
@@ -554,7 +555,7 @@ def consolidated_planner_view(request):
         # Nested heading sub-groups, per project -- only populated for projects that actually
         # have headings; project_heading_data.get(code) is None/falsy for the rest, and the
         # template falls back to the flat (pre-existing) rendering for those.
-        for project in Project.objects.order_by('project_id'):
+        for project in Project.objects.filter(is_archived=False).order_by('project_id'):
             proj_activities = sorted(activities_by_project.get(project.id, []), key=lambda a: a.start_date)
             display_data[project.project_id] = proj_activities
             project_lookup[project.project_id] = project
@@ -1616,6 +1617,7 @@ def resource_availability_report_view(request):
     # Non-completed activities for these employees whose date range overlaps the window.
     activities = Activity.objects.filter(
         assignee__in=employees_qs,
+        project__is_archived=False,
         is_completed=False,
         start_date__lte=period_end,
         end_date__gte=period_start,
@@ -1867,6 +1869,14 @@ def delete_project_view(request, pk):
     get_object_or_404(Project, pk=pk).delete()
     return redirect('planner_project_list')
 
+@require_POST
+def toggle_archive_project_view(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    project.is_archived = not project.is_archived
+    project.save(update_fields=['is_archived'])
+    # Land back on the list the user acted from (active list after archiving, archived list after restoring)
+    return redirect(reverse('planner_project_list') + ('?archived=1' if not project.is_archived else ''))
+
 def delete_employee_view(request, pk):
     get_object_or_404(Employee, pk=pk).delete()
     return _redirect_to_referer_or(request, reverse('planner_workforce'))
@@ -1878,6 +1888,27 @@ def delete_leave_view(request, pk):
 def delete_site_view(request, pk):
     get_object_or_404(Site, pk=pk).delete()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
+
+def update_site_view(request, pk):
+    site = get_object_or_404(Site, pk=pk)
+    fallback = f"{reverse('planner_workforce')}?tab=site_team&subtab=sites"
+    if request.method == 'POST':
+        location = (request.POST.get('location') or '').strip()
+        if location:
+            if site.is_office:
+                name = (request.POST.get('name') or '').strip()
+                if name:
+                    site.name = name
+                    site.location = location
+                    site.save()
+            else:
+                project = Project.objects.filter(pk=request.POST.get('project')).first()
+                project_taken = project and Site.objects.filter(project=project).exclude(pk=site.pk).exists()
+                if project and not project_taken:
+                    site.project = project
+                    site.location = location
+                    site.save()
+    return _redirect_to_referer_or(request, fallback)
 
 def delete_site_allocation_view(request, pk):
     get_object_or_404(SiteAllocation, pk=pk).delete()
@@ -2427,7 +2458,8 @@ def capacity_plan_view(request):
     forecasted_workload_by_segment = defaultdict(lambda: defaultdict(float))
     
     for activity in Activity.objects.select_related('assignee', 'project__segment').filter(
-        assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False
+        assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False,
+        project__is_archived=False
     ):
         daily_hours = general_settings.working_hours_per_day
         current_date = activity.start_date
@@ -2498,7 +2530,7 @@ def capacity_plan_view(request):
     global_forecast_workload = defaultdict(float)
     
     # Calculate global sums for Charts (Workload Volume)
-    for activity in Activity.objects.filter(assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False):
+    for activity in Activity.objects.filter(assignee__isnull=False, start_date__isnull=False, end_date__isnull=False, is_completed=False, project__is_archived=False):
         current_date = activity.start_date
         while current_date <= activity.end_date:
             if current_date.weekday() < 5 and current_date not in holidays:

@@ -31,10 +31,14 @@
     <div class="w-full py-3 px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-xl font-bold tracking-tight text-gray-900">Project Management</h1>
-                <p class="text-xs text-gray-500 mt-0.5">Manage your projects and track activities across your organization</p>
+                <h1 class="text-xl font-bold tracking-tight text-gray-900">{% if show_archived %}Archived Projects{% else %}Project Management{% endif %}</h1>
+                <p class="text-xs text-gray-500 mt-0.5">{% if show_archived %}Completed projects hidden from planning and capacity. Restore one to bring it back.{% else %}Manage your projects and track activities across your organization{% endif %}</p>
             </div>
             <div class="flex space-x-2">
+                <a href="{% url 'planner_project_list' %}{% if not show_archived %}?archived=1{% endif %}" class="bg-white border border-gray-300 text-gray-700 py-1.5 px-3 rounded-md shadow-sm hover:bg-gray-50 flex items-center text-xs font-medium transition-colors">
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                    {% if show_archived %}View Active{% else %}View Archived{% endif %}
+                </a>
                 <a href="{% url 'planner_consolidated_planner' %}" class="bg-purple-600 text-white py-1.5 px-3 rounded-md shadow-sm hover:bg-purple-700 flex items-center text-xs font-medium transition-colors">
                     <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -221,6 +225,16 @@
                                 <button onclick="editProject({{ project.pk }}, '{{ project.project_id }}', '{{ project.customer_name }}', {{ project.team_lead.pk|default:'null' }}, {{ project.segment.pk|default:'null' }})" class="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Edit Project">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                 </button>
+                                <form method="POST" action="{% url 'planner_toggle_archive_project' project.pk %}" class="inline" onsubmit="return confirm('{% if project.is_archived %}Restore{% else %}Archive{% endif %} project {{ project.project_id }}?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-gray-400 {% if project.is_archived %}hover:text-green-600{% else %}hover:text-amber-600{% endif %} transition-colors p-1" title="{% if project.is_archived %}Restore Project{% else %}Archive Project{% endif %}">
+                                        {% if project.is_archived %}
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                        {% else %}
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                                        {% endif %}
+                                    </button>
+                                </form>
                                 <form method="POST" action="{% url 'planner_delete_project' project.pk %}" class="inline" onsubmit="return confirm('Delete project {{ project.project_id }}?');">
                                     {% csrf_token %}
                                     <button type="submit" class="text-gray-400 hover:text-red-600 transition-colors p-1" title="Delete Project">

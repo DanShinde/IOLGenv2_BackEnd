@@ -51,6 +51,9 @@ class Project(models.Model):
         verbose_name="Linked Tracker Project",
         help_text="Connected project from tracker app"
     )
+    # Independent of tracker.Project.is_archived: archiving here only hides a completed
+    # project (and its activities) from planning views and capacity demand.
+    is_archived = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['project_id']

@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
 from employees.models import Employee
-from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson, ProjectComment, SavedReportFilter, DelayReasonTag, StageDelayReason
+from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson, ProjectComment, SavedReportFilter, DelayReasonTag, StageDelayReason, Phase
 
 from django.db import transaction
 from django.db.models import Q, F, Sum, Count
@@ -20,12 +20,18 @@ from datetime import date, timedelta, datetime
 # hundreds of thousands of days. Any day-delta outside this bound is treated as bad
 # data and excluded rather than allowed to skew the average.
 MAX_PLAUSIBLE_DAY_DELTA = 3650  # ~10 years
+
+# Stages that are not rows of the report's Stage-wise Planned vs Actual Summary (and so are
+# also not part of its totals/KPI cards): Dispatch is only used by the Emulation Timing
+# Analysis, Handover is the project's single closing stage with its own OTIF figure.
+SUMMARY_TABLE_EXCLUDED_STAGES = ('Dispatch', 'Handover')
 from dateutil.relativedelta import relativedelta
 from collections import Counter
 from collections import Counter, defaultdict 
 from tracker.utils import (
     get_completion_percentage, get_otif_percentage, get_overall_status,
-    get_schedule_status, get_next_milestone,get_final_project_otif
+    get_schedule_status, get_next_milestone,get_final_project_otif,
+    get_phase_summary, sort_stages_by_phase, get_timeline_progress, OTIF_EXCLUDED_STAGES
 
 )
 from django.core.cache import cache
@@ -81,7 +87,7 @@ def signup_view(request):
 @login_required
 def index(request):
     show_archived = request.GET.get('archived') == '1'
-    projects = Project.objects.filter(is_archived=show_archived).select_related('segment_con').prefetch_related('stages').all()
+    projects = Project.objects.filter(is_archived=show_archived).select_related('segment_con').prefetch_related('stages', 'phases').all()
     context = {
         'projects': projects,
         'all_segments': trackerSegment.objects.all(),
@@ -117,10 +123,7 @@ def new_project(request):
         )
 
         # ... stage creation logic is unchanged ...
-        for stage_name, _ in Stage.AUTOMATION_STAGES:
-            Stage.objects.create(project=project, name=stage_name, stage_type='Automation')
-        for stage_name, _ in Stage.EMULATION_STAGES:
-            Stage.objects.create(project=project, name=stage_name, stage_type='Emulation')
+        project.seed_stages()
 
         messages.success(request, "Project created successfully!")
         return redirect('tracker_project_detail', project_id=project.id)
@@ -160,6 +163,59 @@ def edit_project(request, project_id):
         'team_leads': Employee.objects.filter(designation='TEAM_LEAD')
     }
     return render(request, 'tracker/project_form.html', context)
+
+@login_required
+def add_phase(request, project_id):
+    project = get_object_or_404(Project, pk=project_id)
+    detail_url = reverse('tracker_project_detail', args=[project.id])
+    if request.method != 'POST':
+        return redirect(detail_url)
+
+    # A completed project (Handover done) is finished work -- it doesn't get new phases.
+    if project.stages.filter(name=Stage.HANDOVER, status='Completed').exists():
+        messages.error(request, "This project is already Completed, so a new phase can't be added.")
+        return redirect(detail_url)
+
+    # Splitting a single-phase project makes its existing phase visible for the first
+    # time, so the form also lets the user describe that zone.
+    existing_zone = request.POST.get('existing_zone_description')
+    existing = project.phases.order_by('number')
+    if existing_zone is not None and existing.count() == 1:
+        existing.update(zone_description=existing_zone.strip())
+    phase = project.add_phase(zone_description=request.POST.get('zone_description', '').strip())
+    cache.delete(f'project_detail_{project_id}')
+    messages.success(request, f"{phase.label} added with a fresh copy of the stage list.")
+    return redirect(f"{detail_url}?phase={phase.id}")
+
+
+@login_required
+def edit_phase(request, phase_id):
+    phase = get_object_or_404(Phase, pk=phase_id)
+    if request.method == 'POST':
+        phase.zone_description = request.POST.get('zone_description', '').strip()
+        phase.save(update_fields=['zone_description'])
+        cache.delete(f'project_detail_{phase.project_id}')
+        messages.success(request, f"{phase.label} zone description updated.")
+    return redirect(f"{reverse('tracker_project_detail', args=[phase.project_id])}?phase={phase.id}")
+
+
+@login_required
+def delete_phase(request, phase_id):
+    phase = get_object_or_404(Phase.objects.select_related('project'), pk=phase_id)
+    project = phase.project
+    if request.method == 'POST':
+        started = phase.stages.exclude(status__in=['Not started', 'Not Applicable']).exists()
+        if project.phases.count() <= 1:
+            messages.error(request, "A project must keep at least one phase.")
+        elif started:
+            messages.error(request, f"{phase.label} has stages with progress and can't be deleted. Reset or mark them first.")
+        else:
+            label = phase.label
+            phase.delete()
+            cache.delete(f'project_detail_{project.id}')
+            messages.success(request, f"{label} deleted.")
+    return redirect('tracker_project_detail', project_id=project.id)
+
 
 @login_required
 def project_detail(request, project_id):
@@ -202,10 +258,18 @@ def project_detail(request, project_id):
             return HttpResponseRedirect(redirect_url)
 
         stages_to_save = []
-        if 'save_all_automation' in request.POST:
-            stages_to_save = project.stages.filter(stage_type='Automation')
-        elif 'save_all_emulation' in request.POST:
-            stages_to_save = project.stages.filter(stage_type='Emulation')
+        phase_scope = request.POST.get('phase_id')
+        if 'save_all_automation' in request.POST or 'save_all_emulation' in request.POST:
+            stage_type = 'Automation' if 'save_all_automation' in request.POST else 'Emulation'
+            stages_to_save = project.stages.filter(stage_type=stage_type)
+            # With several phases each phase's table is its own form, so a "Save All" must
+            # only touch that phase's stages -- otherwise the other phases' stages (absent
+            # from the posted form) would be overwritten with blanks. 'none' = the
+            # project-level Handover.
+            if phase_scope == 'none':
+                stages_to_save = stages_to_save.filter(phase__isnull=True)
+            elif phase_scope:
+                stages_to_save = stages_to_save.filter(phase_id=phase_scope)
         elif 'stage_id' in request.POST:
             stage_id = request.POST.get('stage_id')
             stages_to_save = project.stages.filter(id=stage_id)
@@ -231,6 +295,9 @@ def project_detail(request, project_id):
                 new_status = 'Completed'
             if new_status == 'Completed' and not actual_date_val:
                 skipped_stage_names.append(stage.name)
+                continue
+            if new_status == 'Completed' and stage.status != 'Completed' and _handover_blockers(stage):
+                messages.error(request, _handover_blocked_message(_handover_blockers(stage)))
                 continue
 
             # Safely parse date strings
@@ -287,6 +354,17 @@ def project_detail(request, project_id):
         messages.success(request, success_message)
         base_url = reverse('tracker_project_detail', args=[project.id])
         redirect_url = f'{base_url}?active_tab={active_tab}'
+        # Land back on the phase tab that was just saved
+        # (Handover has no phase of its own, so it hands back whichever tab was open.)
+        landing_phase = None
+        if phase_scope and phase_scope != 'none':
+            landing_phase = phase_scope
+        elif 'stage_id' in request.POST and stages_to_save:
+            landing_phase = stages_to_save.first().phase_id
+        if not landing_phase:
+            landing_phase = request.POST.get('current_phase')
+        if landing_phase and landing_phase != 'main':
+            redirect_url += f"&phase={landing_phase}"
         return HttpResponseRedirect(redirect_url)
 
     # Filter stages based on status if provided
@@ -294,19 +372,28 @@ def project_detail(request, project_id):
 
     automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks', 'history')
     emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks', 'history')
-    automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').prefetch_related('remarks__added_by', 'history__changed_by', 'delay_reason__reasons')
-    emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').prefetch_related('remarks__added_by', 'history__changed_by', 'delay_reason__reasons')
-    
+    automation_stages_qs = Stage.objects.filter(project=project, stage_type='Automation').select_related('phase').prefetch_related('remarks__added_by', 'history__changed_by', 'delay_reason__reasons')
+    emulation_stages_qs = Stage.objects.filter(project=project, stage_type='Emulation').select_related('phase').prefetch_related('remarks__added_by', 'history__changed_by', 'delay_reason__reasons')
+
     if status_filter:
         automation_stages_qs = automation_stages_qs.filter(status=status_filter)
         emulation_stages_qs = emulation_stages_qs.filter(status=status_filter)
-    
+
     automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
     emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
-    automation_stages = sorted(list(automation_stages_qs), key=lambda s: automation_order.get(s.name, 99))
-    emulation_stages = sorted(list(emulation_stages_qs), key=lambda s: emulation_order.get(s.name, 99))
+    automation_stages = sort_stages_by_phase(automation_stages_qs, automation_order)
+    emulation_stages = sort_stages_by_phase(emulation_stages_qs, emulation_order)
 
     all_stages = automation_stages + emulation_stages
+
+    # Phase-wise summary (always from the full, unfiltered stage list)
+    project_phases = list(project.phases.all())
+    stages_by_phase = defaultdict(list)
+    for s in project.stages.all():
+        stages_by_phase[s.phase_id].append(s)
+    phase_summaries = [get_phase_summary(p, stages_by_phase.get(p.id, [])) for p in project_phases]
+    can_delete_phases = len(project_phases) > 1
+    can_add_phase = not any(s.name == Stage.HANDOVER and s.status == 'Completed' for s in stages_by_phase.get(None, []))
     
     updates = project.updates.select_related('author', 'raised_by').prefetch_related('who_contact', 'remarks__added_by').all()[:5]
     updates_count = project.updates.count()
@@ -316,23 +403,57 @@ def project_detail(request, project_id):
     last_update_obj = StageHistory.objects.filter(stage__project=project).order_by('-changed_at').first()
     last_update_time = last_update_obj.changed_at if last_update_obj else project.so_punch_date
     
-    applicable_auto_stages = [s for s in automation_stages if s.status != "Not Applicable"]
-    last_completed_auto_index = -1
-    for i, stage in enumerate(applicable_auto_stages):
-        if stage.status == "Completed": last_completed_auto_index = i
-    timeline_progress_auto = 0
-    total_auto_segments = len(applicable_auto_stages) - 1
-    if last_completed_auto_index >= 0 and total_auto_segments > 0:
-        timeline_progress_auto = round((last_completed_auto_index / total_auto_segments) * 100)
+    # Stage panels: one for the whole project when it has a single phase (so no phase is
+    # ever mentioned), otherwise one per phase plus one for the project-level Handover.
+    multi_phase = len(project_phases) > 1
+    requested_sub = request.GET.get('active_tab')
 
-    applicable_emu_stages = [s for s in emulation_stages if s.status != "Not Applicable"]
-    last_completed_emu_index = -1
-    for i, stage in enumerate(applicable_emu_stages):
-        if stage.status == "Completed": last_completed_emu_index = i
-    timeline_progress_emu = 0
-    total_emu_segments = len(applicable_emu_stages) - 1
-    if last_completed_emu_index >= 0 and total_emu_segments > 0:
-        timeline_progress_emu = round((last_completed_emu_index / total_emu_segments) * 100)
+    def _make_panel(uid, key, title, auto, emu, phase_id_value, show_timeline=True, zone_description=''):
+        if requested_sub == 'emulation' and emu:
+            active_sub = 'emulation'
+        else:
+            active_sub = 'automation' if auto else 'emulation'
+        return {
+            'uid': uid, 'key': key, 'title': title,
+            'automation_stages': auto, 'emulation_stages': emu,
+            'timeline_progress_auto': get_timeline_progress(auto),
+            'timeline_progress_emu': get_timeline_progress(emu),
+            'phase_id_value': phase_id_value, 'show_timeline': show_timeline,
+            'zone_description': zone_description,
+            'active_sub': active_sub,
+        }
+
+    if multi_phase:
+        panels = [
+            _make_panel(
+                f'p{p.id}', str(p.id), p.label,
+                [s for s in automation_stages if s.phase_id == p.id],
+                [s for s in emulation_stages if s.phase_id == p.id],
+                str(p.id), zone_description=p.zone_description,
+            )
+            for p in project_phases
+        ]
+        # The single project-level Handover stage isn't a tab: it's one row shown under the
+        # phase tabs so it stays visible whichever phase is selected.
+        handover_stages = [s for s in automation_stages if s.phase_id is None]
+        wanted = request.GET.get('phase')
+        active_phase_key = wanted if wanted in {p['key'] for p in panels} else panels[0]['key']
+    else:
+        panels = [_make_panel('main', 'main', '', automation_stages, emulation_stages, '')]
+        handover_stages = []
+        active_phase_key = 'main'
+
+    # Next milestones per phase (the project-level Handover trails the automation list)
+    phase_milestones = [
+        {'label': panel['title'],
+         'auto': get_next_milestone(panel['automation_stages']),
+         'emu': get_next_milestone(panel['emulation_stages']),
+         'auto_schedule': get_schedule_status(panel['automation_stages']),
+         'emu_schedule': get_schedule_status(panel['emulation_stages'])}
+        for panel in panels
+    ] if multi_phase else []
+    next_handover_milestone = get_next_milestone(handover_stages) if multi_phase else None
+    handover_schedule = get_schedule_status(handover_stages) if multi_phase else None
 
     total_comments_count = project.comments.count()
     initial_limit = 5
@@ -350,8 +471,12 @@ def project_detail(request, project_id):
         'updates_count': updates_count,
         'open_updates_count': open_updates_count,
         'completion_percentage': get_completion_percentage(all_stages),
-        'timeline_progress_auto': timeline_progress_auto,
-        'timeline_progress_emu': timeline_progress_emu,
+        'panels': panels,
+        'handover_stages': handover_stages,
+        'phase_milestones': phase_milestones,
+        'next_handover_milestone': next_handover_milestone,
+        'handover_schedule': handover_schedule,
+        'active_phase_key': active_phase_key,
         'overall_otif_percentage': get_otif_percentage(all_stages),
         'project_otif': get_final_project_otif(all_stages),
         'overall_status': get_overall_status(all_stages),
@@ -371,6 +496,11 @@ def project_detail(request, project_id):
         'planner_project': planner_project,
         'update_status_choices': ProjectUpdate.STATUS_CHOICES,
         'all_delay_reason_tags': DelayReasonTag.objects.all(),
+        'phase_summaries': phase_summaries,
+        'can_delete_phases': can_delete_phases,
+        'can_add_phase': can_add_phase,
+        'multi_phase': multi_phase,
+        'single_phase_zone': project_phases[0].zone_description if (project_phases and not multi_phase) else '',
 
     }
     
@@ -497,7 +627,7 @@ def dashboard(request):
     ).select_related('segment_con').order_by('so_punch_date')
     # --- END OF CORRECTION ---
 
-    completed_stages = Stage.objects.filter(project__in=live_projects, status='Completed').exclude(name='Dispatch')
+    completed_stages = Stage.objects.filter(project__in=live_projects, status='Completed').exclude(name__in=OTIF_EXCLUDED_STAGES)
     if period != 'all' or (custom_start and custom_end):
         completed_stages = completed_stages.filter(actual_date__range=[start_date, end_date])
     total_completed_stages = completed_stages.count()
@@ -789,13 +919,12 @@ def project_reports(request):
         except (ValueError, TypeError): pass
 
     # Which stages the rest of the report (summary table, charts, cross-tab) covers.
-    # Dispatch is excluded here: it's not counted in OTIF or the Planned vs Actual
-    # summary table — it's only used for the separate Emulation Timing Analysis.
+    # Dispatch and Handover are excluded here (see SUMMARY_TABLE_EXCLUDED_STAGES).
     if selected_stage_keys:
         stage_names_to_report = [(k, v) for k, v in Stage.STAGE_NAMES if k in selected_stage_keys]
     else:
         stage_names_to_report = Stage.STAGE_NAMES
-    stage_names_to_report = [(k, v) for k, v in stage_names_to_report if k != 'Dispatch']
+    stage_names_to_report = [(k, v) for k, v in stage_names_to_report if k not in SUMMARY_TABLE_EXCLUDED_STAGES]
     stage_keys_to_report = [k for k, _ in stage_names_to_report]
 
     # --- Check for the 'hide_completed' filter ---
@@ -862,12 +991,28 @@ def project_reports(request):
     projects_with_details = []
     automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
     emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
+    multi_phase_ids = _multi_phase_project_ids()
+    phases_by_project = defaultdict(list)
+    for ph in Phase.objects.filter(project_id__in=multi_phase_ids).order_by('number'):
+        phases_by_project[ph.project_id].append(ph)
     for project in distinct_projects:
-        all_stages = list(project.stages.all())
-        auto_stages = sorted([s for s in all_stages if s.stage_type == 'Automation'], key=lambda s: automation_order.get(s.name, 99))
-        emu_stages = sorted([s for s in all_stages if s.stage_type == 'Emulation'], key=lambda s: emulation_order.get(s.name, 99))
+        all_stages = list(project.stages.select_related('phase'))
+        auto_stages = sort_stages_by_phase([s for s in all_stages if s.stage_type == 'Automation'], automation_order)
+        emu_stages = sort_stages_by_phase([s for s in all_stages if s.stage_type == 'Emulation'], emulation_order)
+        phase_schedules = []
+        handover_schedule = None
+        if project.id in multi_phase_ids:
+            for ph in phases_by_project[project.id]:
+                phase_schedules.append({
+                    'label': ph.label,
+                    'auto': get_schedule_status([s for s in auto_stages if s.phase_id == ph.id]),
+                    'emu': get_schedule_status([s for s in emu_stages if s.phase_id == ph.id]),
+                })
+            handover_schedule = get_schedule_status([s for s in auto_stages if s.phase_id is None])
         projects_with_details.append({
             'project': project,
+            'phase_schedules': phase_schedules,
+            'handover_schedule': handover_schedule,
             'otif': project.get_otif_percentage(),
             'next_auto_milestone': get_next_milestone(auto_stages),
             'next_emu_milestone': get_next_milestone(emu_stages),
@@ -887,8 +1032,9 @@ def project_reports(request):
         Q(actual_date__gt=F('planned_date')) |
         Q(status__in=['Not started', 'In Progress'], planned_date__lt=today)
     )
-    if selected_stage_keys:
-        delayed_stages_qs = delayed_stages_qs.filter(name__in=stage_keys_to_report)
+    # Always follow the report's stage list (not only when the Stages filter is used), so
+    # the bars match the drill-down lists they open, which use that same list.
+    delayed_stages_qs = delayed_stages_qs.filter(name__in=stage_keys_to_report)
     delayed_stages_qs = delayed_stages_qs.values('name').annotate(
         count=Count('id'), project_count=Count('project_id', distinct=True)
     ).order_by('-count')
@@ -910,8 +1056,7 @@ def project_reports(request):
         planned_date__gte=plausible_planned_date_floor,
         planned_date__lte=end_date,
     ).exclude(status='Not Applicable')
-    if selected_stage_keys:
-        trend_source_qs = trend_source_qs.filter(name__in=stage_keys_to_report)
+    trend_source_qs = trend_source_qs.filter(name__in=stage_keys_to_report)
     trend_rows = list(trend_source_qs.values('planned_date', 'actual_date', 'status', 'project_id'))
 
     if has_explicit_period:
@@ -975,9 +1120,8 @@ def project_reports(request):
         project_id__in=chart_project_ids,
         planned_date__isnull=False,
         planned_date__gte=plausible_planned_date_floor,
-    ).exclude(status='Not Applicable').exclude(name='Dispatch')
-    if selected_stage_keys:
-        otif_qs = otif_qs.filter(name__in=stage_keys_to_report)
+    ).exclude(status='Not Applicable').exclude(name__in=OTIF_EXCLUDED_STAGES)
+    otif_qs = otif_qs.filter(name__in=stage_keys_to_report)
     if has_explicit_period:
         otif_qs = otif_qs.filter(planned_date__range=[start_date, end_date])
 
@@ -1036,7 +1180,8 @@ def project_reports(request):
     in_progress_stage_keys = []
     in_progress_stage_project_counts = []
 
-    total_planned = total_actual = total_pending = total_delayed = total_on_time = 0
+    total_planned = total_actual = total_pending = total_delayed = 0
+    otif_total_actual = otif_total_on_time = 0   # excludes stages that never count toward OTIF
 
     for stage_key, stage_display in stage_names_to_report:
         planned_backlog_qs = Stage.objects.filter(
@@ -1074,13 +1219,16 @@ def project_reports(request):
 
         actual_count = actual_period_qs.count()
         on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
-        otif_pct = round((on_time_count / actual_count) * 100, 1) if actual_count else None
+        counts_in_otif = stage_key not in OTIF_EXCLUDED_STAGES
+        otif_pct = round((on_time_count / actual_count) * 100, 1) if (actual_count and counts_in_otif) else None
 
         total_planned += planned_count
         total_actual += actual_count
         total_pending += pending_count
         total_delayed += delayed_count
-        total_on_time += on_time_count
+        if counts_in_otif:
+            otif_total_actual += actual_count
+            otif_total_on_time += on_time_count
 
         # Average staleness of the currently-overdue backlog, in days
         avg_delay_days = None
@@ -1100,7 +1248,7 @@ def project_reports(request):
 
         # Period-over-period OTIF trend
         otif_trend = None
-        if has_explicit_period:
+        if has_explicit_period and counts_in_otif:
             prev_actual_qs = Stage.objects.filter(
                 project_id__in=chart_project_ids,
                 name=stage_key,
@@ -1175,14 +1323,14 @@ def project_reports(request):
         del a['actual_date_raw']
 
     # --- NEW: Report-wide KPI summary (all stages combined, for the filtered set) ---
-    overall_otif = round((total_on_time / total_actual) * 100, 1) if total_actual else None
+    overall_otif = round((otif_total_on_time / otif_total_actual) * 100, 1) if otif_total_actual else None
     overall_otif_trend = None
-    if has_explicit_period and total_actual:
+    if has_explicit_period and otif_total_actual:
         prev_overall_qs = Stage.objects.filter(
             project_id__in=chart_project_ids,
             status='Completed',
             actual_date__range=[prev_period_start, prev_period_end]
-        ).exclude(name='Dispatch')
+        ).exclude(name__in=OTIF_EXCLUDED_STAGES)
         prev_overall_actual = prev_overall_qs.count()
         if prev_overall_actual:
             prev_overall_on_time = prev_overall_qs.filter(actual_date__lte=F('planned_date')).count()
@@ -1212,8 +1360,7 @@ def project_reports(request):
         status__in=['Not started', 'In Progress'],
         planned_date__lt=today,
     )
-    if selected_stage_keys:
-        delayed_now_qs = delayed_now_qs.filter(name__in=stage_keys_to_report)
+    delayed_now_qs = delayed_now_qs.filter(name__in=stage_keys_to_report)
     delayed_now_qs = delayed_now_qs.select_related('project__team_lead', 'project__segment_con')
 
     delay_by_team_lead = Counter()
@@ -1254,34 +1401,40 @@ def project_reports(request):
     emu_trend_data = defaultdict(lambda: {'cat1': 0, 'cat2': 0, 'cat3': 0})
     
     for p in distinct_chart_projects:
-        stages_map = {s.name: s for s in p.stages.all()}
-        
-        emu = stages_map.get('Emulation Testing')
-        dispatch = stages_map.get('Dispatch')
-        comm = stages_map.get('Commissioning')
-        
-        if emu and emu.actual_date:
-            month_key = emu.actual_date.replace(day=1)
-            
-            # Filter by date range if selected
-            if has_explicit_period and not (start_date <= emu.actual_date <= end_date):
-                continue
-            
-            dispatch_date = dispatch.actual_date if (dispatch and dispatch.actual_date) else None
-            # Using planned_start_date as the 'Start Date' for Go Live (Commissioning) as per user request
-            comm_start_date = comm.planned_start_date if (comm and comm.planned_start_date) else None
-            
-            # 1. Before Dispatch (or Dispatch not yet done)
-            if not dispatch_date or emu.actual_date <= dispatch_date:
-                emu_trend_data[month_key]['cat1'] += 1
-            
-            # 2. After Dispatch but Before Go Live (or Go Live not yet done)
-            elif not comm_start_date or emu.actual_date <= comm_start_date:
-                emu_trend_data[month_key]['cat2'] += 1
-            
-            # 3. After Go Live
-            else:
-                emu_trend_data[month_key]['cat3'] += 1
+        # Each phase has its own Emulation Testing / Dispatch, so compare within a phase
+        # (a name-keyed map over the whole project would mix phases together) and count
+        # every phase as its own data point.
+        stage_maps_by_phase = defaultdict(dict)
+        for s in p.stages.all():
+            stage_maps_by_phase[s.phase_id][s.name] = s
+
+        for stages_map in stage_maps_by_phase.values():
+            emu = stages_map.get('Emulation Testing')
+            dispatch = stages_map.get('Dispatch')
+            comm = stages_map.get('Commissioning')
+
+            if emu and emu.actual_date:
+                month_key = emu.actual_date.replace(day=1)
+
+                # Filter by date range if selected
+                if has_explicit_period and not (start_date <= emu.actual_date <= end_date):
+                    continue
+
+                dispatch_date = dispatch.actual_date if (dispatch and dispatch.actual_date) else None
+                # Using planned_start_date as the 'Start Date' for Go Live (Commissioning) as per user request
+                comm_start_date = comm.planned_start_date if (comm and comm.planned_start_date) else None
+
+                # 1. Before Dispatch (or Dispatch not yet done)
+                if not dispatch_date or emu.actual_date <= dispatch_date:
+                    emu_trend_data[month_key]['cat1'] += 1
+
+                # 2. After Dispatch but Before Go Live (or Go Live not yet done)
+                elif not comm_start_date or emu.actual_date <= comm_start_date:
+                    emu_trend_data[month_key]['cat2'] += 1
+
+                # 3. After Go Live
+                else:
+                    emu_trend_data[month_key]['cat3'] += 1
 
     sorted_months = sorted(emu_trend_data.keys())
     emu_chart_data = {
@@ -1304,13 +1457,14 @@ def project_reports(request):
     # --- NEW: Reason-wise Delay Report ---
     delay_qs = StageDelayReason.objects.filter(
         stage__project_id__in=chart_project_ids
-    ).select_related('stage', 'stage__project').prefetch_related('reasons')
+    ).select_related('stage', 'stage__project', 'stage__phase').prefetch_related('reasons')
     if has_explicit_period:
         delay_qs = delay_qs.filter(stage__actual_date__range=[start_date, end_date])
 
     reason_counter = Counter()
     reason_days_counter = Counter()
     delay_details = []
+    multi_phase_ids = _multi_phase_project_ids()
     for d in delay_qs:
         tag_names = [t.name for t in d.reasons.all()]
         if not tag_names:
@@ -1328,6 +1482,7 @@ def project_reports(request):
             'code': stage.project.code,
             'customer': stage.project.customer_name,
             'stage': stage.name,
+            'phase': (stage.phase.label if stage.phase_id else 'Handover') if stage.project_id in multi_phase_ids else '',
             'reasons': tag_names,
             'reasons_display': ', '.join(tag_names),
             'description': d.description,
@@ -1337,6 +1492,7 @@ def project_reports(request):
         })
 
     delay_details.sort(key=lambda x: (x['delay_days'] is None, -(x['delay_days'] or 0)))
+    show_delay_phase_column = any(d['phase'] for d in delay_details)
 
     # Ordered by total delay days (the actual schedule impact), not just how many
     # stages carried the reason.
@@ -1402,6 +1558,7 @@ def project_reports(request):
         'reason_delay_days': json.dumps(reason_delay_days),
         'reason_delay_table': reason_delay_table,
         'delay_details': delay_details,
+        'show_delay_phase_column': show_delay_phase_column,
     }
     return render(request, 'tracker/project_report.html', context)
 
@@ -1436,7 +1593,7 @@ def stage_projects_list(request):
         heading_suffix = 'In Progress'
         stages_qs = stages_qs.filter(status='In Progress')
 
-    stages = stages_qs.select_related('project', 'project__team_lead', 'project__segment_con').order_by('planned_date')
+    stages = stages_qs.select_related('project', 'phase', 'project__team_lead', 'project__segment_con').order_by('planned_date')
     project_count = stages.values('project_id').distinct().count()
 
     return render(request, 'tracker/stage_projects_list.html', {
@@ -1447,6 +1604,7 @@ def stage_projects_list(request):
         'stages': stages,
         'project_count': project_count,
         'today': today,
+        'multi_phase_project_ids': _multi_phase_project_ids(),
     })
 
 
@@ -1473,7 +1631,7 @@ def delay_owner_projects_list(request):
         planned_date__lte=end_date,
         status__in=['Not started', 'In Progress'],
         planned_date__lt=today,
-    ).select_related('project', 'project__team_lead', 'project__segment_con')
+    ).select_related('project', 'phase', 'project__team_lead', 'project__segment_con')
 
     owner_type = 'All'
     owner_label = 'All Owners'
@@ -1505,6 +1663,7 @@ def delay_owner_projects_list(request):
         'stages': stages,
         'project_count': project_count,
         'today': today,
+        'multi_phase_project_ids': _multi_phase_project_ids(),
     })
 
 
@@ -1551,7 +1710,7 @@ def trend_month_projects_list(request):
                 Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=month_start))
             ).order_by('planned_date')
 
-    stages = stages.select_related('project', 'project__team_lead', 'project__segment_con')
+    stages = stages.select_related('project', 'phase', 'project__team_lead', 'project__segment_con')
     project_count = stages.values('project_id').distinct().count()
 
     return render(request, 'tracker/trend_month_projects_list.html', {
@@ -1560,6 +1719,7 @@ def trend_month_projects_list(request):
         'stages': stages,
         'project_count': project_count,
         'today': today,
+        'multi_phase_project_ids': _multi_phase_project_ids(),
     })
 
 
@@ -1587,10 +1747,11 @@ def delete_report_preset(request, preset_id):
 @login_required
 def project_activity(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
-    history_logs = StageHistory.objects.select_related('stage', 'changed_by').filter(stage__project=project).order_by('-changed_at')
+    history_logs = StageHistory.objects.select_related('stage', 'stage__phase', 'changed_by').filter(stage__project=project).order_by('-changed_at')
     return render(request, 'tracker/project_activity.html', {
         'project': project,
         'history_logs': history_logs,
+        'multi_phase': project.phases.count() > 1,
     })
 
 
@@ -1609,7 +1770,7 @@ def upcoming_milestones(request):
     stages = apply_team_segment_filters(stages, selected_team_lead, selected_segment)
 
     # Add select_related for performance and order by project for grouping
-    stages = stages.select_related('project').order_by('project__code', 'planned_date')
+    stages = stages.select_related('project', 'phase').order_by('project__code', 'planned_date')
 
     # Group the stages by project
     stages_list = list(stages)
@@ -1634,7 +1795,25 @@ def upcoming_milestones(request):
         'all_segments': trackerSegment.objects.all(),
         'selected_team_lead': selected_team_lead,
         'selected_segment': selected_segment,
+        'multi_phase_project_ids': _multi_phase_project_ids(),
     })
+
+
+def _multi_phase_project_ids():
+    """Projects with more than one phase -- the only ones where a phase is ever named
+    in the UI (a single-phase project just looks like it has no phases)."""
+    return set(
+        Phase.objects.values('project_id').annotate(c=Count('id')).filter(c__gt=1)
+        .values_list('project_id', flat=True)
+    )
+
+
+def _stage_label(stage, multi_phase_ids):
+    """"Offline Development (Phase 2)" for a multi-phase project's stage; just the name
+    otherwise (a single-phase project never mentions its phase)."""
+    if stage.phase_id and stage.project_id in multi_phase_ids:
+        return f"{stage.name} ({stage.phase.label})"
+    return stage.name
 
 
 def get_filtered_stages(filter_type):
@@ -1693,7 +1872,7 @@ def apply_team_segment_filters(stages, team_lead_id, segment_id):
 def export_milestones_excel(request):
     filter_type = request.GET.get('filter', 'all').capitalize()
     stages = get_filtered_stages(filter_type)
-    stages = apply_team_segment_filters(stages, request.GET.get('team_lead', ''), request.GET.get('segment', ''))
+    stages = apply_team_segment_filters(stages, request.GET.get('team_lead', ''), request.GET.get('segment', '')).select_related('project', 'phase')
 
     timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
     filename = f'Upcoming Milestones {filter_type} {timestamp}.csv'
@@ -1703,12 +1882,13 @@ def export_milestones_excel(request):
 
     writer = csv.writer(response)
     writer.writerow(['Project Code', 'Customer', 'Milestone', 'Status', 'Planned Date'])
+    multi_phase_ids = _multi_phase_project_ids()
 
     for stage in stages:
         writer.writerow([
             stage.project.code,
             stage.project.customer_name,
-            stage.name,
+            _stage_label(stage, multi_phase_ids),
             stage.status,
             stage.planned_date
         ])
@@ -1719,7 +1899,7 @@ def export_milestones_pdf(request):
     raw_filter = request.GET.get('filter', 'all')
     filter_type = raw_filter.lower()
     stages = get_filtered_stages(filter_type)
-    stages = apply_team_segment_filters(stages, request.GET.get('team_lead', ''), request.GET.get('segment', ''))
+    stages = apply_team_segment_filters(stages, request.GET.get('team_lead', ''), request.GET.get('segment', '')).select_related('project', 'phase')
 
     # Format filename as "Upcoming Milestones [Filter] [dd-mm-yyyy HH-MM].pdf"
     timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
@@ -1733,11 +1913,12 @@ def export_milestones_pdf(request):
     elements.append(Paragraph(f"Upcoming Milestones - Filter: {filter_type.capitalize()}", styles['Heading2']))
 
     data = [['Project Code', 'Customer', 'Milestone', 'Status', 'Planned Date']]
+    multi_phase_ids = _multi_phase_project_ids()
     for stage in stages:
         data.append([
             stage.project.code,
             stage.project.customer_name,
-            stage.name,
+            _stage_label(stage, multi_phase_ids),
             stage.status,
             stage.planned_date.strftime('%Y-%m-%d') if stage.planned_date else 'N/A'
         ])
@@ -1860,9 +2041,8 @@ def _build_filtered_report_projects(request):
         [(k, v) for k, v in Stage.STAGE_NAMES if k in selected_stage_keys] if selected_stage_keys
         else Stage.STAGE_NAMES
     )
-    # Dispatch is excluded: not counted in OTIF or the Planned vs Actual summary
-    # table — it's only used for the separate Emulation Timing Analysis.
-    stage_names_to_report = [(k, v) for k, v in stage_names_to_report if k != 'Dispatch']
+    # Dispatch and Handover are excluded (see SUMMARY_TABLE_EXCLUDED_STAGES).
+    stage_names_to_report = [(k, v) for k, v in stage_names_to_report if k not in SUMMARY_TABLE_EXCLUDED_STAGES]
 
     return {
         'projects_qs': projects_qs.distinct(),
@@ -1997,7 +2177,7 @@ def export_report_excel(request):
         delayed_count = delayed_qs.count()
         actual_count = actual_period_qs.count()
         on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
-        otif_pct = round((on_time_count / actual_count) * 100, 1) if actual_count else None
+        otif_pct = round((on_time_count / actual_count) * 100, 1) if (actual_count and stage_key not in OTIF_EXCLUDED_STAGES) else None
 
         overdue_planned_dates = list(delayed_qs.values_list('planned_date', flat=True))
         overdue_deltas = [(today - d).days for d in overdue_planned_dates if 0 <= (today - d).days <= MAX_PLAUSIBLE_DAY_DELTA]
@@ -2791,6 +2971,23 @@ def _apply_stage_field(stage, field_name, new_value, parsed_value, status, actua
     return updated_actual_date, updated_status
 
 
+def _handover_blockers(stage):
+    """Handover is the project's single closing stage, so it can't be completed while any
+    phase still has open stages. Returns labels of the open ones (empty = fine)."""
+    if stage.name != Stage.HANDOVER:
+        return []
+    open_stages = stage.project.stages.exclude(name=Stage.HANDOVER).exclude(
+        status__in=['Completed', 'Not Applicable']
+    ).select_related('phase')
+    multi_phase = stage.project.phases.count() > 1
+    return [f"{s.name} ({s.phase.label})" if (multi_phase and s.phase_id) else s.name for s in open_stages]
+
+
+def _handover_blocked_message(blockers):
+    shown = ', '.join(blockers[:4]) + (f" and {len(blockers) - 4} more" if len(blockers) > 4 else '')
+    return f"Handover can only be completed once every phase is done. Still open: {shown}."
+
+
 @login_required
 def update_stage_ajax(request, stage_id):
     if request.method == 'POST':
@@ -2800,6 +2997,11 @@ def update_stage_ajax(request, stage_id):
             data = json.loads(request.body)
             field_name = data.get('field_name')
             new_value = data.get('new_value')
+
+            if stage.status != 'Completed' and ((field_name == 'status' and new_value == 'Completed') or (field_name == 'actual_date' and new_value)):
+                blockers = _handover_blockers(stage)
+                if blockers:
+                    return JsonResponse({'status': 'error', 'message': _handover_blocked_message(blockers)}, status=400)
 
             # Prevent clearing actual date if status is Completed
             if field_name == 'actual_date' and not new_value and stage.status == 'Completed':

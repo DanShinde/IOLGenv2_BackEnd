@@ -1,0 +1,88 @@
+{# Timelines + stage tables for one set of stages (the whole project when it has a single phase, otherwise one phase or the project-level Handover). Expects: panel, project #}
+{% if panel.show_timeline %}
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title mb-0"><i class="fas fa-cogs"></i>Automation Timeline</h5></div>
+            <div class="card-body">
+                <div class="roadmap">
+                    <div class="roadmap-line"></div>
+                    <div class="roadmap-progress" style="width: {{ panel.timeline_progress_auto }}%;"></div>
+                    {% for stage in panel.automation_stages %}
+                        {% with status=stage.status|default:"Not started" %}
+                        <div class="roadmap-step">
+                            <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
+                                {% if status == "Completed" %}<i class="fas fa-check"></i>
+                                {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
+                                {% elif status == "Hold" %}<i class="fas fa-pause"></i>
+                                {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
+                                {% else %}<i class="far fa-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="roadmap-label">{{ stage.name }}</div>
+                        </div>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-header-title mb-0"><i class="fas fa-gamepad"></i>Emulation Timeline</h5></div>
+            <div class="card-body">
+                <div class="roadmap">
+                    <div class="roadmap-line"></div>
+                    <div class="roadmap-progress" style="width: {{ panel.timeline_progress_emu }}%;"></div>
+                    {% for stage in panel.emulation_stages %}
+                        {% with status=stage.status|default:"Not started" %}
+                        <div class="roadmap-step">
+                            <div class="roadmap-circle status-{{ status|cut:' '|capfirst }}" data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="top" title="<strong>{{ stage.name }}</strong><br>Status: {{ status }}<br>{% if stage.planned_date %}Planned: {{ stage.planned_date|date:'M d, Y' }}{% endif %}<br>{% if stage.actual_date %}Actual: {{ stage.actual_date|date:'M d, Y' }}{% endif %}">
+                                {% if status == "Completed" %}<i class="fas fa-check"></i>
+                                {% elif status == "In Progress" %}<i class="fas fa-spinner fa-spin"></i>
+                                {% elif status == "Hold" %}<i class="fas fa-pause"></i>
+                                {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
+                                {% else %}<i class="far fa-circle"></i>
+                                {% endif %}
+                            </div>
+                            <div class="roadmap-label">{{ stage.name }}</div>
+                        </div>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <ul class="nav nav-tabs mb-3" id="stageTabs-{{ panel.uid }}" role="tablist">
+            {% if panel.automation_stages %}
+            <li class="nav-item" role="presentation"><button class="nav-link {% if panel.active_sub == 'automation' %}active{% endif %}" id="automation-tab-{{ panel.uid }}" data-bs-toggle="tab" data-bs-target="#automation-content-{{ panel.uid }}" type="button" role="tab"><i class="fas fa-cogs me-2"></i>Automation</button></li>
+            {% endif %}
+            {% if panel.emulation_stages %}
+            <li class="nav-item" role="presentation"><button class="nav-link {% if panel.active_sub == 'emulation' %}active{% endif %}" id="emulation-tab-{{ panel.uid }}" data-bs-toggle="tab" data-bs-target="#emulation-content-{{ panel.uid }}" type="button" role="tab"><i class="fas fa-gamepad me-2"></i>Emulation</button></li>
+            {% endif %}
+        </ul>
+        <div class="tab-content" id="stageTabsContent-{{ panel.uid }}">
+            {% if panel.automation_stages %}
+            <div class="tab-pane fade {% if panel.active_sub == 'automation' %}show active{% endif %}" id="automation-content-{{ panel.uid }}" role="tabpanel">
+                <h4 class="d-none d-print-block mb-3">Automation Stages</h4>
+                {% with form_id="automationStagesForm-"|add:panel.uid %}
+                {% include 'tracker/partials/stage_table.html' with stages=panel.automation_stages form_id=form_id tab_value='automation' save_name='save_all_automation' save_label='Save All Automation' remarks_modal='allRemarksModalAutomation' phase_id_value=panel.phase_id_value %}
+                {% endwith %}
+            </div>
+            {% endif %}
+            {% if panel.emulation_stages %}
+            <div class="tab-pane fade {% if panel.active_sub == 'emulation' %}show active{% endif %}" id="emulation-content-{{ panel.uid }}" role="tabpanel">
+                <h4 class="d-none d-print-block mb-3">Emulation Stages</h4>
+                {% with form_id="emulationStagesForm-"|add:panel.uid %}
+                {% include 'tracker/partials/stage_table.html' with stages=panel.emulation_stages form_id=form_id tab_value='emulation' save_name='save_all_emulation' save_label='Save All Emulation' remarks_modal='allRemarksModalEmulation' phase_id_value=panel.phase_id_value %}
+                {% endwith %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

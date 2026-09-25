@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'gap_analysis',
     'testvault',
     'estimator',
+    'activitylog',
 ]
 
 MIDDLEWARE = [
@@ -77,6 +78,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'activitylog.middleware.ActivityLogMiddleware',
     'IOLGenv2_BackEnd.middleware.TrackerGroupRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.PlannerAuthRequiredMiddleware',
     'IOLGenv2_BackEnd.middleware.SkillGapGroupRequiredMiddleware',

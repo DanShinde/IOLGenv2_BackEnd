@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import F, Sum
 from employees.models import Employee
+from .utils import OTIF_EXCLUDED_STAGES
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
@@ -54,9 +55,8 @@ class Project(models.Model):
     from datetime import timedelta
 
     def get_otif_percentage(self):
-        # Dispatch is excluded: not counted in OTIF, only used for the separate
-        # Emulation Timing Analysis on the report page.
-        completed_stages = self.stages.filter(status='Completed').exclude(name='Dispatch')
+        # Dispatch and Handover never count toward OTIF (see utils.OTIF_EXCLUDED_STAGES).
+        completed_stages = self.stages.filter(status='Completed').exclude(name__in=OTIF_EXCLUDED_STAGES)
         if not completed_stages.exists():
             return None
         on_time = completed_stages.filter(actual_date__lte=F('planned_date')).count()
@@ -77,21 +77,53 @@ class Project(models.Model):
         else:
             return 'Not started'  # fallback
 
+    def _stages_in_phase_order(self, stage_type=None):
+        """This project's stages in phase order (project-level Handover last), then stage
+        list order. Reads self.stages.all() and self.phases.all() so a caller that
+        prefetched them (the project list page does) costs no extra queries; phase numbers
+        come from the phases rather than stage.phase for the same reason."""
+        phase_numbers = {p.id: p.number for p in self.phases.all()}
+        stages = [s for s in self.stages.all() if stage_type is None or s.stage_type == stage_type]
+        stages.sort(key=lambda s: (phase_numbers.get(s.phase_id, 10**6), s.id))
+        return stages
+
     def get_current_automation_stage(self):
-        stages = [s for s in self.stages.all() if s.stage_type == 'Automation']
-        stages.sort(key=lambda x: x.id)
+        stages = self._stages_in_phase_order('Automation')
         for stage in stages:
             if stage.status not in ['Completed', 'Not Applicable']:
                 return stage.name
         return "Completed" if stages else "N/A"
 
     def get_current_emulation_stage(self):
-        stages = [s for s in self.stages.all() if s.stage_type == 'Emulation']
-        stages.sort(key=lambda x: x.id)
+        stages = self._stages_in_phase_order('Emulation')
         for stage in stages:
             if stage.status not in ['Completed', 'Not Applicable']:
                 return stage.name
         return "Completed" if stages else "N/A"
+
+    def _create_phase_stages(self, phase):
+        """One phase's worth of stages: every stage except Handover, which is a single
+        project-level stage (phase=None) rather than repeated per phase."""
+        for stage_name, _ in Stage.AUTOMATION_STAGES:
+            if stage_name != Stage.HANDOVER:
+                Stage.objects.create(project=self, phase=phase, name=stage_name, stage_type='Automation')
+        for stage_name, _ in Stage.EMULATION_STAGES:
+            Stage.objects.create(project=self, phase=phase, name=stage_name, stage_type='Emulation')
+
+    def seed_stages(self):
+        """Stage checklist for a brand-new project: Phase 1 plus the one Handover stage."""
+        phase = Phase.objects.create(project=self, number=1)
+        self._create_phase_stages(phase)
+        Stage.objects.create(project=self, phase=None, name=Stage.HANDOVER, stage_type='Automation')
+        return phase
+
+    def add_phase(self, zone_description=''):
+        """Appends the next phase, with a fresh (blank-dated) copy of the stage list."""
+        last = self.phases.order_by('-number').first()
+        phase = Phase.objects.create(project=self, number=(last.number + 1) if last else 1,
+                                     zone_description=zone_description)
+        self._create_phase_stages(phase)
+        return phase
 
 
     @property
@@ -108,8 +140,8 @@ class Project(models.Model):
 
     @property
     def next_milestone(self):
-        completed = list(self.stages.filter(status='Completed').order_by('id'))
-        all_stages = list(self.stages.all().order_by('id'))
+        all_stages = self._stages_in_phase_order()
+        completed = [s for s in all_stages if s.status == 'Completed']
 
         if completed:
             last_done = completed[-1]
@@ -121,7 +153,30 @@ class Project(models.Model):
 
 # tracker/models.py
 
+class Phase(models.Model):
+    """A delivery phase of a project. Each phase carries its own copy of the stage list
+    (except Handover, which is one project-level stage). Start/finish dates and progress
+    are derived from the phase's stages at render time, never stored."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='phases')
+    number = models.PositiveIntegerField(default=1)
+    name = models.CharField(max_length=100, blank=True)
+    zone_description = models.TextField(blank=True, help_text="Which zone/scope of the project this phase covers.")
+
+    class Meta:
+        ordering = ['number']
+        unique_together = ('project', 'number')
+
+    @property
+    def label(self):
+        return self.name or f"Phase {self.number}"
+
+    def __str__(self):
+        return f"{self.project.code} - {self.label}"
+
+
 class Stage(models.Model):
+    HANDOVER = "Handover"
+
     AUTOMATION_STAGES = [
         ("DAP", "DAP"),
         ("IO List & BOM Release", "IO List & BOM Release"),
@@ -158,6 +213,8 @@ class Stage(models.Model):
     ]
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='stages')
+    # Null only for the project-level Handover stage.
+    phase = models.ForeignKey(Phase, on_delete=models.CASCADE, null=True, blank=True, related_name='stages')
     name = models.CharField(max_length=100, choices=STAGE_NAMES)
     stage_type = models.CharField(max_length=20, choices=STAGE_TYPE_CHOICES, default='Automation')
     planned_start_date = models.DateField(null=True, blank=True)
@@ -165,6 +222,22 @@ class Stage(models.Model):
     actual_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="Not started")
     completion_percentage = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
+
+    def save(self, *args, **kwargs):
+        # Keep the phase rules true however a stage is saved (admin, Excel import, shell):
+        # Handover is the single project-level stage (no phase), and every other stage
+        # belongs to a phase -- a stage arriving without one joins the project's first.
+        if self.name == self.HANDOVER:
+            self.phase = None
+        elif self.phase_id is None and self.project_id:
+            self.phase = (
+                self.project.phases.order_by('number').first()
+                or Phase.objects.create(project=self.project, number=1)
+            )
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'phase' not in update_fields:
+            kwargs['update_fields'] = list(update_fields) + ['phase']
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.project.code} - {self.name}"

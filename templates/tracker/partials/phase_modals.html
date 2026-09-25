@@ -1,0 +1,66 @@
+{# Add Phase / Edit Phase zone description modals. Expects: project, multi_phase, single_phase_zone #}
+<div class="modal fade" id="addPhaseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'tracker_add_phase' project.id %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Add Phase</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">The new phase gets a fresh copy of the stage list with blank dates. Handover stays a single project-level stage.</p>
+                    {% if not multi_phase %}
+                    <div class="mb-3">
+                        <label for="existingZoneDescription" class="form-label">Zone description for the existing scope <span class="text-muted small">(it becomes Phase 1)</span></label>
+                        <textarea name="existing_zone_description" id="existingZoneDescription" class="form-control" rows="2" placeholder="e.g. Zone A - Inbound conveyors">{{ single_phase_zone }}</textarea>
+                    </div>
+                    {% endif %}
+                    <div class="mb-2">
+                        <label for="newZoneDescription" class="form-label">Zone description for the new phase</label>
+                        <textarea name="zone_description" id="newZoneDescription" class="form-control" rows="2" placeholder="e.g. Zone B - Outbound sorter"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Phase</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editPhaseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="editPhaseForm" action="">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-pen me-2"></i>Edit <span id="editPhaseLabel"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="editZoneDescription" class="form-label">Zone description</label>
+                    <textarea name="zone_description" id="editZoneDescription" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.edit-phase-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('editPhaseForm').action = btn.dataset.action;
+            document.getElementById('editPhaseLabel').textContent = btn.dataset.label;
+            document.getElementById('editZoneDescription').value = btn.dataset.zone || '';
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('editPhaseModal')).show();
+        });
+    });
+});
+</script>

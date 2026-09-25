@@ -75,7 +75,7 @@
                 </div>
                 <div class="timeline-content">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <strong class="text-dark">{{ log.stage.name }} - {{ log.field_name|title }} changed</strong>
+                        <strong class="text-dark">{{ log.stage.name }}{% if multi_phase and log.stage.phase %} ({{ log.stage.phase.label }}){% endif %} - {{ log.field_name|title }} changed</strong>
                         <small class="text-muted">{{ log.changed_at|naturaltime }}</small>
                     </div>
                     <div class="d-flex align-items-center mt-1">
