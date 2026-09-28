@@ -560,6 +560,11 @@
             </a>
           </li>
           <li class="nav-item">
+            <a class="nav-link {% if 'tools' in request.path %}active{% endif %}" href="{% url 'tools_home' %}" title="Tools">
+              <i class="bi bi-tools"></i><span class="nav-label sidebar-text">Tools</span>
+            </a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if 'downloads' in request.path %}active{% endif %}" href="{% url 'downloads' %}" title="Downloads">
               <i class="bi bi-cloud-arrow-down-fill"></i><span class="nav-label sidebar-text">Downloads</span>
             </a>
