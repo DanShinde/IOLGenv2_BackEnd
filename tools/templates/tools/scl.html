@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}SCL IO-Mapping Generator{% endblock %}
+
+{% block styles %}
+<style>
+  .tools-card { border: 1px solid var(--bs-border-color); border-radius: .75rem; }
+  .scl-code { background: #0d1117; color: #e6edf3; border-radius: .6rem; padding: 1rem;
+              font-size: .8rem; line-height: 1.5; max-height: 30rem; overflow: auto; margin: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="h3 mb-1"><i class="bi bi-cpu me-2"></i>SCL IO-Mapping Generator</h1>
+    <p class="text-muted mb-0">
+      Generates the TIA <code>POKE_BLK</code> block that maps the input, output and HMI test data blocks.
+    </p>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'tools_home' %}">
+    <i class="bi bi-arrow-left me-1"></i>All tools
+  </a>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-5">
+    <div class="tools-card p-4">
+      <form method="post" action="{% url 'tools_scl' %}" id="sclForm">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="row g-3">
+          {% for field in form %}
+          <div class="col-12 col-sm-6">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            <div class="form-text">{{ field.help_text }}</div>
+            {% for e in field.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-arrow-repeat me-1"></i>Preview
+          </button>
+          <button type="submit" form="sclForm" formaction="{% url 'tools_scl_download' %}"
+                  formmethod="post" class="btn btn-success">
+            <i class="bi bi-download me-1"></i>Download .txt
+          </button>
+        </div>
+        <p class="form-text mt-2 mb-0">
+          The defaults match what the old generator always produced &mdash; change them only if
+          your project uses different data blocks.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="tools-card p-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h2 class="h6 mb-0">Generated SCL</h2>
+        {% if code %}
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="copyScl">
+          <i class="bi bi-clipboard me-1"></i>Copy
+        </button>
+        {% endif %}
+      </div>
+      {% if code %}
+      <pre class="scl-code" id="sclCode">{{ code }}</pre>
+      {% else %}
+      <p class="text-muted mb-0">Fix the values on the left and press Preview.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Engineers paste this into TIA far more often than they save it.
+  document.getElementById('copyScl')?.addEventListener('click', function () {
+    var code = document.getElementById('sclCode');
+    if (!code) return;
+    var button = this;
+    navigator.clipboard.writeText(code.textContent).then(function () {
+      button.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied';
+      setTimeout(function () {
+        button.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
+      }, 1500);
+    });
+  });
+</script>
+{% endblock %}

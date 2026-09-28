@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}IO Text List Generator{% endblock %}
+
+{% block styles %}
+<style>
+  .tools-card { border: 1px solid var(--bs-border-color); border-radius: .75rem; }
+  .tools-kpi { border: 1px solid var(--bs-border-color); border-radius: .6rem; padding: .85rem 1rem; }
+  .tools-kpi .value { font-size: 1.5rem; font-weight: 600; line-height: 1; }
+  .tools-kpi .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: inline-block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="h3 mb-1"><i class="bi bi-card-text me-2"></i>IO Text List Generator</h1>
+    <p class="text-muted mb-0">
+      Upload an IO list and get per-channel text lists for label and ferrule printing.
+    </p>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'tools_home' %}">
+    <i class="bi bi-arrow-left me-1"></i>All tools
+  </a>
+</div>
+
+<div class="tools-card p-4 mb-4">
+  {# One form serves both steps, and which one runs is decided by WHO raises the event:  #}
+  {#                                                                                     #}
+  {#   * Validate -- the button carries hx-post, so HTMX swaps the summary in and the    #}
+  {#     chosen file stays in the input, ready to be sent again.                         #}
+  {#   * Download -- a plain submit, which the browser sends natively to the form's      #}
+  {#     own action so it arrives as a file save.                                        #}
+  {#                                                                                     #}
+  {# The form's hx-trigger deliberately does NOT list `submit`. With it, HTMX listens on #}
+  {# the form and swallows EVERY submission, including the download -- the .xlsx bytes   #}
+  {# then get swapped into the page as text instead of being saved. hx-disable on the    #}
+  {# download button does not help: the listener is on the form, not the button.         #}
+  <form id="textlistForm" method="post" enctype="multipart/form-data"
+        action="{% url 'tools_textlist_download' %}"
+        hx-post="{% url 'tools_textlist' %}"
+        hx-trigger="change from:#id_text_format"
+        hx-target="#textlist-summary" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        hx-indicator="#textlistSpinner">
+    {% csrf_token %}
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-7">
+        <label class="form-label" for="{{ form.workbook.id_for_label }}">{{ form.workbook.label }}</label>
+        {{ form.workbook }}
+        <div class="form-text">{{ form.workbook.help_text }}</div>
+        {% for e in form.workbook.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-lg-5">
+        <label class="form-label" for="{{ form.text_format.id_for_label }}">{{ form.text_format.label }}</label>
+        {{ form.text_format }}
+        <div class="form-text">{{ form.text_format.help_text }}</div>
+        {% for e in form.text_format.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center flex-wrap gap-2 mt-3">
+      {# formaction is the no-JS fallback: if HTMX never loads, this submits natively to #}
+      {# the validate view and the full page comes back with the summary.                #}
+      <button type="submit" class="btn btn-primary"
+              formaction="{% url 'tools_textlist' %}"
+              hx-post="{% url 'tools_textlist' %}"
+              hx-include="#textlistForm">
+        <i class="bi bi-check2-circle me-1"></i>Validate
+      </button>
+      <span id="textlistSpinner" class="htmx-indicator spinner-border spinner-border-sm text-primary"
+            role="status" aria-hidden="true"></span>
+      <span class="text-muted small ms-auto">
+        Your file is checked first, then sent again when you download. Nothing is stored on the server.
+      </span>
+    </div>
+
+    <div id="textlist-summary" class="mt-4">
+      {% include 'tools/_textlist_summary.html' %}
+    </div>
+  </form>
+</div>
+{% endblock %}

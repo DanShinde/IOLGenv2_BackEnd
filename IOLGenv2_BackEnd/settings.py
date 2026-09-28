@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'testvault',
     'estimator',
     'activitylog',
+    'tools',
 ]
 
 MIDDLEWARE = [

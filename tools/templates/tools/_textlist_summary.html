@@ -1,0 +1,109 @@
+{# Swapped into #textlist-summary by HTMX, and included directly on a full-page render. #}
+{# It sits INSIDE #textlistForm, so the hidden fingerprint below is re-posted with the  #}
+{# file when the Download button submits.                                               #}
+
+{% if error %}
+<div class="alert alert-danger d-flex gap-2" role="alert">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+  <div>{{ error }}</div>
+</div>
+{% endif %}
+
+{% if summary %}
+<input type="hidden" name="fingerprint" value="{{ summary.fingerprint }}">
+
+<div class="row g-2 mb-3">
+  <div class="col-4">
+    <div class="tools-kpi">
+      <div class="value">{{ summary.sheet_count }}</div>
+      <div class="label text-muted">Sheet{{ summary.sheet_count|pluralize }} found</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="tools-kpi">
+      <div class="value">{{ summary.total_input_rows }}</div>
+      <div class="label text-muted">Input rows</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="tools-kpi">
+      <div class="value">{{ summary.total_output_rows }}</div>
+      <div class="label text-muted">Output rows</div>
+    </div>
+  </div>
+</div>
+
+<p class="small text-muted">
+  Format: <strong>{{ summary.text_format_label }}</strong> &middot; from <strong>{{ summary.filename }}</strong>
+</p>
+
+<div class="table-responsive mb-3">
+  <table class="table table-sm align-middle">
+    <thead>
+      <tr>
+        <th>Source sheet</th>
+        <th>Will be written as</th>
+        <th class="text-end">Inputs</th>
+        <th class="text-end">Outputs</th>
+        <th>Grouped by</th>
+        <th class="text-end">Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sheet in summary.sheets %}
+      <tr>
+        <td>{{ sheet.name }}</td>
+        <td class="small">
+          {% if sheet.inputs_sheet_name %}<code>{{ sheet.inputs_sheet_name }}</code>{% endif %}
+          {% if sheet.inputs_sheet_name and sheet.outputs_sheet_name %}<br>{% endif %}
+          {% if sheet.outputs_sheet_name %}<code>{{ sheet.outputs_sheet_name }}</code>{% endif %}
+          {% if not sheet.inputs_sheet_name and not sheet.outputs_sheet_name %}
+            <span class="text-muted">nothing to write</span>
+          {% endif %}
+        </td>
+        <td class="text-end">{{ sheet.input_rows }}</td>
+        <td class="text-end">{{ sheet.output_rows }}</td>
+        <td class="small">{{ sheet.group_by }}</td>
+        <td class="text-end">{{ sheet.column_summary }}</td>
+      </tr>
+      {% if sheet.warnings %}
+      <tr class="table-light">
+        <td colspan="6" class="small text-muted">
+          <ul class="mb-0 ps-3">
+            {% for warning in sheet.warnings %}<li>{{ warning }}</li>{% endfor %}
+          </ul>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if summary.skipped_sheets %}
+<details class="mb-3">
+  <summary class="small text-muted">
+    {{ summary.skipped_sheets|length }} sheet{{ summary.skipped_sheets|length|pluralize }} skipped
+  </summary>
+  <ul class="small text-muted mt-2 mb-0">
+    {% for skipped in summary.skipped_sheets %}
+    <li><strong>{{ skipped.name }}</strong> &mdash; {{ skipped.reason }}</li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+
+<div class="d-flex align-items-center flex-wrap gap-2">
+  {# A plain submit: the form's own action is the download URL, and the form does not #}
+  {# listen for submit over HTMX, so the browser handles this natively as a file save. #}
+  <button type="submit" form="textlistForm"
+          class="btn btn-success" {% if not interactive %}disabled{% endif %}>
+    <i class="bi bi-download me-1"></i>Download .xlsx
+  </button>
+  {% if not interactive %}
+  <span class="text-muted small">
+    Choose the file again and press Validate to enable the download.
+  </span>
+  {% endif %}
+</div>
+{% endif %}

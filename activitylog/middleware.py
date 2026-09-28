@@ -6,12 +6,14 @@ from .services import denied_title, describe, record_event, title_for_changes
 
 logger = logging.getLogger(__name__)
 
-# Never logged: assets, tooling, the Log page itself (viewing it would only add noise), and
-# the sign-in/out endpoints, which are recorded by the auth signals instead.
+# Never logged: assets, tooling, the Log page itself (viewing it would only add noise),
+# the sign-in/out endpoints, which are recorded by the auth signals instead, and Tools,
+# which is a public stateless utility -- it stores nothing and changes nothing, so an
+# entry per generated text list would only be noise.
 SKIP_PREFIXES = (
     '/static/', '/media/', '/__debug__/', '/log/', '/deploy-hook/', '/favicon',
     '/admin/jsi18n/', '/accounts/loginw/', '/accounts/logoutw/', '/accounts/login/',
-    '/accounts/token/',
+    '/accounts/token/', '/tools/',
 )
 WRITE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
 

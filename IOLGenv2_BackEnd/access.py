@@ -16,6 +16,7 @@ SOFTWARE = {
     'inventory': ('Inventory', '📦'),
     'skillgap': ('Skill Gap', '🎯'),
     'estimator': ('Estimator', '🧮'),
+    'tools': ('Tools', '🧰'),
     'testvault': ('TestVault', '🧪'),
     'forum': ('Knowledge Base', '💡'),
     'acgen': ('ACGen', '⚙️'),

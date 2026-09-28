@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Tools{% endblock %}
+
+{% block styles %}
+<style>
+  .tool-card { border: 1px solid var(--bs-border-color); border-radius: .75rem; height: 100%;
+               transition: box-shadow .15s ease, transform .15s ease; }
+  .tool-card:hover { box-shadow: 0 .5rem 1rem rgba(0,0,0,.08); transform: translateY(-2px); }
+  .tool-icon { width: 3rem; height: 3rem; display: inline-flex; align-items: center;
+               justify-content: center; border-radius: .6rem; font-size: 1.4rem;
+               background: rgba(var(--bs-primary-rgb), .1); color: var(--bs-primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h1 class="h3 mb-1"><i class="bi bi-tools me-2"></i>Tools</h1>
+  <p class="text-muted mb-0">Small standalone utilities for IO lists and PLC code. No sign-in needed.</p>
+</div>
+
+<div class="row g-3">
+  {% for tool in tools %}
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="tool-card p-4 d-flex flex-column">
+      <div class="tool-icon mb-3"><i class="bi {{ tool.icon }}"></i></div>
+      <h2 class="h5">{{ tool.name }}</h2>
+      <p class="text-muted small flex-grow-1">{{ tool.description }}</p>
+      <a class="btn btn-primary btn-sm align-self-start" href="{% url tool.url_name %}">
+        Open <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12"><p class="text-muted">No tools are available yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
