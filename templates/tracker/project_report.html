@@ -438,7 +438,9 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <canvas id="stageDelayChart"></canvas>
+                    <div id="stageDelayChartWrap" style="position: relative; height: 300px;">
+                        <canvas id="stageDelayChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -821,6 +823,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const stageDelayLabels = {{ stage_delay_labels|safe }};
     const stageDelayProjectCounts = {{ stage_delay_project_counts|safe }};
     if (stageDelayCtx && stageDelayData.length > 0) {
+        // Give each bar enough room that every stage name renders; otherwise Chart.js
+        // auto-skips alternate labels and bars look like they belong to the wrong stage.
+        document.getElementById('stageDelayChartWrap').style.height = Math.max(150, stageDelayData.length * 34 + 50) + 'px';
         new Chart(stageDelayCtx, {
             type: 'bar',
             data: {
@@ -839,7 +844,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     legend: { display: false },
                     tooltip: { callbacks: { label: (ctx) => projectCountLabel(ctx, stageDelayProjectCounts) } }
                 },
-                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { stepSize: 1 } },
+                    y: { ticks: { autoSkip: false } }
+                },
                 onClick: (evt, elements) => {
                     if (!elements.length) return;
                     const stageKey = stageDelayLabels[elements[0].index];
