@@ -14,7 +14,7 @@
             <div class="list-toolbar">
                 <div class="search-box">
                     <i class="bi bi-search"></i>
-                    <input type="text" class="form-control" id="tableSearchInput" placeholder="Search activities...">
+                    <input type="text" class="form-control" id="tableSearchInput" data-persist-filter="search" placeholder="Search activities...">
                 </div>
                 <span class="row-count" id="tableRowCount">{{ activities|length }} activit{{ activities|length|pluralize:'y,ies' }}</span>
                 <a href="{% url 'estimator_activity_new' %}" class="btn btn-primary btn-sm">

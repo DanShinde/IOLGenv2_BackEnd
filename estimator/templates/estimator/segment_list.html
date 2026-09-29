@@ -12,7 +12,7 @@
         <div class="list-toolbar">
             <div class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search segments...">
+                <input type="text" class="form-control" id="tableSearchInput" data-persist-filter="search" placeholder="Search segments...">
             </div>
             <span class="row-count" id="tableRowCount">{{ segments|length }} segment{{ segments|length|pluralize }}</span>
             <a href="{% url 'estimator_segment_new' %}" class="btn btn-primary btn-sm">

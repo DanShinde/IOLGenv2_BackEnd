@@ -15,7 +15,7 @@
         <div class="list-toolbar">
             <div class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search projects...">
+                <input type="text" class="form-control" id="tableSearchInput" data-persist-filter="search" placeholder="Search projects...">
             </div>
             <span class="row-count" id="tableRowCount">{{ projects|length }} project{{ projects|length|pluralize }}</span>
             <a href="{% url 'estimator_project_new' %}" class="btn btn-primary btn-sm">

@@ -12,7 +12,7 @@
         <div class="list-toolbar">
             <div class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search module types...">
+                <input type="text" class="form-control" id="tableSearchInput" data-persist-filter="search" placeholder="Search module types...">
             </div>
             <span class="row-count" id="tableRowCount">{{ module_types|length }} module type{{ module_types|length|pluralize }}</span>
             <a href="{% url 'estimator_module_type_new' %}" class="btn btn-primary btn-sm">

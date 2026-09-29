@@ -1,5 +1,6 @@
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .models import user_can_manage_employee
 
@@ -24,6 +25,20 @@ class EmployeeSelfOrManagerRequiredMixin:
         if not (user_can_manage_employee(user, obj) or obj.user_id == user.id):
             raise PermissionDenied("You don't have access to this employee's profile.")
         return obj
+
+
+class ReturnToNextMixin:
+    """Sends a successful save/delete back to the `?next=` URL the list page linked with
+    (so its filters survive the round trip), falling back to the view's own success_url.
+    Put it before CancelUrlMixin so Cancel returns to the same filtered list."""
+
+    def get_success_url(self):
+        next_url = self.request.GET.get('next')
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()}, require_https=self.request.is_secure(),
+        ):
+            return next_url
+        return super().get_success_url()
 
 
 class CancelUrlMixin:
