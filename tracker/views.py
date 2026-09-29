@@ -1021,13 +1021,16 @@ def project_reports(request):
         })
 
     # --- NEW: Stage Bottleneck Analysis (Top Delayed Stages) ---
-    # Count stages where Actual > Planned OR (Status is active AND Today > Planned)
+    # Count stages where Actual > Planned OR (Status is active AND Today > Planned), within
+    # the same planned-period backlog window as the summary table (stages completed before
+    # the period started drop out, so a stage finished late long ago isn't a bottleneck now).
     today = timezone.now().date()
     delayed_stages_qs = Stage.objects.filter(
         project__in=distinct_projects,
         planned_date__gte=plausible_planned_date_floor,
+        planned_date__lte=end_date,
     ).exclude(
-        status='Not Applicable'
+        Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=start_date))
     ).filter(
         Q(actual_date__gt=F('planned_date')) |
         Q(status__in=['Not started', 'In Progress'], planned_date__lt=today)
@@ -1582,9 +1585,13 @@ def stage_projects_list(request):
     stages_qs = Stage.objects.filter(project_id__in=project_ids, name=stage_key)
     if list_type == 'delayed':
         heading_suffix = 'Delayed'
+        # Same window and rule as the bar chart in project_report.
         stages_qs = stages_qs.filter(
             planned_date__gte=plausible_planned_date_floor,
-        ).exclude(status='Not Applicable').filter(
+            planned_date__lte=filtered['end_date'],
+        ).exclude(
+            Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=filtered['start_date']))
+        ).filter(
             Q(actual_date__gt=F('planned_date')) |
             Q(status__in=['Not started', 'In Progress'], planned_date__lt=today)
         )
@@ -1593,8 +1600,15 @@ def stage_projects_list(request):
         heading_suffix = 'In Progress'
         stages_qs = stages_qs.filter(status='In Progress')
 
-    stages = stages_qs.select_related('project', 'phase', 'project__team_lead', 'project__segment_con').order_by('planned_date')
-    project_count = stages.values('project_id').distinct().count()
+    stages = list(stages_qs.select_related('project', 'phase', 'project__team_lead', 'project__segment_con').order_by('planned_date'))
+    # Delay is how late the stage actually finished (actual - planned) once it has an
+    # actual date; only still-open stages keep accruing delay up to today.
+    for stage in stages:
+        stage.delay_is_final = bool(stage.actual_date)
+        end = stage.actual_date or today
+        stage.delay_days = (end - stage.planned_date).days if stage.planned_date and end > stage.planned_date else None
+    stages.sort(key=lambda s: -(s.delay_days or 0))
+    project_count = len({s.project_id for s in stages})
 
     return render(request, 'tracker/stage_projects_list.html', {
         'stage_key': stage_key,
