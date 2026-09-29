@@ -117,10 +117,22 @@ class Project(models.Model):
         Stage.objects.create(project=self, phase=None, name=Stage.HANDOVER, stage_type='Automation')
         return phase
 
+    def ensure_phase_one(self):
+        """The project's first phase, owning every stage that has none yet.
+
+        Projects created before the Phase model exists predate any phase, so their
+        stages carry phase=None. Splitting such a project would strand those stages
+        outside every phase and hide them from the detail page, so adopt them into
+        Phase 1 first. Handover stays project-level."""
+        phase = self.phases.order_by('number').first() or Phase.objects.create(project=self, number=1)
+        self.stages.filter(phase__isnull=True).exclude(name=Stage.HANDOVER).update(phase=phase)
+        return phase
+
     def add_phase(self, zone_description=''):
         """Appends the next phase, with a fresh (blank-dated) copy of the stage list."""
+        self.ensure_phase_one()
         last = self.phases.order_by('-number').first()
-        phase = Phase.objects.create(project=self, number=(last.number + 1) if last else 1,
+        phase = Phase.objects.create(project=self, number=last.number + 1,
                                      zone_description=zone_description)
         self._create_phase_stages(phase)
         return phase

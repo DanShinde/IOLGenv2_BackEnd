@@ -177,7 +177,9 @@ def add_phase(request, project_id):
         return redirect(detail_url)
 
     # Splitting a single-phase project makes its existing phase visible for the first
-    # time, so the form also lets the user describe that zone.
+    # time, so the form also lets the user describe that zone. A project predating the
+    # Phase model has no Phase 1 to describe yet, so materialise it first.
+    project.ensure_phase_one()
     existing_zone = request.POST.get('existing_zone_description')
     existing = project.phases.order_by('number')
     if existing_zone is not None and existing.count() == 1:
@@ -391,7 +393,13 @@ def project_detail(request, project_id):
     stages_by_phase = defaultdict(list)
     for s in project.stages.all():
         stages_by_phase[s.phase_id].append(s)
-    phase_summaries = [get_phase_summary(p, stages_by_phase.get(p.id, [])) for p in project_phases]
+    # Legacy phase-less stages (see migration 0018) roll up under the first phase, the
+    # same place the stage panels show them, so the summary matches what's on screen.
+    legacy_orphans = [s for s in stages_by_phase.get(None, []) if s.name != Stage.HANDOVER]
+    phase_summaries = [
+        get_phase_summary(p, stages_by_phase.get(p.id, []) + (legacy_orphans if i == 0 else []))
+        for i, p in enumerate(project_phases)
+    ]
     can_delete_phases = len(project_phases) > 1
     can_add_phase = not any(s.name == Stage.HANDOVER and s.status == 'Completed' for s in stages_by_phase.get(None, []))
     
@@ -424,18 +432,27 @@ def project_detail(request, project_id):
         }
 
     if multi_phase:
+        # Only Handover is legitimately phase-less. Any other phase-less stage is legacy
+        # data from before the Phase model (migration 0018 adopts it into Phase 1); group
+        # it with the first phase here too, so it can never fall out of the page.
+        def _phase_stages(stages, phase, is_first):
+            picked = [s for s in stages if s.phase_id == phase.id]
+            if is_first:
+                picked += [s for s in stages if s.phase_id is None and s.name != Stage.HANDOVER]
+            return picked
+
         panels = [
             _make_panel(
                 f'p{p.id}', str(p.id), p.label,
-                [s for s in automation_stages if s.phase_id == p.id],
-                [s for s in emulation_stages if s.phase_id == p.id],
+                _phase_stages(automation_stages, p, i == 0),
+                _phase_stages(emulation_stages, p, i == 0),
                 str(p.id), zone_description=p.zone_description,
             )
-            for p in project_phases
+            for i, p in enumerate(project_phases)
         ]
         # The single project-level Handover stage isn't a tab: it's one row shown under the
         # phase tabs so it stays visible whichever phase is selected.
-        handover_stages = [s for s in automation_stages if s.phase_id is None]
+        handover_stages = [s for s in automation_stages if s.phase_id is None and s.name == Stage.HANDOVER]
         wanted = request.GET.get('phase')
         active_phase_key = wanted if wanted in {p['key'] for p in panels} else panels[0]['key']
     else:
