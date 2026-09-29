@@ -1396,6 +1396,44 @@ def project_reports(request):
     delay_by_segment_ids = [segment_id_by_name[x[0]] for x in delay_by_segment_top]
     delay_by_segment_project_counts = [len(segment_projects[x[0]]) for x in delay_by_segment_top]
 
+    # --- OTIF % by Team Lead and by Segment ---
+    # Same basis as the Overall OTIF % KPI: stages completed within the period (excluding
+    # stages that never count toward OTIF), on time when actual <= planned -- just split by
+    # owner, so the per-owner figures reconcile with the headline number.
+    otif_owner_qs = _otif_completed_stages(
+        chart_project_ids, stage_keys_to_report, summary_start, summary_end,
+    ).select_related('project__team_lead', 'project__segment_con')
+
+    otif_by_team_lead = defaultdict(lambda: [0, 0])   # name -> [on_time, total]
+    otif_by_segment = defaultdict(lambda: [0, 0])
+    otif_team_lead_ids = {}
+    otif_segment_ids = {}
+    for s in otif_owner_qs:
+        on_time = 1 if (s.planned_date and s.actual_date <= s.planned_date) else 0
+        tl = s.project.team_lead
+        seg = s.project.segment_con
+        tl_key = tl.name if tl else 'Unassigned'
+        seg_key = seg.name if seg else 'Unassigned'
+        otif_team_lead_ids[tl_key] = tl.id if tl else 'unassigned'
+        otif_segment_ids[seg_key] = seg.id if seg else 'unassigned'
+        for bucket, key in ((otif_by_team_lead, tl_key), (otif_by_segment, seg_key)):
+            bucket[key][0] += on_time
+            bucket[key][1] += 1
+
+    def _otif_chart(bucket, ids_by_name):
+        # Lowest OTIF first so the owners needing attention sit at the top.
+        rows = sorted(bucket.items(), key=lambda kv: (kv[1][0] / kv[1][1], -kv[1][1]))
+        return {
+            'labels': [name for name, _ in rows],
+            'data': [round(on_time / total * 100, 1) for _, (on_time, total) in rows],
+            'on_time': [on_time for _, (on_time, _t) in rows],
+            'total': [total for _, (_o, total) in rows],
+            'ids': [ids_by_name[name] for name, _ in rows],
+        }
+
+    otif_by_team_lead_chart = _otif_chart(otif_by_team_lead, otif_team_lead_ids)
+    otif_by_segment_chart = _otif_chart(otif_by_segment, otif_segment_ids)
+
     # --- NEW: Emulation Timing Analysis Trends ---
     # Categories:
     # 1. Before Dispatch
@@ -1554,6 +1592,8 @@ def project_reports(request):
         'delay_by_segment_data': delay_by_segment_data,
         'delay_by_segment_ids': json.dumps(delay_by_segment_ids),
         'delay_by_segment_project_counts': delay_by_segment_project_counts,
+        'otif_by_team_lead_chart': otif_by_team_lead_chart,
+        'otif_by_segment_chart': otif_by_segment_chart,
         'saved_report_presets': SavedReportFilter.objects.filter(user=request.user) if request.user.is_authenticated else [],
         'current_query_string': request.GET.urlencode(),
         'reason_delay_labels': json.dumps(reason_delay_labels),
@@ -1647,26 +1687,7 @@ def delay_owner_projects_list(request):
         planned_date__lt=today,
     ).select_related('project', 'phase', 'project__team_lead', 'project__segment_con')
 
-    owner_type = 'All'
-    owner_label = 'All Owners'
-    if team_lead_id == 'unassigned':
-        stages = stages.filter(project__team_lead__isnull=True)
-        owner_type = 'Team Lead'
-        owner_label = 'Unassigned'
-    elif team_lead_id:
-        stages = stages.filter(project__team_lead_id=team_lead_id)
-        owner = Employee.objects.filter(id=team_lead_id).first()
-        owner_type = 'Team Lead'
-        owner_label = owner.name if owner else 'Unknown'
-    elif segment_id == 'unassigned':
-        stages = stages.filter(project__segment_con__isnull=True)
-        owner_type = 'Segment'
-        owner_label = 'Unassigned'
-    elif segment_id:
-        stages = stages.filter(project__segment_con_id=segment_id)
-        owner = trackerSegment.objects.filter(id=segment_id).first()
-        owner_type = 'Segment'
-        owner_label = owner.name if owner else 'Unknown'
+    stages, owner_type, owner_label = _filter_stages_by_owner(stages, team_lead_id, segment_id)
 
     stages = stages.order_by('planned_date')
     project_count = stages.values('project_id').distinct().count()
@@ -1677,6 +1698,75 @@ def delay_owner_projects_list(request):
         'stages': stages,
         'project_count': project_count,
         'today': today,
+        'multi_phase_project_ids': _multi_phase_project_ids(),
+    })
+
+
+def _otif_completed_stages(project_ids, stage_keys, start_date, end_date):
+    """Stages that count toward OTIF for a period: completed within it, excluding stages
+    that never count toward OTIF. Shared by the report's OTIF-by-owner charts and their
+    drill-down so both always count the same stages."""
+    return Stage.objects.filter(
+        project_id__in=project_ids,
+        name__in=stage_keys,
+        status='Completed',
+        actual_date__range=[start_date, end_date],
+    ).exclude(name__in=OTIF_EXCLUDED_STAGES)
+
+
+def _filter_stages_by_owner(stages, team_lead_id, segment_id):
+    """Narrows a Stage queryset to one team lead or one segment ('unassigned' selects
+    projects with none). Returns (stages, owner_type, owner_label) for the page heading."""
+    if team_lead_id == 'unassigned':
+        return stages.filter(project__team_lead__isnull=True), 'Team Lead', 'Unassigned'
+    if team_lead_id:
+        owner = Employee.objects.filter(id=team_lead_id).first()
+        return stages.filter(project__team_lead_id=team_lead_id), 'Team Lead', owner.name if owner else 'Unknown'
+    if segment_id == 'unassigned':
+        return stages.filter(project__segment_con__isnull=True), 'Segment', 'Unassigned'
+    if segment_id:
+        owner = trackerSegment.objects.filter(id=segment_id).first()
+        return stages.filter(project__segment_con_id=segment_id), 'Segment', owner.name if owner else 'Unknown'
+    return stages, 'All', 'All Owners'
+
+
+@login_required
+def otif_owner_stages_list(request):
+    """Drill-down for the "OTIF % by Team Lead / by Segment" charts: lists the completed
+    stages behind one owner's OTIF bar -- late ones first, with how late -- respecting the
+    report's active filters and period."""
+    filtered = _build_filtered_report_projects(request)
+    project_ids = filtered['projects_qs'].values_list('id', flat=True)
+    stage_keys = [k for k, _ in filtered['stage_names_to_report']]
+
+    stages = _otif_completed_stages(
+        project_ids, stage_keys, filtered['start_date'], filtered['end_date'],
+    ).select_related('project', 'phase', 'project__team_lead', 'project__segment_con')
+    stages, owner_type, owner_label = _filter_stages_by_owner(
+        stages, request.GET.get('team_lead'), request.GET.get('segment'),
+    )
+
+    stages = list(stages)
+    for s in stages:
+        s.on_time = bool(s.planned_date and s.actual_date <= s.planned_date)
+        s.days_late = (s.actual_date - s.planned_date).days if (s.planned_date and not s.on_time) else None
+    # Late first (worst first), then on-time by most recent completion.
+    stages.sort(key=lambda s: (s.on_time, -(s.days_late or 0), -s.actual_date.toordinal()))
+
+    on_time_count = sum(1 for s in stages if s.on_time)
+    otif_pct = round(on_time_count / len(stages) * 100, 1) if stages else None
+
+    return render(request, 'tracker/otif_owner_stages_list.html', {
+        'owner_type': owner_type,
+        'owner_label': owner_label,
+        'stages': stages,
+        'on_time_count': on_time_count,
+        'late_count': len(stages) - on_time_count,
+        'otif_pct': otif_pct,
+        'project_count': len({s.project_id for s in stages}),
+        # "All Time" uses a 2000-01-01 sentinel start; show it as open-ended.
+        'start_date': filtered['start_date'] if filtered['start_date'] > date(2000, 1, 1) else None,
+        'end_date': filtered['end_date'],
         'multi_phase_project_ids': _multi_phase_project_ids(),
     })
 

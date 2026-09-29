@@ -512,6 +512,51 @@
         </div>
     </div>
 
+    <div class="row mt-4">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-user-check me-2"></i>OTIF % &mdash; by Team Lead
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Share of stages completed in the selected period that finished on or before their planned date (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if otif_by_team_lead_chart.labels %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="otifByTeamLeadChart"></canvas>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">No stages were completed in the selected period.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-bullseye me-2"></i>OTIF % &mdash; by Segment
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Share of stages completed in the selected period that finished on or before their planned date (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if otif_by_segment_chart.labels %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="otifBySegmentChart"></canvas>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">No stages were completed in the selected period.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {{ otif_by_team_lead_chart|json_script:"otifByTeamLeadData" }}
+    {{ otif_by_segment_chart|json_script:"otifBySegmentData" }}
+
     <!-- Common Chart Controls -->
     <div class="row mt-4">
         <div class="col-12">
@@ -894,6 +939,64 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' }, {{ delay_by_team_lead_ids|safe }}, 'team_lead', {{ delay_by_team_lead_project_counts|safe }});
     initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' }, {{ delay_by_segment_ids|safe }}, 'segment', {{ delay_by_segment_project_counts|safe }});
+
+    // OTIF % by Team Lead / by Segment — green at or above the 80% target, red below.
+    // Click a bar to open that owner's completed stages (late ones first) in a new tab.
+    // The two cards sit side by side, so both charts share one label-column width to line up;
+    // bars use Chart.js' default sizing, like the "Who Owns Today's Delays" charts above.
+    const otifSources = {
+        otifByTeamLeadData: JSON.parse(document.getElementById('otifByTeamLeadData').textContent),
+        otifBySegmentData: JSON.parse(document.getElementById('otifBySegmentData').textContent),
+    };
+    const otifLabelWidth = (() => {
+        const m = document.createElement('canvas').getContext('2d');
+        m.font = `${Chart.defaults.font.size}px ${Chart.defaults.font.family}`;
+        const labels = Object.values(otifSources).flatMap(s => s.labels);
+        return Math.ceil(Math.max(0, ...labels.map(l => m.measureText(l).width))) + 16;
+    })();
+
+    function initOtifBar(canvasId, dataId, ownerParam) {
+        const ctx = document.getElementById(canvasId);
+        const src = otifSources[dataId];
+        if (!ctx || !src.data.length) return;
+        const good = (v) => v >= 80;
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: src.labels,
+                datasets: [{
+                    label: 'OTIF %',
+                    data: src.data,
+                    backgroundColor: src.data.map(v => good(v) ? 'rgba(25, 135, 84, 0.7)' : 'rgba(220, 53, 69, 0.7)'),
+                    borderColor: src.data.map(v => good(v) ? 'rgba(25, 135, 84, 1)' : 'rgba(220, 53, 69, 1)'),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                layout: { padding: { right: 36 } },
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { anchor: 'end', align: 'end', formatter: (v) => v + '%', font: { size: 10 } },
+                    tooltip: { callbacks: { label: (c) =>
+                        `OTIF: ${c.raw}% (${src.on_time[c.dataIndex]} of ${src.total[c.dataIndex]} stages on time)` } }
+                },
+                scales: {
+                    x: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + '%' } },
+                    y: { ticks: { autoSkip: false }, afterFit: (scale) => { scale.width = otifLabelWidth; } }
+                },
+                onClick: (evt, elements) => {
+                    if (!elements.length) return;
+                    const ownerId = src.ids[elements[0].index];
+                    if (ownerId === undefined || ownerId === null) return;
+                    openDrilldownTab("{% url 'tracker_otif_owner_stages' %}", { [ownerParam]: ownerId });
+                },
+                onHover: cursorOnHover
+            }
+        });
+    }
+    initOtifBar('otifByTeamLeadChart', 'otifByTeamLeadData', 'team_lead');
+    initOtifBar('otifBySegmentChart', 'otifBySegmentData', 'segment');
 
     // In Progress Stages pie chart — click a slice to open that stage's project list in a new tab
     const inProgressCtx = document.getElementById('inProgressStageChart');

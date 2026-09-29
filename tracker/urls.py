@@ -31,6 +31,7 @@ urlpatterns = [
     path('project/reports/', views.project_reports, name='project_reports'),
     path('project/reports/stage-projects/', views.stage_projects_list, name='tracker_stage_projects'),
     path('project/reports/delay-owner-projects/', views.delay_owner_projects_list, name='tracker_delay_owner_projects'),
+    path('project/reports/otif-owner-stages/', views.otif_owner_stages_list, name='tracker_otif_owner_stages'),
     path('project/reports/trend-month-projects/', views.trend_month_projects_list, name='tracker_trend_month_projects'),
     path('project/<int:project_id>/activity/', views.project_activity, name='tracker_project_activity'),
 
