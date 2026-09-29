@@ -2,6 +2,43 @@
 
 Work log for Pravin Shinde. Other contributors keep their own `<initials>_WorkLog.md`.
 
+Every change gets an entry, newest first: `## YYYY-MM-DD — what changed`, a short
+**Reason:** (why it was needed), **Changed:** (files touched), and anything done to
+prod. Keep it brief — enough to answer "why is this like this?" months later.
+
+---
+
+## 2026-09-29 — Tracker: phase-less stages vanished when a project got a 2nd phase
+
+**Reason:** On A1636 the Phase 1 Emulation timeline rendered blank after adding Phase 2.
+Migration `0017` added the `Phase` model but never backfilled `Stage.phase`, so every
+pre-existing stage sat at `NULL`. `Stage.save()` adopted stages into a lazily-created
+Phase 1 only as they were saved — "Save All Automation" rescued the Automation stages,
+the Emulation ones stayed `NULL`. Single-phase projects hid this (one unfiltered panel);
+adding a phase switched `project_detail` to `s.phase_id == p.id` and the orphans matched
+no phase and no Handover row, so they disappeared and became uneditable.
+
+**Changed:**
+- `tracker/models.py` — new `Project.ensure_phase_one()`; `add_phase()` calls it first, so
+  splitting a legacy project can't strand stages. Also fixes `add_phase` numbering the new
+  phase 1 and dropping `existing_zone_description` when the project had no `Phase` row.
+- `tracker/views.py` — any remaining phase-less non-Handover stage groups with the first
+  phase (panels and `phase_summaries`); `handover_stages` narrowed to Handover only.
+- `tracker/migrations/0018_backfill_stage_phase.py` — data migration. **Not in git**
+  (`.gitignore` has `*/migrations/`); lives only on the dev machine.
+
+**Prod (`Auto-AD` @ 10.10.11.218, PG 17.4):** `pg_dump` custom-format backup taken and
+`pg_restore --list`-verified first, plus a JSON snapshot of all 1,686 stage→phase rows.
+Then `migrate tracker 0018`: orphans **1397 → 0** across 124 projects, phases 24 → 128
+(104 created), 0 stages created/deleted, 0 pre-existing assignments moved, 126 Handover
+stages still project-level. A1636 Phase 1 now `auto=6 emu=6`; its rollup corrected from
+43% (Automation-only) to 29% across all 12.
+
+**Verified:** single-phase pages render byte-identical before/after the backfill (A1485,
+0 diff, same 26 queries) — the new Phase 1 rows are invisible because all phase UI is
+gated on `>1` phase. Dashboard, reports, milestones, stage-projects and delay-owner all
+200. Commit `876dd21`, pushed to `main`.
+
 ---
 
 ## 2026-09-28 — New `tools` app (ported from the standalone TextLists Flask app)
