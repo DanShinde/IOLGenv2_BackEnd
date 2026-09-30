@@ -61,6 +61,7 @@
     </div>
 </div>
 
+{% if stage.delay_reason_applicable %}
 <div class="modal fade" id="delayReasonModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -94,6 +95,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="modal fade" id="historyModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">

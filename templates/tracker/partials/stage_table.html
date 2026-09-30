@@ -53,7 +53,9 @@
                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#historyModal{{ stage.id }}"><i class="fas fa-history me-2"></i>History</button></li>
                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addRemarkModal{{ stage.id }}"><i class="fas fa-plus-circle me-2"></i>Add Remark</button></li>
                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewRemarkModal{{ stage.id }}"><i class="fas fa-eye me-2"></i>View Remarks</button></li>
+                            {% if stage.delay_reason_applicable %}
                             <li><button type="button" class="dropdown-item" onclick="openDelayReasonModal({{ stage.id }}, false)"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Delay Reason</button></li>
+                            {% endif %}
                         </ul>
                     </div>
                 </div>

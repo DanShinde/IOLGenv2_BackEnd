@@ -1503,6 +1503,8 @@ def project_reports(request):
         stage__project_id__in=chart_project_ids
     ).exclude(
         stage__actual_date__lte=F('stage__planned_date')
+    ).exclude(
+        stage__name__in=Stage.DELAY_REASON_EXCLUDED_STAGES
     ).select_related('stage', 'stage__project', 'stage__phase').prefetch_related('reasons')
     if has_explicit_period:
         delay_qs = delay_qs.filter(stage__actual_date__range=[start_date, end_date])
@@ -2657,6 +2659,8 @@ def save_stage_delay_reason_ajax(request, stage_id):
         return JsonResponse({'status': 'error', 'message': 'Invalid request method.'}, status=405)
 
     stage = get_object_or_404(Stage, id=stage_id)
+    if not stage.delay_reason_applicable:
+        return JsonResponse({'status': 'error', 'message': f'Delay reasons are not recorded for {stage.name}.'}, status=400)
 
     try:
         data = json.loads(request.body)
@@ -3117,7 +3121,7 @@ def update_stage_ajax(request, stage_id):
             is_delayed = bool(status == 'Completed' and planned_date and actual_date and actual_date > planned_date)
             has_delay_reason = hasattr(stage, 'delay_reason') and stage.delay_reason.reasons.exists()
 
-            if is_delayed and field_name in DELAY_GATE_FIELDS:
+            if is_delayed and field_name in DELAY_GATE_FIELDS and stage.delay_reason_applicable:
                 # Hold off saving anything until a delay reason is supplied — see
                 # save_stage_delay_reason_ajax, which applies this same field change
                 # atomically together with the reason.
