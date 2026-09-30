@@ -1,8 +1,14 @@
 {% extends 'tracker/base.html' %}
 {% load custom_tags %}
 {% load humanize %}
+{% load static %}
 
 {% block title %}Dashboard | Project Tracker{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/chart-style.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -244,6 +250,7 @@
 
 {% block scripts %}
 {{ block.super }}
+<script src="{% static 'js/chart-style.js' %}"></script>
 <script>
 // --- Table Filtering Function ---
 function filterDashboardTables(input) {
@@ -266,7 +273,12 @@ function filterDashboardTables(input) {
 
 document.addEventListener('DOMContentLoaded', function() {
     Chart.register(ChartDataLabels);
+    RS.applyDefaults();
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => Object.values(Chart.instances).forEach(c => c.update('none')));
+    }
 
+    const crore = (v) => '₹' + Number(v).toFixed(2) + ' Cr';
 
     // --- SCRIPT FOR SCROLLABLE PROGRESS CHART ---
     const progressCtx = document.getElementById('progressChart');
@@ -283,154 +295,140 @@ document.addEventListener('DOMContentLoaded', function() {
     // 3. Determine the final height for the chart's container
     // It will be AT LEAST the height of the viewport, or taller if there are many projects.
     const finalHeight = Math.max(viewportHeight, totalContentHeight);
-    
+
     // 4. Apply the calculated height to the inner container
     progressChartContainer.style.height = `${finalHeight}px`;
 
-    // 5. Create the chart
+    // 5. Create the chart. Each project falls in exactly one band (On Track / At Risk /
+    // Delayed), so every row is a single segment and gets the same pill-shaped bar as the
+    // other charts.
+    const progressScales = RS.hScales({ stacked: true, min: 0, max: 100, title: { display: true, text: 'Completion %' }, ticks: { padding: 6, callback: (v) => v + '%' } });
+    progressScales.y.stacked = true;
+    const progressSegment = (pair) => RS.bar({ backgroundColor: RS.gradient(pair, true), barPercentage: 0.75, categoryPercentage: 0.85 });
     new Chart(progressCtx, {
         type: 'bar',
-        data: { 
-            labels: [{% for label in labels %}"{{ label|escapejs }}",{% endfor %}], 
-            datasets: [ 
-                { label: 'On Track (>= 80%)', data: {{ on_track_data|safe }}, backgroundColor: 'rgba(67, 97, 238, 0.7)', borderWidth: 1 }, 
-                { label: 'At Risk (40-79%)', data: {{ at_risk_data|safe }}, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderWidth: 1 }, 
-                { label: 'Delayed (< 40%)', data: {{ delayed_data|safe }}, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderWidth: 1 } 
-            ] 
+        data: {
+            labels: [{% for label in labels %}"{{ label|escapejs }}",{% endfor %}],
+            datasets: [
+                Object.assign({ label: 'On Track (>= 80%)', data: {{ on_track_data|safe }} }, progressSegment(RS.indigo)),
+                Object.assign({ label: 'At Risk (40-79%)', data: {{ at_risk_data|safe }} }, progressSegment(RS.amber)),
+                Object.assign({ label: 'Delayed (< 40%)', data: {{ delayed_data|safe }} }, progressSegment(RS.rose))
+            ]
         },
-        options: { 
-            indexAxis: 'y', 
+        options: {
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false, // This is crucial to allow resizing
-            plugins: { 
-                legend: { display: true, position: 'top' }, 
-                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value, context) { return value > 0 ? value + '%' : null; } } 
-            }, 
-            scales: { 
-                x: { stacked: true, min: 0, max: 100, title: { display: true, text: 'Completion %' } }, 
-                y: { stacked: true } 
-            } 
+            layout: { padding: { right: 36 } },
+            plugins: {
+                legend: { display: true, position: 'top' },
+                // Percentage just past the end of each bar, like the other bar charts.
+                datalabels: RS.endLabels({ formatter: function(value, context) { return value > 0 ? value + '%' : null; } })
+            },
+            scales: progressScales
         }
     });
 
-    // --- Status Chart (This part is corrected) ---
+    // --- Status Chart --- (colours come from the server and stand for each status)
     const statusCanvas = document.getElementById('statusChart');
 
     if (statusCanvas && {{ status_data|safe }}.length > 0) {
-        // ✅ CORRECTED: Changed getContext('d') to getContext('2d')
-        const statusCtx = statusCanvas.getContext('2d');
-        new Chart(statusCtx, {
-            type: 'pie',
-            data: { 
-                labels: [{% for label in status_labels %}"{{ label|escapejs }}",{% endfor %}], 
-                datasets: [{ 
-                    label: 'Project Status', 
-                    data: {{ status_data|safe }}, 
-                    backgroundColor: [{% for color in status_colors %}"{{ color|escapejs }}",{% endfor %}]
-                }] 
+        const statusLabels = [{% for label in status_labels %}"{{ label|escapejs }}",{% endfor %}];
+        const statusOptions = doughnutOptions('projects');
+        new Chart(statusCanvas.getContext('2d'), {
+            type: 'doughnut',
+            plugins: [centerTotalPlugin],
+            data: {
+                labels: statusLabels,
+                datasets: [Object.assign({ label: 'Project Status', data: {{ status_data|safe }} }, doughnutStyle(statusLabels),
+                    { backgroundColor: [{% for color in status_colors %}"{{ color|escapejs }}",{% endfor %}] })]
             },
-            options: { 
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { 
-                    legend: { position: 'top' },
-                    datalabels: { color: '#ffffff', font: { weight: 'bold' } }
-                } 
-            }
+            options: { ...statusOptions, plugins: { ...statusOptions.plugins, legend: { position: 'top' } } }
         });
     }
 
-    // --- Segment Chart ---
-    const segmentCtx = document.getElementById('segmentChart').getContext('2d');
-    new Chart(segmentCtx, {
+    // --- Segment Chart --- (number of projects per segment)
+    const segmentLabels = [{% for label in segment_labels %}"{{ label|escapejs }}",{% endfor %}];
+    const segmentOptions = doughnutOptions('projects');
+    new Chart(document.getElementById('segmentChart').getContext('2d'), {
         type: 'doughnut',
+        plugins: [centerTotalPlugin],
         data: {
-            labels: [{% for label in segment_labels %}"{{ label|escapejs }}",{% endfor %}],
-            datasets: [{
-                data: {{ segment_data|safe }},
-                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'],
-                hoverOffset: 4
-            }]
+            labels: segmentLabels,
+            datasets: [Object.assign({ data: {{ segment_data|safe }} }, doughnutStyle(segmentLabels))]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { 
-                legend: { position: 'right' },
+            ...segmentOptions,
+            plugins: {
+                ...segmentOptions.plugins,
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            if (label) { label += ': '; }
-                            if (context.parsed !== null) { label += '₹' + context.parsed.toFixed(2) + ' Cr'; }
-                            return label;
-                        }
+                        label: (context) => `${context.label}: ${context.parsed} project${context.parsed === 1 ? '' : 's'}`
                     }
-                },
-                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
+                }
             }
         }
     });
 
     // --- Team Lead Chart ---
-    const teamLeadCtx = document.getElementById('teamLeadChart').getContext('2d');
-    new Chart(teamLeadCtx, {
+    new Chart(document.getElementById('teamLeadChart').getContext('2d'), {
         type: 'bar',
         data: {
             labels: [{% for label in team_lead_labels %}"{{ label|escapejs }}",{% endfor %}],
-            datasets: [{
+            datasets: [RS.bar({
                 label: 'Projects',
                 data: {{ team_lead_data|safe }},
-                backgroundColor: '#36b9cc',
-            }]
+                backgroundColor: RS.gradient(RS.teal, false)
+            })]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            scales: RS.vScales({ ticks: { precision: 0, padding: 6 } }),
             plugins: {
                 legend: { display: false },
-                datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' } }
+                datalabels: RS.endLabels({ align: 'top' })
             }
         }
     });
 
     // --- NEW: Segment Value Chart ---
-    const segmentValueCtx = document.getElementById('segmentValueChart').getContext('2d');
-    new Chart(segmentValueCtx, {
+    const segmentValueLabels = [{% for label in segment_value_labels %}"{{ label|escapejs }}",{% endfor %}];
+    const segmentValueOptions = doughnutOptions('₹ Cr', (t) => '₹' + t.toFixed(2));
+    new Chart(document.getElementById('segmentValueChart').getContext('2d'), {
         type: 'doughnut',
+        plugins: [centerTotalPlugin],
         data: {
-            labels: [{% for label in segment_value_labels %}"{{ label|escapejs }}",{% endfor %}],
-            datasets: [{
-                data: {{ segment_value_data|safe }},
-                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'],
-                hoverOffset: 4
-            }]
+            labels: segmentValueLabels,
+            datasets: [Object.assign({ data: {{ segment_value_data|safe }} }, doughnutStyle(segmentValueLabels))]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'right' }, datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } } }
+            ...segmentValueOptions,
+            plugins: {
+                ...segmentValueOptions.plugins,
+                tooltip: { callbacks: { label: (context) => `${context.label}: ${crore(context.parsed)}` } },
+                datalabels: { ...segmentValueOptions.plugins.datalabels, formatter: function(value) { return value.toFixed(2); } }
+            }
         }
     });
 
     // --- NEW: Team Lead Value Chart ---
-    const teamLeadValueCtx = document.getElementById('teamLeadValueChart').getContext('2d');
-    new Chart(teamLeadValueCtx, {
+    new Chart(document.getElementById('teamLeadValueChart').getContext('2d'), {
         type: 'bar',
         data: {
             labels: [{% for label in team_lead_value_labels %}"{{ label|escapejs }}",{% endfor %}],
-            datasets: [{
+            datasets: [RS.bar({
                 label: 'Total Value (Cr)',
                 data: {{ team_lead_value_data|safe }},
-                backgroundColor: '#4e73df',
-            }]
+                backgroundColor: RS.gradient(RS.indigo, false)
+            })]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true } },
+            scales: RS.vScales(),
             plugins: {
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -445,27 +443,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 },
-                datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
+                datalabels: RS.endLabels({ align: 'top', formatter: function(value) { return value.toFixed(2); } })
             }
         }
     });
 
-    // --- NEW: Status Value Chart ---
-    const statusValueCtx = document.getElementById('statusValueChart').getContext('2d');
-    new Chart(statusValueCtx, {
-        type: 'pie',
+    // --- NEW: Status Value Chart --- (status colours from the server)
+    const statusValueLabels = [{% for label in status_value_labels %}"{{ label|escapejs }}",{% endfor %}];
+    const statusValueOptions = doughnutOptions('₹ Cr', (t) => '₹' + t.toFixed(2));
+    new Chart(document.getElementById('statusValueChart').getContext('2d'), {
+        type: 'doughnut',
+        plugins: [centerTotalPlugin],
         data: {
-            labels: [{% for label in status_value_labels %}"{{ label|escapejs }}",{% endfor %}],
-            datasets: [{
-                data: {{ status_value_data|safe }},
-                backgroundColor: [{% for color in status_value_colors %}"{{ color|escapejs }}",{% endfor %}]
-            }]
+            labels: statusValueLabels,
+            datasets: [Object.assign({ data: {{ status_value_data|safe }} }, doughnutStyle(statusValueLabels),
+                { backgroundColor: [{% for color in status_value_colors %}"{{ color|escapejs }}",{% endfor %}] })]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { 
-                legend: { position: 'right' },
+            ...statusValueOptions,
+            plugins: {
+                ...statusValueOptions.plugins,
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -480,28 +477,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 },
-                datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: function(value) { return value.toFixed(2); } }
+                datalabels: { ...statusValueOptions.plugins.datalabels, formatter: function(value) { return value.toFixed(2); } }
             }
         }
     });
 
     // --- NEW: Project Age Chart ---
-    const ageCtx = document.getElementById('ageChart').getContext('2d');
-    new Chart(ageCtx, {
+    new Chart(document.getElementById('ageChart').getContext('2d'), {
         type: 'bar',
         data: {
             labels: [{% for label in age_labels %}"{{ label|escapejs }}",{% endfor %}],
-            datasets: [{
+            datasets: [RS.bar({
                 label: 'Number of Projects',
                 data: {{ age_data|safe }},
-                backgroundColor: '#fd7e14', // Orange
-            }]
+                backgroundColor: RS.gradient(RS.amber, false)
+            })]
         },
-        options: { 
-            responsive: true, 
+        options: {
+            responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-            plugins: { legend: { display: false }, datalabels: { color: '#ffffff', anchor: 'center', align: 'center', font: { weight: 'bold' } } }
+            scales: RS.vScales({ ticks: { precision: 0, padding: 6 } }),
+            plugins: { legend: { display: false }, datalabels: RS.endLabels({ align: 'top' }) }
         }
     });
 });
