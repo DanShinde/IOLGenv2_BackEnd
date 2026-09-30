@@ -1496,8 +1496,13 @@ def project_reports(request):
         emu_chart_data['financial_years'].append(fy_str)
 
     # --- NEW: Reason-wise Delay Report ---
+    # A reason only counts while its stage is actually late: if the actual date was later
+    # corrected to on/before the planned date, the stage isn't delayed any more, so its
+    # (still-saved) reason drops out here rather than showing up with negative delay days.
     delay_qs = StageDelayReason.objects.filter(
         stage__project_id__in=chart_project_ids
+    ).exclude(
+        stage__actual_date__lte=F('stage__planned_date')
     ).select_related('stage', 'stage__project', 'stage__phase').prefetch_related('reasons')
     if has_explicit_period:
         delay_qs = delay_qs.filter(stage__actual_date__range=[start_date, end_date])
