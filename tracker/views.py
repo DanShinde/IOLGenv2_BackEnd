@@ -2650,19 +2650,6 @@ def add_contact_person_ajax(request):
     return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=405)
 
 
-@login_required
-def add_delay_reason_tag_ajax(request):
-    if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        name = (request.POST.get('name') or '').strip()
-        if not name:
-            return JsonResponse({'status': 'error', 'message': 'Name is required'}, status=400)
-
-        tag, created = DelayReasonTag.objects.get_or_create(name=name)
-
-        return JsonResponse({'status': 'success', 'id': tag.id, 'name': tag.name, 'created': created})
-
-    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=405)
-
 
 @login_required
 def save_stage_delay_reason_ajax(request, stage_id):

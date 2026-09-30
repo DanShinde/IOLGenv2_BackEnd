@@ -75,12 +75,11 @@
                     <div class="delay-reason-tags d-flex flex-wrap gap-2 mb-2" data-stage-id="{{ stage.id }}">
                         {% for tag in all_delay_reason_tags %}
                         <button type="button" class="btn btn-sm delay-reason-tag-btn {% if tag in stage.delay_reason.reasons.all %}btn-primary active{% else %}btn-outline-secondary{% endif %}" data-tag-id="{{ tag.id }}">{{ tag.name }}</button>
+                        {% empty %}
+                        <span class="text-muted small">No delay reasons are set up yet. Please ask an admin to add them.</span>
                         {% endfor %}
                     </div>
-                    <div class="input-group input-group-sm" style="max-width: 320px;">
-                        <input type="text" class="form-control delay-reason-new-input" placeholder="Add a new reason...">
-                        <button type="button" class="btn btn-outline-primary delay-reason-add-btn" data-stage-id="{{ stage.id }}"><i class="fas fa-plus me-1"></i>Add</button>
-                    </div>
+                    <div class="form-text">Reasons are managed by the admins. If none of the listed reasons exactly matches your situation, select the closest option and provide the details in the description. If you cannot find a suitable reason, please contact the admin (Mahesh Shirsat).</div>
                 </div>
                 <div class="mb-2">
                     <label for="delay-reason-description-{{ stage.id }}" class="form-label">Description (optional)</label>

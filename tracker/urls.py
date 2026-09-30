@@ -78,7 +78,6 @@ urlpatterns = [
     path('contact/add/ajax/', views.add_contact_person_ajax, name='add_contact_person_ajax'),
 
     # AJAX for Delay Reason
-    path('delay-reason-tag/add/ajax/', views.add_delay_reason_tag_ajax, name='add_delay_reason_tag_ajax'),
     path('ajax/stage/<int:stage_id>/delay-reason/', views.save_stage_delay_reason_ajax, name='save_stage_delay_reason_ajax'),
     
     # ✅ FIXED: Restored 'help_page' name to match base.html
