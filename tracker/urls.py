@@ -42,6 +42,7 @@ urlpatterns = [
     
     path('reports/export/pdf/', views.export_report_pdf, name='export_report_pdf'),
     path('reports/export/excel/', views.export_report_excel, name='export_report_excel'),
+    path('reports/export/project-summary/', views.export_project_summary_excel, name='export_project_summary_excel'),
     path('reports/preset/save/', views.save_report_preset, name='save_report_preset'),
     path('reports/preset/<int:preset_id>/delete/', views.delete_report_preset, name='delete_report_preset'),
 

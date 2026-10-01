@@ -10,7 +10,7 @@ from employees.models import Employee
 from .models import Stage, StageHistory, trackerSegment, StageRemark, ProjectUpdate, UpdateRemark, Project, ContactPerson, ProjectComment, SavedReportFilter, DelayReasonTag, StageDelayReason, Phase
 
 from django.db import transaction
-from django.db.models import Q, F, Sum, Count
+from django.db.models import Q, F, Sum, Count, Max
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -1014,6 +1014,12 @@ def project_reports(request):
     phases_by_project = defaultdict(list)
     for ph in Phase.objects.filter(project_id__in=multi_phase_ids).order_by('number'):
         phases_by_project[ph.project_id].append(ph)
+    # "Last updated" for the Project Summary table: latest stage change per project
+    last_update_by_project = dict(
+        StageHistory.objects.filter(stage__project__in=distinct_projects)
+        .values('stage__project_id').annotate(last=Max('changed_at'))
+        .values_list('stage__project_id', 'last')
+    )
     for project in distinct_projects:
         all_stages = list(project.stages.select_related('phase'))
         auto_stages = sort_stages_by_phase([s for s in all_stages if s.stage_type == 'Automation'], automation_order)
@@ -1037,6 +1043,8 @@ def project_reports(request):
             'next_emu_milestone': get_next_milestone(emu_stages),
             'auto_schedule': get_schedule_status(auto_stages),
             'emu_schedule': get_schedule_status(emu_stages),
+            'summary': _project_summary(phases_by_project.get(project.id, []), auto_stages, emu_stages),
+            'last_updated': last_update_by_project.get(project.id) or project.so_punch_date,
         })
 
     # --- NEW: Stage Bottleneck Analysis (Top Delayed Stages) ---
@@ -1702,6 +1710,52 @@ def delay_owner_projects_list(request):
     })
 
 
+def _project_summary(phases, auto_stages, emu_stages):
+    """The Project Detail page's "Project Summary" card as data, for the Reports page's
+    Project Summary table. `auto_stages` / `emu_stages` are the project's full stage lists
+    in workflow order (sort_stages_by_phase). Rows are one per phase -- or a single unlabeled
+    row for a one-phase project -- plus a Handover row when there are several phases."""
+    all_stages = auto_stages + emu_stages
+    summary = {
+        'status': get_overall_status(all_stages),
+        'otif': get_otif_percentage(all_stages),
+        'handover_otif': get_final_project_otif(all_stages),
+        'multi_phase': len(phases) > 1,
+    }
+    if not summary['multi_phase']:
+        summary['rows'] = [{
+            'label': '',
+            'auto': get_next_milestone(auto_stages), 'emu': get_next_milestone(emu_stages),
+            'auto_schedule': get_live_schedule_status(auto_stages),
+            'emu_schedule': get_live_schedule_status(emu_stages),
+        }]
+        summary['handover'] = None
+        return summary
+
+    def _in_phase(stages, phase, is_first):
+        # Legacy phase-less stages (anything but Handover) belong with the first phase,
+        # as on the Project Detail page.
+        return [s for s in stages if s.phase_id == phase.id
+                or (is_first and s.phase_id is None and s.name != Stage.HANDOVER)]
+
+    rows = []
+    for i, p in enumerate(phases):
+        auto, emu = _in_phase(auto_stages, p, i == 0), _in_phase(emu_stages, p, i == 0)
+        rows.append({
+            'label': p.label,
+            'auto': get_next_milestone(auto), 'emu': get_next_milestone(emu),
+            'auto_schedule': get_live_schedule_status(auto),
+            'emu_schedule': get_live_schedule_status(emu),
+        })
+    handover = [s for s in auto_stages if s.phase_id is None and s.name == Stage.HANDOVER]
+    summary['rows'] = rows
+    summary['handover'] = {
+        'next': get_next_milestone(handover),
+        'schedule': get_live_schedule_status(handover),
+    } if handover else None
+    return summary
+
+
 def _otif_due_stages(project_ids, stage_keys, start_date, end_date, today):
     """Stages that count toward OTIF for a period (the shared definition in utils: due in
     the period). Shared by the report's OTIF-by-owner charts and their drill-down so both
@@ -1827,6 +1881,289 @@ def trend_month_projects_list(request):
         'today': today,
         'multi_phase_project_ids': _multi_phase_project_ids(),
     })
+
+
+def _schedule_text(status):
+    """One live-schedule result as plain text, e.g. 'Delayed by 5 days (Go Live, overdue)'."""
+    if not status:
+        return 'Not enough data'
+    d, st = status['days'], status['stage']
+    head = (f"Delayed by {d} day{'s' if d != 1 else ''}" if d > 0
+            else f"Ahead by {-d} day{'s' if d != -1 else ''}" if d < 0 else 'On Time')
+    if not st:
+        return head
+    return f"{head} ({st.get_name_display()}{', overdue' if status['overdue'] else ''})"
+
+
+def _milestone_text(stage):
+    if not stage:
+        return 'Complete'
+    planned = stage.planned_date.strftime('%d %b %Y') if stage.planned_date else '-'
+    return f"{stage.get_name_display()} (Planned {planned})"
+
+
+@login_required
+def export_project_summary_excel(request):
+    """The Reports page's Project Summary table as a presentation-ready Excel sheet:
+    same filters as the page (plus the table's own search box, `q`), same figures as
+    each project's detail-page summary."""
+    from openpyxl.styles import PatternFill
+    from openpyxl.utils import get_column_letter
+
+    filtered = _build_filtered_report_projects(request)
+    projects = list(filtered['projects_qs'].order_by('code'))
+    q = (request.GET.get('q') or '').strip().lower()
+    if q:
+        projects = [p for p in projects if q in f"{p.code} {p.customer_name}".lower()]
+
+    automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
+    emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
+    multi_phase_ids = _multi_phase_project_ids()
+    phases_by_project = defaultdict(list)
+    for ph in Phase.objects.filter(project_id__in=multi_phase_ids).order_by('number'):
+        phases_by_project[ph.project_id].append(ph)
+    last_update_by_project = dict(
+        StageHistory.objects.filter(stage__project__in=projects)
+        .values('stage__project_id').annotate(last=Max('changed_at'))
+        .values_list('stage__project_id', 'last')
+    )
+
+    # --- Palette ---
+    NAVY, INK, MUTED, GRID, BAND = '1F3A5F', '1F2937', '6B7280', 'D9DEE5', 'F5F7FA'
+    soft = {  # (fill, font) pairs
+        'green': ('E3F4EA', '1E7B46'), 'red': ('FBE4E4', 'B42318'),
+        'amber': ('FFF4D6', '8A5A00'), 'blue': ('E3EDFB', '1D4E89'), 'grey': ('EEF0F3', '4B5563'),
+    }
+    fill = lambda hex_: PatternFill('solid', start_color=hex_, end_color=hex_)
+    thin = Side(style='thin', color=GRID)
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    wrap_top = Alignment(wrap_text=True, vertical='top')
+    center_top = Alignment(horizontal='center', vertical='top', wrap_text=True)
+
+    columns = [  # (heading, width)
+        ('Project Code', 13), ('Customer', 30), ('Segment', 15), ('Team Lead', 24), ('Status', 13),
+        ('Last Updated', 13), ('Overall OTIF %', 11), ('Handover', 12),
+        ('Next Automation Milestone', 34), ('Next Emulation Milestone', 34),
+        ('Automation Schedule', 36), ('Emulation Schedule', 36),
+    ]
+    ncols = len(columns)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Project Summary'
+    ws.sheet_view.showGridLines = False
+
+    # --- Title + filter context ---
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
+    ws['A1'] = 'Project Summary'
+    ws['A1'].font = Font(size=18, bold=True, color='FFFFFF')
+    ws['A1'].fill = fill(NAVY)
+    ws['A1'].alignment = Alignment(vertical='center', indent=1)
+    ws.row_dimensions[1].height = 34
+
+    gp = request.GET
+    if gp.get('financial_year'):
+        y = int(gp['financial_year'])
+        period_label = f"FY {str(y)[-2:]}-{str(y + 1)[-2:]}"
+    elif gp.get('period') == 'all':
+        period_label = 'All Time'
+    else:
+        period_label = f"{filtered['start_date']:%d %b %Y} – {filtered['end_date']:%d %b %Y}"
+    context_bits = [f"Period: {period_label}"]
+    seg_names = list(trackerSegment.objects.filter(id__in=gp.getlist('segments')).values_list('name', flat=True))
+    if seg_names:
+        context_bits.append('Segments: ' + ', '.join(seg_names))
+    tl_names = list(Employee.objects.filter(id__in=gp.getlist('team_leads')).values_list('name', flat=True))
+    if tl_names:
+        context_bits.append('Team Leads: ' + ', '.join(tl_names))
+    if gp.getlist('stages'):
+        stage_map = dict(Stage.STAGE_NAMES)
+        context_bits.append('Stages: ' + ', '.join(stage_map.get(k, k) for k in gp.getlist('stages')))
+    if gp.get('hide_completed') == '1':
+        context_bits.append('Completed projects hidden')
+    if q:
+        context_bits.append(f'Search: "{request.GET.get("q").strip()}"')
+    context_bits.append(f"Generated {filtered['today']:%d %b %Y}")
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
+    ws['A2'] = '   ·   '.join(context_bits)
+    ws['A2'].font = Font(size=10, italic=True, color=MUTED)
+    ws['A2'].alignment = Alignment(vertical='center', indent=1, wrap_text=True)
+    ws.row_dimensions[2].height = 22
+
+    # --- Build rows ---
+    rows = []
+    for p in projects:
+        stages = list(p.stages.select_related('phase'))
+        auto = sort_stages_by_phase([s for s in stages if s.stage_type == 'Automation'], automation_order)
+        emu = sort_stages_by_phase([s for s in stages if s.stage_type == 'Emulation'], emulation_order)
+        rows.append((p, _project_summary(phases_by_project.get(p.id, []), auto, emu),
+                     last_update_by_project.get(p.id) or p.so_punch_date))
+
+    # --- KPI strip ---
+    status_counts = Counter(s['status'] for _, s, _ in rows)
+    # Same figure as the Reports page's Overall OTIF % card: stages (of the reported
+    # stage types) due in the selected period, pooled across these projects.
+    overall_otif = otif_pct(*otif_counts_qs(
+        Stage.objects.filter(project_id__in=[p.id for p in projects],
+                             name__in=[k for k, _ in filtered['stage_names_to_report']]),
+        filtered['start_date'], filtered['end_date'], filtered['today'],
+    ))
+    kpis = [
+        ('Projects', str(len(rows)), 'blue'),
+        ('In Progress', str(status_counts.get('In Progress', 0)), 'amber'),
+        ('Completed', str(status_counts.get('Completed', 0)), 'green'),
+        ('On Hold', str(status_counts.get('Hold', 0)), 'red'),
+        ('Overall OTIF % (period)', f"{overall_otif}%" if overall_otif is not None else '—', 'grey'),
+    ]
+    col = 1
+    for label, value, tone in kpis:
+        bg, fg = soft[tone]
+        ws.merge_cells(start_row=4, start_column=col, end_row=4, end_column=col + 1)
+        ws.merge_cells(start_row=5, start_column=col, end_row=5, end_column=col + 1)
+        top, bottom = ws.cell(row=4, column=col), ws.cell(row=5, column=col)
+        top.value, bottom.value = value, label
+        top.font = Font(size=16, bold=True, color=fg)
+        bottom.font = Font(size=9, color=fg)
+        for r in (4, 5):
+            for c in (col, col + 1):
+                ws.cell(row=r, column=c).fill = fill(bg)
+        top.alignment = Alignment(horizontal='center', vertical='bottom')
+        bottom.alignment = Alignment(horizontal='center', vertical='top')
+        col += 2
+    ws.row_dimensions[4].height = 26
+    ws.row_dimensions[5].height = 18
+
+    # --- Table header ---
+    HEADER_ROW = 7
+    for i, (heading, width) in enumerate(columns, start=1):
+        c = ws.cell(row=HEADER_ROW, column=i, value=heading)
+        c.font = Font(bold=True, color='FFFFFF', size=10)
+        c.fill = fill(NAVY)
+        c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        c.border = border
+        ws.column_dimensions[get_column_letter(i)].width = width
+    ws.row_dimensions[HEADER_ROW].height = 30
+
+    status_tone = {'Completed': 'green', 'In Progress': 'amber', 'Hold': 'red', 'Not started': 'grey'}
+
+    def schedule_tone(statuses):
+        days = [s['days'] for s in statuses if s]
+        if any(d > 0 for d in days): return 'red'
+        if any(d < 0 for d in days): return 'green'
+        if days: return 'blue'
+        return None
+
+    def lines(summary, key, fmt, handover_key=None):
+        out, statuses = [], []
+        for r in summary['rows']:
+            val = r[key]
+            statuses.append(val)
+            out.append((f"{r['label']}: " if r['label'] else '') + fmt(val))
+        h = summary.get('handover')
+        if handover_key and h and h.get(handover_key) is not None:
+            statuses.append(h[handover_key])
+            out.append('Handover: ' + fmt(h[handover_key]))
+        return out, statuses
+
+    for idx, (p, s, last) in enumerate(rows):
+        r = HEADER_ROW + 1 + idx
+        band = fill(BAND) if idx % 2 else None
+        auto_ms, _ = lines(s, 'auto', _milestone_text, 'next')
+        emu_ms, _ = lines(s, 'emu', _milestone_text)
+        auto_sch, auto_st = lines(s, 'auto_schedule', _schedule_text, 'schedule')
+        emu_sch, emu_st = lines(s, 'emu_schedule', _schedule_text)
+        handover = {101: 'Before Time', 100: 'On Time', 0: 'Delayed'}.get(s['handover_otif'], 'Pending')
+        last_date = last.date() if hasattr(last, 'date') and callable(last.date) else last
+
+        values = [
+            p.code, p.customer_name, p.segment_con.name if p.segment_con else '',
+            p.team_lead.name if p.team_lead else '', s['status'], last_date,
+            (s['otif'] / 100) if s['otif'] is not None else '—', handover,
+            '\n'.join(auto_ms), '\n'.join(emu_ms), '\n'.join(auto_sch), '\n'.join(emu_sch),
+        ]
+        for i, v in enumerate(values, start=1):
+            c = ws.cell(row=r, column=i, value=v)
+            c.font = Font(size=10, color=INK)
+            c.alignment = wrap_top
+            c.border = border
+            if band:
+                c.fill = band
+        ws.cell(row=r, column=1).font = Font(size=10, bold=True, color=NAVY)
+        ws.cell(row=r, column=6).number_format = 'DD MMM YYYY'
+        ws.cell(row=r, column=6).alignment = center_top
+
+        def tint(col_idx, tone):
+            if not tone: return
+            bg, fg = soft[tone]
+            cell = ws.cell(row=r, column=col_idx)
+            cell.fill = fill(bg)
+            cell.font = Font(size=10, bold=col_idx in (5, 7, 8), color=fg)
+
+        tint(5, status_tone.get(s['status']))
+        ws.cell(row=r, column=5).alignment = center_top
+        otif_cell = ws.cell(row=r, column=7)
+        otif_cell.alignment = center_top
+        if s['otif'] is not None:
+            otif_cell.number_format = '0.0%'
+            tint(7, 'green' if s['otif'] >= 80 else 'red')
+        tint(8, {'Before Time': 'green', 'On Time': 'blue', 'Delayed': 'red'}.get(handover))
+        ws.cell(row=r, column=8).alignment = center_top
+        tint(11, schedule_tone(auto_st))
+        tint(12, schedule_tone(emu_st))
+        # Excel doesn't auto-fit wrapped rows from a file: estimate the tallest cell from its
+        # text and column width (~1.15 characters per width unit at 10pt).
+        def visual_lines(text, width):
+            per_line = max(int(width * 1.2), 1)
+            count = 0
+            for part in str(text).split('\n'):  # greedy word wrap, like Excel
+                used, n = 0, 1
+                for word in part.split():
+                    if used and used + 1 + len(word) > per_line:
+                        n, used = n + 1, len(word)
+                    else:
+                        used += (1 if used else 0) + len(word)
+                count += n
+            return count
+        tallest = max(visual_lines(v, columns[i][1]) for i, v in enumerate(values) if isinstance(v, str))
+        ws.row_dimensions[r].height = max(18, 14 * tallest + 4)
+
+    if not rows:
+        ws.merge_cells(start_row=HEADER_ROW + 1, start_column=1, end_row=HEADER_ROW + 1, end_column=ncols)
+        ws.cell(row=HEADER_ROW + 1, column=1, value='No projects match these filters.').font = Font(italic=True, color=MUTED)
+
+    last_row = HEADER_ROW + max(len(rows), 1)
+    ws.auto_filter.ref = f"A{HEADER_ROW}:{get_column_letter(ncols)}{last_row}"
+    ws.freeze_panes = ws.cell(row=HEADER_ROW + 1, column=3)
+
+    # Legend under the table
+    legend_row = last_row + 2
+    ws.cell(row=legend_row, column=1, value='Schedule colours:').font = Font(size=9, bold=True, color=MUTED)
+    for i, (label, tone) in enumerate([('Delayed', 'red'), ('Ahead', 'green'), ('On Time', 'blue')]):
+        c = ws.cell(row=legend_row, column=2 + i, value=label)
+        bg, fg = soft[tone]
+        c.fill, c.font = fill(bg), Font(size=9, bold=True, color=fg)
+        c.alignment = Alignment(horizontal='center')
+    ws.cell(row=legend_row + 1, column=1,
+            value='OTIF % = due stages completed on or before their planned date ÷ stages due by today. '
+                  'The Overall OTIF % tile covers stages planned in the selected period (as on the Reports page); '
+                  'the per-project column covers each project\'s whole life (as on its detail page). '
+                  'Schedules show where each stream stands today; "overdue" means the stage is still open past its planned date.'
+            ).font = Font(size=9, italic=True, color=MUTED)
+
+    # Print / slide friendly
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = f'{HEADER_ROW}:{HEADER_ROW}'
+    ws.print_options.horizontalCentered = True
+    ws.page_margins.left = ws.page_margins.right = 0.4
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Project_Summary_{datetime.now():%Y-%m-%d_%H-%M}.xlsx"'
+    wb.save(response)
+    return response
 
 
 @login_required
