@@ -111,6 +111,36 @@ def get_schedule_status(stages):
     last = sorted(completed, key=lambda s: s.id)[-1]
     return (last.actual_date - last.planned_date).days
 
+def get_live_schedule_status(stages, today=None, max_delta=3650):
+    """Current schedule position of one stream (used only by the Project Detail summary;
+    Reports keep get_schedule_status). `stages` must be in workflow order.
+
+    1. The earliest open stage (anything not Completed) past its planned date sets the
+       delay: today - planned. This catches slips before the stage is marked Completed.
+    2. Otherwise the latest completed stage, in workflow order, gives actual - planned.
+    3. Otherwise On Time if any planned date exists, else None (not enough data).
+
+    Returns {'days', 'stage', 'overdue'} or None. Days are calendar days; +ve = delayed.
+    Gaps beyond max_delta days (typo dates like year 0020) are skipped as bad data, the
+    same bound the Reports use (MAX_PLAUSIBLE_DAY_DELTA).
+    """
+    today = today or timezone.localdate()
+    applicable = [s for s in stages if s.status != 'Not Applicable']
+
+    for s in applicable:
+        if s.status != 'Completed' and s.planned_date and 0 < (today - s.planned_date).days <= max_delta:
+            return {'days': (today - s.planned_date).days, 'stage': s, 'overdue': True}
+
+    completed = [s for s in applicable if s.status == 'Completed' and s.planned_date and s.actual_date
+                 and abs((s.actual_date - s.planned_date).days) <= max_delta]
+    if completed:
+        last = completed[-1]
+        return {'days': (last.actual_date - last.planned_date).days, 'stage': last, 'overdue': False}
+
+    if any(s.planned_date for s in applicable):
+        return {'days': 0, 'stage': None, 'overdue': False}
+    return None
+
 def get_next_milestone(stages):
     """
     Finds the first stage in a given list that is not 'Completed' or 'Not Applicable'.
