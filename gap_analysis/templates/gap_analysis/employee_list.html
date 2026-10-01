@@ -200,10 +200,10 @@
                     </a>
                     {% if user.is_staff %}
                     <div class="d-flex gap-1">
-                        <a href="{% url 'skillgap_employee_update' employee.id %}" class="btn btn-outline-secondary btn-icon" title="Edit">
+                        <a href="{% url 'skillgap_employee_update' employee.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-outline-secondary btn-icon" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <a href="{% url 'skillgap_employee_delete' employee.id %}" class="btn btn-outline-secondary btn-icon" title="Delete">
+                        <a href="{% url 'skillgap_employee_delete' employee.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-outline-secondary btn-icon" title="Delete">
                             <i class="bi bi-trash"></i>
                         </a>
                     </div>

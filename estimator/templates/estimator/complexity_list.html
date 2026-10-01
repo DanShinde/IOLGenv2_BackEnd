@@ -12,7 +12,7 @@
         <div class="list-toolbar">
             <div class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search complexity levels...">
+                <input type="text" class="form-control" id="tableSearchInput" data-persist-filter="search" placeholder="Search complexity levels...">
             </div>
             <span class="row-count" id="tableRowCount">{{ complexity_levels|length }} level{{ complexity_levels|length|pluralize }}</span>
             <a href="{% url 'estimator_complexity_new' %}" class="btn btn-primary btn-sm">

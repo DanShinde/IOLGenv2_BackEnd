@@ -16,7 +16,7 @@ from planner.models import Segment
 from .forms import (
     RoleMatrixForm, SkillMatrixForm, EmployeeSkillForm, SkillForm, DevelopmentPlanForm,
 )
-from .mixins import StaffRequiredMixin, EmployeeSelfOrManagerRequiredMixin, CancelUrlMixin
+from .mixins import StaffRequiredMixin, EmployeeSelfOrManagerRequiredMixin, CancelUrlMixin, ReturnToNextMixin
 from .models import (
     RoleMatrix, SkillBenchmark, SkillMatrix, EmployeeSkill, Skill, DevelopmentPlan,
     gap_weight, user_can_manage_employee,
@@ -646,21 +646,19 @@ class BulkSkillUpdateView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
 
         return redirect('skillgap_bulk_skill_update')
 
-class SkillMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
+class SkillMatrixUpdateView(LoginRequiredMixin, StaffRequiredMixin, ReturnToNextMixin, CancelUrlMixin, SuccessMessageMixin, UpdateView):
     model = SkillMatrix
     form_class = SkillMatrixForm
     template_name = 'gap_analysis/add_form.html'
     success_message = "Employee updated successfully!"
-
-    def get_success_url(self):
-        return reverse('skillgap_employee_list')
+    success_url = reverse_lazy('skillgap_employee_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = f'Edit Employee: {self.object.name}'
         return context
 
-class SkillMatrixDeleteView(LoginRequiredMixin, StaffRequiredMixin, SuccessMessageMixin, DeleteView):
+class SkillMatrixDeleteView(LoginRequiredMixin, StaffRequiredMixin, ReturnToNextMixin, CancelUrlMixin, SuccessMessageMixin, DeleteView):
     model = SkillMatrix
     template_name = 'gap_analysis/employee_confirm_delete.html'
     success_url = reverse_lazy('skillgap_employee_list')

@@ -7,7 +7,7 @@
 <div class="page-header mb-4">
     <h1 class="page-title"><i class="fas {% if list_type == 'delayed' %}fa-exclamation-triangle{% else %}fa-spinner{% endif %} me-2"></i>{{ stage_display }} &mdash; {{ heading_suffix }}</h1>
     <p class="page-subtitle">
-        {% if list_type == 'delayed' %}Projects currently overdue at this stage, matching the report filters used on the chart.
+        {% if list_type == 'delayed' %}Stage instances that finished late or are still overdue at this stage, matching the report filters and period used on the chart.
         {% else %}Projects currently in progress at this stage, matching the report filters used on the chart.{% endif %}
     </p>
 </div>
@@ -27,7 +27,8 @@
                         <th>Segment</th>
                         <th>Team Lead</th>
                         <th>Planned Date</th>
-                        <th>Days Overdue</th>
+                        <th>Actual Date</th>
+                        <th>Delay</th>
                     </tr>
                 </thead>
                 {% if stages %}
@@ -39,9 +40,10 @@
                         <td>{{ stage.project.segment_con.name|default:'N/A' }}</td>
                         <td>{{ stage.project.team_lead.name|default:'N/A' }}</td>
                         <td>{{ stage.planned_date|date:"M d, Y"|default:'N/A' }}</td>
+                        <td>{{ stage.actual_date|date:"M d, Y"|default:'&mdash;' }}</td>
                         <td>
-                            {% if stage.planned_date and stage.planned_date < today %}
-                                <span class="badge bg-danger-soft text-danger">{{ stage.planned_date|timesince:today }} overdue</span>
+                            {% if stage.delay_days %}
+                                <span class="badge bg-danger-soft text-danger">{{ stage.delay_days }} day{{ stage.delay_days|pluralize }} {% if stage.delay_is_final %}late{% else %}overdue{% endif %}</span>
                             {% else %}
                                 <span class="text-muted small">&mdash;</span>
                             {% endif %}
@@ -52,7 +54,7 @@
                 {% else %}
                 <tbody>
                     <tr>
-                        <td colspan="6">
+                        <td colspan="7">
                             <div class="text-center py-5">
                                 <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
                                 <p class="text-muted">No projects match this filter.</p>

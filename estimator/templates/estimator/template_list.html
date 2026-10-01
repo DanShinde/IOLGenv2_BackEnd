@@ -18,7 +18,7 @@
         <div class="list-toolbar">
             <div class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text" class="form-control" id="tableSearchInput" placeholder="Search templates...">
+                <input type="text" class="form-control" id="tableSearchInput" data-persist-filter="search" placeholder="Search templates...">
             </div>
             <span class="row-count" id="tableRowCount">{{ templates|length }} template{{ templates|length|pluralize }}</span>
             <a href="{% url 'estimator_template_new' %}" class="btn btn-primary btn-sm">

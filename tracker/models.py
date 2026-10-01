@@ -211,6 +211,10 @@ class Stage(models.Model):
     # Combine all stage names for the database choices
     STAGE_NAMES = AUTOMATION_STAGES + EMULATION_STAGES
 
+    # Stages that never take a delay reason (no popup, no menu option, not in the
+    # reason-wise delay report).
+    DELAY_REASON_EXCLUDED_STAGES = ("Dispatch", "Handover")
+
     STATUS_CHOICES = [
         ("Not started", "Not started"),
         ("In Progress", "In Progress"),
@@ -250,6 +254,10 @@ class Stage(models.Model):
         if update_fields is not None and 'phase' not in update_fields:
             kwargs['update_fields'] = list(update_fields) + ['phase']
         super().save(*args, **kwargs)
+
+    @property
+    def delay_reason_applicable(self):
+        return self.name not in self.DELAY_REASON_EXCLUDED_STAGES
 
     def __str__(self):
         return f"{self.project.code} - {self.name}"
