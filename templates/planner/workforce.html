@@ -106,6 +106,13 @@
     .wf-nav-item.wf-nav-active:hover {
         background-color: #eef2ff;
     }
+
+    /* Site map: Full view (fullscreen, or a window-filling fallback) and its view buttons */
+    #site-map:fullscreen { height: 100vh !important; width: 100vw; border: 0 !important; }
+    #site-map:-webkit-full-screen { height: 100vh !important; width: 100vw; border: 0 !important; }
+    #site-map.map-full-fallback { position: fixed !important; inset: 0; height: 100vh !important; width: 100vw; z-index: 9999; border: 0 !important; }
+    .map-view-bar a { font-size: 16px; line-height: 30px !important; color: #374151; }
+    .map-view-bar a:hover { color: #4f46e5; }
 </style>
 
 <!-- Load Leaflet here to ensure it works even if head_extra block is missing in base template -->
@@ -1305,9 +1312,12 @@
         // Clear loading text
         mapContainer.innerHTML = '';
 
-        // Initialize map, centered on India or the first site
-        window.mapInstance = L.map('site-map').setView([20.5937, 78.9629], 5); // Default center on India
+        // Initialize map, centered on India or the first site. Quarter-step zoom so "World"
+        // can fit the whole map to the box, and the map pans seamlessly across the date line.
+        window.mapInstance = L.map('site-map', { zoomSnap: 0.25, zoomDelta: 0.5, worldCopyJump: true, minZoom: 1 })
+            .setView([20.5937, 78.9629], 5); // Default center on India
         const map = window.mapInstance;
+        const WORLD_BOUNDS = L.latLngBounds([[-56, -168], [76, 190]]);  // inhabited world, no polar caps
 
         // tile.openstreetmap.org blocks production/business traffic per its usage policy
         // (https://operations.osmfoundation.org/policies/tiles/), and CARTO's basemaps now
@@ -1318,33 +1328,41 @@
             maxZoom: 19
         }).addTo(map);
 
+        // Pins are inline SVG so they stay sharp at any size, and they scale with the zoom
+        // level: small but distinct on the world view, full size once zoomed in.
+        const PIN_COLORS = { site: '#2563eb', office: '#16a34a' };
+        function pinSvg(color, w, h) {
+            return `<svg viewBox="0 0 24 36" width="${w}" height="${h}" style="display:block;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.45))">
+                <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}" stroke="#fff" stroke-width="1.6"/>
+                <circle cx="12" cy="12" r="4.6" fill="#fff"/></svg>`;
+        }
+        function pinScale(zoom) {
+            return Math.max(0.55, Math.min(1.15, 0.55 + (zoom - 2) * 0.1));  // z2 -> 55%, z8+ -> 115%
+        }
+        function makeSiteIcon(site, zoom) {
+            const s = pinScale(zoom);
+            const w = Math.round(26 * s), h = Math.round(39 * s);
+            const empCount = site.employees ? site.employees.length : 0;
+            let html = pinSvg(site.is_office ? PIN_COLORS.office : PIN_COLORS.site, w, h);
+            if (empCount > 0 && s >= 0.65) {  // count badge once there is room for it
+                const b = Math.round(18 * Math.max(s, 0.8));
+                html += `<div class="absolute flex items-center justify-center bg-red-600 text-white font-bold rounded-full border-2 border-white shadow-sm"
+                              style="top:${-Math.round(b / 3)}px;right:${-Math.round(b / 2)}px;width:${b}px;height:${b}px;font-size:${Math.round(b * 0.55)}px;">${empCount}</div>`;
+            }
+            return L.divIcon({
+                className: '', // Remove default leaflet styles
+                html: `<div class="relative">${html}</div>`,
+                iconSize: [w, h],
+                iconAnchor: [w / 2, h],
+                popupAnchor: [0, -h + 4]
+            });
+        }
+
         const markers = [];
         const searchData = []; // Store data for searching
         sites.forEach(site => {
-            const empCount = site.employees ? site.employees.length : 0;
-            
-            // Use standard Leaflet marker look with a badge for count
-            // Apply hue-rotate filter for offices to make them green (approx -90deg from blue)
-            const imgStyle = site.is_office ? 'filter: hue-rotate(270deg);' : '';
-            let iconHtml = `<img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-[25px] h-[41px]" style="${imgStyle}">`;
-            
-            if (empCount > 0) {
-                iconHtml += `
-                    <div class="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 bg-red-600 text-white text-[10px] font-bold rounded-full border-2 border-white shadow-sm z-10">
-                        ${empCount}
-                    </div>
-                `;
-            }
-            
-            const customIcon = L.divIcon({
-                className: '', // Remove default leaflet styles
-                html: `<div class="relative">${iconHtml}</div>`,
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34]
-            });
-
-            const marker = L.marker([site.lat, site.lng], {icon: customIcon}).addTo(map);
+            const marker = L.marker([site.lat, site.lng], {icon: makeSiteIcon(site, map.getZoom())}).addTo(map);
+            marker.siteData = site;
             
             let popupContent = `<b>${site.name}</b><br><span class="text-xs text-gray-500">${site.project_code}</span><br><small>${site.location}</small>`;
             
@@ -1371,10 +1389,17 @@
         });
 
         // Fit map to show all markers
-        if (markers.length > 0) {
-            const group = new L.featureGroup(markers);
-            map.fitBounds(group.getBounds().pad(0.3));
+        function fitAllSites() {
+            const shown = markers.filter(m => map.hasLayer(m));
+            if (shown.length > 0) map.fitBounds(new L.featureGroup(shown).getBounds().pad(0.3));
         }
+        fitAllSites();
+
+        // Resize every pin to the new zoom level
+        map.on('zoomend', function () {
+            const z = map.getZoom();
+            markers.forEach(m => m.setIcon(makeSiteIcon(m.siteData, z)));
+        });
 
         // Add Legend
         const legend = L.control({position: 'bottomright'});
@@ -1383,17 +1408,88 @@
             div.innerHTML = `
                 <div class="font-bold mb-2 text-gray-700">Location Type</div>
                 <div class="flex items-center mb-1.5">
-                    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-3 h-5 mr-2">
+                    <span class="mr-2">${pinSvg(PIN_COLORS.site, 12, 18)}</span>
                     <span class="text-gray-600">Project Site</span>
                 </div>
                 <div class="flex items-center">
-                    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" class="w-3 h-5 mr-2" style="filter: hue-rotate(270deg);">
+                    <span class="mr-2">${pinSvg(PIN_COLORS.office, 12, 18)}</span>
                     <span class="text-gray-600">Office Location</span>
                 </div>
             `;
             return div;
         };
         legend.addTo(map);
+
+        // View controls: World (whole map in one view), All sites, and Full view (fullscreen)
+        const mapEl = document.getElementById('site-map');
+        const fsSupported = !!(mapEl.requestFullscreen || mapEl.webkitRequestFullscreen);
+        const isFull = () => (document.fullscreenElement || document.webkitFullscreenElement) === mapEl || mapEl.classList.contains('map-full-fallback');
+        function showWorld() { map.fitBounds(WORLD_BOUNDS); }
+        function toggleFullView() {
+            if (isFull()) {
+                if (document.fullscreenElement || document.webkitFullscreenElement) {
+                    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+                } else {
+                    mapEl.classList.remove('map-full-fallback');
+                    afterFullViewChange();
+                }
+            } else if (fsSupported) {
+                (mapEl.requestFullscreen || mapEl.webkitRequestFullscreen).call(mapEl);
+            } else {
+                mapEl.classList.add('map-full-fallback');  // e.g. iPhone Safari: fill the window instead
+                afterFullViewChange();
+            }
+        }
+        const viewControl = L.control({position: 'topleft'});
+        viewControl.onAdd = function () {
+            const bar = L.DomUtil.create('div', 'leaflet-bar map-view-bar');
+            bar.innerHTML = `
+                <a href="#" role="button" data-act="full" title="Full view (Esc to exit)">&#x26F6;</a>
+                <a href="#" role="button" data-act="world" title="Show the whole world">&#x1F310;</a>
+                <a href="#" role="button" data-act="fit" title="Zoom to all sites">&#x25CE;</a>`;
+            L.DomEvent.disableClickPropagation(bar);
+            bar.addEventListener('click', function (e) {
+                const a = e.target.closest('a[data-act]');
+                if (!a) return;
+                e.preventDefault();
+                if (a.dataset.act === 'full') toggleFullView();
+                else if (a.dataset.act === 'world') showWorld();
+                else fitAllSites();
+            });
+            return bar;
+        };
+        viewControl.addTo(map);
+
+        // Entering full view opens on the whole world; leaving it returns to all sites. The
+        // refit waits for the map box to actually change size (it settles a little after the
+        // fullscreen event), otherwise it would fit against the old dimensions.
+        let pendingFit = null;
+        function afterFullViewChange() {
+            const full = isFull();
+            const btn = mapEl.querySelector('.map-view-bar a[data-act="full"]');
+            if (btn) { btn.innerHTML = full ? '&#x2715;' : '&#x26F6;'; btn.title = full ? 'Exit full view (Esc)' : 'Full view (Esc to exit)'; }
+            pendingFit = full ? showWorld : fitAllSites;
+            setTimeout(runPendingFit, 600);  // safety net if no resize is observed
+        }
+        function runPendingFit() {
+            if (!pendingFit) return;
+            // Mid-transition the box can briefly be 0px tall; fitting then zooms right out
+            if (mapEl.clientHeight < 50 || mapEl.clientWidth < 50) { setTimeout(runPendingFit, 100); return; }
+            const fit = pendingFit;
+            pendingFit = null;
+            map.invalidateSize();
+            fit();
+        }
+        if (window.ResizeObserver) {
+            new ResizeObserver(function () {
+                if (pendingFit) requestAnimationFrame(runPendingFit);
+            }).observe(mapEl);
+        }
+        document.addEventListener('fullscreenchange', afterFullViewChange);
+        document.addEventListener('webkitfullscreenchange', afterFullViewChange);
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && mapEl.classList.contains('map-full-fallback')) toggleFullView();
+        });
 
         // Search Functionality
         const searchInput = document.getElementById('map-search');
