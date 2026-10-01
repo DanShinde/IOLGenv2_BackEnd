@@ -46,6 +46,7 @@ from reportlab.lib.units import cm
 from django.template.loader import render_to_string
 from django.http import HttpResponseRedirect, HttpResponse, JsonResponse, QueryDict
 import csv
+import io
 from itertools import groupby
 from operator import attrgetter
 import json
@@ -1722,6 +1723,12 @@ def _project_summary(phases, auto_stages, emu_stages):
         'handover_otif': get_final_project_otif(all_stages),
         'multi_phase': len(phases) > 1,
     }
+    def _timeline(label, auto, emu):
+        # The detail page's Automation / Emulation roadmaps, for the Reports Timeline tab
+        # (and its Excel sheet). Handover sits at the end of the Automation line.
+        return {'label': label, 'auto': auto, 'emu': emu,
+                'auto_progress': get_timeline_progress(auto), 'emu_progress': get_timeline_progress(emu)}
+
     if not summary['multi_phase']:
         summary['rows'] = [{
             'label': '',
@@ -1730,6 +1737,7 @@ def _project_summary(phases, auto_stages, emu_stages):
             'emu_schedule': get_live_schedule_status(emu_stages),
         }]
         summary['handover'] = None
+        summary['timelines'] = [_timeline('', auto_stages, emu_stages)]
         return summary
 
     def _in_phase(stages, phase, is_first):
@@ -1738,17 +1746,21 @@ def _project_summary(phases, auto_stages, emu_stages):
         return [s for s in stages if s.phase_id == phase.id
                 or (is_first and s.phase_id is None and s.name != Stage.HANDOVER)]
 
-    rows = []
+    handover = [s for s in auto_stages if s.phase_id is None and s.name == Stage.HANDOVER]
+    rows, timelines = [], []
     for i, p in enumerate(phases):
         auto, emu = _in_phase(auto_stages, p, i == 0), _in_phase(emu_stages, p, i == 0)
+        # The project-level Handover closes the last phase's Automation line on the
+        # Timeline tab, so it stays on a timeline row rather than one of its own.
+        timelines.append(_timeline(p.label, auto + (handover if i == len(phases) - 1 else []), emu))
         rows.append({
             'label': p.label,
             'auto': get_next_milestone(auto), 'emu': get_next_milestone(emu),
             'auto_schedule': get_live_schedule_status(auto),
             'emu_schedule': get_live_schedule_status(emu),
         })
-    handover = [s for s in auto_stages if s.phase_id is None and s.name == Stage.HANDOVER]
     summary['rows'] = rows
+    summary['timelines'] = timelines
     summary['handover'] = {
         'next': get_next_milestone(handover),
         'schedule': get_live_schedule_status(handover),
@@ -1900,6 +1912,92 @@ def _milestone_text(stage):
         return 'Complete'
     planned = stage.planned_date.strftime('%d %b %Y') if stage.planned_date else '-'
     return f"{stage.get_name_display()} (Planned {planned})"
+
+
+def _write_timeline_sheet(ws, rows, context_line, header_fill, border, muted):
+    """The Reports page's Project Summary > Timeline tab as a sheet: one row per project
+    with its Automation and Emulation roadmaps as images (tracker.timeline_image), drawn
+    at the same scale so the two streams line up."""
+    from openpyxl.drawing.image import Image as XLImage
+    from openpyxl.utils import get_column_letter
+    from .timeline_image import render_roadmaps
+
+    from .timeline_image import GUTTER_W, STEP_W, STEPS
+
+    ws.sheet_view.showGridLines = False
+    # Columns: A project | B phase-tag strip | C Automation | D Emulation. The Automation image
+    # (tags + roadmap) is anchored in B and runs on into C, so B is exactly the tag gutter and
+    # the "Automation Timeline" heading centres over the roadmap itself. Emulation lines follow
+    # the same phase order untagged and are six stages wide, so their heading centres too.
+    EMU_STEPS = 6
+    px_to_width = lambda px: (px - 5) / 7  # Excel column width units (Calibri 11)
+    widths = [28, px_to_width(GUTTER_W), px_to_width(STEP_W * STEPS), px_to_width(STEP_W * EMU_STEPS)]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.merge_cells('A1:D1')
+    ws['A1'] = 'Project Timeline'
+    ws['A1'].font = Font(size=18, bold=True, color='FFFFFF')
+    ws['A1'].fill = header_fill
+    ws['A1'].alignment = Alignment(vertical='center', indent=1)
+    ws.row_dimensions[1].height = 34
+    ws.merge_cells('A2:D2')
+    ws['A2'] = context_line
+    ws['A2'].font = Font(size=10, italic=True, color=muted)
+    ws['A2'].alignment = Alignment(vertical='center', indent=1, wrap_text=True)
+    ws.row_dimensions[2].height = 22
+
+    legend = [('Completed', '28A745'), ('In Progress', 'FFC107'), ('Not started', 'ADB5BD'),
+              ('Hold', 'DC3545'), ('Not Applicable', '8D99AE')]
+    ws['A3'] = 'Legend:'
+    ws['A3'].font = Font(size=9, bold=True, color=muted)
+    from openpyxl.cell.rich_text import CellRichText, TextBlock
+    from openpyxl.cell.text import InlineFont
+    parts = []
+    for label, color in legend:
+        parts += [TextBlock(InlineFont(color=color, sz=12), '● '), TextBlock(InlineFont(color='4B5563', sz=9), f'{label}     ')]
+    ws.merge_cells('C3:D3')
+    ws['C3'] = CellRichText(*parts)
+
+    HEADER_ROW = 5
+    for i, heading in enumerate(['Project', '', 'Automation Timeline', 'Emulation Timeline'], start=1):
+        c = ws.cell(row=HEADER_ROW, column=i, value=heading)
+        c.font = Font(bold=True, color='FFFFFF', size=11)
+        c.fill = header_fill
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        c.border = border
+    ws.row_dimensions[HEADER_ROW].height = 26
+
+    for idx, (p, s, _) in enumerate(rows):
+        r = HEADER_ROW + 1 + idx
+        auto_lines = [(t['label'], t['auto']) for t in s['timelines']]
+        emu_lines = [(t['label'], t['emu']) for t in s['timelines']]
+        n_lines = max(len(auto_lines), len(emu_lines))
+        for col, lines in ((2, auto_lines), (4, emu_lines)):
+            png, w, h = (render_roadmaps(lines, show_tags=True) if col == 2
+                         else render_roadmaps(lines, show_tags=False, steps=EMU_STEPS))
+            img = XLImage(io.BytesIO(png))
+            img.width, img.height = w, h
+            ws.add_image(img, f'{get_column_letter(col)}{r}')
+        ws.row_dimensions[r].height = n_lines * 60 * 0.75 + 8  # px -> points, plus breathing room
+        code = ws.cell(row=r, column=1, value=CellRichText(
+            TextBlock(InlineFont(b=True, sz=11, color='1F3A5F'), p.code),
+            TextBlock(InlineFont(sz=9, color='6B7280'), '\n' + p.customer_name),
+        ))
+        code.alignment = Alignment(vertical='center', wrap_text=True, indent=1)
+        code.border = border  # image cells stay borderless: lines would peek out around the pictures
+
+    if not rows:
+        ws.cell(row=HEADER_ROW + 1, column=1, value='No projects match these filters.').font = Font(italic=True, color=muted)
+
+    ws.freeze_panes = ws.cell(row=HEADER_ROW + 1, column=2)
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = f'{HEADER_ROW}:{HEADER_ROW}'
+    ws.page_margins.left = ws.page_margins.right = 0.4
 
 
 @login_required
@@ -2159,6 +2257,8 @@ def export_project_summary_excel(request):
     ws.print_title_rows = f'{HEADER_ROW}:{HEADER_ROW}'
     ws.print_options.horizontalCentered = True
     ws.page_margins.left = ws.page_margins.right = 0.4
+
+    _write_timeline_sheet(wb.create_sheet('Timeline'), rows, ws['A2'].value, fill(NAVY), border, MUTED)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="Project_Summary_{datetime.now():%Y-%m-%d_%H-%M}.xlsx"'
