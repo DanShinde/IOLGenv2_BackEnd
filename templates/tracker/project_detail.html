@@ -564,25 +564,21 @@
                  <h6 class="text-muted">Automation Schedule</h6>
                  {% if multi_phase %}
                     {% for pm in phase_milestones %}
-                    <div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ pm.label }}</span> {% include 'tracker/partials/schedule_badge.html' with value=pm.auto_schedule %}</div>
+                    <div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ pm.label }}</span> {% include 'tracker/partials/live_schedule_badge.html' with status=pm.auto_schedule %}</div>
                     {% endfor %}
-                    {% if handover_schedule is not None %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">Handover</span> {% include 'tracker/partials/schedule_badge.html' with value=handover_schedule %}</div>{% endif %}
+                    {% if handover_schedule %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">Handover</span> {% include 'tracker/partials/live_schedule_badge.html' with status=handover_schedule %}</div>{% endif %}
                 {% else %}
-                {% with schedule_status=automation_schedule_status %}
-                    {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                 {% endwith %}
+                    {% include 'tracker/partials/live_schedule_badge.html' with status=automation_schedule_status %}
                 {% endif %}
             </div>
              <div class="col-md-6">
                 <h6 class="text-muted">Emulation Schedule</h6>
                 {% if multi_phase %}
                     {% for pm in phase_milestones %}
-                    <div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ pm.label }}</span> {% include 'tracker/partials/schedule_badge.html' with value=pm.emu_schedule %}</div>
+                    <div class="mb-1"><span class="badge bg-light text-dark border me-1">{{ pm.label }}</span> {% include 'tracker/partials/live_schedule_badge.html' with status=pm.emu_schedule %}</div>
                     {% endfor %}
                 {% else %}
-                {% with schedule_status=emulation_schedule_status %}
-                   {% if schedule_status is not None %}{% if schedule_status > 0 %}<span class="badge bg-danger">Delayed by {{ schedule_status }} day{{ schedule_status|pluralize }}</span>{% elif schedule_status < 0 %}<span class="badge bg-success">Ahead by {{ schedule_status|abs }} day{{ schedule_status|abs|pluralize }}</span>{% else %}<span class="badge bg-primary">On Time</span>{% endif %}{% else %}<span class="text-muted small">Not enough data</span>{% endif %}
-                {% endwith %}
+                    {% include 'tracker/partials/live_schedule_badge.html' with status=emulation_schedule_status %}
                 {% endif %}
            </div>
         </div>

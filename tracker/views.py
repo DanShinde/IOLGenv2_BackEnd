@@ -30,7 +30,7 @@ from collections import Counter
 from collections import Counter, defaultdict 
 from tracker.utils import (
     get_completion_percentage, get_otif_percentage, get_overall_status,
-    get_schedule_status, get_next_milestone,get_final_project_otif,
+    get_schedule_status, get_live_schedule_status, get_next_milestone,get_final_project_otif,
     get_phase_summary, sort_stages_by_phase, get_timeline_progress, OTIF_EXCLUDED_STAGES
 
 )
@@ -443,17 +443,23 @@ def project_detail(request, project_id):
         handover_stages = []
         active_phase_key = 'main'
 
+    # Live schedule badges for the summary card: always from the full stage list, so the
+    # stage-table status filter can't change them.
+    all_project_stages = list(project.stages.select_related('phase'))
+    schedule_auto = sort_stages_by_phase([s for s in all_project_stages if s.stage_type == 'Automation'], automation_order)
+    schedule_emu = sort_stages_by_phase([s for s in all_project_stages if s.stage_type == 'Emulation'], emulation_order)
+
     # Next milestones per phase (the project-level Handover trails the automation list)
     phase_milestones = [
-        {'label': panel['title'],
+        {'label': p.label,
          'auto': get_next_milestone(panel['automation_stages']),
          'emu': get_next_milestone(panel['emulation_stages']),
-         'auto_schedule': get_schedule_status(panel['automation_stages']),
-         'emu_schedule': get_schedule_status(panel['emulation_stages'])}
-        for panel in panels
+         'auto_schedule': get_live_schedule_status([s for s in schedule_auto if s.phase_id == p.id]),
+         'emu_schedule': get_live_schedule_status([s for s in schedule_emu if s.phase_id == p.id])}
+        for p, panel in zip(project_phases, panels)
     ] if multi_phase else []
     next_handover_milestone = get_next_milestone(handover_stages) if multi_phase else None
-    handover_schedule = get_schedule_status(handover_stages) if multi_phase else None
+    handover_schedule = get_live_schedule_status([s for s in schedule_auto if s.phase_id is None]) if multi_phase else None
 
     total_comments_count = project.comments.count()
     initial_limit = 5
@@ -480,8 +486,8 @@ def project_detail(request, project_id):
         'overall_otif_percentage': get_otif_percentage(all_stages),
         'project_otif': get_final_project_otif(all_stages),
         'overall_status': get_overall_status(all_stages),
-        'automation_schedule_status': get_schedule_status(automation_stages),
-        'emulation_schedule_status': get_schedule_status(emulation_stages),
+        'automation_schedule_status': get_live_schedule_status(schedule_auto),
+        'emulation_schedule_status': get_live_schedule_status(schedule_emu),
         'next_automation_milestone': get_next_milestone(automation_stages),
         'next_emulation_milestone': get_next_milestone(emulation_stages),
         'last_update_time': last_update_time,
