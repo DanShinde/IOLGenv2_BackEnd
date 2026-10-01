@@ -698,7 +698,8 @@ def bug_report_dashboard(request):
                     uploaded_by=request.user,
                 )
             messages.success(request, "Thank you! Your bug report has been submitted.")
-            return redirect("bug-report-dashboard")
+            # Back to the same URL so an active ?status= filter is kept.
+            return redirect(request.get_full_path())
         messages.error(request, "Please correct the errors below and resubmit your report.")
     else:
         form = BugReportForm()

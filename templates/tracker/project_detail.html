@@ -737,18 +737,18 @@
                             <!-- Filter Row -->
                             <tr class="filter-row bg-light d-print-none">
                                 <th class="p-2">
-                                    <select class="form-select form-select-sm filter-input shadow-none border" data-col="0" style="font-size: 0.75rem;">
+                                    <select class="form-select form-select-sm filter-input shadow-none border" data-col="0" data-persist-filter="col-0" style="font-size: 0.75rem;">
                                         <option value="">All</option>
                                         <option value="push">Push</option>
                                         <option value="pull">Pull</option>
                                     </select>
                                 </th>
-                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="1" placeholder="Search..." style="font-size: 0.75rem;"></th>
-                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="2" placeholder="Search..." style="font-size: 0.75rem;"></th>
-                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="3" placeholder="Search..." style="font-size: 0.75rem;"></th>
+                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="1" data-persist-filter="col-1" placeholder="Search..." style="font-size: 0.75rem;"></th>
+                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="2" data-persist-filter="col-2" placeholder="Search..." style="font-size: 0.75rem;"></th>
+                                <th class="p-2"><input type="text" class="form-control form-control-sm filter-input shadow-none border" data-col="3" data-persist-filter="col-3" placeholder="Search..." style="font-size: 0.75rem;"></th>
                                 <th class="p-2"></th>
                                 <th class="p-2">
-                                    <select class="form-select form-select-sm filter-input shadow-none border" data-col="5" style="font-size: 0.75rem;">
+                                    <select class="form-select form-select-sm filter-input shadow-none border" data-col="5" data-persist-filter="col-5" style="font-size: 0.75rem;">
                                         <option value="">All</option>
                                         <option value="open">Open</option>
                                         <option value="in progress">In Progress</option>
@@ -1176,54 +1176,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $btn.toggleClass('btn-primary', nowActive).toggleClass('btn-outline-secondary', !nowActive);
     });
 
-    // New reason tags are created server-side immediately so only real tag IDs are ever
-    // saved, then appended as an already-selected pill next to the standard ones.
-    function addNewDelayReasonTag(stageId) {
-        const $container = $(`.delay-reason-tags[data-stage-id="${stageId}"]`);
-        const $input = $container.siblings('.input-group').find('.delay-reason-new-input');
-        const name = $.trim($input.val());
-        if (!name) return;
-
-        const isExisting = $container.find('.delay-reason-tag-btn').filter(function() {
-            return $.trim($(this).text()).toLowerCase() === name.toLowerCase();
-        });
-        if (isExisting.length) {
-            isExisting.addClass('active btn-primary').removeClass('btn-outline-secondary');
-            $input.val('');
-            return;
-        }
-
-        $.ajax({
-            url: "{% url 'add_delay_reason_tag_ajax' %}",
-            method: 'POST',
-            data: { name: name, csrfmiddlewaretoken: '{{ csrf_token }}' },
-            success: function(response) {
-                if (response.status === 'success') {
-                    const $btn = $('<button type="button" class="btn btn-sm delay-reason-tag-btn active btn-primary"></button>')
-                        .attr('data-tag-id', response.id)
-                        .text(response.name);
-                    $container.append($btn);
-                    $input.val('');
-                } else {
-                    alert('Error creating new reason.');
-                }
-            },
-            error: function() {
-                alert('Error creating new reason.');
-            }
-        });
-    }
-
-    $(document).on('click', '.delay-reason-add-btn', function() {
-        addNewDelayReasonTag($(this).data('stage-id'));
-    });
-    $(document).on('keydown', '.delay-reason-new-input', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const stageId = $(this).closest('.mb-3').find('.delay-reason-tags').data('stage-id');
-            addNewDelayReasonTag(stageId);
-        }
-    });
+    // Users can only pick from the predefined reasons; new ones are added in the admin panel.
 
     // Holds the not-yet-saved field edit that triggered the mandatory popup (if any),
     // keyed by stage id. Nothing is written to the server for that field until the

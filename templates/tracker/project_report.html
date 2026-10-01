@@ -1,10 +1,12 @@
 {% extends 'tracker/base.html' %}
 {% load custom_tags %}
 {% load humanize %}
+{% load static %}
 
 {% block title %}Project Reports | Project Tracker{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/chart-style.css' %}">
 <style>
     .details-row td {
         background-color: #f8fafd;
@@ -37,6 +39,7 @@
     .trend-up { color: #198754; }
     .trend-down { color: #dc3545; }
     .trend-flat { color: #6c757d; }
+
 </style>
 {% endblock %}
 
@@ -263,13 +266,13 @@
                         </tr>
                         {# NEW: Row for filter inputs #}
                         <tr class="table-filter-row">
-                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Code..." onkeyup="filterTable()"></th>
-                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Customer..." onkeyup="filterTable()"></th>
-                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Segment..." onkeyup="filterTable()"></th>
-                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Team Lead..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" data-persist-filter="code" placeholder="Filter Code..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" data-persist-filter="customer" placeholder="Filter Customer..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" data-persist-filter="segment" placeholder="Filter Segment..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" data-persist-filter="team-lead" placeholder="Filter Team Lead..." onkeyup="filterTable()"></th>
                             <th></th> {# No filter for Value #}
                             <th></th> {# No filter for Completion #}
-                            <th><input type="text" class="form-control form-control-sm" placeholder="Filter Status..." onkeyup="filterTable()"></th>
+                            <th><input type="text" class="form-control form-control-sm" data-persist-filter="status" placeholder="Filter Status..." onkeyup="filterTable()"></th>
                             <th></th> {# No filter for Actions #}
                         </tr>
                     </thead>
@@ -428,27 +431,24 @@
     </div>
 
     <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card h-100">
                 <div class="card-header">
                     <h5 class="card-header-title mb-0">
                         <i class="fas fa-exclamation-triangle me-2"></i>Top Process Bottlenecks (Delayed Stages)
                         <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
-                           title="Click a bar to open that stage's currently-overdue projects in a new tab."></i>
+                           title="Stages in the selected period that finished late or are still overdue. Click a bar to open that stage's list in a new tab."></i>
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div id="stageDelayChartWrap" style="position: relative; height: 300px;">
+                    <div style="position: relative; height: 300px;">
                         <canvas id="stageDelayChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
+        <div class="col-md-6">
+            <div class="card h-100">
                 <div class="card-header">
                     <h5 class="card-header-title mb-0">
                         <i class="fas fa-chart-pie me-2"></i>In Progress Stages
@@ -458,7 +458,7 @@
                 </div>
                 <div class="card-body">
                     {% if in_progress_stage_labels %}
-                    <div style="max-width: 480px; height: 360px; position: relative; margin: 0 auto;">
+                    <div style="height: 300px; position: relative;">
                         <canvas id="inProgressStageChart"></canvas>
                     </div>
                     {% else %}
@@ -511,6 +511,51 @@
             </div>
         </div>
     </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-user-check me-2"></i>OTIF % &mdash; by Team Lead
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Share of stages completed in the selected period that finished on or before their planned date (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if otif_by_team_lead_chart.labels %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="otifByTeamLeadChart"></canvas>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">No stages were completed in the selected period.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-bullseye me-2"></i>OTIF % &mdash; by Segment
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="Share of stages completed in the selected period that finished on or before their planned date (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if otif_by_segment_chart.labels %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="otifBySegmentChart"></canvas>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4 mb-0">No stages were completed in the selected period.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {{ otif_by_team_lead_chart|json_script:"otifByTeamLeadData" }}
+    {{ otif_by_segment_chart|json_script:"otifBySegmentData" }}
 
     <!-- Common Chart Controls -->
     <div class="row mt-4">
@@ -674,6 +719,7 @@
 {% block scripts %}
 
 {{ block.super }}
+<script src="{% static 'js/chart-style.js' %}"></script>
 <script>
 // Opens a report drill-down page in a new tab, carrying forward whatever report
 // filters (segments, team leads, date window, etc.) are active on this page load.
@@ -727,8 +773,12 @@ function equalizeChartCardHeights() {
 
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Register the datalabels plugin
+    // Register the datalabels plugin, then the shared chart look
     Chart.register(ChartDataLabels);
+    RS.applyDefaults();
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => Object.values(Chart.instances).forEach(c => c.update('none')));
+    }
 
     // --- Filtering UX enhancements ---
 
@@ -823,31 +873,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const stageDelayLabels = {{ stage_delay_labels|safe }};
     const stageDelayProjectCounts = {{ stage_delay_project_counts|safe }};
     if (stageDelayCtx && stageDelayData.length > 0) {
-        // Give each bar enough room that every stage name renders; otherwise Chart.js
-        // auto-skips alternate labels and bars look like they belong to the wrong stage.
-        document.getElementById('stageDelayChartWrap').style.height = Math.max(150, stageDelayData.length * 34 + 50) + 'px';
+        // Fixed 300px like the cards beside/below it; autoSkip is off on the name axis
+        // (RS.hScales), so every one of the top 10 stages still gets its own label.
         new Chart(stageDelayCtx, {
             type: 'bar',
             data: {
                 labels: stageDelayLabels,
-                datasets: [{
+                datasets: [RS.bar({
                     label: 'Delayed Stages',
                     data: stageDelayData,
-                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
-                    borderColor: 'rgba(220, 53, 69, 1)',
-                    borderWidth: 1
-                }]
+                    backgroundColor: RS.gradient(RS.rose, true)
+                })]
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                layout: { padding: { right: 30 } },
                 plugins: {
                     legend: { display: false },
+                    datalabels: RS.endLabels(),
                     tooltip: { callbacks: { label: (ctx) => projectCountLabel(ctx, stageDelayProjectCounts) } }
                 },
-                scales: {
-                    x: { beginAtZero: true, ticks: { stepSize: 1 } },
-                    y: { ticks: { autoSkip: false } }
-                },
+                scales: RS.hScales({ ticks: { precision: 0, padding: 6 } }),
                 onClick: (evt, elements) => {
                     if (!elements.length) return;
                     const stageKey = stageDelayLabels[elements[0].index];
@@ -867,21 +913,21 @@ document.addEventListener('DOMContentLoaded', function() {
             type: 'bar',
             data: {
                 labels: labels,
-                datasets: [{
+                datasets: [RS.bar({
                     label: 'Overdue Stages',
                     data: data,
-                    backgroundColor: color.bg,
-                    borderColor: color.border,
-                    borderWidth: 1
-                }]
+                    backgroundColor: RS.gradient(color, true)
+                })]
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                layout: { padding: { right: 30 } },
                 plugins: {
                     legend: { display: false },
+                    datalabels: RS.endLabels(),
                     tooltip: { callbacks: { label: (c) => projectCountLabel(c, projectCounts) } }
                 },
-                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                scales: RS.hScales({ ticks: { precision: 0, padding: 6 } }),
                 onClick: (evt, elements) => {
                     if (!elements.length || !ids) return;
                     const ownerId = ids[elements[0].index];
@@ -892,8 +938,66 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, { bg: 'rgba(111, 66, 193, 0.7)', border: 'rgba(111, 66, 193, 1)' }, {{ delay_by_team_lead_ids|safe }}, 'team_lead', {{ delay_by_team_lead_project_counts|safe }});
-    initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, { bg: 'rgba(253, 126, 20, 0.7)', border: 'rgba(253, 126, 20, 1)' }, {{ delay_by_segment_ids|safe }}, 'segment', {{ delay_by_segment_project_counts|safe }});
+    initHorizontalBar('delayByTeamLeadChart', {{ delay_by_team_lead_labels|safe }}, {{ delay_by_team_lead_data|safe }}, RS.violet, {{ delay_by_team_lead_ids|safe }}, 'team_lead', {{ delay_by_team_lead_project_counts|safe }});
+    initHorizontalBar('delayBySegmentChart', {{ delay_by_segment_labels|safe }}, {{ delay_by_segment_data|safe }}, RS.amber, {{ delay_by_segment_ids|safe }}, 'segment', {{ delay_by_segment_project_counts|safe }});
+
+    // OTIF % by Team Lead / by Segment — green at or above the 80% target, red below.
+    // Click a bar to open that owner's completed stages (late ones first) in a new tab.
+    // The two cards sit side by side, so both charts share one label-column width to line up;
+    // bars use Chart.js' default sizing, like the "Who Owns Today's Delays" charts above.
+    const otifSources = {
+        otifByTeamLeadData: JSON.parse(document.getElementById('otifByTeamLeadData').textContent),
+        otifBySegmentData: JSON.parse(document.getElementById('otifBySegmentData').textContent),
+    };
+    const otifLabelWidth = () => {
+        const m = document.createElement('canvas').getContext('2d');
+        m.font = `${Chart.defaults.font.size}px ${Chart.defaults.font.family}`;
+        const labels = Object.values(otifSources).flatMap(s => s.labels);
+        return Math.ceil(Math.max(0, ...labels.map(l => m.measureText(l).width))) + 20;
+    };
+
+    function initOtifBar(canvasId, dataId, ownerParam) {
+        const ctx = document.getElementById(canvasId);
+        const src = otifSources[dataId];
+        if (!ctx || !src.data.length) return;
+        const good = (v) => v >= 80;
+        const otifScales = RS.hScales({ max: 100, ticks: { padding: 6, callback: (v) => v + '%' } });
+        otifScales.y.afterFit = (scale) => { scale.width = otifLabelWidth(); };
+        new Chart(ctx, {
+            type: 'bar',
+            plugins: [otifTargetPlugin],
+            data: {
+                labels: src.labels,
+                datasets: [RS.bar({
+                    label: 'OTIF %',
+                    data: src.data,
+                    // Teal at or above the 80% target, rose below.
+                    backgroundColor: (c) => RS.gradient(good(c.raw) ? RS.teal : RS.rose, true)(c)
+                })]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                layout: { padding: { right: 36, top: 16 } },
+                plugins: {
+                    legend: { display: false },
+                    otifTarget: { show: true },
+                    datalabels: RS.endLabels({ formatter: (v) => v + '%' }),
+                    tooltip: { callbacks: { label: (c) =>
+                        `OTIF: ${c.raw}% (${src.on_time[c.dataIndex]} of ${src.total[c.dataIndex]} stages on time)` } }
+                },
+                scales: otifScales,
+                onClick: (evt, elements) => {
+                    if (!elements.length) return;
+                    const ownerId = src.ids[elements[0].index];
+                    if (ownerId === undefined || ownerId === null) return;
+                    openDrilldownTab("{% url 'tracker_otif_owner_stages' %}", { [ownerParam]: ownerId });
+                },
+                onHover: cursorOnHover
+            }
+        });
+    }
+    initOtifBar('otifByTeamLeadChart', 'otifByTeamLeadData', 'team_lead');
+    initOtifBar('otifBySegmentChart', 'otifBySegmentData', 'segment');
 
     // In Progress Stages pie chart — click a slice to open that stage's project list in a new tab
     const inProgressCtx = document.getElementById('inProgressStageChart');
@@ -902,26 +1006,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const inProgressKeys = {{ in_progress_stage_keys|safe }};
     const inProgressProjectCounts = {{ in_progress_stage_project_counts|safe }};
     if (inProgressCtx && inProgressData.length > 0) {
-        const pieColors = [
-            'rgba(13, 110, 253, 0.8)', 'rgba(220, 53, 69, 0.8)', 'rgba(25, 135, 84, 0.8)',
-            'rgba(255, 193, 7, 0.8)', 'rgba(111, 66, 193, 0.8)', 'rgba(253, 126, 20, 0.8)',
-            'rgba(13, 202, 240, 0.8)', 'rgba(214, 51, 132, 0.8)', 'rgba(108, 117, 125, 0.8)',
-            'rgba(32, 201, 151, 0.8)'
-        ];
+        const inProgressOptions = doughnutOptions('in progress');
         new Chart(inProgressCtx, {
-            type: 'pie',
+            type: 'doughnut',
+            plugins: [centerTotalPlugin],
             data: {
                 labels: inProgressLabels,
-                datasets: [{
-                    data: inProgressData,
-                    backgroundColor: inProgressLabels.map((_, i) => pieColors[i % pieColors.length]),
-                }]
+                datasets: [Object.assign({ data: inProgressData }, doughnutStyle(inProgressLabels))]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                ...inProgressOptions,
                 plugins: {
-                    legend: { position: 'right' },
+                    ...inProgressOptions.plugins,
                     tooltip: {
                         callbacks: {
                             label: (ctx) => {
@@ -1216,6 +1312,16 @@ function updateTrendChart() {
 
     const targetData = new Array(filteredLabels.length).fill(80);
 
+    // Axis ceilings set from the data, with ~20% headroom above the tallest bar, so every
+    // bar and its label (and the OTIF labels above 100% points) stays inside the chart.
+    const tallestBar = Math.max(0, ...[...filteredPlanned, ...filteredActual].filter(Number.isFinite));
+    const niceStep = (raw) => {
+        const mag = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1))));
+        return [1, 2, 5, 10].map(m => m * mag).find(s => s >= raw);
+    };
+    const countStep = niceStep(tallestBar * 1.2 / 10);
+    const countAxisMax = Math.max(countStep, Math.ceil(tallestBar * 1.2 / countStep) * countStep);
+
     trendChart = new Chart(trendCtx, {
         data: {
             labels: filteredLabels,
@@ -1224,35 +1330,51 @@ function updateTrendChart() {
                     type: 'bar',
                     label: 'Planned',
                     data: filteredPlanned,
-                    borderColor: '#0d6efd', // Bootstrap Primary
-                    backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                    backgroundColor: RS.gradient(RS.indigoLight, false),
+                    borderWidth: 0, borderRadius: 6, borderSkipped: 'start',
                     yAxisID: 'y'
                 },
                 {
                     type: 'bar',
                     label: 'Actual Completed',
                     data: filteredActual,
-                    borderColor: '#198754', // Bootstrap Success
-                    backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                    backgroundColor: RS.gradient(RS.indigo, false),
+                    borderWidth: 0, borderRadius: 6, borderSkipped: 'start',
                     yAxisID: 'y'
                 },
                 {
                     type: 'line',
                     label: 'OTIF %',
                     data: filteredOtif,
-                    borderColor: '#fd7e14',
-                    backgroundColor: 'rgba(253, 126, 20, 0.15)',
-                    borderWidth: 2,
-                    tension: 0.3,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#fd7e14',
+                    borderColor: RS.amberLine,
+                    // Soft amber area under the OTIF line
+                    fill: 'origin',
+                    backgroundColor: (ctx) => {
+                        const area = ctx.chart.chartArea;
+                        if (!area) return 'rgba(245, 158, 11, 0.12)';
+                        const g = ctx.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+                        g.addColorStop(0, 'rgba(245, 158, 11, 0.16)');
+                        g.addColorStop(1, 'rgba(245, 158, 11, 0)');
+                        return g;
+                    },
+                    borderWidth: 2.5,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: RS.amberLine,
+                    pointBorderWidth: 2,
                     spanGaps: true,
                     yAxisID: 'y1',
                     datalabels: {
                         anchor: 'end',
                         align: 'top',
-                        color: '#fd7e14',
-                        font: { weight: 'bold', size: 11 },
+                        color: '#b45309',
+                        // Light backing keeps the label readable where the line crosses bars.
+                        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                        borderRadius: 3,
+                        padding: { top: 1, bottom: 1, left: 2, right: 2 },
+                        font: { weight: '600', size: 10 },
                         formatter: (value) => (value === null || value === undefined) ? '' : value.toFixed(0) + '%'
                     }
                 },
@@ -1260,8 +1382,8 @@ function updateTrendChart() {
                     type: 'line',
                     label: 'OTIF Target (80%)',
                     data: targetData,
-                    borderColor: '#dc3545',
-                    borderWidth: 2,
+                    borderColor: RS.target,
+                    borderWidth: 1.5,
                     borderDash: [5, 5],
                     pointRadius: 0,
                     fill: false,
@@ -1324,21 +1446,34 @@ function updateTrendChart() {
                 datalabels: {
                     anchor: 'end',
                     align: 'top',
-                    color: '#444',
-                    font: { weight: 'bold' }
+                    color: RS.ink,
+                    font: { weight: '600', size: 11 },
+                    // Keep every label inside the chart area even when its bar/point sits
+                    // at the very top (tallest bar, or OTIF at 100%).
+                    clamp: true
                 }
             },
+            // Room above the plot for labels on the topmost bars/points.
+            layout: { padding: { top: 24 } },
             scales: {
+                x: { grid: { display: false }, border: { display: false } },
                 y: {
                     beginAtZero: true,
-                    ticks: { stepSize: 1 },
+                    max: countAxisMax,
+                    grid: { color: RS.grid, drawTicks: false },
+                    border: { display: false },
+                    ticks: { stepSize: countStep, precision: 0, padding: 6 },
                     title: { display: true, text: 'Number of Stages' }
                 },
                 y1: {
                     beginAtZero: true,
-                    max: 100,
+                    // Headroom above 100% for the label on a 100% point; the axis
+                    // itself still reads 0-100.
+                    max: 120,
                     position: 'right',
                     grid: { drawOnChartArea: false },
+                    border: { display: false },
+                    ticks: { stepSize: 10, padding: 6, callback: (v) => v <= 100 ? v + '%' : '' },
                     title: { display: true, text: 'OTIF %' }
                 }
             }
@@ -1410,20 +1545,25 @@ function updateEmuChart() {
         data: {
             labels: filteredLabels,
             datasets: [
+                // Green-ish = on time (before dispatch), amber = late, rose = very late.
+                // A 2px white top edge separates the stacked segments.
                 {
                     label: 'Before Dispatch',
                     data: filteredCat1,
-                    backgroundColor: 'rgba(25, 135, 84, 0.7)', // Success Green
+                    backgroundColor: RS.gradient(RS.teal, false),
+                    borderColor: '#fff', borderWidth: { top: 2 }, borderSkipped: false,
                 },
                 {
                     label: 'After Dispatch / Before Go Live',
                     data: filteredCat2,
-                    backgroundColor: 'rgba(255, 193, 7, 0.7)', // Warning Yellow
+                    backgroundColor: RS.gradient(RS.amber, false),
+                    borderColor: '#fff', borderWidth: { top: 2 }, borderSkipped: false,
                 },
                 {
                     label: 'After Go Live',
                     data: filteredCat3,
-                    backgroundColor: 'rgba(220, 53, 69, 0.7)', // Danger Red
+                    backgroundColor: RS.gradient(RS.rose, false),
+                    borderColor: '#fff', borderWidth: { top: 2 }, borderSkipped: false,
                 }
             ]
         },
@@ -1431,10 +1571,13 @@ function updateEmuChart() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { stacked: true },
-                y: { 
+                x: { stacked: true, grid: { display: false }, border: { display: false } },
+                y: {
                     stacked: true,
                     beginAtZero: true,
+                    grid: { color: RS.grid, drawTicks: false },
+                    border: { display: false },
+                    ticks: { padding: 6, precision: 0 },
                     title: { display: true, text: 'Number of Projects' }
                 }
             },
@@ -1449,7 +1592,7 @@ function updateEmuChart() {
                     }
                 },
                 datalabels: {
-                    anchor: 'center', align: 'center', color: '#fff', font: { weight: 'bold' },
+                    anchor: 'center', align: 'center', color: '#fff', font: { weight: '600', size: 11 },
                     formatter: (value) => value > 0 ? value : ''
                 }
             }
@@ -1476,28 +1619,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const delayReasonDays = {{ reason_delay_days|safe }};
     const delayReasonCounts = {{ reason_delay_counts|safe }};
     if (delayReasonCtx && delayReasonLabels.length > 0) {
-        const pieColors = [
-            'rgba(220, 53, 69, 0.8)', 'rgba(255, 193, 7, 0.8)', 'rgba(13, 110, 253, 0.8)',
-            'rgba(111, 66, 193, 0.8)', 'rgba(253, 126, 20, 0.8)', 'rgba(25, 135, 84, 0.8)',
-            'rgba(13, 202, 240, 0.8)', 'rgba(214, 51, 132, 0.8)', 'rgba(108, 117, 125, 0.8)',
-            'rgba(32, 201, 151, 0.8)'
-        ];
+        const delayReasonOptions = doughnutOptions('delay days');
         new Chart(delayReasonCtx, {
-            type: 'pie',
+            type: 'doughnut',
+            plugins: [centerTotalPlugin],
             data: {
                 labels: delayReasonLabels,
                 // Slice size = total delay days attributed to the reason (the actual
                 // schedule impact), not just how many stages carried it.
-                datasets: [{
-                    data: delayReasonDays,
-                    backgroundColor: delayReasonLabels.map((_, i) => pieColors[i % pieColors.length]),
-                }]
+                datasets: [Object.assign({ data: delayReasonDays }, doughnutStyle(delayReasonLabels))]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                ...delayReasonOptions,
                 plugins: {
-                    legend: { position: 'right' },
+                    ...delayReasonOptions.plugins,
                     tooltip: {
                         callbacks: {
                             label: (ctx) => {

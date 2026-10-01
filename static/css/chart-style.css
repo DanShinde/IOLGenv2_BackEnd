@@ -1,0 +1,20 @@
+/* Chart cards ("Soft Gradient" chart style), shared by the Reports page and Dashboard:
+   softer, deeper shadow and a gradient icon tile in the header. Only cards that hold a
+   chart are affected. */
+.card:has(canvas) {
+    border: 0;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px -12px rgba(67, 97, 238, 0.25), 0 2px 6px rgba(16, 24, 40, 0.05);
+}
+.card:has(canvas) > .card-header {
+    background: transparent;
+    border-bottom: 1px solid #eef0f6;
+}
+.card:has(canvas) .card-header-title > i.fas:first-child {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; font-size: 0.8rem;
+    vertical-align: middle;
+}
