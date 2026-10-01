@@ -130,6 +130,8 @@ class SiteAllocationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Inactive employees cannot be assigned to a site
+        self.fields['employee'].queryset = self.fields['employee'].queryset.filter(is_active=True).order_by('name')
         for field in self.fields.values():
             field.widget.attrs.update({
                 'class': 'form-input w-full px-3 py-2 text-xs rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:outline-none'
