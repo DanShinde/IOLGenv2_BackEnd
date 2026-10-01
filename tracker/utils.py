@@ -1,9 +1,87 @@
+from django.db.models import F, Q
 from django.utils import timezone
 import datetime
+
+# ---------------------------------------------------------------------------------------
+# OTIF -- the one definition used everywhere (project, phase, dashboard, reports, exports)
+#
+#   OTIF % = due stages completed on or before their planned date / due stages
+#
+# A stage is "due" when its planned date is inside the period and on or before today.
+# Every due stage that isn't completed on time is a miss: completed late, or still open
+# past its planned date. Stages are bucketed into periods by PLANNED date.
+# Never counted: Not Applicable, Hold (holds are customer-side), Dispatch and Handover
+# (Handover has its own Early / On Time / Late figure), and bad data -- planned dates more
+# than OTIF_MAX_DAY_DELTA days old (typo years like 0020) or Completed stages with no
+# usable actual date.
+# ---------------------------------------------------------------------------------------
 
 # Stages that never count toward any OTIF figure. Dispatch is only used by the Emulation
 # Timing Analysis; Handover has its own dedicated figure (get_final_project_otif).
 OTIF_EXCLUDED_STAGES = ('Dispatch', 'Handover')
+OTIF_EXCLUDED_STATUSES = ('Not Applicable', 'Hold')
+OTIF_MAX_DAY_DELTA = 3650  # ~10 years; same bound as the Reports' MAX_PLAUSIBLE_DAY_DELTA
+
+
+def _otif_window(start, end, today):
+    today = today or timezone.localdate()
+    floor = today - datetime.timedelta(days=OTIF_MAX_DAY_DELTA)
+    lo = max(start, floor) if start else floor
+    hi = min(end, today) if end else today
+    return lo, hi, floor
+
+
+def otif_due_q(start=None, end=None, today=None):
+    """Q selecting the stages that count toward OTIF for [start, end] (either may be None)."""
+    lo, hi, floor = _otif_window(start, end, today)
+    return (
+        Q(planned_date__isnull=False, planned_date__gte=lo, planned_date__lte=hi)
+        & ~Q(status__in=OTIF_EXCLUDED_STATUSES)
+        & ~Q(name__in=OTIF_EXCLUDED_STAGES)
+        & ~Q(status='Completed', actual_date__isnull=True)
+        & ~Q(status='Completed', actual_date__lt=floor)
+    )
+
+
+# A due stage is on time when it was completed on or before its planned date.
+OTIF_ON_TIME_Q = Q(status='Completed', actual_date__lte=F('planned_date'))
+
+
+def otif_pct(on_time, due):
+    return round(on_time / due * 100, 1) if due else None
+
+
+def otif_counts_qs(stages_qs, start=None, end=None, today=None):
+    """(on_time, due) for a Stage queryset."""
+    due_qs = stages_qs.filter(otif_due_q(start, end, today))
+    return due_qs.filter(OTIF_ON_TIME_Q).count(), due_qs.count()
+
+
+def is_otif_due(stage, start=None, end=None, today=None):
+    """Python twin of otif_due_q for stages already in memory."""
+    lo, hi, floor = _otif_window(start, end, today)
+    if not stage.planned_date or not (lo <= stage.planned_date <= hi):
+        return False
+    if stage.status in OTIF_EXCLUDED_STATUSES or stage.name in OTIF_EXCLUDED_STAGES:
+        return False
+    if stage.status == 'Completed' and (not stage.actual_date or stage.actual_date < floor):
+        return False
+    return True
+
+
+def is_otif_on_time(stage):
+    return stage.status == 'Completed' and stage.actual_date <= stage.planned_date
+
+
+def get_otif_counts(stages, start=None, end=None, today=None):
+    """(on_time, due) for stages already in memory."""
+    due = [s for s in stages if is_otif_due(s, start, end, today)]
+    return sum(1 for s in due if is_otif_on_time(s)), len(due)
+
+
+def get_otif_percentage(stages, start=None, end=None, today=None):
+    return otif_pct(*get_otif_counts(stages, start, end, today))
+
 
 def get_completion_percentage(stages):
     stages = [s for s in stages if s.status != "Not Applicable"]
@@ -11,13 +89,6 @@ def get_completion_percentage(stages):
     if total == 0: return 0
     total_progress = sum(s.completion_percentage for s in stages)
     return round(total_progress / total)
-
-def get_otif_percentage(stages):
-    completed = [s for s in stages if s.status == 'Completed' and s.name not in OTIF_EXCLUDED_STAGES]
-    if not completed:
-        return None
-    on_time = [s for s in completed if s.actual_date and s.planned_date and s.actual_date <= s.planned_date]
-    return round((len(on_time) / len(completed)) * 100, 1)
 
 def get_final_project_otif(stages):
     """

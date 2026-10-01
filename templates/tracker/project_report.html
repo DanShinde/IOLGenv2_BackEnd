@@ -318,7 +318,7 @@
                                             </div>
                                             <div class="detail-item">
                                                 <h6>Project OTIF</h6>
-                                                <p>{{ item.otif|floatformat:1|default:"N/A" }}{% if item.otif %} %{% endif %}</p>
+                                                <p>{% if item.otif is not None %}{{ item.otif|floatformat:1 }} %{% else %}N/A{% endif %}</p>
                                             </div>
                                             <div class="detail-item">
                                                 <h6>Automation Schedule</h6>
@@ -519,7 +519,7 @@
                     <h5 class="card-header-title mb-0">
                         <i class="fas fa-user-check me-2"></i>OTIF % &mdash; by Team Lead
                         <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
-                           title="Share of stages completed in the selected period that finished on or before their planned date (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
+                           title="Share of stages due (planned) in the selected period, up to today, that were completed on or before their planned date; late and still-open overdue stages are misses (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
                     </h5>
                 </div>
                 <div class="card-body">
@@ -539,7 +539,7 @@
                     <h5 class="card-header-title mb-0">
                         <i class="fas fa-bullseye me-2"></i>OTIF % &mdash; by Segment
                         <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
-                           title="Share of stages completed in the selected period that finished on or before their planned date (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
+                           title="Share of stages due (planned) in the selected period, up to today, that were completed on or before their planned date; late and still-open overdue stages are misses (same basis as Overall OTIF %). Green meets the 80% target. Lowest first. Click a bar to see the stages behind it."></i>
                     </h5>
                 </div>
                 <div class="card-body">
