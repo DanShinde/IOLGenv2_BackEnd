@@ -113,18 +113,27 @@
         </div>
 
         {% if consolidated.total_days %}
+        {# Each pie: legend on the right (an HTML list, so long names and many sites fit), and an expand button for a full-size view #}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
-                <p class="text-sm font-semibold text-gray-800 mb-2">Time Allocation &mdash; Site vs Office vs Leave</p>
-                <div class="relative h-64">
-                    <canvas id="consolidatedPieChart" class="w-full h-full"></canvas>
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-sm font-semibold text-gray-800">Time Allocation &mdash; Site vs Office vs Leave</p>
+                    <button type="button" class="pie-expand-btn" onclick="openPieModal('consolidatedPieChart')" title="View full size"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/></svg></button>
+                </div>
+                <div class="pie-with-legend h-64">
+                    <div class="pie-canvas-box"><canvas id="consolidatedPieChart"></canvas></div>
+                    <ul class="pie-legend" id="consolidatedPieChart-legend"></ul>
                 </div>
             </div>
             <div>
-                <p class="text-sm font-semibold text-gray-800 mb-2">Site-wise Day Distribution</p>
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-sm font-semibold text-gray-800">Site-wise Day Distribution</p>
+                    {% if consolidated.site_days %}<button type="button" class="pie-expand-btn" onclick="openPieModal('siteDistPieChart')" title="View full size"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/></svg></button>{% endif %}
+                </div>
                 {% if consolidated.site_days %}
-                <div class="relative h-64">
-                    <canvas id="siteDistPieChart" class="w-full h-full"></canvas>
+                <div class="pie-with-legend h-64">
+                    <div class="pie-canvas-box"><canvas id="siteDistPieChart"></canvas></div>
+                    <ul class="pie-legend" id="siteDistPieChart-legend"></ul>
                 </div>
                 {% else %}
                 <div class="h-64 flex items-center justify-center text-sm text-gray-500">No on-site allocations in this period.</div>
@@ -379,6 +388,38 @@
     {% endif %}
 </div>
 
+<!-- Full-size pie view (Expand button on the Consolidated Summary charts) -->
+<div id="pieModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onclick="if (event.target === this) closePieModal()">
+    <div class="bg-white rounded-xl shadow-2xl flex flex-col" style="width: min(1200px, 96vw); height: 88vh;">
+        <div class="flex items-center justify-between px-5 py-3 border-b">
+            <h3 id="pieModalTitle" class="text-base font-semibold text-gray-900"></h3>
+            <button type="button" onclick="closePieModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none" title="Close (Esc)">&times;</button>
+        </div>
+        <div class="pie-with-legend pie-modal-body flex-1 min-h-0 p-5">
+            <div class="pie-canvas-box"><canvas id="pieModalCanvas"></canvas></div>
+            <ul class="pie-legend" id="pieModalLegend"></ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Pie + legend side by side: the pie takes the remaining width, the legend scrolls */
+    .pie-with-legend { display: flex; gap: 12px; }
+    .pie-canvas-box { position: relative; flex: 1 1 auto; min-width: 0; }
+    .pie-legend { flex: 0 0 auto; width: 46%; max-width: 280px; max-height: 100%; align-self: center; overflow-y: auto; margin: 0; padding: 0; list-style: none; font-size: 11px; }
+    .pie-legend li { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; cursor: pointer; color: #374151; }
+    .pie-legend li:hover { background: #f3f4f6; }
+    .pie-legend li.off { opacity: .45; }
+    .pie-legend li.off .name { text-decoration: line-through; }
+    .pie-legend .swatch { flex: 0 0 10px; height: 10px; border-radius: 2px; }
+    .pie-legend .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pie-legend .val { flex: 0 0 auto; font-weight: 600; color: #4b5563; font-variant-numeric: tabular-nums; }
+    .pie-modal-body .pie-legend { width: 380px; max-width: 36%; font-size: 13px; }
+    .pie-modal-body .pie-legend li { padding: 4px 8px; }
+    .pie-expand-btn { padding: 4px; border-radius: 6px; color: #9ca3af; }
+    .pie-expand-btn:hover { color: #4f46e5; background: #eef2ff; }
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script>
 function setReportMode(m) {
@@ -389,6 +430,8 @@ function setReportMode(m) {
 // Shared count-vs-percent display mode for every pie chart on this page.
 let chartViewMode = 'percent';
 const allPieCharts = [];
+const pieDataById = {};        // chart data by canvas id, for the full-size view
+const legendRefreshers = [];   // HTML legends re-render when the count/% mode changes
 
 function setChartViewMode(mode) {
     chartViewMode = mode;
@@ -397,24 +440,59 @@ function setChartViewMode(mode) {
     document.getElementById('chart-view-percent').className = 'px-3 py-1 text-xs font-medium rounded-md' +
         (mode === 'percent' ? ' bg-white text-indigo-700 shadow-sm' : ' text-gray-500 hover:text-gray-700');
     allPieCharts.forEach(function (chart) { chart.update(); });
+    legendRefreshers.forEach(function (fn) { fn(); });
 }
 
-function renderPieChart(canvasId, data) {
-    const ctx = document.getElementById(canvasId);
-    if (!ctx || !data || !data.values.some(v => v > 0)) return;
+function pieValueText(value, total) {
+    if (chartViewMode === 'count') return value + 'd';
+    const pct = total ? Math.round((value / total) * 100) : 0;
+    return (pct === 0 && value > 0) ? '<1%' : pct + '%';
+}
 
+// Legend as an HTML list beside the pie: full names, values, scrolls when long, and a click
+// hides/shows that slice. Listed largest first.
+function renderHtmlLegend(chart, el, data, total) {
+    const order = data.labels.map((_, i) => i).sort((a, b) => data.values[b] - data.values[a]);
+    function draw() {
+        el.innerHTML = '';
+        order.forEach(function (i) {
+            if (!(data.values[i] > 0)) return;
+            const li = document.createElement('li');
+            li.className = chart.getDataVisibility(i) ? '' : 'off';
+            li.title = data.labels[i] + ': ' + data.values[i] + ' day' + (data.values[i] === 1 ? '' : 's') + ' (click to hide / show)';
+            li.innerHTML = '<span class="swatch"></span><span class="name"></span><span class="val"></span>';
+            li.querySelector('.swatch').style.background = data.colors[i];
+            li.querySelector('.name').textContent = data.labels[i];
+            li.querySelector('.val').textContent = pieValueText(data.values[i], total);
+            li.addEventListener('click', function () {
+                chart.toggleDataVisibility(i);
+                chart.update();
+                draw();
+            });
+            el.appendChild(li);
+        });
+    }
+    draw();
+    return draw;
+}
+
+// opts: legendEl (HTML legend beside the pie; omit for Chart.js's own bottom legend),
+// labelMinShare (no on-slice label below this share -- small slices are in the legend and
+// tooltip instead, so labels never pile up), labelSize.
+function buildPie(canvas, data, opts) {
     const total = data.values.reduce((a, b) => a + b, 0);
-    const chart = new Chart(ctx, {
+    const chart = new Chart(canvas, {
         type: 'pie',
         data: {
             labels: data.labels,
-            datasets: [{ data: data.values, backgroundColor: data.colors }]
+            datasets: [{ data: data.values, backgroundColor: data.colors, borderColor: '#fff', borderWidth: 1 }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: 4 },
             plugins: {
-                legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                legend: { display: !opts.legendEl, position: 'bottom', labels: { font: { size: 11 } } },
                 tooltip: {
                     callbacks: {
                         label: function (ctx) {
@@ -424,22 +502,59 @@ function renderPieChart(canvasId, data) {
                     }
                 },
                 datalabels: {
-                    display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+                    display: (ctx) => {
+                        const v = ctx.dataset.data[ctx.dataIndex];
+                        return v > 0 && total > 0 && v / total >= (opts.labelMinShare || 0);
+                    },
                     color: '#fff',
-                    font: { weight: 'bold', size: 11 },
-                    formatter: (value) => {
-                        if (chartViewMode === 'count') {
-                            return value + 'd';
-                        }
-                        const pct = total ? Math.round((value / total) * 100) : 0;
-                        return pct + '%';
-                    }
+                    font: { weight: 'bold', size: opts.labelSize || 11 },
+                    formatter: (value) => pieValueText(value, total)
                 }
             }
         }
     });
     allPieCharts.push(chart);
+    if (opts.legendEl) {
+        const redraw = renderHtmlLegend(chart, opts.legendEl, data, total);
+        legendRefreshers.push(redraw);
+        chart._legendRedraw = redraw;
+    }
+    return chart;
 }
+
+function renderPieChart(canvasId, data) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !data || !data.values.some(v => v > 0)) return;
+    pieDataById[canvasId] = data;
+    const legendEl = document.getElementById(canvasId + '-legend');
+    buildPie(canvas, data, { legendEl: legendEl, labelMinShare: legendEl ? 0.04 : 0, labelSize: 11 });
+}
+
+// Full-size view of one pie, with its legend on the right
+let modalPieChart = null;
+function openPieModal(canvasId) {
+    const data = pieDataById[canvasId];
+    if (!data) return;
+    const card = document.getElementById(canvasId).closest('.pie-with-legend').parentElement;
+    document.getElementById('pieModalTitle').textContent = card.querySelector('p').textContent;
+    document.getElementById('pieModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    modalPieChart = buildPie(document.getElementById('pieModalCanvas'), data,
+        { legendEl: document.getElementById('pieModalLegend'), labelMinShare: 0.015, labelSize: 13 });
+}
+function closePieModal() {
+    if (modalPieChart) {
+        allPieCharts.splice(allPieCharts.indexOf(modalPieChart), 1);
+        legendRefreshers.splice(legendRefreshers.indexOf(modalPieChart._legendRedraw), 1);
+        modalPieChart.destroy();
+        modalPieChart = null;
+    }
+    document.getElementById('pieModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modalPieChart) closePieModal();
+});
 
 document.addEventListener('DOMContentLoaded', function () {
     if (window.ChartDataLabels) {

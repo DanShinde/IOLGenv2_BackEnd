@@ -880,6 +880,15 @@ _PIE_PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7'
 def _pie_colors(n):
     return [_PIE_PALETTE[i % len(_PIE_PALETTE)] for i in range(n)]
 
+def _site_chart_labels(site_names):
+    """Pie labels for sites: project code first ("A1362 · HSPL KASAN II Nagpur"), so a
+    slice can be matched to its project. Sites without a project keep their plain name."""
+    codes = dict(
+        Site.objects.filter(name__in=site_names, project__isnull=False)
+        .values_list('name', 'project__project_id')
+    )
+    return [f"{codes[n]} · {n}" if codes.get(n) else n for n in site_names]
+
 def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
     """A reportlab vector Pie chart + legend, ready to place on a canvas page via
     renderPDF.draw(drawing, canvas, x, y). Returns None if there's nothing to draw.
@@ -1108,7 +1117,7 @@ def employee_site_history_report_view(request):
             if selected_employee_obj:
                 employee_breakdown = _compute_employee_day_breakdown(selected_employee_obj, start_date, end_date)
                 site_names = list(employee_breakdown['site_days'].keys())
-                chart_labels = site_names + ['In Office', 'On Leave']
+                chart_labels = _site_chart_labels(site_names) + ['In Office', 'On Leave']
                 chart_values = [employee_breakdown['site_days'][n] for n in site_names] + [
                     employee_breakdown['office_days'], employee_breakdown['on_leave_days']
                 ]
@@ -1142,7 +1151,7 @@ def employee_site_history_report_view(request):
     })
     site_dist_sorted = sorted(consolidated['site_days'].items(), key=lambda kv: -kv[1])
     site_dist_chart_json = json.dumps({
-        'labels': [n for n, _ in site_dist_sorted],
+        'labels': _site_chart_labels([n for n, _ in site_dist_sorted]),
         'values': [d for _, d in site_dist_sorted],
         'colors': _pie_colors(len(site_dist_sorted)),
     })
@@ -1427,7 +1436,7 @@ def export_site_history_pdf(request):
             ['#6366f1', '#94a3b8', '#f97316']
         )
         site_sorted = sorted(consolidated['site_days'].items(), key=lambda kv: -kv[1])
-        pie2 = _build_pie_drawing([n for n, _ in site_sorted], [d for _, d in site_sorted], _pie_colors(len(site_sorted))) if site_sorted else None
+        pie2 = _build_pie_drawing(_site_chart_labels([n for n, _ in site_sorted]), [d for _, d in site_sorted], _pie_colors(len(site_sorted))) if site_sorted else None
 
         # Stacked one per row (not side-by-side) so each legend gets the full page width —
         # site names vary too much in length to safely share a row with another chart.
@@ -1464,7 +1473,7 @@ def export_site_history_pdf(request):
         y -= 18
         site_items = sorted(b['site_days'].items(), key=lambda kv: -kv[1])
         emp_pie = _build_pie_drawing(
-            [n for n, _ in site_items] + ['In Office', 'On Leave'],
+            _site_chart_labels([n for n, _ in site_items]) + ['In Office', 'On Leave'],
             [d for _, d in site_items] + [b['office_days'], b['on_leave_days']],
             _pie_colors(len(site_items)) + ['#94a3b8', '#f97316']
         )
