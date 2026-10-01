@@ -715,6 +715,17 @@
     
                 <!-- Allocations Table -->
                 <div class="px-4 pb-4">
+                    {# Sort by how long each allocation lasted at its site / office (with the site filter: that site only) #}
+                    <div class="flex items-center justify-end gap-2 mb-2">
+                        <label for="alloc-sort" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort by duration</label>
+                        <select id="alloc-sort" data-persist-filter="alloc-sort" class="text-xs border border-gray-300 rounded px-2 py-1">
+                            <option value="">Default order</option>
+                            <option value="site:desc">Longest at site</option>
+                            <option value="site:asc">Shortest at site</option>
+                            <option value="office:desc">Longest in office</option>
+                            <option value="office:asc">Shortest in office</option>
+                        </select>
+                    </div>
                     <table class="w-full">
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
@@ -734,6 +745,9 @@
                         <tbody class="divide-y divide-gray-100" id="allocations-table-body">
                             {% for alloc in all_allocations %}
                             <tr class="employee-row allocation-row"
+                                data-order="{{ forloop.counter0 }}"
+                                data-duration="{{ alloc.duration_days }}"
+                                data-kind="{% if alloc.site.is_office %}office{% else %}site{% endif %}"
                                 data-employee="{{ alloc.employee.pk }}"
                                 data-site="{{ alloc.site.pk }}"
                                 data-start-date="{{ alloc.start_date|date:'Y-m-d' }}"
@@ -1319,6 +1333,19 @@
         const map = window.mapInstance;
         const WORLD_BOUNDS = L.latLngBounds([[-56, -168], [76, 190]]);  // inhabited world, no polar caps
 
+        // The world map is only 256 * 2^zoom px tall. Zoomed out further than the box is
+        // tall, everything beyond the poles is empty grey -- so the lowest zoom always keeps
+        // the world at least as tall as the box (recomputed whenever the box resizes), and
+        // panning stops at the poles.
+        function fitMinZoomToBox() {
+            const h = map.getSize().y;
+            if (!h) return;
+            map.setMinZoom(Math.max(1, Math.ceil(Math.log2(h / 256) * 4) / 4));  // quarter steps, like zoomSnap
+        }
+        map.setMaxBounds([[-85, -100000], [85, 100000]]);  // north/south limit only; east-west still wraps
+        map.options.maxBoundsViscosity = 1.0;
+        fitMinZoomToBox();
+
         // tile.openstreetmap.org blocks production/business traffic per its usage policy
         // (https://operations.osmfoundation.org/policies/tiles/), and CARTO's basemaps now
         // require a registered API key for non-anonymous use. Esri's ArcGIS Online raster
@@ -1463,27 +1490,32 @@
         // Entering full view opens on the whole world; leaving it returns to all sites. The
         // refit waits for the map box to actually change size (it settles a little after the
         // fullscreen event), otherwise it would fit against the old dimensions.
+        // The box changes size in steps while entering/leaving full view. Leaflet only loads
+        // tiles for the size it last measured, so it is told about EVERY size change (else
+        // part of the screen stays grey); the refit runs once the size has stopped changing.
         let pendingFit = null;
+        let settleTimer = null;
         function afterFullViewChange() {
             const full = isFull();
             const btn = mapEl.querySelector('.map-view-bar a[data-act="full"]');
             if (btn) { btn.innerHTML = full ? '&#x2715;' : '&#x26F6;'; btn.title = full ? 'Exit full view (Esc)' : 'Full view (Esc to exit)'; }
             pendingFit = full ? showWorld : fitAllSites;
-            setTimeout(runPendingFit, 600);  // safety net if no resize is observed
+            onMapBoxResized();  // in case no resize is observed
         }
-        function runPendingFit() {
-            if (!pendingFit) return;
-            // Mid-transition the box can briefly be 0px tall; fitting then zooms right out
-            if (mapEl.clientHeight < 50 || mapEl.clientWidth < 50) { setTimeout(runPendingFit, 100); return; }
-            const fit = pendingFit;
-            pendingFit = null;
-            map.invalidateSize();
-            fit();
+        function onMapBoxResized() {
+            if (mapEl.clientHeight < 50 || mapEl.clientWidth < 50) return;  // mid-transition
+            map.invalidateSize({ pan: false });
+            fitMinZoomToBox();
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(function () {
+                map.invalidateSize({ pan: false });
+                if (pendingFit) { const fit = pendingFit; pendingFit = null; fit(); }
+            }, 250);
         }
         if (window.ResizeObserver) {
-            new ResizeObserver(function () {
-                if (pendingFit) requestAnimationFrame(runPendingFit);
-            }).observe(mapEl);
+            new ResizeObserver(function () { requestAnimationFrame(onMapBoxResized); }).observe(mapEl);
+        } else {
+            window.addEventListener('resize', onMapBoxResized);
         }
         document.addEventListener('fullscreenchange', afterFullViewChange);
         document.addEventListener('webkitfullscreenchange', afterFullViewChange);
@@ -1612,6 +1644,27 @@
     if (filterEmployee && filterSite) {
         filterEmployee.addEventListener('keyup', filterAllocations);
         filterSite.addEventListener('keyup', filterAllocations);
+    }
+
+    // Team Allocations: sort by how long each allocation has lasted. "At site" puts project-site
+    // allocations first (longest or shortest first) and office ones after; "in office" the
+    // reverse. With the site filter set, only that site's rows are visible, so it ranks
+    // people by their time at that site.
+    const allocSort = document.getElementById('alloc-sort');
+    if (allocSort) {
+        const allocBody = document.getElementById('allocations-table-body');
+        allocSort.addEventListener('change', function () {
+            const [kind, dir] = allocSort.value.split(':');
+            const rows = Array.from(allocBody.querySelectorAll('tr.allocation-row'));
+            rows.sort(function (a, b) {
+                if (!kind) return a.dataset.order - b.dataset.order;
+                const aMatch = a.dataset.kind === kind, bMatch = b.dataset.kind === kind;
+                if (aMatch !== bMatch) return aMatch ? -1 : 1;
+                const d = a.dataset.duration - b.dataset.duration;
+                return (dir === 'asc' ? d : -d) || (a.dataset.order - b.dataset.order);
+            });
+            rows.forEach(r => allocBody.appendChild(r));
+        });
     }
 </script>
 {% endblock %}

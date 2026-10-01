@@ -7,6 +7,7 @@ from .models import (ProjectType, Segment, Category, Holiday,
                      Project, Activity, ActivityHeading, GeneralSettings, CapacitySettings,
                      SalesForecast, EffortBracket, Leave, Site, SiteAllocation)
 from datetime import date, timedelta, datetime
+from dateutil.relativedelta import relativedelta
 from collections import OrderedDict, defaultdict
 from django.db.models import Min, Max, Q, Prefetch
 from .forms import ActivityForm, ProjectForm, LeaveForm, SiteForm, SiteAllocationForm
@@ -824,16 +825,60 @@ def workforce_view(request):
     })
     return render(request, 'planner/workforce.html', context)
 
+def _site_history_presets(today):
+    """Quick date ranges for the Site History report. Financial year runs April-March and
+    its quarters are Q1 Apr-Jun, Q2 Jul-Sep, Q3 Oct-Dec, Q4 Jan-Mar (as in the Tracker)."""
+    def month_range(d):
+        first = d.replace(day=1)
+        return first, (first + relativedelta(months=1)) - timedelta(days=1)
+
+    def quarter_range(d):
+        first = date(d.year, ((d.month - 1) // 3) * 3 + 1, 1)
+        return first, (first + relativedelta(months=3)) - timedelta(days=1)
+
+    def fy_range(d):
+        y = d.year if d.month >= 4 else d.year - 1
+        return date(y, 4, 1), date(y + 1, 3, 31)
+
+    def fy_label(start):
+        return f"FY {str(start.year)[-2:]}-{str(start.year + 1)[-2:]}"
+
+    def q_label(start):
+        return f"Q{(start.month - 4) % 12 // 3 + 1} {fy_label(fy_range(start)[0])}"
+
+    this_m, prev_m = month_range(today), month_range(today.replace(day=1) - timedelta(days=1))
+    this_q = quarter_range(today)
+    prev_q = quarter_range(this_q[0] - timedelta(days=1))
+    this_fy = fy_range(today)
+    prev_fy = fy_range(this_fy[0] - timedelta(days=1))
+    return [
+        {'key': 'this_month', 'label': 'This month', 'hint': this_m[0].strftime('%b %Y'), 'range': this_m},
+        {'key': 'prev_month', 'label': 'Previous month', 'hint': prev_m[0].strftime('%b %Y'), 'range': prev_m},
+        {'key': 'this_quarter', 'label': 'This quarter', 'hint': q_label(this_q[0]), 'range': this_q},
+        {'key': 'prev_quarter', 'label': 'Previous quarter', 'hint': q_label(prev_q[0]), 'range': prev_q},
+        {'key': 'this_fy', 'label': 'This year', 'hint': fy_label(this_fy[0]), 'range': this_fy},
+        {'key': 'prev_fy', 'label': 'Previous year', 'hint': fy_label(prev_fy[0]), 'range': prev_fy},
+    ]
+
+
+def _site_history_period(request):
+    """(start, end as chosen, end used for counting). Defaults to the whole current month.
+    Days after today are never counted -- an open allocation would otherwise add future
+    "site" days and gap days would add future "office" days -- so the counting end is
+    capped at today."""
+    today = date.today()
+    month_start, month_end = _site_history_presets(today)[0]['range']
+    start_date = parse_date(request.GET.get('start_date') or '') or month_start
+    end_date = parse_date(request.GET.get('end_date') or '') or month_end
+    return start_date, end_date, max(start_date, min(end_date, today))
+
+
 def _get_site_history_data(request):
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
     engineer_id = request.GET.get('engineer')
     site_id = request.GET.get('site')
     status_filter = request.GET.get('status')
-    
-    today = date.today()
-    start_date = parse_date(start_date_str) if start_date_str else today.replace(day=1)
-    end_date = parse_date(end_date_str) if end_date_str else today
+
+    start_date, _, end_date = _site_history_period(request)
 
     # Filter allocations that overlap with the selected period
     allocations = SiteAllocation.objects.select_related('employee', 'site', 'site__project')
@@ -1059,10 +1104,15 @@ def _get_employee_wise_overview(request):
     overview = []
     for employee, history in report_data.items():
         sites = {item['site'].name for item in history}
+        # Day-level split (Leave > Site > Office), the same rule as the summary cards, so the
+        # list can be sorted by time on site / in office.
+        b = _compute_employee_day_breakdown(employee, start_date, end_date)
         overview.append({
             'employee': employee,
             'site_count': len(sites),
             'total_days': sum(item['duration'] for item in history),
+            'on_site_days': b['on_site_days'],
+            'office_days': b['office_days'],
         })
     overview.sort(key=lambda x: x['employee'].name)
     return overview
@@ -1092,10 +1142,17 @@ def _compute_consolidated_breakdown(report_data, start_date, end_date):
             if days:
                 bucket_employees[key].add(employee.pk)
 
+    on_site_total = sum(site_days.values())
+    site_people, office_people = len(bucket_employees['on_site']), len(bucket_employees['office'])
     return {
         'employee_count': len(report_data),
         'site_employee_counts': {n: len(e) for n, e in site_employees.items()},
         'bucket_employee_counts': {k: len(e) for k, e in bucket_employees.items()},
+        # Avg days per person = total days there / employees with at least one day there
+        'site_people': site_people,
+        'office_people': office_people,
+        'avg_site_days': round(on_site_total / site_people, 1) if site_people else None,
+        'avg_office_days': round(office_days / office_people, 1) if office_people else None,
         'total_days': total_days,
         'on_leave_days': on_leave_days,
         'office_days': office_days,
@@ -1174,10 +1231,20 @@ def employee_site_history_report_view(request):
         'total_employees': consolidated['employee_count'],
     })
 
+    # Date inputs show the range as chosen; `end_date` (what's counted) stops at today.
+    _, end_date_selected, _ = _site_history_period(request)
+    presets = _site_history_presets(date.today())
+    for p in presets:
+        p['start'], p['end'] = p['range']
+        p['active'] = (start_date, end_date_selected) == p['range']
+
     context = {
         'report_data': dict(report_data),
         'start_date': start_date,
         'end_date': end_date,
+        'end_date_selected': end_date_selected,
+        'counted_to_today': end_date < end_date_selected,
+        'period_presets': presets,
         'active_nav': 'workforce',
         'all_employees': Employee.objects.all().order_by('name'),
         'all_sites': Site.objects.all().order_by('name'),
