@@ -240,6 +240,31 @@ function Update-Dependencies {
 function Write-ReleaseStamp {
     # Read by IOLGenv2_BackEnd/release.py for the "last deployed" marker in the sidebar.
     # Purely cosmetic, so a failure here is a warning and never fails the deploy.
+    #
+    # -JustDeployed marks a run that actually pulled, and is the only run allowed to set
+    # deployed_at. Every other run only *backfills* a missing or stale stamp: the app pool
+    # identity has no git (docs/AUTO_DEPLOY.md), so without this the marker stays blank
+    # until the next commit lands -- which is exactly what happened to the run that
+    # introduced this function, since PowerShell had already loaded the pre-pull script.
+    param(
+        [Parameter(Mandatory = $true)] [string] $Sha,
+        [switch] $JustDeployed
+    )
+
+    $stampPath = Join-Path $RepoPath 'logs\release.json'
+
+    if (-not $JustDeployed) {
+        # Leave a stamp that already describes this commit alone, so deployed_at keeps the
+        # time of the real deploy instead of drifting forward on every scheduled tick.
+        if (Test-Path $stampPath) {
+            try {
+                $existing = Get-Content -Path $stampPath -Raw -ErrorAction Stop | ConvertFrom-Json
+                if ($existing.sha -eq $Sha) { return }
+            }
+            catch { }   # unreadable or corrupt: fall through and rewrite it
+        }
+    }
+
     try {
         $info = Invoke-Git @('log', '-1', '--format=%H%n%cI%n%s', 'HEAD')
         if ($info.ExitCode -ne 0) { throw "git log failed (exit $($info.ExitCode)): $($info.Output)" }
@@ -248,11 +273,16 @@ function Write-ReleaseStamp {
         $subject = ''
         if ($lines.Count -gt 2) { $subject = $lines[2] }
 
+        # Backfilling an existing deployment: when it went live is genuinely unknown, so
+        # leave it null rather than claim this tick. The marker then shows the commit time.
+        $deployedAt = $null
+        if ($JustDeployed) { $deployedAt = (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz') }
+
         $json = [ordered]@{
             sha          = $lines[0]
             committed_at = $lines[1]
             subject      = $subject
-            deployed_at  = (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz')
+            deployed_at  = $deployedAt
         } | ConvertTo-Json
 
         # WriteAllText emits UTF-8 without a BOM, unlike Out-File/Set-Content on 5.1.
@@ -371,7 +401,10 @@ try {
     $remoteSha = (Invoke-Git @('rev-parse', "$Remote/$Branch")).Output
 
     if ($localSha -eq $remoteSha -and -not $Force) {
-        # Quiet by design: this is what almost every scheduled tick does.
+        # Quiet by design: this is what almost every scheduled tick does. The stamp is
+        # still backfilled if it is missing or describes an older commit -- a no-op once
+        # it is correct, so the usual tick stays a couple of file reads.
+        Write-ReleaseStamp -Sha $localSha
         Write-Log "Up to date at $($localSha.Substring(0, 7))"
         exit 0
     }
@@ -435,7 +468,7 @@ try {
     }
 
     # Before the restart, so the fresh process reads the new stamp.
-    Write-ReleaseStamp
+    Write-ReleaseStamp -Sha $remoteSha -JustDeployed
 
     Restart-Application
 

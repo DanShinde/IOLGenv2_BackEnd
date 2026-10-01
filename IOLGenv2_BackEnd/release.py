@@ -10,11 +10,15 @@ Either source failing just means no marker is shown; it must never break a page.
 """
 
 import json
+import re
 import subprocess
 from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
 
 from django.conf import settings
+
+_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
 
 def _parse(value):
@@ -61,11 +65,71 @@ def _from_git():
     }
 
 
+def _git_dir():
+    """The .git directory, following the `gitdir:` pointer a worktree leaves behind."""
+    path = Path(settings.BASE_DIR) / ".git"
+    if path.is_file():
+        try:
+            pointer = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+        if not pointer.startswith("gitdir:"):
+            return None
+        path = Path(pointer[len("gitdir:"):].strip())
+    return path if path.is_dir() else None
+
+
+def _from_git_dir():
+    """The checked-out SHA read straight out of .git, with no git binary involved.
+
+    This is the only fallback that can work in production: the IIS application pool
+    identity has no Git (docs/AUTO_DEPLOY.md), so _from_git() always fails there and a
+    missing stamp used to leave the marker blank. Reading the ref files needs nothing but
+    read access to the checkout, which the worker already has to serve the code.
+
+    Gives the commit and nothing else -- the times live inside the commit object, which
+    is zlib-compressed and usually inside a packfile. Not worth it for a marker.
+    """
+    git_dir = _git_dir()
+    if git_dir is None:
+        return None
+
+    try:
+        head = (git_dir / "HEAD").read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+
+    if not head.startswith("ref:"):
+        # Detached HEAD: the file holds the SHA itself.
+        return {"sha": head} if _SHA_RE.fullmatch(head) else None
+
+    ref = head[len("ref:"):].strip()
+    try:
+        loose = (git_dir / ref).read_text(encoding="utf-8").strip()
+        if _SHA_RE.fullmatch(loose):
+            return {"sha": loose}
+    except OSError:
+        pass
+
+    # Nothing loose, so the ref has been packed into .git/packed-refs.
+    try:
+        lines = (git_dir / "packed-refs").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        if line.startswith(("#", "^")):
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) == 2 and parts[1].strip() == ref and _SHA_RE.fullmatch(parts[0]):
+            return {"sha": parts[0]}
+    return None
+
+
 # Cached for the life of the process: every deploy restarts the app (auto_pull.ps1
 # writes the stamp *before* recycling it), so a fresh process always reads a fresh stamp.
 @lru_cache(maxsize=1)
 def get_release():
-    data = _from_stamp() or _from_git()
+    data = _from_stamp() or _from_git() or _from_git_dir()
     if not data:
         return None
 

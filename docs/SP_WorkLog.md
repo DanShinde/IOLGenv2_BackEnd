@@ -8,6 +8,42 @@ prod. Keep it brief — enough to answer "why is this like this?" months later.
 
 ---
 
+## 2026-10-01 — Release marker showed on dev but never on prod
+
+**Reason:** The marker rendered locally and was blank on the VM, because *both* sources
+failed there. `logselease.json` had never been written: `Write-ReleaseStamp` sits after
+the "nothing new to pull" early exit, so it only runs on a tick that actually pulls — and
+the tick that pulled the commit introducing it was still executing the **pre-pull** script
+(PowerShell loads the whole file before running it). The git fallback can't cover for it
+either: the app pool identity has no Git (`docs/AUTO_DEPLOY.md`), so `_from_git()` always
+fails in production. Marker blank until some unrelated commit happened to land.
+
+**Changed:**
+- `deploy/auto_pull.ps1` — `Write-ReleaseStamp` takes `-Sha` and `-JustDeployed`, and is
+  now also called on the up-to-date path, where it *backfills* a missing or stale stamp.
+  Only a run that really deployed sets `deployed_at`; a backfill leaves it null rather
+  than claim the current tick, so the time shown stays honest. A stamp already describing
+  the checked-out commit is left untouched, so the usual tick is two file reads.
+- `IOLGenv2_BackEnd/release.py` — third fallback `_from_git_dir()` reads the SHA straight
+  out of `.git` (HEAD → loose ref → `packed-refs`, plus detached HEAD and the `gitdir:`
+  pointer). No git binary, no credentials — just read access to the checkout the worker
+  already serves. Gives the commit but no times; the times live in the zlib-compressed
+  commit object, not worth unpacking for a cosmetic marker.
+
+**Verified:** the real `Write-ReleaseStamp` body, extracted from the script via the
+PowerShell AST and exercised directly — backfill writes `deployed_at: null`, an
+already-current stamp is left untouched (mtime unchanged), `-JustDeployed` sets the time,
+and a corrupt or stale stamp is rewritten. UTF-8 with no BOM. On the Python side: stamp,
+git, `.git`-only (prod simulated by disabling `_from_git`), packed-refs and detached HEAD
+all resolve to the right SHA. End to end — stamp written by the real PowerShell function,
+read by `release.py`, rendered in the sidebar.
+
+**Caught in review:** the first patch corrupted the path literal to `'logselease.json'` —
+a stray CR where `logselease.json` belonged. `Test-Path` threw "Illegal characters in
+path" on the first test run. Fixed, and the file's CRLF endings kept consistent.
+
+---
+
 ## 2026-10-01 — Release marker in the sidebar (which commit is live, deployed when)
 
 **Reason:** No way to tell from the app itself which commit of `main` the VM was serving
