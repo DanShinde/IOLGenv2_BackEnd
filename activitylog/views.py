@@ -36,6 +36,22 @@ def can_view_log(user):
     return bool(profile and profile.is_log_viewer)
 
 
+def _scoped(filters):
+    """Entries matching the person / software / search filters, for any dates."""
+    qs = ActivityLog.objects.all()
+    if filters['user']:
+        qs = qs.filter(username=filters['user'])
+    if filters['app']:
+        qs = qs.filter(app=filters['app'])
+    if filters['q']:
+        q = filters['q']
+        qs = qs.filter(
+            Q(description__icontains=q) | Q(target__icontains=q) | Q(path__icontains=q)
+            | Q(username__icontains=q) | Q(full_name__icontains=q)
+        )
+    return qs
+
+
 def _filtered_entries(params):
     """Applies the page's filters (default: the last 7 days, everything except page visits).
 
@@ -50,19 +66,8 @@ def _filtered_entries(params):
         timezone.make_aware(datetime.combine(start, time.min), tz),
         timezone.make_aware(datetime.combine(end, time.max), tz),
     )
-    base = ActivityLog.objects.filter(timestamp__range=window)
     filters = {k: (params.get(k) or '').strip() for k in ('user', 'app', 'q')}
-
-    if filters['user']:
-        base = base.filter(username=filters['user'])
-    if filters['app']:
-        base = base.filter(app=filters['app'])
-    if filters['q']:
-        q = filters['q']
-        base = base.filter(
-            Q(description__icontains=q) | Q(target__icontains=q) | Q(path__icontains=q)
-            | Q(username__icontains=q) | Q(full_name__icontains=q)
-        )
+    base = _scoped(filters).filter(timestamp__range=window)
 
     # 'f' marks a submitted filter form, so unticking every type means "none", not "default".
     valid = {value for value, _ in E.choices}
@@ -105,29 +110,52 @@ def _export(entries):
     return response
 
 
-def _heatmap(base):
-    """Entries per weekday and hour, as 7 rows of 24 cells with a 0-4 shade level."""
+def _heatmap(scoped, week_start, today):
+    """Entries per hour for one calendar week (Mon-Sun from `week_start`), as 7 rows of 24
+    cells with a 0-4 shade level. One real week at a time, so each row is one actual date
+    (a rolling 7-day window would put last week's Sat/Sun under this week's days). Days
+    after today are marked upcoming and left empty."""
+    tz = timezone.get_current_timezone()
+    week_end = week_start + timedelta(days=6)
+    window = (
+        timezone.make_aware(datetime.combine(week_start, time.min), tz),
+        timezone.make_aware(datetime.combine(week_end, time.max), tz),
+    )
     counts = {
         (row['wd'], row['h']): row['n']
-        for row in base.annotate(wd=ExtractIsoWeekDay('timestamp'), h=ExtractHour('timestamp'))
-                       .values('wd', 'h').annotate(n=Count('id'))
+        for row in scoped.filter(timestamp__range=window)
+                         .annotate(wd=ExtractIsoWeekDay('timestamp'), h=ExtractHour('timestamp'))
+                         .values('wd', 'h').annotate(n=Count('id'))
     }
     peak = max(counts.values(), default=0)
     rows = []
     for wd, label in enumerate(WEEKDAYS, start=1):
+        day = week_start + timedelta(days=wd - 1)
+        upcoming = day > today
         cells = []
         for hour in range(24):
-            n = counts.get((wd, hour), 0)
+            n = 0 if upcoming else counts.get((wd, hour), 0)
             level = 0 if not n else min(4, 1 + int(3 * n / peak)) if peak else 0
             cells.append({'hour': hour, 'n': n, 'level': level})
-        rows.append({'day': label, 'cells': cells, 'total': sum(c['n'] for c in cells)})
-    hour_totals = [sum(counts.get((wd, h), 0) for wd in range(1, 8)) for h in range(24)]
+        rows.append({
+            'day': label, 'date': day, 'label': f"{label} {day:%d %b}", 'upcoming': upcoming,
+            'is_today': day == today, 'cells': cells, 'total': sum(c['n'] for c in cells),
+        })
+    hour_totals = [sum(r['cells'][h]['n'] for r in rows) for h in range(24)]
     busiest = max(counts, key=counts.get) if counts else None
+    this_week = today - timedelta(days=today.weekday())
     return {
         'rows': rows,
         'hour_totals': hour_totals,
-        'total': sum(counts.values()),
-        'busiest': f"{WEEKDAYS[busiest[0] - 1]} {busiest[1]:02d}:00 ({counts[busiest]})" if busiest else '',
+        'total': sum(hour_totals),
+        'busiest': (f"{WEEKDAYS[busiest[0] - 1]} {week_start + timedelta(days=busiest[0] - 1):%d %b}, "
+                    f"{busiest[1]:02d}:00 ({counts[busiest]})") if busiest else '',
+        'week_start': week_start,
+        'week_end': week_end,
+        'is_this_week': week_start == this_week,
+        'prev': (week_start - timedelta(days=7)).isoformat(),
+        'next': (week_start + timedelta(days=7)).isoformat() if week_start < this_week else '',
+        'this_week': this_week.isoformat(),
     }
 
 
@@ -251,11 +279,17 @@ def log_list(request):
     chips = [{'value': ev, 'label': labels[ev], 'count': counts.get(ev, 0), 'on': ev in selected}
              for ev in EVENT_ORDER]
 
+    # "When people work" shows one calendar week: the one picked with the ‹ › buttons (`hw`,
+    # any date in that week), else the week holding the filter's end date. Never a future week.
+    today = timezone.localdate()
+    heat_day = min(parse_date(request.GET.get('hw') or '') or end, today)
+    week_start = heat_day - timedelta(days=heat_day.weekday())
+
     context = {
         'tab': tab, 'totals': totals, 'filters': filters, 'start': start, 'end': end,
         'people': people, 'apps': apps, 'chips': chips,
         'views_on': E.VIEW in selected, 'view_count': counts.get(E.VIEW, 0),
-        'heatmap': _heatmap(base), 'hours': range(24),
+        'heatmap': _heatmap(_scoped(filters), week_start, today), 'hours': range(24),
         'by_software': _by_software(base), 'top_people': _top_people(base, names),
     }
 
@@ -266,7 +300,13 @@ def log_list(request):
         # Keep the chosen types when paging or switching tab, even from a default view.
         params.setlist('event', selected)
         params['f'] = '1'
+    # Week links for "When people work": every current filter, minus the week being replaced.
+    # (`hw` is dropped from filter_query too, so filtering returns to the filter's own week.)
+    params.pop('hw', None)
     context['filter_query'] = params.urlencode()
+    context['heat_query'] = context['filter_query'] + ('&' if context['filter_query'] else '') + 'hw='
+    if tab == 'users':
+        context['heat_query'] = 'tab=users&' + context['heat_query']
 
     if tab == 'users':
         rows = list(
