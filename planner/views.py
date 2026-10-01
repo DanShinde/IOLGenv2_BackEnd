@@ -1922,7 +1922,13 @@ def update_site_allocation_view(request, pk):
         start_date_str = request.POST.get('start_date')
         end_date_str = request.POST.get('end_date')
 
-        if employee_id and site_id and start_date_str:
+        # Switching the allocation to a different employee is only allowed for active ones;
+        # an inactive employee's existing (historical) allocation can still be corrected.
+        reassigning_to_inactive = (
+            str(allocation.employee_id) != str(employee_id)
+            and not Employee.objects.filter(pk=employee_id, is_active=True).exists()
+        )
+        if employee_id and site_id and start_date_str and not reassigning_to_inactive:
             allocation.employee_id = employee_id
             allocation.site_id = site_id
             allocation.start_date = parse_date(start_date_str)
@@ -1964,7 +1970,7 @@ def transfer_site_allocation_view(request, pk):
     allocation ends the day before, so there is no gap or overlap.
     """
     allocation = get_object_or_404(SiteAllocation, pk=pk)
-    if request.method == 'POST' and not allocation.end_date:
+    if request.method == 'POST' and not allocation.end_date and allocation.employee.is_active:
         transfer_date = parse_date(request.POST.get('transfer_date') or '')
         new_site = Site.objects.filter(pk=request.POST.get('new_site')).exclude(pk=allocation.site_id).first()
         if transfer_date and new_site and transfer_date > allocation.start_date:
