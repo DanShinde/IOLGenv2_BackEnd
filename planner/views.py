@@ -1957,6 +1957,22 @@ def relieve_site_allocation_view(request, pk):
                     )
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
+def transfer_site_allocation_view(request, pk):
+    """Close the current site allocation and open a new one at another site.
+
+    The employee's first day at the new site is the transfer date; the old
+    allocation ends the day before, so there is no gap or overlap.
+    """
+    allocation = get_object_or_404(SiteAllocation, pk=pk)
+    if request.method == 'POST' and not allocation.end_date:
+        transfer_date = parse_date(request.POST.get('transfer_date') or '')
+        new_site = Site.objects.filter(pk=request.POST.get('new_site')).exclude(pk=allocation.site_id).first()
+        if transfer_date and new_site and transfer_date > allocation.start_date:
+            allocation.end_date = transfer_date - timedelta(days=1)
+            allocation.save()
+            SiteAllocation.objects.create(employee=allocation.employee, site=new_site, start_date=transfer_date)
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
+
 def delete_holiday_view(request, pk):
     get_object_or_404(Holiday, pk=pk).delete()
     return redirect(f"{reverse('planner_configuration')}#holidays")

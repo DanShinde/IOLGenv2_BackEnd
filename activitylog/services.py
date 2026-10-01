@@ -47,7 +47,7 @@ _VERBS = {
     'generate': 'generated', 'reorder': 'reordered', 'move': 'moved', 'close': 'closed',
     'reopen': 'reopened', 'submit': 'submitted', 'sync': 'synced', 'clear': 'cleared',
     'vote': 'voted on', 'cancel': 'cancelled', 'return': 'returned', 'fulfill': 'fulfilled',
-    'relieve': 'relieved', 'publish': 'published', 'resolve': 'resolved', 'accept': 'accepted',
+    'relieve': 'relieved', 'transfer': 'transferred','publish': 'published', 'resolve': 'resolved', 'accept': 'accepted',
 }
 
 # URL names whose automatic phrase reads badly. Keyed by the URL name (not namespaced).
