@@ -237,6 +237,33 @@ function Update-Dependencies {
     return $true
 }
 
+function Write-ReleaseStamp {
+    # Read by IOLGenv2_BackEnd/release.py for the "last deployed" marker in the sidebar.
+    # Purely cosmetic, so a failure here is a warning and never fails the deploy.
+    try {
+        $info = Invoke-Git @('log', '-1', '--format=%H%n%cI%n%s', 'HEAD')
+        if ($info.ExitCode -ne 0) { throw "git log failed (exit $($info.ExitCode)): $($info.Output)" }
+
+        $lines = @($info.Output -split "`r?`n")
+        $subject = ''
+        if ($lines.Count -gt 2) { $subject = $lines[2] }
+
+        $json = [ordered]@{
+            sha          = $lines[0]
+            committed_at = $lines[1]
+            subject      = $subject
+            deployed_at  = (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz')
+        } | ConvertTo-Json
+
+        # WriteAllText emits UTF-8 without a BOM, unlike Out-File/Set-Content on 5.1.
+        [System.IO.File]::WriteAllText((Join-Path $RepoPath 'logs\release.json'), $json)
+        Write-Log 'Wrote logs\release.json'
+    }
+    catch {
+        Write-Log "Could not write the release stamp ($($_.Exception.Message)) - the in-app release marker will be stale or missing" -Level WARN
+    }
+}
+
 function Restart-Application {
     if ($AppPoolName) {
         try {
@@ -406,6 +433,9 @@ try {
         Write-Log 'Static files changed - collecting'
         if (-not (Invoke-ManagePy -Arguments @('collectstatic', '--noinput') -Description 'collectstatic')) { $failed = $true }
     }
+
+    # Before the restart, so the fresh process reads the new stamp.
+    Write-ReleaseStamp
 
     Restart-Application
 

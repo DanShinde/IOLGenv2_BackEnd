@@ -8,6 +8,39 @@ prod. Keep it brief — enough to answer "why is this like this?" months later.
 
 ---
 
+## 2026-10-01 — Release marker in the sidebar (which commit is live, deployed when)
+
+**Reason:** No way to tell from the app itself which commit of `main` the VM was serving
+or when it last deployed — you had to RDP in and read `logs\auto_pull.log`.
+
+**Changed:**
+- `deploy/auto_pull.ps1` — new `Write-ReleaseStamp`, called after a successful pull and
+  before the restart. Writes `logs\release.json` (sha, commit time, subject, deploy time).
+  A failure only logs a WARN; it never fails the deploy.
+- `IOLGenv2_BackEnd/release.py` — new. Reads the stamp, falls back to `git log -1` when
+  there is none (dev, or the VM before its first stamped deploy), cached per process.
+  Also the `release` context processor.
+- `IOLGenv2_BackEnd/settings.py` — registered the context processor; `RELEASE_STAMP_FILE`.
+- `templates/base.html` — marker under the account menu in the sidebar footer: short SHA
+  and the deploy time (commit time when no stamp); hover shows the commit subject.
+- `docs/AUTO_DEPLOY.md` — added the stamp step to "What a run actually does".
+
+Follow-up same day: the marker rendered on top of the account menu's "Admin" item. The
+sidebar's `ul { display: block }` reset outranked Bootstrap's `.dropdown-menu
+{ display: none }`, so the closed menu was always drawn below its trigger — hidden only
+because that used to be off-screen. Added `.sidebar-offcanvas ul.dropdown-menu:not(.show)
+{ display: none }` in `base.html`.
+
+Only `base.html` shows it. Tracker, Inventory, Planner, Estimator, Skill Gap and the KB
+have their own standalone base templates; `release` is already in their context if the
+marker is wanted there too.
+
+**Verified:** rendered `base.html` with no stamp (git fallback) and with a stamp written
+by the same PowerShell as `Write-ReleaseStamp`; `manage.py check` clean. **Not run on the
+VM** — the stamp first appears there on the deploy after this lands.
+
+---
+
 ## 2026-09-29 — Tracker: phase-less stages vanished when a project got a 2nd phase
 
 **Reason:** On A1636 the Phase 1 Emulation timeline rendered blank after adding Phase 2.

@@ -106,6 +106,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'home.context_processors.kb_notifications',
+                'IOLGenv2_BackEnd.release.release',
             ],
         },
     },
@@ -516,4 +517,10 @@ DEPLOY_WEBHOOK_BRANCH = os.getenv('DEPLOY_WEBHOOK_BRANCH', 'main')
 DEPLOY_TRIGGER_FILE = os.getenv(
     'DEPLOY_TRIGGER_FILE',
     str(BASE_DIR / 'logs' / 'deploy.trigger'),
+)
+# Written by deploy\auto_pull.ps1 after each successful pull; read by
+# IOLGenv2_BackEnd/release.py for the "last deployed" marker in the sidebar.
+RELEASE_STAMP_FILE = os.getenv(
+    'RELEASE_STAMP_FILE',
+    str(BASE_DIR / 'logs' / 'release.json'),
 )

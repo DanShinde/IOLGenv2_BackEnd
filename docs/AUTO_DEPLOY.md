@@ -255,7 +255,10 @@ To remove the task: `.\deploy\Register-AutoPullTask.ps1 -Unregister`
    - `requirements.txt` changed → `pip install -r requirements.txt` into `.venv`
    - anything under a `migrations/` folder changed → `manage.py migrate --noinput`
    - anything under a `static/` folder changed → `manage.py collectstatic --noinput`
-7. Recycles the app pool, or touches `web.config`.
+7. Writes `logs\release.json` (commit SHA, commit time, subject, deploy time). The app
+   reads it for the release marker at the bottom of the sidebar — see
+   [`release.py`](../IOLGenv2_BackEnd/release.py).
+8. Recycles the app pool, or touches `web.config`.
 
 Everything is appended to `logs\auto_pull.log`, which rotates at 5 MB. `logs/` is
 gitignored, so the log never shows up as a pending change.

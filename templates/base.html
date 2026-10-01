@@ -105,6 +105,11 @@
             display: block;
             align-items: unset;
         }
+        /* The display:block above outranks Bootstrap's .dropdown-menu { display: none },
+           which left the closed account menu permanently rendered just below its trigger. */
+        .sidebar-offcanvas ul.dropdown-menu:not(.show) {
+            display: none;
+        }
         .sidebar-offcanvas li {
             text-align: left;
             float: none;
@@ -371,6 +376,18 @@
             font-size: 0.85rem;
         }
 
+        .sidebar-release {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.4rem 0.55rem 0;
+            color: #8a92a6;
+            font-size: 0.68rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
         .sidebar-user-menu {
             background: #ffffff;
             border: 1px solid #e7e9f2;
@@ -605,6 +622,18 @@
               </form>
             </li>
           </ul>
+        </div>
+        {% endif %}
+        {# Release marker: which commit is live and when it was deployed (IOLGenv2_BackEnd/release.py) #}
+        {% if release %}
+        <div class="sidebar-release sidebar-text" title="{{ release.subject }}{% if release.committed_at %} (committed {{ release.committed_at|date:'d M Y, H:i' }}){% endif %}">
+          <i class="bi bi-git"></i>
+          <span>{{ release.short_sha }}</span>
+          {% if release.deployed_at %}
+          <span>&middot; deployed {{ release.deployed_at|date:"d M Y, H:i" }}</span>
+          {% elif release.committed_at %}
+          <span>&middot; {{ release.committed_at|date:"d M Y, H:i" }}</span>
+          {% endif %}
         </div>
         {% endif %}
       </div>
