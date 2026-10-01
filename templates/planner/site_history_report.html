@@ -388,8 +388,18 @@
         {% else %}
             <div class="bg-white shadow overflow-hidden sm:rounded-lg">
                 {% if site_overview %}
+                    <div class="flex items-center justify-end gap-2 px-6 pt-4">
+                        <label for="site-sort" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort by</label>
+                        <select id="site-sort" class="sh-sort-select" data-table="site-overview-table">
+                            <option value="name">Site name (A–Z)</option>
+                            <option value="emps:desc">Most employees</option>
+                            <option value="emps:asc">Fewest employees</option>
+                            <option value="days:desc">Most person-days</option>
+                            <option value="days:asc">Fewest person-days</option>
+                        </select>
+                    </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200" id="site-overview-table">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site / Project</th>
@@ -401,7 +411,7 @@
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 {% for row in site_overview %}
-                                <tr>
+                                <tr data-name="{{ row.site.name|lower }}" data-emps="{{ row.engineer_count }}" data-days="{{ row.person_days }}">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {{ row.site.name }}
                                         <span class="text-gray-500 font-normal">
@@ -684,7 +694,7 @@ document.querySelectorAll('.sh-preset').forEach(function (btn) {
     });
 });
 
-// Sort menus: reorder the table's rows by name, or by days on site / in office
+// Sort menus: reorder a table's rows by name or by a numeric data-* field (value "field:asc|desc")
 document.querySelectorAll('.sh-sort-select').forEach(function (sel) {
     const tbody = document.getElementById(sel.dataset.table).querySelector('tbody');
     const key = 'sh-sort:' + sel.id;
