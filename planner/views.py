@@ -1074,6 +1074,10 @@ def _compute_consolidated_breakdown(report_data, start_date, end_date):
     on_leave_days = 0
     office_days = 0
     site_days = defaultdict(int)
+    # Headcount behind each slice: distinct employees with at least one day there. One
+    # employee can count under several sites (and office / leave), so these overlap.
+    site_employees = defaultdict(set)
+    bucket_employees = {'on_site': set(), 'office': set(), 'on_leave': set()}
 
     for employee in report_data.keys():
         b = _compute_employee_day_breakdown(employee, start_date, end_date)
@@ -1082,9 +1086,16 @@ def _compute_consolidated_breakdown(report_data, start_date, end_date):
         office_days += b['office_days']
         for site_name, days in b['site_days'].items():
             site_days[site_name] += days
+            if days:
+                site_employees[site_name].add(employee.pk)
+        for key, days in (('on_site', b['on_site_days']), ('office', b['office_days']), ('on_leave', b['on_leave_days'])):
+            if days:
+                bucket_employees[key].add(employee.pk)
 
     return {
         'employee_count': len(report_data),
+        'site_employee_counts': {n: len(e) for n, e in site_employees.items()},
+        'bucket_employee_counts': {k: len(e) for k, e in bucket_employees.items()},
         'total_days': total_days,
         'on_leave_days': on_leave_days,
         'office_days': office_days,
@@ -1144,16 +1155,23 @@ def employee_site_history_report_view(request):
     #   1) time allocation: on-site (total, no per-site split) vs office vs leave
     #   2) pure site-by-site day distribution (on-site time only), for comparing site workload
     consolidated = _compute_consolidated_breakdown(report_data, start_date, end_date)
+    # `employees` (headcount per slice) and `total_employees` turn these two into doughnuts
+    # with headcount on the labels, legend and centre (see renderPieChart in the template).
+    bucket_emps = consolidated['bucket_employee_counts']
     consolidated_chart_json = json.dumps({
         'labels': ['On Site', 'In Office', 'On Leave'],
         'values': [consolidated['on_site_days'], consolidated['office_days'], consolidated['on_leave_days']],
         'colors': ['#6366f1', '#94a3b8', '#f97316'],
+        'employees': [bucket_emps['on_site'], bucket_emps['office'], bucket_emps['on_leave']],
+        'total_employees': consolidated['employee_count'],
     })
     site_dist_sorted = sorted(consolidated['site_days'].items(), key=lambda kv: -kv[1])
     site_dist_chart_json = json.dumps({
         'labels': _site_chart_labels([n for n, _ in site_dist_sorted]),
         'values': [d for _, d in site_dist_sorted],
         'colors': _pie_colors(len(site_dist_sorted)),
+        'employees': [consolidated['site_employee_counts'].get(n, 0) for n, _ in site_dist_sorted],
+        'total_employees': consolidated['employee_count'],
     })
 
     context = {

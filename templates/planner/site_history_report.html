@@ -414,6 +414,8 @@
     .pie-legend .swatch { flex: 0 0 10px; height: 10px; border-radius: 2px; }
     .pie-legend .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pie-legend .val { flex: 0 0 auto; font-weight: 600; color: #4b5563; font-variant-numeric: tabular-nums; }
+    .pie-legend .emp { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 30px; font-weight: 600; color: #4f46e5; font-variant-numeric: tabular-nums; }
+    .pie-legend .emp svg { width: 11px; height: 11px; }
     .pie-modal-body .pie-legend { width: 380px; max-width: 36%; font-size: 13px; }
     .pie-modal-body .pie-legend li { padding: 4px 8px; }
     .pie-expand-btn { padding: 4px; border-radius: 6px; color: #9ca3af; }
@@ -449,21 +451,31 @@ function pieValueText(value, total) {
     return (pct === 0 && value > 0) ? '<1%' : pct + '%';
 }
 
-// Legend as an HTML list beside the pie: full names, values, scrolls when long, and a click
-// hides/shows that slice. Listed largest first.
+// Headcount (data.employees, per slice) is optional: when present the chart is a doughnut
+// with the total employees in its centre (the hovered slice's headcount on hover), and the
+// slice labels, legend and tooltip all carry the employee count alongside the days.
+const PERSON_ICON = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5z"/></svg>';
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+// Legend as an HTML list beside the pie: full names, value, headcount; scrolls when long,
+// and a click hides/shows that slice. Listed largest first.
 function renderHtmlLegend(chart, el, data, total) {
     const order = data.labels.map((_, i) => i).sort((a, b) => data.values[b] - data.values[a]);
+    const emps = data.employees;
     function draw() {
         el.innerHTML = '';
         order.forEach(function (i) {
             if (!(data.values[i] > 0)) return;
             const li = document.createElement('li');
             li.className = chart.getDataVisibility(i) ? '' : 'off';
-            li.title = data.labels[i] + ': ' + data.values[i] + ' day' + (data.values[i] === 1 ? '' : 's') + ' (click to hide / show)';
-            li.innerHTML = '<span class="swatch"></span><span class="name"></span><span class="val"></span>';
+            li.title = data.labels[i] + ': ' + plural(data.values[i], 'day') +
+                (emps ? ' · ' + plural(emps[i], 'employee') : '') + ' (click to hide / show)';
+            li.innerHTML = '<span class="swatch"></span><span class="name"></span><span class="val"></span>' +
+                (emps ? '<span class="emp">' + PERSON_ICON + '<span></span></span>' : '');
             li.querySelector('.swatch').style.background = data.colors[i];
             li.querySelector('.name').textContent = data.labels[i];
             li.querySelector('.val').textContent = pieValueText(data.values[i], total);
+            if (emps) li.querySelector('.emp span').textContent = emps[i];
             li.addEventListener('click', function () {
                 chart.toggleDataVisibility(i);
                 chart.update();
@@ -476,13 +488,54 @@ function renderHtmlLegend(chart, el, data, total) {
     return draw;
 }
 
+// Doughnut centre: total employees, or the hovered slice's headcount and name
+const headcountCentre = {
+    id: 'headcountCentre',
+    afterDraw(chart, _args, opts) {
+        if (!opts || !opts.data) return;
+        const data = opts.data;
+        const { ctx, chartArea: a } = chart;
+        const cx = (a.left + a.right) / 2, cy = (a.top + a.bottom) / 2;
+        const radius = Math.min(a.right - a.left, a.bottom - a.top) / 2;
+        const scale = Math.max(0.7, Math.min(1.6, radius / 110));
+        const active = chart.getActiveElements()[0];
+        let big, small, caption;
+        if (active) {
+            const n = data.employees[active.index];
+            const name = data.labels[active.index];
+            big = String(n);
+            small = n === 1 ? 'employee' : 'employees';
+            caption = name.length > 24 ? name.slice(0, 23) + '…' : name;
+        } else {
+            big = String(data.total_employees);
+            small = data.total_employees === 1 ? 'employee' : 'employees';
+            caption = 'in total';
+        }
+        const family = Chart.defaults.font.family;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#111827';
+        ctx.font = '700 ' + Math.round(24 * scale) + 'px ' + family;
+        ctx.fillText(big, cx, cy + 6 * scale);
+        ctx.fillStyle = '#4b5563';
+        ctx.font = '500 ' + Math.round(11 * scale) + 'px ' + family;
+        ctx.fillText(small, cx, cy + 21 * scale);
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '400 ' + Math.round(10 * scale) + 'px ' + family;
+        ctx.fillText(caption, cx, cy - 18 * scale);
+        ctx.restore();
+    }
+};
+
 // opts: legendEl (HTML legend beside the pie; omit for Chart.js's own bottom legend),
 // labelMinShare (no on-slice label below this share -- small slices are in the legend and
 // tooltip instead, so labels never pile up), labelSize.
 function buildPie(canvas, data, opts) {
     const total = data.values.reduce((a, b) => a + b, 0);
+    const emps = data.employees;
     const chart = new Chart(canvas, {
-        type: 'pie',
+        type: emps ? 'doughnut' : 'pie',
         data: {
             labels: data.labels,
             datasets: [{ data: data.values, backgroundColor: data.colors, borderColor: '#fff', borderWidth: 1 }]
@@ -491,13 +544,15 @@ function buildPie(canvas, data, opts) {
             responsive: true,
             maintainAspectRatio: false,
             layout: { padding: 4 },
+            cutout: emps ? '52%' : 0,
             plugins: {
                 legend: { display: !opts.legendEl, position: 'bottom', labels: { font: { size: 11 } } },
                 tooltip: {
                     callbacks: {
                         label: function (ctx) {
                             const pct = total ? Math.round((ctx.raw / total) * 100) : 0;
-                            return ctx.label + ': ' + ctx.raw + ' day' + (ctx.raw === 1 ? '' : 's') + ' (' + pct + '%)';
+                            return ctx.label + ': ' + plural(ctx.raw, 'day') + ' (' + pct + '%)' +
+                                (emps ? ' · ' + plural(emps[ctx.dataIndex], 'employee') : '');
                         }
                     }
                 },
@@ -507,11 +562,17 @@ function buildPie(canvas, data, opts) {
                         return v > 0 && total > 0 && v / total >= (opts.labelMinShare || 0);
                     },
                     color: '#fff',
+                    textAlign: 'center',
                     font: { weight: 'bold', size: opts.labelSize || 11 },
-                    formatter: (value) => pieValueText(value, total)
-                }
+                    // Value on the first line; with headcount, "3 emp" under it (in % and count views)
+                    formatter: (value, ctx) => emps
+                        ? [pieValueText(value, total), emps[ctx.dataIndex] + ' emp']
+                        : pieValueText(value, total)
+                },
+                headcountCentre: emps ? { data: data } : false
             }
-        }
+        },
+        plugins: emps ? [headcountCentre] : []
     });
     allPieCharts.push(chart);
     if (opts.legendEl) {
@@ -527,7 +588,7 @@ function renderPieChart(canvasId, data) {
     if (!canvas || !data || !data.values.some(v => v > 0)) return;
     pieDataById[canvasId] = data;
     const legendEl = document.getElementById(canvasId + '-legend');
-    buildPie(canvas, data, { legendEl: legendEl, labelMinShare: legendEl ? 0.04 : 0, labelSize: 11 });
+    buildPie(canvas, data, { legendEl: legendEl, labelMinShare: legendEl ? (data.employees ? 0.05 : 0.04) : 0, labelSize: 11 });
 }
 
 // Full-size view of one pie, with its legend on the right
@@ -540,7 +601,7 @@ function openPieModal(canvasId) {
     document.getElementById('pieModal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     modalPieChart = buildPie(document.getElementById('pieModalCanvas'), data,
-        { legendEl: document.getElementById('pieModalLegend'), labelMinShare: 0.015, labelSize: 13 });
+        { legendEl: document.getElementById('pieModalLegend'), labelMinShare: data.employees ? 0.02 : 0.015, labelSize: 13 });
 }
 function closePieModal() {
     if (modalPieChart) {
