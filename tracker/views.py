@@ -781,22 +781,20 @@ def project_reports(request):
             del request.session['report_filters']
         return redirect('project_reports')
 
-    # Determine which query parameters to use: from request or from session
-    if not request.GET: # If no filters in URL
-        # Check if filters are stored in session
-        if 'report_filters' in request.session:
-            # Rebuild query string and redirect
-            saved_filters = request.session.get('report_filters', {})
-            if saved_filters:
-                query_dict = QueryDict(mutable=True)
-                query_dict.update(saved_filters)
-                return redirect(f"{reverse('project_reports')}?{query_dict.urlencode()}")
+    # Saved as the raw query string: multi-select filters (segments, team leads, stages)
+    # repeat their key, and a dict would keep only the last value of each.
+    if not request.GET:
+        saved_filters = request.session.get('report_filters')
+        if isinstance(saved_filters, dict):  # saved by older code as a flat dict
+            legacy = QueryDict(mutable=True)
+            legacy.update(saved_filters)
+            saved_filters = legacy.urlencode()
+        if saved_filters:
+            return redirect(f"{reverse('project_reports')}?{saved_filters}")
     else:
-        # Filters are in the URL, save them to the session
-        request.session['report_filters'] = request.GET.dict()
+        request.session['report_filters'] = request.GET.urlencode()
 
-    # The rest of the view logic now uses the active query parameters
-    query_params = request.GET or request.session.get('report_filters', {})
+    query_params = request.GET
     
     # --- The FIX is in this line: We add select_related and prefetch_related ---
     projects_qs = Project.objects.filter(is_archived=False).select_related('segment_con', 'team_lead').prefetch_related('stages').all()
