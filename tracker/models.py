@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import F, Sum
 from employees.models import Employee
-from .utils import OTIF_EXCLUDED_STAGES
+from .utils import get_otif_percentage
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
@@ -55,13 +55,9 @@ class Project(models.Model):
     from datetime import timedelta
 
     def get_otif_percentage(self):
-        # Dispatch and Handover never count toward OTIF (see utils.OTIF_EXCLUDED_STAGES).
-        completed_stages = self.stages.filter(status='Completed').exclude(name__in=OTIF_EXCLUDED_STAGES)
-        if not completed_stages.exists():
-            return None
-        on_time = completed_stages.filter(actual_date__lte=F('planned_date')).count()
-        total = completed_stages.count()
-        return round((on_time / total) * 100, 1)
+        # The shared OTIF definition (see utils): every stage of the project due by today.
+        # .all() so a prefetch_related('stages') is reused.
+        return get_otif_percentage(self.stages.all())
 
     def get_overall_status(self):
         stages = self.stages.all()

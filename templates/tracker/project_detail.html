@@ -496,7 +496,7 @@
                 <div class="mt-1">
                     {% if overall_otif_percentage is not None %}
                         <span class="fs-5 fw-bold {% if overall_otif_percentage >= 100 %}text-success{% elif overall_otif_percentage >= 80 %}text-warning{% else %}text-danger{% endif %}">{{ overall_otif_percentage }}%</span>
-                        <small class="text-muted ms-2">(Based on completed stages)</small>
+                        <small class="text-muted ms-2" title="Stages completed on or before their planned date, out of all stages due by today. Late and still-open overdue stages are misses; Hold, Not Applicable, Dispatch and Handover are not counted.">(Based on stages due by today)</small>
                     {% else %}
                         <span class="text-muted small">No completed stages yet</span>
                     {% endif %}

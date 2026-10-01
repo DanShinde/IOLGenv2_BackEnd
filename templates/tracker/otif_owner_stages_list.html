@@ -6,7 +6,7 @@
 {% block content %}
 <div class="page-header mb-4">
     <h1 class="page-title"><i class="fas fa-bullseye me-2"></i>{{ owner_label }} &mdash; OTIF</h1>
-    <p class="page-subtitle">Stages owned by this {{ owner_type|lower }} that were completed {% if start_date %}between {{ start_date|date:"M d, Y" }} and{% else %}up to{% endif %} {{ end_date|date:"M d, Y" }}, matching the report filters used on the chart. Late stages are listed first.</p>
+    <p class="page-subtitle">Stages owned by this {{ owner_type|lower }} that were due (planned) {% if start_date %}between {{ start_date|date:"M d, Y" }} and{% else %}up to{% endif %} {{ end_date|date:"M d, Y" }}, up to today, matching the report filters used on the chart. Misses (completed late, or still open past the planned date) are listed first.</p>
 </div>
 
 <div class="card">
@@ -17,7 +17,8 @@
             <span class="badge {% if otif_pct >= 80 %}bg-success{% else %}bg-danger{% endif %}">OTIF {{ otif_pct }}%</span>
             {% endif %}
             <span class="badge bg-success-soft text-success">{{ on_time_count }} On Time</span>
-            <span class="badge bg-danger-soft text-danger">{{ late_count }} Late</span>
+            <span class="badge bg-danger-soft text-danger">{{ late_count }} Completed Late</span>
+            <span class="badge bg-warning-soft text-warning">{{ open_count }} Open, Overdue</span>
             <span class="badge bg-secondary">{{ stages|length }} Stage{{ stages|length|pluralize }} &middot; {{ project_count }} Project{{ project_count|pluralize }}</span>
         </div>
     </div>
@@ -46,14 +47,14 @@
                         <td>{{ stage.project.segment_con.name|default:'N/A' }}</td>
                         <td>{{ stage.project.team_lead.name|default:'N/A' }}</td>
                         <td>{{ stage.planned_date|date:"M d, Y"|default:'N/A' }}</td>
-                        <td>{{ stage.actual_date|date:"M d, Y" }}</td>
+                        <td>{% if stage.is_open %}<span class="text-muted">{{ stage.status }}</span>{% else %}{{ stage.actual_date|date:"M d, Y" }}{% endif %}</td>
                         <td>
                             {% if stage.on_time %}
                                 <span class="badge bg-success-soft text-success">On time</span>
-                            {% elif stage.days_late %}
-                                <span class="badge bg-danger-soft text-danger">{{ stage.days_late }} day{{ stage.days_late|pluralize }} late</span>
+                            {% elif stage.is_open %}
+                                <span class="badge bg-warning-soft text-warning">Open, {{ stage.days_late }} day{{ stage.days_late|pluralize }} overdue</span>
                             {% else %}
-                                <span class="badge bg-danger-soft text-danger" title="No planned date, so it can't count as on time">No planned date</span>
+                                <span class="badge bg-danger-soft text-danger">{{ stage.days_late }} day{{ stage.days_late|pluralize }} late</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -65,7 +66,7 @@
                         <td colspan="8">
                             <div class="text-center py-5">
                                 <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
-                                <p class="text-muted">No completed stages match this filter.</p>
+                                <p class="text-muted">No due stages match this filter.</p>
                             </div>
                         </td>
                     </tr>
@@ -79,5 +80,6 @@
 <style>
 .bg-danger-soft { background-color: rgba(220, 53, 69, 0.1); }
 .bg-success-soft { background-color: rgba(25, 135, 84, 0.1); }
+.bg-warning-soft { background-color: rgba(255, 193, 7, 0.15); }
 </style>
 {% endblock %}

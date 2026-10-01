@@ -31,7 +31,8 @@ from collections import Counter, defaultdict
 from tracker.utils import (
     get_completion_percentage, get_otif_percentage, get_overall_status,
     get_schedule_status, get_live_schedule_status, get_next_milestone,get_final_project_otif,
-    get_phase_summary, sort_stages_by_phase, get_timeline_progress, OTIF_EXCLUDED_STAGES
+    get_phase_summary, sort_stages_by_phase, get_timeline_progress, OTIF_EXCLUDED_STAGES,
+    otif_due_q, OTIF_ON_TIME_Q, otif_pct, otif_counts_qs, is_otif_on_time,
 
 )
 from django.core.cache import cache
@@ -500,8 +501,9 @@ def project_detail(request, project_id):
         'next_handover_milestone': next_handover_milestone,
         'handover_schedule': handover_schedule,
         'active_phase_key': active_phase_key,
-        'overall_otif_percentage': get_otif_percentage(all_stages),
-        'project_otif': get_final_project_otif(all_stages),
+        # From the full stage list, so the stage-table status filter can't change them
+        'overall_otif_percentage': get_otif_percentage(all_project_stages),
+        'project_otif': get_final_project_otif(all_project_stages),
         'overall_status': get_overall_status(all_stages),
         'automation_schedule_status': get_live_schedule_status(schedule_auto),
         'emulation_schedule_status': get_live_schedule_status(schedule_emu),
@@ -650,12 +652,8 @@ def dashboard(request):
     ).select_related('segment_con').order_by('so_punch_date')
     # --- END OF CORRECTION ---
 
-    completed_stages = Stage.objects.filter(project__in=live_projects, status='Completed').exclude(name__in=OTIF_EXCLUDED_STAGES)
-    if period != 'all' or (custom_start and custom_end):
-        completed_stages = completed_stages.filter(actual_date__range=[start_date, end_date])
-    total_completed_stages = completed_stages.count()
-    on_time_stages = completed_stages.filter(planned_date__isnull=False, actual_date__lte=F('planned_date')).count()
-    department_otif = round((on_time_stages / total_completed_stages) * 100, 1) if total_completed_stages > 0 else 0
+    # Shared OTIF definition (utils): stages due in the period, on time if completed by plan
+    department_otif = otif_pct(*otif_counts_qs(Stage.objects.filter(project__in=live_projects), start_date, end_date, today))
     total_live_projects = live_projects.count()
     
     # Optimized Value Calculation
@@ -1142,20 +1140,18 @@ def project_reports(request):
     }
 
     # --- NEW: OTIF Trend (aggregate across all reported stages) ---
+    # Shared OTIF definition (utils): stages due in each planned month, on time if completed
+    # by plan -- so a quarter's figure here matches the Overall OTIF % card for that quarter.
     otif_qs = Stage.objects.filter(
         project_id__in=chart_project_ids,
-        planned_date__isnull=False,
-        planned_date__gte=plausible_planned_date_floor,
-    ).exclude(status='Not Applicable').exclude(name__in=OTIF_EXCLUDED_STAGES)
-    otif_qs = otif_qs.filter(name__in=stage_keys_to_report)
-    if has_explicit_period:
-        otif_qs = otif_qs.filter(planned_date__range=[start_date, end_date])
+        name__in=stage_keys_to_report,
+    ).filter(otif_due_q(start_date if has_explicit_period else None, end_date, today))
 
     otif_qs = otif_qs.annotate(
         month=TruncMonth('planned_date')
     ).values('month').annotate(
         total=Count('id'),
-        on_time=Count('id', filter=Q(actual_date__isnull=False) & Q(actual_date__lte=F('planned_date')))
+        on_time=Count('id', filter=OTIF_ON_TIME_Q)
     ).order_by('month')
 
     temp_otif = {}
@@ -1207,7 +1203,7 @@ def project_reports(request):
     in_progress_stage_project_counts = []
 
     total_planned = total_actual = total_pending = total_delayed = 0
-    otif_total_actual = otif_total_on_time = 0   # excludes stages that never count toward OTIF
+    otif_total_due = otif_total_on_time = 0
 
     for stage_key, stage_display in stage_names_to_report:
         planned_backlog_qs = Stage.objects.filter(
@@ -1244,17 +1240,17 @@ def project_reports(request):
             in_progress_stage_project_counts.append(in_progress_qs.values('project_id').distinct().count())
 
         actual_count = actual_period_qs.count()
-        on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
-        counts_in_otif = stage_key not in OTIF_EXCLUDED_STAGES
-        otif_pct = round((on_time_count / actual_count) * 100, 1) if (actual_count and counts_in_otif) else None
+        # Shared OTIF definition (utils): stages of this type due in the period
+        stage_all_qs = Stage.objects.filter(project_id__in=chart_project_ids, name=stage_key)
+        on_time_count, due_count = otif_counts_qs(stage_all_qs, summary_start, summary_end, today)
+        stage_otif = otif_pct(on_time_count, due_count)
 
         total_planned += planned_count
         total_actual += actual_count
         total_pending += pending_count
         total_delayed += delayed_count
-        if counts_in_otif:
-            otif_total_actual += actual_count
-            otif_total_on_time += on_time_count
+        otif_total_due += due_count
+        otif_total_on_time += on_time_count
 
         # Average staleness of the currently-overdue backlog, in days
         avg_delay_days = None
@@ -1274,23 +1270,10 @@ def project_reports(request):
 
         # Period-over-period OTIF trend
         otif_trend = None
-        if has_explicit_period and counts_in_otif:
-            prev_actual_qs = Stage.objects.filter(
-                project_id__in=chart_project_ids,
-                name=stage_key,
-                status='Completed',
-                actual_date__range=[prev_period_start, prev_period_end]
-            )
-            prev_actual_count = prev_actual_qs.count()
-            if prev_actual_count and actual_count:
-                prev_on_time = prev_actual_qs.filter(actual_date__lte=F('planned_date')).count()
-                prev_otif = (prev_on_time / prev_actual_count) * 100
-                if otif_pct > prev_otif:
-                    otif_trend = 'up'
-                elif otif_pct < prev_otif:
-                    otif_trend = 'down'
-                else:
-                    otif_trend = 'flat'
+        if has_explicit_period and stage_otif is not None:
+            prev_otif = otif_pct(*otif_counts_qs(stage_all_qs, prev_period_start, prev_period_end, today))
+            if prev_otif is not None:
+                otif_trend = 'up' if stage_otif > prev_otif else ('down' if stage_otif < prev_otif else 'flat')
 
         # Risk color-coding based on how much of the planned backlog is currently delayed
         if planned_count == 0:
@@ -1307,7 +1290,7 @@ def project_reports(request):
             'actual': actual_count,
             'pending': pending_count,
             'delayed': delayed_count,
-            'otif': otif_pct,
+            'otif': stage_otif,
             'otif_trend': otif_trend,
             'avg_delay_days': avg_delay_days,
             'avg_cycle_time': avg_cycle_time,
@@ -1349,24 +1332,14 @@ def project_reports(request):
         del a['actual_date_raw']
 
     # --- NEW: Report-wide KPI summary (all stages combined, for the filtered set) ---
-    overall_otif = round((otif_total_on_time / otif_total_actual) * 100, 1) if otif_total_actual else None
+    overall_otif = otif_pct(otif_total_on_time, otif_total_due)
     overall_otif_trend = None
-    if has_explicit_period and otif_total_actual:
-        prev_overall_qs = Stage.objects.filter(
-            project_id__in=chart_project_ids,
-            status='Completed',
-            actual_date__range=[prev_period_start, prev_period_end]
-        ).exclude(name__in=OTIF_EXCLUDED_STAGES)
-        prev_overall_actual = prev_overall_qs.count()
-        if prev_overall_actual:
-            prev_overall_on_time = prev_overall_qs.filter(actual_date__lte=F('planned_date')).count()
-            prev_overall_otif = (prev_overall_on_time / prev_overall_actual) * 100
-            if overall_otif > prev_overall_otif:
-                overall_otif_trend = 'up'
-            elif overall_otif < prev_overall_otif:
-                overall_otif_trend = 'down'
-            else:
-                overall_otif_trend = 'flat'
+    if has_explicit_period and overall_otif is not None:
+        prev_overall_otif = otif_pct(*otif_counts_qs(
+            Stage.objects.filter(project_id__in=chart_project_ids, name__in=[k for k, _ in stage_names_to_report]),
+            prev_period_start, prev_period_end, today))
+        if prev_overall_otif is not None:
+            overall_otif_trend = 'up' if overall_otif > prev_overall_otif else ('down' if overall_otif < prev_overall_otif else 'flat')
 
     report_kpis = {
         'total_planned': total_planned,
@@ -1420,19 +1393,18 @@ def project_reports(request):
     delay_by_segment_project_counts = [len(segment_projects[x[0]]) for x in delay_by_segment_top]
 
     # --- OTIF % by Team Lead and by Segment ---
-    # Same basis as the Overall OTIF % KPI: stages completed within the period (excluding
-    # stages that never count toward OTIF), on time when actual <= planned -- just split by
+    # Same basis as the Overall OTIF % KPI (stages due in the period) -- just split by
     # owner, so the per-owner figures reconcile with the headline number.
-    otif_owner_qs = _otif_completed_stages(
-        chart_project_ids, stage_keys_to_report, summary_start, summary_end,
+    otif_owner_qs = _otif_due_stages(
+        chart_project_ids, stage_keys_to_report, summary_start, summary_end, today,
     ).select_related('project__team_lead', 'project__segment_con')
 
-    otif_by_team_lead = defaultdict(lambda: [0, 0])   # name -> [on_time, total]
+    otif_by_team_lead = defaultdict(lambda: [0, 0])   # name -> [on_time, due]
     otif_by_segment = defaultdict(lambda: [0, 0])
     otif_team_lead_ids = {}
     otif_segment_ids = {}
     for s in otif_owner_qs:
-        on_time = 1 if (s.planned_date and s.actual_date <= s.planned_date) else 0
+        on_time = 1 if is_otif_on_time(s) else 0
         tl = s.project.team_lead
         seg = s.project.segment_con
         tl_key = tl.name if tl else 'Unassigned'
@@ -1732,16 +1704,14 @@ def delay_owner_projects_list(request):
     })
 
 
-def _otif_completed_stages(project_ids, stage_keys, start_date, end_date):
-    """Stages that count toward OTIF for a period: completed within it, excluding stages
-    that never count toward OTIF. Shared by the report's OTIF-by-owner charts and their
-    drill-down so both always count the same stages."""
+def _otif_due_stages(project_ids, stage_keys, start_date, end_date, today):
+    """Stages that count toward OTIF for a period (the shared definition in utils: due in
+    the period). Shared by the report's OTIF-by-owner charts and their drill-down so both
+    always count the same stages."""
     return Stage.objects.filter(
         project_id__in=project_ids,
         name__in=stage_keys,
-        status='Completed',
-        actual_date__range=[start_date, end_date],
-    ).exclude(name__in=OTIF_EXCLUDED_STAGES)
+    ).filter(otif_due_q(start_date, end_date, today))
 
 
 def _filter_stages_by_owner(stages, team_lead_id, segment_id):
@@ -1762,15 +1732,16 @@ def _filter_stages_by_owner(stages, team_lead_id, segment_id):
 
 @login_required
 def otif_owner_stages_list(request):
-    """Drill-down for the "OTIF % by Team Lead / by Segment" charts: lists the completed
-    stages behind one owner's OTIF bar -- late ones first, with how late -- respecting the
-    report's active filters and period."""
+    """Drill-down for the "OTIF % by Team Lead / by Segment" charts: lists the due stages
+    behind one owner's OTIF bar -- misses first (completed late, or still open past the
+    planned date), worst first -- respecting the report's active filters and period."""
     filtered = _build_filtered_report_projects(request)
     project_ids = filtered['projects_qs'].values_list('id', flat=True)
     stage_keys = [k for k, _ in filtered['stage_names_to_report']]
+    today = filtered['today']
 
-    stages = _otif_completed_stages(
-        project_ids, stage_keys, filtered['start_date'], filtered['end_date'],
+    stages = _otif_due_stages(
+        project_ids, stage_keys, filtered['start_date'], filtered['end_date'], today,
     ).select_related('project', 'phase', 'project__team_lead', 'project__segment_con')
     stages, owner_type, owner_label = _filter_stages_by_owner(
         stages, request.GET.get('team_lead'), request.GET.get('segment'),
@@ -1778,21 +1749,24 @@ def otif_owner_stages_list(request):
 
     stages = list(stages)
     for s in stages:
-        s.on_time = bool(s.planned_date and s.actual_date <= s.planned_date)
-        s.days_late = (s.actual_date - s.planned_date).days if (s.planned_date and not s.on_time) else None
-    # Late first (worst first), then on-time by most recent completion.
-    stages.sort(key=lambda s: (s.on_time, -(s.days_late or 0), -s.actual_date.toordinal()))
+        s.on_time = is_otif_on_time(s)
+        s.is_open = s.status != 'Completed'
+        # Completed late: actual - planned. Still open: how far past the planned date today.
+        s.days_late = None if s.on_time else ((today if s.is_open else s.actual_date) - s.planned_date).days
+    # Misses first (worst first), then on-time by most recent completion.
+    stages.sort(key=lambda s: (s.on_time, -(s.days_late or 0), -(s.actual_date or s.planned_date).toordinal()))
 
     on_time_count = sum(1 for s in stages if s.on_time)
-    otif_pct = round(on_time_count / len(stages) * 100, 1) if stages else None
+    open_count = sum(1 for s in stages if s.is_open)
 
     return render(request, 'tracker/otif_owner_stages_list.html', {
         'owner_type': owner_type,
         'owner_label': owner_label,
         'stages': stages,
         'on_time_count': on_time_count,
-        'late_count': len(stages) - on_time_count,
-        'otif_pct': otif_pct,
+        'late_count': len(stages) - on_time_count - open_count,
+        'open_count': open_count,
+        'otif_pct': otif_pct(on_time_count, len(stages)),
         'project_count': len({s.project_id for s in stages}),
         # "All Time" uses a 2000-01-01 sentinel start; show it as open-ended.
         'start_date': filtered['start_date'] if filtered['start_date'] > date(2000, 1, 1) else None,
@@ -2310,8 +2284,8 @@ def export_report_excel(request):
         pending_count = planned_backlog_qs.exclude(status='Completed').count()
         delayed_count = delayed_qs.count()
         actual_count = actual_period_qs.count()
-        on_time_count = actual_period_qs.filter(actual_date__lte=F('planned_date')).count()
-        otif_pct = round((on_time_count / actual_count) * 100, 1) if (actual_count and stage_key not in OTIF_EXCLUDED_STAGES) else None
+        stage_otif = otif_pct(*otif_counts_qs(
+            Stage.objects.filter(project_id__in=chart_project_ids, name=stage_key), summary_start, summary_end, today))
 
         overdue_planned_dates = list(delayed_qs.values_list('planned_date', flat=True))
         overdue_deltas = [(today - d).days for d in overdue_planned_dates if 0 <= (today - d).days <= MAX_PLAUSIBLE_DAY_DELTA]
@@ -2327,7 +2301,7 @@ def export_report_excel(request):
             planned_count, actual_count, pending_count, delayed_count,
             avg_delay_days if avg_delay_days is not None else '',
             avg_cycle_time if avg_cycle_time is not None else '',
-            otif_pct if otif_pct is not None else '',
+            stage_otif if stage_otif is not None else '',
         ])
 
     for sheet in (projects_sheet, summary_sheet):

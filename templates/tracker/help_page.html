@@ -145,7 +145,7 @@
                 <h5>Project Summary & Key Metrics</h5>
                 <p>This card gives you a vital snapshot of the project's health. It includes schedule variance and two distinct OTIF (On-Time In-Full) metrics:</p>
                 <ul>
-                    <li><code>Overall OTIF % (All Stages)</code>: Think of this as the project's "term grade." It looks at every stage completed so far and calculates the percentage that met their planned deadline. The <strong>Dispatch</strong> and <strong>Handover</strong> stages are deliberately left out of this figure (and of every other OTIF % in the app): Dispatch is only used for the Emulation Timing Analysis on the Reports page, and Handover is judged separately by <em>Project OTIF (Handover)</em>, which is unaffected. With several phases, the stages of all phases are counted together.</li>
+                    <li><code>Overall OTIF % (All Stages)</code>: Think of this as the project's "term grade." It looks at every stage that is <em>due</em> (planned date on or before today) and calculates the percentage completed on or before their planned date. A stage still open past its planned date counts as a miss, just like one completed late. The calculation is the same everywhere in the app &mdash; see <a href="#otif-definition">How OTIF % is calculated</a>. The <strong>Dispatch</strong> and <strong>Handover</strong> stages are deliberately left out of this figure (and of every other OTIF % in the app): Dispatch is only used for the Emulation Timing Analysis on the Reports page, and Handover is judged separately by <em>Project OTIF (Handover)</em>, which is unaffected. With several phases, the stages of all phases are counted together.</li>
                     <li><code>Project OTIF (Handover)</code>: Think of this as the project's "final exam." This metric focuses only on the final delivery and answers one question: was the project handed over on or before the promised date?</li>
                 </ul>
                 <img src="{% static 'tracker_static/project_summary.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Project Summary Screenshot">
@@ -173,6 +173,19 @@
                     <li>Finally, you can click on any project row to expand its <strong>Collapsible Summary</strong> and view its key stats without leaving the page.</li>
                 </ol>
                  <img src="{% static 'tracker_static/report_filter.png' %}" class="img-fluid rounded my-3 img-placeholder" alt="Filter In Reports Screenshot">
+
+                <h5 id="otif-definition">How OTIF % is calculated</h5>
+                <p>Every OTIF % in the app &mdash; Project Detail (overall and per phase), the Dashboard's Department OTIF %, and on this page the Overall OTIF % card, the per-stage table, the OTIF trend line, the OTIF by Team Lead / by Segment charts and the Excel export &mdash; uses one definition:</p>
+                <p class="text-center"><strong>OTIF % = due stages completed on or before their planned date &divide; due stages</strong></p>
+                <ul>
+                    <li>A stage is <strong>due</strong> when its <strong>planned date</strong> falls in the selected period and is on or before today. Stages planned for later are not counted yet.</li>
+                    <li>A due stage is a <strong>miss</strong> if it was completed after its planned date, or is still open (Not started / In Progress) past it.</li>
+                    <li>Stages belong to a month or quarter by their <strong>planned</strong> date, so a quarter's figure on the trend line matches the Overall OTIF % card for that quarter.</li>
+                    <li>Not counted: <strong>Hold</strong> (holds are customer-side), Not Applicable, Dispatch and Handover, and bad data (typo dates more than 10 years old, or a Completed stage with no actual date).</li>
+                    <li>When nothing is due, OTIF shows &ldquo;&mdash;&rdquo; / N/A rather than 0%.</li>
+                    <li>Clicking a bar in OTIF by Team Lead / by Segment lists every due stage behind it: on time, completed late, or <em>Open, N days overdue</em>.</li>
+                    <li>The per-stage table's <strong>Currently Delayed</strong> column is different: it counts all open overdue stages up to the period end, including older ones carried forward, so it can be higher than the open misses in OTIF.</li>
+                </ul>
 
                 <h5>Good to Know</h5>
                 <ul>
