@@ -36,6 +36,18 @@
     .lg-heat .c { height:14px; border-radius:3px; }
     .lg-heat .c:hover { outline:2px solid #1b263b; outline-offset:-1px; }
     .lg-h0 { background:#eef1f8; } .lg-h1 { background:#c9d4fb; } .lg-h2 { background:#93a8f5; } .lg-h3 { background:#5f7ef0; } .lg-h4 { background:#3450d6; }
+    /* "When people work": week navigation, today's row, and days after today */
+    .lg-week-nav { display:inline-flex; align-items:center; gap:.15rem; font-size:.72rem; color:#3b4660; }
+    .lg-week-nav a, .lg-week-off { display:inline-grid; place-items:center; width:1.35rem; height:1.35rem; border-radius:5px; color:#3b4660; text-decoration:none; }
+    .lg-week-nav a:hover { background:#e7ecfd; color:var(--primary); }
+    .lg-week-off { color:#c3c9d6; }
+    .lg-week-label { font-weight:600; white-space:nowrap; padding:0 .15rem; }
+    .lg-week-nav-lg { font-size:.95rem; }
+    .lg-week-nav-lg a, .lg-week-nav-lg .lg-week-off { width:1.8rem; height:1.8rem; }
+    .lg-heat .hl.today, .lg-heat-full .hl.today { color:var(--primary); font-weight:700; }
+    .lg-heat .hl.upcoming, .lg-heat-full .hl.upcoming { color:#b4bccb; }
+    .lg-upcoming { background:repeating-linear-gradient(135deg, #f6f7fa 0 4px, #eceff5 4px 8px); }
+    .lg-heat .c.lg-upcoming:hover, .lg-heat-full .c.lg-upcoming:hover { outline:none; }
     .lg-legend { display:flex; align-items:center; gap:4px; justify-content:flex-end; font-size:.68rem; color:#6b7690; margin-top:.4rem; }
     .lg-legend i { width:13px; height:9px; border-radius:2px; display:inline-block; }
     .lg-hbar { display:grid; grid-template-columns:minmax(70px,110px) 1fr 34px; gap:.5rem; align-items:center; font-size:.8rem; padding:3px 4px; border-radius:6px; color:inherit; text-decoration:none; }
@@ -63,7 +75,7 @@
     .lg-full-stats { display:flex; flex-wrap:wrap; gap:.75rem; margin-bottom:1rem; }
     .lg-full-stats > div { background:#fff; border:1px solid #e3e7f0; border-radius:10px; padding:.6rem 1rem; display:flex; flex-direction:column; min-width:180px; }
     .lg-full-stats b { font-size:1.15rem; color:#1b263b; }
-    .lg-heat-full { display:grid; grid-template-columns:60px repeat(24,minmax(34px,1fr)) 64px; gap:4px; min-width:1100px; background:#fff; border:1px solid #e3e7f0; border-radius:12px; padding:1rem; }
+    .lg-heat-full { display:grid; grid-template-columns:92px repeat(24,minmax(34px,1fr)) 64px; gap:4px; min-width:1100px; background:#fff; border:1px solid #e3e7f0; border-radius:12px; padding:1rem; }
     .lg-heat-full .hl { font-size:.85rem; color:#3b4660; display:flex; align-items:center; font-weight:600; }
     .lg-heat-full .hx { font-size:.72rem; color:#6b7690; text-align:center; }
     .lg-heat-full .c { height:44px; border-radius:6px; display:grid; place-items:center; font-size:.8rem; font-weight:600; color:#1b263b; font-variant-numeric:tabular-nums; }
@@ -179,12 +191,19 @@
             </div>
             <div class="lg-panels">
                 <div class="lg-panel lg-expand heat-panel" data-full="lg-full-heat" title="Click to open in full view">
-                    <h6>When people work <span class="d-inline-flex align-items-center gap-2"><span>all entries, by weekday and hour</span><button type="button" class="lg-expand-btn" data-bs-toggle="modal" data-bs-target="#lg-full-heat" aria-label="Open When people work in full view"><i class="bi bi-arrows-angle-expand"></i></button></span></h6>
+                    <h6>When people work <span class="d-inline-flex align-items-center gap-2">
+                        {# One calendar week at a time; ‹ › step through weeks, never past this one #}
+                        <span class="lg-week-nav">
+                            <a href="?{{ heat_query }}{{ heatmap.prev }}" title="Previous week" aria-label="Previous week"><i class="bi bi-chevron-left"></i></a>
+                            <span class="lg-week-label">{{ heatmap.week_start|date:"d M" }} – {{ heatmap.week_end|date:"d M" }}{% if heatmap.is_this_week %} · this week{% endif %}</span>
+                            {% if heatmap.next %}<a href="?{{ heat_query }}{{ heatmap.next }}" title="Next week" aria-label="Next week"><i class="bi bi-chevron-right"></i></a>{% else %}<span class="lg-week-off" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>{% endif %}
+                        </span>
+                        <button type="button" class="lg-expand-btn" data-bs-toggle="modal" data-bs-target="#lg-full-heat" aria-label="Open When people work in full view"><i class="bi bi-arrows-angle-expand"></i></button></span></h6>
                     <div class="lg-heat-wrap">
                         <div class="lg-heat">
                             <span></span>{% for h in hours %}<span class="hx">{% if h|divisibleby:3 %}{{ h|stringformat:"02d" }}{% endif %}</span>{% endfor %}
                             {% for row in heatmap.rows %}
-                                <span class="hl">{{ row.day }}</span>{% for c in row.cells %}<span class="c lg-h{{ c.level }}" title="{{ row.day }} {{ c.hour|stringformat:'02d' }}:00 · {{ c.n }} entr{{ c.n|pluralize:'y,ies' }}"></span>{% endfor %}
+                                <span class="hl{% if row.is_today %} today{% endif %}{% if row.upcoming %} upcoming{% endif %}" title="{{ row.date|date:'l d M Y' }}">{{ row.day }}</span>{% for c in row.cells %}<span class="c {% if row.upcoming %}lg-upcoming{% else %}lg-h{{ c.level }}{% endif %}" title="{{ row.label }} {{ c.hour|stringformat:'02d' }}:00 · {% if row.upcoming %}upcoming{% else %}{{ c.n }} entr{{ c.n|pluralize:'y,ies' }}{% endif %}"></span>{% endfor %}
                             {% endfor %}
                         </div>
                     </div>
@@ -223,20 +242,27 @@
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="lg-full-heat-title"><i class="bi bi-grid-3x3-gap me-2 text-primary"></i>When people work <span class="lg-muted fw-normal fs-6 ms-2">{{ start|date:"d M" }} – {{ end|date:"d M Y" }}</span></h5>
+                    <h5 class="modal-title d-flex align-items-center flex-wrap gap-2" id="lg-full-heat-title"><i class="bi bi-grid-3x3-gap text-primary"></i>When people work
+                        <span class="lg-week-nav lg-week-nav-lg ms-2">
+                            <a href="?{{ heat_query }}{{ heatmap.prev }}#heat-full" title="Previous week" aria-label="Previous week"><i class="bi bi-chevron-left"></i></a>
+                            <span class="lg-week-label">{{ heatmap.week_start|date:"d M" }} – {{ heatmap.week_end|date:"d M Y" }}{% if heatmap.is_this_week %} · this week{% endif %}</span>
+                            {% if heatmap.next %}<a href="?{{ heat_query }}{{ heatmap.next }}#heat-full" title="Next week" aria-label="Next week"><i class="bi bi-chevron-right"></i></a>{% else %}<span class="lg-week-off" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>{% endif %}
+                        </span>
+                        {% if not heatmap.is_this_week %}<a class="btn btn-sm btn-outline-primary py-0 lg-week-this" href="?{{ heat_query }}{{ heatmap.this_week }}#heat-full">This week</a>{% endif %}
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body lg-full">
                     <div class="lg-full-stats">
                         <div><span class="lg-label">Entries</span><b>{{ heatmap.total }}</b></div>
                         <div><span class="lg-label">Busiest hour</span><b>{{ heatmap.busiest|default:"-" }}</b></div>
-                        <div><span class="lg-label">What is counted</span><b class="fw-normal small lg-muted">Every entry matching the filters, whatever its type</b></div>
+                        <div><span class="lg-label">What is counted</span><b class="fw-normal small lg-muted">Every entry in this week matching the person, software and search filters, whatever its type</b></div>
                     </div>
                     <div class="lg-heat-wrap">
                         <div class="lg-heat-full">
                             <span></span>{% for h in hours %}<span class="hx">{{ h|stringformat:"02d" }}</span>{% endfor %}<span class="hx fw-bold">Total</span>
                             {% for row in heatmap.rows %}
-                                <span class="hl">{{ row.day }}</span>{% for c in row.cells %}<span class="c lg-h{{ c.level }}{% if c.level >= 3 %} dark{% endif %}" title="{{ row.day }} {{ c.hour|stringformat:'02d' }}:00 · {{ c.n }} entr{{ c.n|pluralize:'y,ies' }}">{% if c.n %}{{ c.n }}{% endif %}</span>{% endfor %}<span class="tot">{{ row.total }}</span>
+                                <span class="hl{% if row.is_today %} today{% endif %}{% if row.upcoming %} upcoming{% endif %}" title="{{ row.date|date:'l d M Y' }}">{{ row.label }}</span>{% for c in row.cells %}<span class="c {% if row.upcoming %}lg-upcoming{% else %}lg-h{{ c.level }}{% if c.level >= 3 %} dark{% endif %}{% endif %}" title="{{ row.label }} {{ c.hour|stringformat:'02d' }}:00 · {% if row.upcoming %}upcoming{% else %}{{ c.n }} entr{{ c.n|pluralize:'y,ies' }}{% endif %}">{% if c.n %}{{ c.n }}{% endif %}</span>{% endfor %}<span class="tot">{% if row.upcoming %}<span class="lg-muted small">upcoming</span>{% else %}{{ row.total }}{% endif %}</span>
                             {% endfor %}
                             <span class="hl">Total</span>{% for n in heatmap.hour_totals %}<span class="tot">{% if n %}{{ n }}{% endif %}</span>{% endfor %}<span class="tot fw-bold">{{ heatmap.total }}</span>
                         </div>
@@ -459,6 +485,39 @@
         setStrip(collapsed);
         try { localStorage.setItem('av-log-strip', collapsed ? 'collapsed' : 'open'); } catch (e) {}
     });
+
+    // "When people work" week arrows: load the chosen week and swap just the card and the
+    // full view in place, so an open full view stays open. Same URL a reload would use, so
+    // the address bar (and a refresh) keeps the week.
+    function swapWeek(href) {
+        var url = href.split('#')[0];
+        return fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                ['.heat-panel', '#lg-full-heat .modal-content'].forEach(function (sel) {
+                    var fresh = doc.querySelector(sel), here = document.querySelector(sel);
+                    if (fresh && here) here.innerHTML = fresh.innerHTML;
+                });
+                history.replaceState(null, '', url);
+            });
+    }
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('.lg-week-nav a, .lg-week-this');
+        if (!link) return;
+        e.preventDefault();
+        e.stopPropagation();  // don't let the card's own click open (or re-open) the full view
+        swapWeek(link.href).catch(function () { location.href = link.href; });  // fall back to a normal load
+    }, true);
+
+    // A normal load with #heat-full (the fallback above) reopens the full view. Bootstrap's
+    // script loads after this one, so wait for the page to finish loading first.
+    if (location.hash === '#heat-full') {
+        window.addEventListener('load', function () {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('lg-full-heat')).show();
+            history.replaceState(null, '', location.pathname + location.search);
+        });
+    }
 
     // Clicking an overview card anywhere except its filter links opens it in full view.
     document.querySelectorAll('.lg-expand').forEach(function (card) {

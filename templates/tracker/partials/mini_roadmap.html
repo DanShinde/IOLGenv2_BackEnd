@@ -1,0 +1,26 @@
+{# Compact version of the detail page's Automation / Emulation roadmap (stage_panel.html), for the Reports page's Project Summary > Timeline tab. Each stage takes 1/7 of the track (the widest stream: Automation ending in Handover), so Automation and Emulation share the same spacing. Expects: stages, progress #}
+<div class="mini-roadmap-track">
+{% if stages %}
+<div class="mini-roadmap" style="width: calc(100% * {{ stages|length }} / 7);">
+    <div class="mini-roadmap-line"></div>
+    <div class="mini-roadmap-progress" style="width: {{ progress }}%;"></div>
+    {% for stage in stages %}
+        {% with status=stage.status|default:"Not started" %}
+        {# Tooltip built on first hover by the Timeline tab's script (same style as the detail page) #}
+        <div class="mini-roadmap-step" data-tip="<strong>{{ stage.get_name_display }}</strong><br>Status: {{ status }}<br>Planned: {{ stage.planned_date|date:'M d, Y'|default:'—' }}<br>Actual: {{ stage.actual_date|date:'M d, Y'|default:'—' }}">
+            <div class="mini-roadmap-circle status-{{ status|cut:' '|capfirst }}">
+                {% if status == "Completed" %}<i class="fas fa-check"></i>
+                {% elif status == "In Progress" %}<i class="fas fa-ellipsis-h"></i>
+                {% elif status == "Hold" %}<i class="fas fa-pause"></i>
+                {% elif status == "Not Applicable" %}<i class="fas fa-ban"></i>
+                {% endif %}
+            </div>
+            <div class="mini-roadmap-label">{{ stage.get_name_display }}</div>
+        </div>
+        {% endwith %}
+    {% endfor %}
+</div>
+{% else %}
+<span class="text-muted small">No stages</span>
+{% endif %}
+</div>

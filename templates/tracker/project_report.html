@@ -82,10 +82,9 @@
                             {% for preset in saved_report_presets %}
                             <div class="btn-group btn-group-sm">
                                 <a href="{% url 'project_reports' %}?{{ preset.query_string }}" class="btn btn-outline-primary">{{ preset.name }}</a>
-                                <form method="post" action="{% url 'delete_report_preset' preset.id %}" onsubmit="return confirm('Delete saved view \'{{ preset.name }}\'?');" class="d-inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-outline-danger" title="Delete this saved view"><i class="fas fa-times"></i></button>
-                                </form>
+                                {# Not a nested <form>: this block sits inside the filter form, and a nested form would end it early. #}
+                                <button type="button" class="btn btn-outline-danger js-delete-preset" title="Delete this saved view"
+                                        data-url="{% url 'delete_report_preset' preset.id %}" data-name="{{ preset.name }}"><i class="fas fa-times"></i></button>
                             </div>
                             {% endfor %}
                         {% else %}
@@ -205,21 +204,28 @@
     </form>
 
     <div class="row mb-4">
-        <div class="col-lg-3 col-md-6 mb-3">
+        <div class="col-xl col-lg-4 col-md-6 mb-3">
+            <div class="metric-card" style="border-top-color: #0d6efd;">
+                <div class="metric-icon" style="color: #0d6efd; background: rgba(13, 110, 253, 0.1);"><i class="fas fa-folder-open"></i></div>
+                <div class="metric-value">{{ projects_with_details|length }}</div>
+                <div class="metric-label">Projects</div>
+            </div>
+        </div>
+        <div class="col-xl col-lg-4 col-md-6 mb-3">
             <div class="metric-card">
                 <div class="metric-icon"><i class="fas fa-clipboard-list"></i></div>
                 <div class="metric-value">{{ report_kpis.total_planned }}</div>
                 <div class="metric-label">Planned (all stages)</div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 mb-3">
+        <div class="col-xl col-lg-4 col-md-6 mb-3">
             <div class="metric-card" style="border-top-color: #28a745;">
                 <div class="metric-icon" style="color: #28a745; background: rgba(40, 167, 69, 0.1);"><i class="fas fa-check-double"></i></div>
                 <div class="metric-value">{{ report_kpis.total_actual }}</div>
                 <div class="metric-label">Actually Completed (in period)</div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 mb-3">
+        <div class="col-xl col-lg-4 col-md-6 mb-3">
             <div class="metric-card" style="border-top-color: #6f42c1;">
                 <div class="metric-icon" style="color: #6f42c1; background: rgba(111, 66, 193, 0.1);"><i class="fas fa-percentage"></i></div>
                 <div class="metric-value">
@@ -232,7 +238,7 @@
                 <div class="metric-label">Overall OTIF %</div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 mb-3">
+        <div class="col-xl col-lg-4 col-md-6 mb-3">
             <div class="metric-card" style="border-top-color: #dc3545;">
                 <div class="metric-icon" style="color: #dc3545; background: rgba(220, 53, 69, 0.1);"><i class="fas fa-exclamation-triangle"></i></div>
                 <div class="metric-value">{{ report_kpis.total_delayed }}</div>
@@ -429,6 +435,314 @@
             </div>
         </div>
     </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="card-header-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Project Summary
+                        <i class="fas fa-info-circle text-muted small ms-2" data-bs-toggle="tooltip" data-bs-placement="right"
+                           title="The Project Summary card from each project's detail page, for every project matching the filters. OTIF and schedules cover the whole project (not just the selected period). Hover a schedule badge to see which stage set it."></i>
+                    </h5>
+                    <ul class="nav nav-pills nav-sm project-summary-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="ps-summary-tab" data-bs-toggle="pill" data-bs-target="#ps-summary-pane" type="button" role="tab"><i class="fas fa-table me-1"></i>Summary</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="ps-timeline-tab" data-bs-toggle="pill" data-bs-target="#ps-timeline-pane" type="button" role="tab"><i class="fas fa-stream me-1"></i>Timeline</button>
+                        </li>
+                    </ul>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="text" id="projectSummaryFilter" data-persist-filter="project-summary" class="form-control form-control-sm" style="width: 220px;" placeholder="Filter project / customer..." oninput="filterProjectSummary()">
+                        <span class="badge bg-secondary">{{ projects_with_details|length }} Project{{ projects_with_details|length|pluralize }}</span>
+                        <button type="button" id="copyProjectSummaryBtn" class="btn btn-sm btn-outline-secondary js-summary-only" onclick="copyProjectSummary()" title="Copy the table (rows shown by the filter box) to paste into Excel">
+                            <i class="far fa-copy me-1"></i>Copy
+                        </button>
+                        <button type="button" class="btn btn-sm btn-success" onclick="exportProjectSummary()" title="Download a formatted Excel workbook with both tabs as sheets: Project Summary and Timeline (current filters and search box)">
+                            <i class="fas fa-file-excel me-1"></i>Export Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0 tab-content">
+                    <div class="tab-pane fade show active" id="ps-summary-pane" role="tabpanel">
+                    <div class="table-responsive project-summary-scroll">
+                        <table class="table table-custom table-hover mb-0 align-top" id="projectSummaryTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Current Status</th>
+                                    <th class="text-center">Overall OTIF %</th>
+                                    <th>Handover</th>
+                                    <th>Next Automation Milestone</th>
+                                    <th>Next Emulation Milestone</th>
+                                    <th>Automation Schedule</th>
+                                    <th>Emulation Schedule</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in projects_with_details %}
+                                {% with project=item.project ps=item.summary %}
+                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}">
+                                    <td>
+                                        <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
+                                        <div class="text-muted small">{{ project.customer_name }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if ps.status == 'Completed' %}bg-success{% elif ps.status == 'In Progress' %}bg-warning text-dark{% elif ps.status == 'Hold' %}bg-danger{% else %}bg-secondary{% endif %}">{{ ps.status }}</span>
+                                        {% if item.last_updated %}<div class="text-muted small mt-1 text-nowrap"><i class="far fa-clock me-1"></i>{{ item.last_updated|date:"M d, Y" }}</div>{% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if ps.otif is not None %}<span class="fw-bold {% if ps.otif >= 100 %}text-success{% elif ps.otif >= 80 %}text-warning{% else %}text-danger{% endif %}">{{ ps.otif }}%</span>
+                                        {% else %}<span class="text-muted small">&mdash;</span>{% endif %}
+                                    </td>
+                                    <td class="text-nowrap">
+                                        {% if ps.handover_otif is not None %}
+                                            {% if ps.handover_otif == 101 %}<span class="badge bg-success">Before Time</span>
+                                            {% elif ps.handover_otif == 100 %}<span class="badge bg-primary">On Time</span>
+                                            {% else %}<span class="badge bg-danger">Delayed</span>{% endif %}
+                                        {% else %}<span class="text-muted small">Pending</span>{% endif %}
+                                    </td>
+                                    <td class="small">
+                                        {% for r in ps.rows %}
+                                        <div class="mb-1">{% if r.label %}<span class="badge bg-light text-dark border me-1">{{ r.label }}</span>{% endif %}{% if r.auto %}<strong>{{ r.auto.name }}</strong> <span class="text-muted">Planned: {{ r.auto.planned_date|date:"M d, Y"|default:"-" }}</span>{% else %}<span class="text-muted">Complete</span>{% endif %}</div>
+                                        {% endfor %}
+                                        {% if ps.handover and ps.handover.next %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">Handover</span><strong>{{ ps.handover.next.name }}</strong> <span class="text-muted">Planned: {{ ps.handover.next.planned_date|date:"M d, Y"|default:"-" }}</span></div>{% endif %}
+                                    </td>
+                                    <td class="small">
+                                        {% for r in ps.rows %}
+                                        <div class="mb-1">{% if r.label %}<span class="badge bg-light text-dark border me-1">{{ r.label }}</span>{% endif %}{% if r.emu %}<strong>{{ r.emu.name }}</strong> <span class="text-muted">Planned: {{ r.emu.planned_date|date:"M d, Y"|default:"-" }}</span>{% else %}<span class="text-muted">Complete</span>{% endif %}</div>
+                                        {% endfor %}
+                                    </td>
+                                    <td class="small">
+                                        {% for r in ps.rows %}
+                                        <div class="mb-1">{% if r.label %}<span class="badge bg-light text-dark border me-1">{{ r.label }}</span>{% endif %}{% include 'tracker/partials/live_schedule_badge.html' with status=r.auto_schedule %}</div>
+                                        {% endfor %}
+                                        {% if ps.handover and ps.handover.schedule %}<div class="mb-1"><span class="badge bg-light text-dark border me-1">Handover</span>{% include 'tracker/partials/live_schedule_badge.html' with status=ps.handover.schedule %}</div>{% endif %}
+                                    </td>
+                                    <td class="small">
+                                        {% for r in ps.rows %}
+                                        <div class="mb-1">{% if r.label %}<span class="badge bg-light text-dark border me-1">{{ r.label }}</span>{% endif %}{% include 'tracker/partials/live_schedule_badge.html' with status=r.emu_schedule %}</div>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                                {% empty %}
+                                <tr><td colspan="8" class="text-center py-4 text-muted">No projects match your filter criteria.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="ps-timeline-pane" role="tabpanel">
+                    <div class="table-responsive project-summary-scroll">
+                        <table class="table table-custom mb-0 align-top" id="projectTimelineTable">
+                            <thead class="table-light">
+                                <tr>
+                                    {# Emulation has no phase-tag slot (72px), so it is that much narrower: the circle spacing still matches Automation #}
+                                    <th style="width: 190px;">Project</th>
+                                    <th style="width: calc((100% - 190px + 72px) / 2);"><div class="tl-heading tl-heading-auto"><i class="fas fa-cogs me-1"></i>Automation Timeline</div></th>
+                                    <th style="width: calc((100% - 190px - 72px) / 2);"><div class="tl-heading tl-heading-emu"><i class="fas fa-gamepad me-1"></i>Emulation Timeline</div></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in projects_with_details %}
+                                {% with project=item.project ps=item.summary %}
+                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}">
+                                    <td>
+                                        <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
+                                        <div class="text-muted small lh-sm">{{ project.customer_name }}</div>
+                                    </td>
+                                    <td>
+                                        {% for t in ps.timelines %}
+                                        <div class="mini-roadmap-row">
+                                            <span class="mini-roadmap-phase">{% if t.label %}<span class="badge bg-light text-dark border">{{ t.label }}</span>{% endif %}</span>
+                                            {% include 'tracker/partials/mini_roadmap.html' with stages=t.auto progress=t.auto_progress %}
+                                        </div>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% for t in ps.timelines %}
+                                        <div class="mini-roadmap-row">
+                                            {% include 'tracker/partials/mini_roadmap.html' with stages=t.emu progress=t.emu_progress %}
+                                        </div>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center py-4 text-muted">No projects match your filter criteria.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-3 py-2 border-top small text-muted d-flex flex-wrap gap-3 align-items-center">
+                        <span><span class="legend-dot status-Completed"></span>Completed</span>
+                        <span><span class="legend-dot status-InProgress"></span>In Progress</span>
+                        <span><span class="legend-dot status-Notstarted"></span>Not started</span>
+                        <span><span class="legend-dot status-Hold"></span>Hold</span>
+                        <span><span class="legend-dot status-NotApplicable"></span>Not Applicable</span>
+                        <span class="ms-auto">Hover a circle for its planned and actual dates.</span>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        .project-summary-scroll { max-height: 640px; overflow-y: auto; }
+        .project-summary-scroll thead th { position: sticky; top: 0; z-index: 3; }
+        .project-summary-tabs .nav-link { padding: 0.25rem 0.75rem; font-size: 0.85rem; }
+
+        /* Compact copy of the detail page's roadmap (.roadmap in project_detail.html) */
+        .mini-roadmap-row { display: flex; align-items: flex-start; gap: 8px; }
+        .mini-roadmap-row + .mini-roadmap-row { margin-top: 4px; }
+        /* Fixed slot for the phase tag on every row (empty on single-phase projects) so all
+           timelines start at the same point */
+        .mini-roadmap-phase { flex: 0 0 64px; margin-top: 3px; }
+        .mini-roadmap-phase .badge { font-size: 0.65rem; }
+        /* Emulation lines follow the Automation phase order, so they carry no tag (their
+           column is 72px narrower instead -- see the table header). */
+        /* Every step is 1/7 of the track (the widest stream: Automation ending in Handover),
+           so Automation and Emulation share the same circle spacing. */
+        #projectTimelineTable { table-layout: fixed; min-width: 1100px; }
+        /* Headings centred over the roadmaps themselves: Automation's starts after the
+           72px phase-tag slot and fills the track; Emulation's six stages fill 6/7 of it. */
+        .tl-heading { text-align: center; }
+        .tl-heading-auto { margin-left: 72px; }
+        .tl-heading-emu { width: calc(100% * 6 / 7); }
+        .mini-roadmap-track { flex: 1; min-width: 0; }
+        .mini-roadmap { display: flex; position: relative; }
+        .mini-roadmap-step { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 2; flex: 1 1 0; min-width: 0; text-align: center; cursor: help; }
+        .mini-roadmap-circle { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; box-shadow: 0 0 0 3px #fff; flex-shrink: 0; }
+        .mini-roadmap-label { font-size: 0.62rem; line-height: 1.15; color: #4b5563; margin-top: 4px; padding: 0 2px; min-height: 2.3em; }
+        .mini-roadmap-line, .mini-roadmap-progress { position: absolute; top: 9px; left: 0; height: 2px; z-index: 1; }
+        .mini-roadmap-line { right: 0; background-color: #dee2e6; }
+        .mini-roadmap-progress { background-color: #28a745; }
+        .mini-roadmap .status-Completed, .legend-dot.status-Completed { background-color: #28a745; color: #fff; }
+        .mini-roadmap .status-InProgress, .legend-dot.status-InProgress { background-color: #ffc107; color: #000; }
+        .mini-roadmap .status-Notstarted, .legend-dot.status-Notstarted { background-color: #adb5bd; color: #fff; }
+        .mini-roadmap .status-Hold, .legend-dot.status-Hold { background-color: #dc3545; color: #fff; }
+        .mini-roadmap .status-NotApplicable, .legend-dot.status-NotApplicable { background-color: #8d99ae; color: #fff; }
+        .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+        #projectTimelineTable td { padding-top: 10px; padding-bottom: 10px; vertical-align: top; }
+    </style>
+    <script>
+        function filterProjectSummary() {
+            const q = document.getElementById('projectSummaryFilter').value.trim().toLowerCase();
+            document.querySelectorAll('#projectSummaryTable tbody tr[data-search], #projectTimelineTable tbody tr[data-search]').forEach(tr => {
+                tr.style.display = !q || tr.dataset.search.includes(q) ? '' : 'none';
+            });
+        }
+
+        // Timeline circles: Bootstrap tooltips (planned / actual dates), created on first hover
+        // rather than up front -- there are seven-plus circles per project line.
+        document.addEventListener('DOMContentLoaded', function () {
+            const timelineTable = document.getElementById('projectTimelineTable');
+            if (!timelineTable || !window.bootstrap) return;
+            timelineTable.addEventListener('mouseover', function (e) {
+                const step = e.target.closest('.mini-roadmap-step[data-tip]');
+                if (!step || bootstrap.Tooltip.getInstance(step)) return;
+                bootstrap.Tooltip.getOrCreateInstance(step, {
+                    title: step.dataset.tip, html: true, placement: 'top', trigger: 'hover', container: 'body',
+                }).show();
+            });
+        });
+
+        // Copy acts on the Summary table, so it only shows on that tab (Export covers both)
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.project-summary-tabs [data-bs-toggle="pill"]').forEach(btn => {
+                btn.addEventListener('shown.bs.tab', function (e) {
+                    const onSummary = e.target.id === 'ps-summary-tab';
+                    document.querySelectorAll('.js-summary-only').forEach(b => b.classList.toggle('d-none', !onSummary));
+                });
+            });
+        });
+
+        // Copy the Project Summary table for Excel: one row per project, phase lines kept
+        // inside one cell. Puts both HTML (Excel keeps the in-cell line breaks) and
+        // tab-separated text on the clipboard.
+        function copyProjectSummary() {
+            const cellLines = (td) => {
+                const blocks = td.querySelectorAll(':scope > div.mb-1');
+                const parts = blocks.length ? Array.from(blocks) : [td];
+                return parts.map(el => {
+                    let text = el.innerText.replace(/\s+/g, ' ').trim();
+                    // "Phase 1" / "Handover" label badge: separate it from the value
+                    const label = el.querySelector(':scope > .badge.bg-light');
+                    const labelText = label ? label.innerText.trim() : '';
+                    if (labelText && text.startsWith(labelText)) text = labelText + ': ' + text.slice(labelText.length).trim();
+                    return text;
+                }).filter(Boolean);
+            };
+            const header = ['Project Code', 'Customer', 'Current Status', 'Last Updated', 'Overall OTIF %', 'Handover',
+                            'Next Automation Milestone', 'Next Emulation Milestone', 'Automation Schedule', 'Emulation Schedule'];
+            const rows = [header.map(h => [h])];
+            document.querySelectorAll('#projectSummaryTable tbody tr[data-search]').forEach(tr => {
+                if (tr.style.display === 'none') return;
+                const td = tr.children;
+                rows.push([
+                    [td[0].querySelector('a').innerText.trim()],
+                    [td[0].querySelector('div').innerText.trim()],
+                    [td[1].querySelector('.badge').innerText.trim()],
+                    [(td[1].querySelector('div') || {innerText: ''}).innerText.trim()],
+                    cellLines(td[2]), cellLines(td[3]), cellLines(td[4]), cellLines(td[5]), cellLines(td[6]), cellLines(td[7]),
+                ]);
+            });
+
+            const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const html = '<table>' + rows.map((r, i) => '<tr>' + r.map(lines =>
+                `<${i ? 'td' : 'th'} style="vertical-align:top">` + lines.map(esc).join('<br style="mso-data-placement:same-cell">') + `</${i ? 'td' : 'th'}>`
+            ).join('') + '</tr>').join('') + '</table>';
+            const tsvCell = (lines) => {
+                const s = lines.join('\n');
+                return /[\t\n"]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            };
+            const text = rows.map(r => r.map(tsvCell).join('\t')).join('\r\n');
+
+            const btn = document.getElementById('copyProjectSummaryBtn');
+            const done = (ok) => {
+                const original = '<i class="far fa-copy me-1"></i>Copy';
+                btn.innerHTML = ok ? `<i class="fas fa-check me-1"></i>Copied ${rows.length - 1}` : '<i class="fas fa-times me-1"></i>Copy failed';
+                setTimeout(() => { btn.innerHTML = original; }, 2000);
+            };
+            if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
+                navigator.clipboard.write([new ClipboardItem({
+                    'text/html': new Blob([html], { type: 'text/html' }),
+                    'text/plain': new Blob([text], { type: 'text/plain' }),
+                })]).then(() => done(true), () => done(legacyCopy(html)));
+            } else {
+                done(legacyCopy(html));
+            }
+        }
+
+        function exportProjectSummary() {
+            const params = new URLSearchParams(window.location.search);
+            params.delete('chart_view');
+            const q = document.getElementById('projectSummaryFilter').value.trim();
+            if (q) params.set('q', q); else params.delete('q');
+            window.location.href = "{% url 'export_project_summary_excel' %}?" + params.toString();
+        }
+
+        // Fallback for plain-http pages, where the async clipboard API is unavailable.
+        function legacyCopy(html) {
+            const box = document.createElement('div');
+            box.style.cssText = 'position:fixed;left:-9999px;top:0';
+            box.innerHTML = html;
+            document.body.appendChild(box);
+            const range = document.createRange();
+            range.selectNodeContents(box);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) {}
+            sel.removeAllRanges();
+            box.remove();
+            return ok;
+        }
+    </script>
 
     <div class="row mt-4">
         <div class="col-md-6 mb-3 mb-md-0">
@@ -1073,11 +1387,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save current filters as a named preset
     const savePresetBtn = document.getElementById('savePresetBtn');
     if (savePresetBtn) {
+        const nameInput = document.getElementById('presetNameInput');
+        // The name box sits inside the filter form: without this, Enter submits the form
+        // (applying filters) instead of saving the view.
+        nameInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); savePresetBtn.click(); }
+        });
         savePresetBtn.addEventListener('click', function() {
-            const nameInput = document.getElementById('presetNameInput');
             const name = nameInput.value.trim();
             if (!name) { nameInput.focus(); return; }
-            const qs = window.location.search.startsWith('?') ? window.location.search.slice(1) : window.location.search;
+            // Save what is selected in the form now (even if not yet applied), not the URL.
+            const params = new URLSearchParams();
+            for (const [k, v] of new FormData(savePresetBtn.closest('form'))) {
+                if (v !== '') params.append(k, v);
+            }
+            const qs = params.toString();
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = "{% url 'save_report_preset' %}";
@@ -1099,6 +1423,24 @@ document.addEventListener('DOMContentLoaded', function() {
             form.submit();
         });
     }
+
+    // Delete a saved view: posts a standalone form (see the template note on nesting)
+    document.querySelectorAll('.js-delete-preset').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!confirm(`Delete saved view '${btn.dataset.name}'?`)) return;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = btn.dataset.url;
+            form.style.display = 'none';
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+            form.append(csrfInput);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
 
     // ✅ NEW: Call the function to make the cards the same height
     equalizeChartCardHeights();

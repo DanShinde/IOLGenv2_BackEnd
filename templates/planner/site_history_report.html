@@ -6,7 +6,7 @@
 <div class="w-full py-6 px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-900">Employee Site History Report</h1>
-        <a href="{% url 'planner_workforce' %}?tab=site_team" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+        <a href="{% url 'planner_workforce' %}?tab=site_team&subtab=allocations" id="sh-back-link" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
             &larr; Back to Workforce
         </a>
     </div>
@@ -23,6 +23,15 @@
     </div>
 
     <div class="bg-white shadow rounded-lg p-6 mb-6">
+        {# Quick ranges (financial year Apr-Mar; quarters Q1 Apr-Jun ... Q4 Jan-Mar, as in the Tracker) #}
+        <div class="flex flex-wrap items-center gap-2 mb-4" role="group" aria-label="Quick date range">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide mr-1">Period</span>
+            {% for p in period_presets %}
+            <button type="button" class="sh-preset {% if p.active %}sh-preset-on{% endif %}" data-start="{{ p.start|date:'Y-m-d' }}" data-end="{{ p.end|date:'Y-m-d' }}" title="{{ p.start|date:'d M Y' }} – {{ p.end|date:'d M Y' }}">
+                {{ p.label }} <span class="sh-preset-hint">{{ p.hint }}</span>
+            </button>
+            {% endfor %}
+        </div>
         <form method="GET" id="site-history-filter-form" class="flex flex-wrap items-end gap-4">
             <input type="hidden" name="mode" id="mode-input" value="{{ mode }}">
             <div>
@@ -31,7 +40,7 @@
             </div>
             <div>
                 <label for="end_date" class="block text-sm font-medium text-gray-700">End Date</label>
-                <input type="date" name="end_date" id="end_date" value="{{ end_date|date:'Y-m-d' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2">
+                <input type="date" name="end_date" id="end_date" value="{{ end_date_selected|date:'Y-m-d' }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2">
             </div>
             <div>
                 <label for="engineer" class="block text-sm font-medium text-gray-700">Engineer</label>
@@ -85,7 +94,7 @@
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h2 class="text-lg font-bold text-gray-900">Consolidated Summary</h2>
-                <p class="text-sm text-gray-500">{{ consolidated.employee_count }} employee{{ consolidated.employee_count|pluralize }} &middot; {{ start_date|date:"d M Y" }} to {{ end_date|date:"d M Y" }}</p>
+                <p class="text-sm text-gray-500">{{ consolidated.employee_count }} employee{{ consolidated.employee_count|pluralize }} &middot; {{ start_date|date:"d M Y" }} to {{ end_date|date:"d M Y" }}{% if counted_to_today %} <span class="text-xs text-gray-400">(counted up to today; the range runs to {{ end_date_selected|date:"d M Y" }})</span>{% endif %}</p>
             </div>
             <div class="flex items-center gap-1 bg-gray-100 rounded-md p-1" role="group" aria-label="Chart value display">
                 <button type="button" id="chart-view-count" onclick="setChartViewMode('count')" class="px-3 py-1 text-xs font-medium rounded-md">Count</button>
@@ -101,10 +110,28 @@
             <div class="bg-indigo-50 rounded-lg p-4 text-center">
                 <p class="text-2xl font-bold text-indigo-700">{{ consolidated.on_site_days }}</p>
                 <p class="text-xs text-gray-500 uppercase tracking-wide mt-1">On Site{% if consolidated.total_days %} ({% widthratio consolidated.on_site_days consolidated.total_days 100 %}%){% endif %}</p>
+                <p class="sh-avg">
+                    {% if consolidated.avg_site_days is not None %}Avg <b>{{ consolidated.avg_site_days }}</b> days per person{% else %}No site days{% endif %}
+                    <span class="sh-info" tabindex="0" aria-label="How the site average is calculated">i
+                        <span class="sh-info-tip" role="tooltip">
+                            <b>Avg on site</b> = total on-site days ÷ employees with at least one site day
+                            {% if consolidated.site_people %}<br>{{ consolidated.on_site_days }} days ÷ {{ consolidated.site_people }} employee{{ consolidated.site_people|pluralize }} = {{ consolidated.avg_site_days }} days{% endif %}
+                        </span>
+                    </span>
+                </p>
             </div>
             <div class="bg-slate-50 rounded-lg p-4 text-center">
                 <p class="text-2xl font-bold text-slate-600">{{ consolidated.office_days }}</p>
                 <p class="text-xs text-gray-500 uppercase tracking-wide mt-1">In Office{% if consolidated.total_days %} ({% widthratio consolidated.office_days consolidated.total_days 100 %}%){% endif %}</p>
+                <p class="sh-avg">
+                    {% if consolidated.avg_office_days is not None %}Avg <b>{{ consolidated.avg_office_days }}</b> days per person{% else %}No office days{% endif %}
+                    <span class="sh-info" tabindex="0" aria-label="How the office average is calculated">i
+                        <span class="sh-info-tip" role="tooltip">
+                            <b>Avg in office</b> = total in-office days ÷ employees with at least one office day
+                            {% if consolidated.office_people %}<br>{{ consolidated.office_days }} days ÷ {{ consolidated.office_people }} employee{{ consolidated.office_people|pluralize }} = {{ consolidated.avg_office_days }} days{% endif %}
+                        </span>
+                    </span>
+                </p>
             </div>
             <div class="bg-orange-50 rounded-lg p-4 text-center">
                 <p class="text-2xl font-bold text-orange-600">{{ consolidated.on_leave_days }}</p>
@@ -113,18 +140,27 @@
         </div>
 
         {% if consolidated.total_days %}
+        {# Each pie: legend on the right (an HTML list, so long names and many sites fit), and an expand button for a full-size view #}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>
-                <p class="text-sm font-semibold text-gray-800 mb-2">Time Allocation &mdash; Site vs Office vs Leave</p>
-                <div class="relative h-64">
-                    <canvas id="consolidatedPieChart" class="w-full h-full"></canvas>
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-sm font-semibold text-gray-800">Time Allocation &mdash; Site vs Office vs Leave</p>
+                    <button type="button" class="pie-expand-btn" onclick="openPieModal('consolidatedPieChart')" title="View full size"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/></svg></button>
+                </div>
+                <div class="pie-with-legend h-64">
+                    <div class="pie-canvas-box"><canvas id="consolidatedPieChart"></canvas></div>
+                    <ul class="pie-legend" id="consolidatedPieChart-legend"></ul>
                 </div>
             </div>
             <div>
-                <p class="text-sm font-semibold text-gray-800 mb-2">Site-wise Day Distribution</p>
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-sm font-semibold text-gray-800">Site-wise Day Distribution</p>
+                    {% if consolidated.site_days %}<button type="button" class="pie-expand-btn" onclick="openPieModal('siteDistPieChart')" title="View full size"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/></svg></button>{% endif %}
+                </div>
                 {% if consolidated.site_days %}
-                <div class="relative h-64">
-                    <canvas id="siteDistPieChart" class="w-full h-full"></canvas>
+                <div class="pie-with-legend h-64">
+                    <div class="pie-canvas-box"><canvas id="siteDistPieChart"></canvas></div>
+                    <ul class="pie-legend" id="siteDistPieChart-legend"></ul>
                 </div>
                 {% else %}
                 <div class="h-64 flex items-center justify-center text-sm text-gray-500">No on-site allocations in this period.</div>
@@ -241,26 +277,40 @@
         {% else %}
             <div class="bg-white shadow overflow-hidden sm:rounded-lg">
                 {% if employee_overview %}
+                    <div class="flex items-center justify-end gap-2 px-6 pt-4">
+                        <label for="emp-sort" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort by</label>
+                        <select id="emp-sort" class="sh-sort-select" data-table="emp-overview-table">
+                            <option value="name">Name (A–Z)</option>
+                            <option value="site:desc">Most days on site</option>
+                            <option value="site:asc">Fewest days on site</option>
+                            <option value="office:desc">Most days in office</option>
+                            <option value="office:asc">Fewest days in office</option>
+                        </select>
+                    </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200" id="emp-overview-table">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Designation</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sites</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Days at a project site (leave days excluded)">On Site</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Days in office, including days with no allocation (leave days excluded)">In Office</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Days</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 {% for row in employee_overview %}
-                                <tr>
+                                <tr data-name="{{ row.employee.name|lower }}" data-site="{{ row.on_site_days }}" data-office="{{ row.office_days }}">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ row.employee.name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.employee.get_designation_display }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ row.site_count }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-700 font-medium">{{ row.on_site_days }} day{{ row.on_site_days|pluralize }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">{{ row.office_days }} day{{ row.office_days|pluralize }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{{ row.total_days }} days</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                        <a href="?mode=employee&engineer={{ row.employee.id }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:text-indigo-900 font-medium">View Details &rarr;</a>
+                                        <a href="?mode=employee&engineer={{ row.employee.id }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date_selected|date:'Y-m-d' }}" class="text-indigo-600 hover:text-indigo-900 font-medium">View Details &rarr;</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -313,7 +363,7 @@
                             {% for employee, days in site_breakdown.employee_days.items %}
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    <a href="?mode=employee&engineer={{ employee.id }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:text-indigo-900">{{ employee.name }}</a>
+                                    <a href="?mode=employee&engineer={{ employee.id }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date_selected|date:'Y-m-d' }}" class="text-indigo-600 hover:text-indigo-900">{{ employee.name }}</a>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ employee.get_designation_display }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{{ days }} days</td>
@@ -338,8 +388,18 @@
         {% else %}
             <div class="bg-white shadow overflow-hidden sm:rounded-lg">
                 {% if site_overview %}
+                    <div class="flex items-center justify-end gap-2 px-6 pt-4">
+                        <label for="site-sort" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort by</label>
+                        <select id="site-sort" class="sh-sort-select" data-table="site-overview-table">
+                            <option value="name">Site name (A–Z)</option>
+                            <option value="emps:desc">Most employees</option>
+                            <option value="emps:asc">Fewest employees</option>
+                            <option value="days:desc">Most person-days</option>
+                            <option value="days:asc">Fewest person-days</option>
+                        </select>
+                    </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200" id="site-overview-table">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site / Project</th>
@@ -351,7 +411,7 @@
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 {% for row in site_overview %}
-                                <tr>
+                                <tr data-name="{{ row.site.name|lower }}" data-emps="{{ row.engineer_count }}" data-days="{{ row.person_days }}">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {{ row.site.name }}
                                         <span class="text-gray-500 font-normal">
@@ -362,7 +422,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ row.engineer_count }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{{ row.person_days }} days</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                        <a href="?mode=site&site={{ row.site.id }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:text-indigo-900 font-medium">View Details &rarr;</a>
+                                        <a href="?mode=site&site={{ row.site.id }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date_selected|date:'Y-m-d' }}" class="text-indigo-600 hover:text-indigo-900 font-medium">View Details &rarr;</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -379,6 +439,57 @@
     {% endif %}
 </div>
 
+<!-- Full-size pie view (Expand button on the Consolidated Summary charts) -->
+<div id="pieModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onclick="if (event.target === this) closePieModal()">
+    <div class="bg-white rounded-xl shadow-2xl flex flex-col" style="width: min(1200px, 96vw); height: 88vh;">
+        <div class="flex items-center justify-between px-5 py-3 border-b">
+            <h3 id="pieModalTitle" class="text-base font-semibold text-gray-900"></h3>
+            <button type="button" onclick="closePieModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none" title="Close (Esc)">&times;</button>
+        </div>
+        <div class="pie-with-legend pie-modal-body flex-1 min-h-0 p-5">
+            <div class="pie-canvas-box"><canvas id="pieModalCanvas"></canvas></div>
+            <ul class="pie-legend" id="pieModalLegend"></ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Pie + legend side by side: the pie takes the remaining width, the legend scrolls */
+    .pie-with-legend { display: flex; gap: 12px; }
+    .pie-canvas-box { position: relative; flex: 1 1 auto; min-width: 0; }
+    .pie-legend { flex: 0 0 auto; width: 46%; max-width: 280px; max-height: 100%; align-self: center; overflow-y: auto; margin: 0; padding: 0; list-style: none; font-size: 11px; }
+    .pie-legend li { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 4px; cursor: pointer; color: #374151; }
+    .pie-legend li:hover { background: #f3f4f6; }
+    .pie-legend li.off { opacity: .45; }
+    .pie-legend li.off .name { text-decoration: line-through; }
+    .pie-legend .swatch { flex: 0 0 10px; height: 10px; border-radius: 2px; }
+    .pie-legend .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pie-legend .val { flex: 0 0 auto; font-weight: 600; color: #4b5563; font-variant-numeric: tabular-nums; }
+    .pie-legend .emp { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 30px; font-weight: 600; color: #4f46e5; font-variant-numeric: tabular-nums; }
+    .pie-legend .emp svg { width: 11px; height: 11px; }
+    .pie-modal-body .pie-legend { width: 380px; max-width: 36%; font-size: 13px; }
+    .pie-modal-body .pie-legend li { padding: 4px 8px; }
+    .pie-expand-btn { padding: 4px; border-radius: 6px; color: #9ca3af; }
+    .pie-expand-btn:hover { color: #4f46e5; background: #eef2ff; }
+
+    /* Quick period buttons and sort menus */
+    .sh-preset { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid #d1d5db; background: #fff; color: #374151; }
+    .sh-preset:hover { border-color: #6366f1; color: #4338ca; }
+    .sh-preset-on { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+    .sh-preset-on:hover { color: #fff; }
+    .sh-preset-hint { font-size: 11px; opacity: .7; margin-left: 2px; }
+    /* Average line on the On Site / In Office cards, with its formula on the info icon */
+    .sh-avg { margin-top: 6px; font-size: 12px; color: #4b5563; display: inline-flex; align-items: center; gap: 5px; }
+    .sh-avg b { color: #111827; }
+    .sh-info { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; border: 1px solid #9ca3af; color: #6b7280; font: italic 600 10px/1 Georgia, serif; cursor: help; }
+    .sh-info:hover, .sh-info:focus { border-color: #4f46e5; color: #4f46e5; outline: none; }
+    .sh-info-tip { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 250px; padding: 8px 10px; border-radius: 6px; background: #1f2937; color: #f9fafb; font: 400 12px/1.45 system-ui, sans-serif; text-align: left; z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+    .sh-info-tip b { color: #fff; }
+    .sh-info-tip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top-color: #1f2937; }
+    .sh-info:hover .sh-info-tip, .sh-info:focus .sh-info-tip { display: block; }
+    .sh-sort-select { font-size: 13px; border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 8px; background: #fff; }
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script>
 function setReportMode(m) {
@@ -389,6 +500,8 @@ function setReportMode(m) {
 // Shared count-vs-percent display mode for every pie chart on this page.
 let chartViewMode = 'percent';
 const allPieCharts = [];
+const pieDataById = {};        // chart data by canvas id, for the full-size view
+const legendRefreshers = [];   // HTML legends re-render when the count/% mode changes
 
 function setChartViewMode(mode) {
     chartViewMode = mode;
@@ -397,49 +510,224 @@ function setChartViewMode(mode) {
     document.getElementById('chart-view-percent').className = 'px-3 py-1 text-xs font-medium rounded-md' +
         (mode === 'percent' ? ' bg-white text-indigo-700 shadow-sm' : ' text-gray-500 hover:text-gray-700');
     allPieCharts.forEach(function (chart) { chart.update(); });
+    legendRefreshers.forEach(function (fn) { fn(); });
 }
 
-function renderPieChart(canvasId, data) {
-    const ctx = document.getElementById(canvasId);
-    if (!ctx || !data || !data.values.some(v => v > 0)) return;
+function pieValueText(value, total) {
+    if (chartViewMode === 'count') return value + 'd';
+    const pct = total ? Math.round((value / total) * 100) : 0;
+    return (pct === 0 && value > 0) ? '<1%' : pct + '%';
+}
 
+// Headcount (data.employees, per slice) is optional: when present the chart is a doughnut
+// with the total employees in its centre (the hovered slice's headcount on hover), and the
+// slice labels, legend and tooltip all carry the employee count alongside the days.
+const PERSON_ICON = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5z"/></svg>';
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+// Legend as an HTML list beside the pie: full names, value, headcount; scrolls when long,
+// and a click hides/shows that slice. Listed largest first.
+function renderHtmlLegend(chart, el, data, total) {
+    const order = data.labels.map((_, i) => i).sort((a, b) => data.values[b] - data.values[a]);
+    const emps = data.employees;
+    function draw() {
+        el.innerHTML = '';
+        order.forEach(function (i) {
+            if (!(data.values[i] > 0)) return;
+            const li = document.createElement('li');
+            li.className = chart.getDataVisibility(i) ? '' : 'off';
+            li.title = data.labels[i] + ': ' + plural(data.values[i], 'day') +
+                (emps ? ' · ' + plural(emps[i], 'employee') : '') + ' (click to hide / show)';
+            li.innerHTML = '<span class="swatch"></span><span class="name"></span><span class="val"></span>' +
+                (emps ? '<span class="emp">' + PERSON_ICON + '<span></span></span>' : '');
+            li.querySelector('.swatch').style.background = data.colors[i];
+            li.querySelector('.name').textContent = data.labels[i];
+            li.querySelector('.val').textContent = pieValueText(data.values[i], total);
+            if (emps) li.querySelector('.emp span').textContent = emps[i];
+            li.addEventListener('click', function () {
+                chart.toggleDataVisibility(i);
+                chart.update();
+                draw();
+            });
+            el.appendChild(li);
+        });
+    }
+    draw();
+    return draw;
+}
+
+// Doughnut centre: total employees, or the hovered slice's headcount and name
+const headcountCentre = {
+    id: 'headcountCentre',
+    afterDraw(chart, _args, opts) {
+        if (!opts || !opts.data) return;
+        const data = opts.data;
+        const { ctx, chartArea: a } = chart;
+        const cx = (a.left + a.right) / 2, cy = (a.top + a.bottom) / 2;
+        const radius = Math.min(a.right - a.left, a.bottom - a.top) / 2;
+        const scale = Math.max(0.7, Math.min(1.6, radius / 110));
+        const active = chart.getActiveElements()[0];
+        let big, small, caption;
+        if (active) {
+            const n = data.employees[active.index];
+            const name = data.labels[active.index];
+            big = String(n);
+            small = n === 1 ? 'employee' : 'employees';
+            caption = name.length > 24 ? name.slice(0, 23) + '…' : name;
+        } else {
+            big = String(data.total_employees);
+            small = data.total_employees === 1 ? 'employee' : 'employees';
+            caption = 'in total';
+        }
+        const family = Chart.defaults.font.family;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#111827';
+        ctx.font = '700 ' + Math.round(24 * scale) + 'px ' + family;
+        ctx.fillText(big, cx, cy + 6 * scale);
+        ctx.fillStyle = '#4b5563';
+        ctx.font = '500 ' + Math.round(11 * scale) + 'px ' + family;
+        ctx.fillText(small, cx, cy + 21 * scale);
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '400 ' + Math.round(10 * scale) + 'px ' + family;
+        ctx.fillText(caption, cx, cy - 18 * scale);
+        ctx.restore();
+    }
+};
+
+// opts: legendEl (HTML legend beside the pie; omit for Chart.js's own bottom legend),
+// labelMinShare (no on-slice label below this share -- small slices are in the legend and
+// tooltip instead, so labels never pile up), labelSize.
+function buildPie(canvas, data, opts) {
     const total = data.values.reduce((a, b) => a + b, 0);
-    const chart = new Chart(ctx, {
-        type: 'pie',
+    const emps = data.employees;
+    const chart = new Chart(canvas, {
+        type: emps ? 'doughnut' : 'pie',
         data: {
             labels: data.labels,
-            datasets: [{ data: data.values, backgroundColor: data.colors }]
+            datasets: [{ data: data.values, backgroundColor: data.colors, borderColor: '#fff', borderWidth: 1 }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: 4 },
+            cutout: emps ? '52%' : 0,
             plugins: {
-                legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                legend: { display: !opts.legendEl, position: 'bottom', labels: { font: { size: 11 } } },
                 tooltip: {
                     callbacks: {
                         label: function (ctx) {
                             const pct = total ? Math.round((ctx.raw / total) * 100) : 0;
-                            return ctx.label + ': ' + ctx.raw + ' day' + (ctx.raw === 1 ? '' : 's') + ' (' + pct + '%)';
+                            return ctx.label + ': ' + plural(ctx.raw, 'day') + ' (' + pct + '%)' +
+                                (emps ? ' · ' + plural(emps[ctx.dataIndex], 'employee') : '');
                         }
                     }
                 },
                 datalabels: {
-                    display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+                    display: (ctx) => {
+                        const v = ctx.dataset.data[ctx.dataIndex];
+                        return v > 0 && total > 0 && v / total >= (opts.labelMinShare || 0);
+                    },
                     color: '#fff',
-                    font: { weight: 'bold', size: 11 },
-                    formatter: (value) => {
-                        if (chartViewMode === 'count') {
-                            return value + 'd';
-                        }
-                        const pct = total ? Math.round((value / total) * 100) : 0;
-                        return pct + '%';
-                    }
-                }
+                    textAlign: 'center',
+                    font: { weight: 'bold', size: opts.labelSize || 11 },
+                    // Value on the first line; with headcount, "3 emp" under it (in % and count views)
+                    formatter: (value, ctx) => emps
+                        ? [pieValueText(value, total), emps[ctx.dataIndex] + ' emp']
+                        : pieValueText(value, total)
+                },
+                headcountCentre: emps ? { data: data } : false
             }
-        }
+        },
+        plugins: emps ? [headcountCentre] : []
     });
     allPieCharts.push(chart);
+    if (opts.legendEl) {
+        const redraw = renderHtmlLegend(chart, opts.legendEl, data, total);
+        legendRefreshers.push(redraw);
+        chart._legendRedraw = redraw;
+    }
+    return chart;
 }
+
+function renderPieChart(canvasId, data) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !data || !data.values.some(v => v > 0)) return;
+    pieDataById[canvasId] = data;
+    const legendEl = document.getElementById(canvasId + '-legend');
+    buildPie(canvas, data, { legendEl: legendEl, labelMinShare: legendEl ? (data.employees ? 0.05 : 0.04) : 0, labelSize: 11 });
+}
+
+// Full-size view of one pie, with its legend on the right
+let modalPieChart = null;
+function openPieModal(canvasId) {
+    const data = pieDataById[canvasId];
+    if (!data) return;
+    const card = document.getElementById(canvasId).closest('.pie-with-legend').parentElement;
+    document.getElementById('pieModalTitle').textContent = card.querySelector('p').textContent;
+    document.getElementById('pieModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    modalPieChart = buildPie(document.getElementById('pieModalCanvas'), data,
+        { legendEl: document.getElementById('pieModalLegend'), labelMinShare: data.employees ? 0.02 : 0.015, labelSize: 13 });
+}
+function closePieModal() {
+    if (modalPieChart) {
+        allPieCharts.splice(allPieCharts.indexOf(modalPieChart), 1);
+        legendRefreshers.splice(legendRefreshers.indexOf(modalPieChart._legendRedraw), 1);
+        modalPieChart.destroy();
+        modalPieChart = null;
+    }
+    document.getElementById('pieModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modalPieChart) closePieModal();
+});
+
+// Quick period buttons: fill both dates and run the report
+document.querySelectorAll('.sh-preset').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.getElementById('start_date').value = btn.dataset.start;
+        document.getElementById('end_date').value = btn.dataset.end;
+        document.getElementById('site-history-filter-form').submit();
+    });
+});
+
+// Sort menus: reorder a table's rows by name or by a numeric data-* field (value "field:asc|desc")
+document.querySelectorAll('.sh-sort-select').forEach(function (sel) {
+    const tbody = document.getElementById(sel.dataset.table).querySelector('tbody');
+    const key = 'sh-sort:' + sel.id;
+    function apply() {
+        const [field, dir] = sel.value.split(':');
+        const rows = Array.from(tbody.querySelectorAll('tr[data-name]'));
+        rows.sort(function (a, b) {
+            if (field === 'name') return a.dataset.name.localeCompare(b.dataset.name);
+            const d = Number(a.dataset[field]) - Number(b.dataset[field]);
+            return (dir === 'asc' ? d : -d) || a.dataset.name.localeCompare(b.dataset.name);
+        });
+        rows.forEach(r => tbody.appendChild(r));
+        try { sessionStorage.setItem(key, sel.value); } catch (e) {}
+    }
+    try { const saved = sessionStorage.getItem(key); if (saved) sel.value = saved; } catch (e) {}
+    sel.addEventListener('change', apply);
+    apply();
+});
+
+// "Back to Workforce" returns to the Workforce view this report was opened from (e.g. Team
+// Allocations), remembered for this tab while you change the report's filters.
+(function () {
+    const back = document.getElementById('sh-back-link');
+    if (!back) return;
+    try {
+        const ref = document.referrer ? new URL(document.referrer) : null;
+        if (ref && ref.origin === location.origin && ref.pathname === new URL(back.href).pathname) {
+            sessionStorage.setItem('sh-back', ref.pathname + ref.search);
+        }
+        const saved = sessionStorage.getItem('sh-back');
+        if (saved) back.href = saved;
+    } catch (e) {}
+})();
 
 document.addEventListener('DOMContentLoaded', function () {
     if (window.ChartDataLabels) {
