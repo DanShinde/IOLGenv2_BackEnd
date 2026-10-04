@@ -232,9 +232,6 @@
                                         <tr>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 {{ item.site.display_name }}
-                                                <span class="text-gray-500 font-normal">
-                                                    ({% if item.site.project %}{{ item.site.project.project_id }}{% else %}Office{% endif %})
-                                                </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 {{ item.site.location }}
@@ -265,6 +262,56 @@
                                     </tbody>
                                 </table>
                             </div>
+                            {% if selected_employee_obj %}
+                            {# The leave entries behind the "Days on leave" card, and how each was counted #}
+                            <div class="mt-5">
+                                <h4 class="text-sm font-semibold text-gray-800 mb-1">Leave entries in this period</h4>
+                                <p class="text-xs text-gray-500 mb-2">Only working days count as leave. Saturdays, Sundays and planner holidays inside a leave are not counted as leave: they stay site days if the person is allocated to a site, otherwise office days.</p>
+                                {% if employee_leave_rows %}
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-orange-50">
+                                            <tr>
+                                                <th scope="col" class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leave Period</th>
+                                                <th scope="col" class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                                                <th scope="col" class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days in Period</th>
+                                                <th scope="col" class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Counted as Leave</th>
+                                                <th scope="col" class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Not Counted</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            {% for row in employee_leave_rows %}
+                                            <tr>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
+                                                    {{ row.leave.start_date|date:"d M Y" }} – {{ row.leave.end_date|date:"d M Y" }}
+                                                    {% if row.clipped %}<span class="text-xs text-gray-400 block">(in period: {{ row.first|date:"d M" }} – {{ row.last|date:"d M" }})</span>{% endif %}
+                                                </td>
+                                                <td class="px-6 py-3 text-sm text-gray-500">{{ row.leave.reason|default:"—" }}</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700">{{ row.calendar_days }} day{{ row.calendar_days|pluralize }}</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm font-semibold text-orange-600">{{ row.counted }} day{{ row.counted|pluralize }}</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-xs text-gray-500">
+                                                    {% if row.weekend %}{{ row.weekend }} weekend day{{ row.weekend|pluralize }}{% endif %}
+                                                    {% if row.holiday %}{% if row.weekend %} · {% endif %}{{ row.holiday }} holiday{{ row.holiday|pluralize }}{% endif %}
+                                                    {% if row.overlap %}{% if row.weekend or row.holiday %} · {% endif %}{{ row.overlap }} already in another leave{% endif %}
+                                                    {% if not row.weekend and not row.holiday and not row.overlap %}—{% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot class="bg-gray-50">
+                                            <tr>
+                                                <td colspan="3" class="px-6 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Total days on leave</td>
+                                                <td class="px-6 py-2 text-sm font-bold text-orange-600">{{ employee_breakdown.on_leave_days }} day{{ employee_breakdown.on_leave_days|pluralize }}</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <p class="text-sm text-gray-500 italic">No leave recorded in this period.</p>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </li>
                         {% endfor %}
                     </ul>
@@ -285,6 +332,8 @@
                             <option value="site:asc">Fewest days on site</option>
                             <option value="office:desc">Most days in office</option>
                             <option value="office:asc">Fewest days in office</option>
+                            <option value="leave:desc">Most leave</option>
+                            <option value="leave:asc">Fewest leave</option>
                         </select>
                     </div>
                     <div class="overflow-x-auto">
@@ -296,18 +345,20 @@
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sites</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Days at a project site (leave days excluded)">On Site</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Days in office, including days with no allocation (leave days excluded)">In Office</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Days</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Working days on leave (weekends and holidays inside a leave are not counted)">On Leave</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="On site + in office + on leave">Total Days</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 {% for row in employee_overview %}
-                                <tr data-name="{{ row.employee.name|lower }}" data-site="{{ row.on_site_days }}" data-office="{{ row.office_days }}">
+                                <tr data-name="{{ row.employee.name|lower }}" data-site="{{ row.on_site_days }}" data-office="{{ row.office_days }}" data-leave="{{ row.on_leave_days }}">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ row.employee.name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.employee.get_designation_display }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ row.site_count }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-700 font-medium">{{ row.on_site_days }} day{{ row.on_site_days|pluralize }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">{{ row.office_days }} day{{ row.office_days|pluralize }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">{{ row.on_leave_days }} day{{ row.on_leave_days|pluralize }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{{ row.total_days }} days</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
                                         <a href="?mode=employee&engineer={{ row.employee.id }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date_selected|date:'Y-m-d' }}" class="text-indigo-600 hover:text-indigo-900 font-medium">View Details &rarr;</a>
@@ -502,9 +553,12 @@ const legendRefreshers = [];   // HTML legends re-render when the count/% mode c
 
 function setChartViewMode(mode) {
     chartViewMode = mode;
-    document.getElementById('chart-view-count').className = 'px-3 py-1 text-xs font-medium rounded-md' +
+    // The Count / % switch only exists on the Consolidated Summary
+    const countBtn = document.getElementById('chart-view-count');
+    const pctBtn = document.getElementById('chart-view-percent');
+    if (countBtn) countBtn.className = 'px-3 py-1 text-xs font-medium rounded-md' +
         (mode === 'count' ? ' bg-white text-indigo-700 shadow-sm' : ' text-gray-500 hover:text-gray-700');
-    document.getElementById('chart-view-percent').className = 'px-3 py-1 text-xs font-medium rounded-md' +
+    if (pctBtn) pctBtn.className = 'px-3 py-1 text-xs font-medium rounded-md' +
         (mode === 'percent' ? ' bg-white text-indigo-700 shadow-sm' : ' text-gray-500 hover:text-gray-700');
     allPieCharts.forEach(function (chart) { chart.update(); });
     legendRefreshers.forEach(function (fn) { fn(); });

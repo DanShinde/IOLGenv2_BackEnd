@@ -471,8 +471,17 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                             </svg>
                             <div>
-                                <h2 class="text-lg font-bold text-gray-800">Upcoming Leaves</h2>
-                                <p class="text-xs text-gray-600">List of scheduled absences</p>
+                                <h2 class="text-lg font-bold text-gray-800">Leaves</h2>
+                                <p class="text-xs text-gray-600">Upcoming and past absences</p>
+                            </div>
+                        </div>
+                        {# Which leaves to list; the choice is remembered for this browser tab #}
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="leave-filter-name" data-persist-filter="leave-name" placeholder="Filter employee..." class="text-xs border border-gray-300 rounded px-2 py-1 w-40">
+                            <div class="inline-flex bg-gray-200 rounded-md p-0.5" role="group" aria-label="Show leaves">
+                                <button type="button" class="leave-view-btn px-3 py-1 text-xs font-medium rounded" data-view="upcoming">Upcoming</button>
+                                <button type="button" class="leave-view-btn px-3 py-1 text-xs font-medium rounded" data-view="past">Past</button>
+                                <button type="button" class="leave-view-btn px-3 py-1 text-xs font-medium rounded" data-view="all">All</button>
                             </div>
                         </div>
                     </div>
@@ -484,15 +493,23 @@
                             <tr>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Employee</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Dates</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600" title="Weekends and planner holidays are not counted as leave">Working Days</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Status</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Reason</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Action</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
+                        <tbody class="divide-y divide-gray-100" id="leave-table-body">
                             {% for leave in all_leaves %}
-                            <tr class="hover:bg-gray-50">
+                            <tr class="hover:bg-gray-50 leave-row" data-state="{{ leave.state }}" data-name="{{ leave.employee.name|lower }}">
                                 <td class="px-4 py-2 text-xs font-medium text-gray-900">{{ leave.employee.name }}</td>
-                                <td class="px-4 py-2 text-xs text-gray-600">{{ leave.start_date }} to {{ leave.end_date }}</td>
+                                <td class="px-4 py-2 text-xs text-gray-600 whitespace-nowrap">{{ leave.start_date|date:"d M Y" }} – {{ leave.end_date|date:"d M Y" }}</td>
+                                <td class="px-4 py-2 text-xs text-gray-700" title="{{ leave.calendar_days }} calendar day{{ leave.calendar_days|pluralize }}">{{ leave.working_days }}</td>
+                                <td class="px-4 py-2 text-xs whitespace-nowrap">
+                                    {% if leave.state == 'upcoming' %}<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">Upcoming</span>
+                                    {% elif leave.state == 'current' %}<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">On leave now</span>
+                                    {% else %}<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">Completed</span>{% endif %}
+                                </td>
                                 <td class="px-4 py-2 text-xs text-gray-500 italic">{{ leave.reason|default:"-" }}</td>
                                 <td class="px-4 py-2 text-xs">
                                     <form method="POST" action="{% url 'planner_delete_leave' leave.pk %}" onsubmit="return confirm('Remove this leave?');">
@@ -501,11 +518,10 @@
                                     </form>
                                 </td>
                             </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="px-4 py-8 text-center text-xs text-gray-500">No upcoming leaves found.</td>
-                            </tr>
                             {% endfor %}
+                            <tr id="leave-empty-row" class="hidden">
+                                <td colspan="6" class="px-4 py-8 text-center text-xs text-gray-500">No leaves to show.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -1669,6 +1685,47 @@
         filterEmployee.addEventListener('keyup', filterAllocations);
         filterSite.addEventListener('keyup', filterAllocations);
     }
+
+    // Leaves panel: Upcoming (incl. on leave now) / Past / All, plus a name filter
+    (function () {
+        const rows = Array.from(document.querySelectorAll('#leave-table-body tr.leave-row'));
+        const empty = document.getElementById('leave-empty-row');
+        const nameBox = document.getElementById('leave-filter-name');
+        const buttons = Array.from(document.querySelectorAll('.leave-view-btn'));
+        if (!empty || !nameBox) return;
+        let view = 'upcoming';
+        try { view = sessionStorage.getItem('leave-view') || 'upcoming'; } catch (e) {}
+        const emptyText = { upcoming: 'No upcoming leaves found.', past: 'No past leaves found.', all: 'No leaves found.' };
+        function apply() {
+            const q = nameBox.value.trim().toLowerCase();
+            let shown = 0;
+            rows.forEach(function (r) {
+                const stateOk = view === 'all' || (view === 'past' ? r.dataset.state === 'past' : r.dataset.state !== 'past');
+                const ok = stateOk && (!q || r.dataset.name.includes(q));
+                r.style.display = ok ? '' : 'none';
+                if (ok) shown++;
+            });
+            empty.classList.toggle('hidden', shown > 0);
+            empty.querySelector('td').textContent = emptyText[view];
+            buttons.forEach(function (b) {
+                const on = b.dataset.view === view;
+                b.classList.toggle('bg-white', on);
+                b.classList.toggle('text-indigo-700', on);
+                b.classList.toggle('shadow-sm', on);
+                b.classList.toggle('text-gray-600', !on);
+                b.setAttribute('aria-pressed', on);
+            });
+        }
+        buttons.forEach(function (b) {
+            b.addEventListener('click', function () {
+                view = b.dataset.view;
+                try { sessionStorage.setItem('leave-view', view); } catch (e) {}
+                apply();
+            });
+        });
+        nameBox.addEventListener('input', apply);
+        apply();
+    })();
 
     // Team Allocations: sort by how long each allocation has lasted. "At site" puts project-site
     // allocations first (longest or shortest first) and office ones after; "in office" the

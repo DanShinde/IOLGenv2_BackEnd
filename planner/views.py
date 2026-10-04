@@ -705,7 +705,7 @@ def _get_workforce_context():
         },
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
-        'all_leaves': Leave.objects.filter(end_date__gte=today).select_related('employee').order_by('start_date'),
+        'all_leaves': _leave_list(today),
         'all_sites': all_sites,
         'sites_for_map_json': json.dumps(sites_for_map),
         'sites_missing_coords': sites_missing_coords,
@@ -1004,21 +1004,87 @@ def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
     d.add(legend)
     return d
 
+def _leave_list(today):
+    """Every leave for the Workforce "Leaves" panel: upcoming/current ones first (soonest
+    first), then past ones (most recent first). Each gets a state for the Upcoming / Past
+    switch and the working days it counts (weekends and planner holidays excluded, the same
+    rule the Site History report uses)."""
+    holidays = set(Holiday.objects.values_list('date', flat=True))
+    leaves = list(Leave.objects.select_related('employee'))
+    for lv in leaves:
+        if lv.start_date > today:
+            lv.state = 'upcoming'
+        elif lv.end_date >= today:
+            lv.state = 'current'
+        else:
+            lv.state = 'past'
+        lv.working_days = sum(
+            1 for i in range((lv.end_date - lv.start_date).days + 1)
+            if _is_leave_day(lv.start_date + timedelta(days=i), holidays)
+        )
+        lv.calendar_days = (lv.end_date - lv.start_date).days + 1
+    current = sorted((lv for lv in leaves if lv.state != 'past'), key=lambda lv: lv.start_date)
+    past = sorted((lv for lv in leaves if lv.state == 'past'), key=lambda lv: lv.start_date, reverse=True)
+    return current + past
+
+
+def _is_leave_day(d, holidays):
+    """Leave only uses working days: a Saturday, Sunday or planner Holiday inside a leave
+    entry isn't a leave day -- it falls to wherever the person is allocated (a site keeps
+    counting weekends/holidays as site days; otherwise it's an office-bucket day as usual)."""
+    return d.weekday() < 5 and d not in holidays
+
+
+def _leave_entries_in_period(employee, start_date, end_date, holidays=None):
+    """The employee's leave entries overlapping the period, each with how its days were
+    counted: working days counted as leave, and weekend/holiday days left out. A day
+    covered by two entries is counted once (under the earlier entry)."""
+    if holidays is None:
+        holidays = set(Holiday.objects.values_list('date', flat=True))
+    rows, seen = [], set()
+    leaves = (Leave.objects.filter(employee=employee, start_date__lte=end_date, end_date__gte=start_date)
+              .order_by('start_date', 'pk'))
+    for lv in leaves:
+        first, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
+        counted = weekend = holiday = overlap = 0
+        d = first
+        while d <= last:
+            if d.weekday() >= 5:
+                weekend += 1
+            elif d in holidays:
+                holiday += 1
+            elif d in seen:
+                overlap += 1
+            else:
+                counted += 1
+                seen.add(d)
+            d += timedelta(days=1)
+        rows.append({
+            'leave': lv, 'first': first, 'last': last, 'calendar_days': (last - first).days + 1,
+            'counted': counted, 'weekend': weekend, 'holiday': holiday, 'overlap': overlap,
+            'clipped': first != lv.start_date or last != lv.end_date,
+        })
+    return rows
+
+
 def _compute_employee_day_breakdown(employee, start_date, end_date):
     """Day-by-day bucket for one employee over a period: On Leave beats On Site beats the
     default In Office bucket (gap days with no allocation/leave record count as office).
-    An inactive employee is counted only up to their last working day."""
+    Leave counts working days only (see _is_leave_day). An inactive employee is counted
+    only up to their last working day."""
     last_day = _last_counted_day(employee)
     if last_day is not None and last_day < end_date:
         end_date = last_day
     if end_date < start_date:
         return {'total_days': 0, 'on_leave_days': 0, 'office_days': 0, 'on_site_days': 0, 'site_days': {}}
+    holidays = set(Holiday.objects.values_list('date', flat=True))
     leaves = Leave.objects.filter(employee=employee, start_date__lte=end_date).filter(end_date__gte=start_date)
     leave_days = set()
     for lv in leaves:
         d, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
         while d <= last:
-            leave_days.add(d)
+            if _is_leave_day(d, holidays):
+                leave_days.add(d)
             d += timedelta(days=1)
 
     allocations = SiteAllocation.objects.filter(
@@ -1132,9 +1198,11 @@ def _get_employee_wise_overview(request):
         overview.append({
             'employee': employee,
             'site_count': len(sites),
-            'total_days': sum(item['duration'] for item in history),
+            # Same day-level count as the columns beside it: site + office + leave
+            'total_days': b['total_days'],
             'on_site_days': b['on_site_days'],
             'office_days': b['office_days'],
+            'on_leave_days': b['on_leave_days'],
         })
     overview.sort(key=lambda x: x['employee'].name)
     return overview
@@ -1195,6 +1263,7 @@ def employee_site_history_report_view(request):
     selected_employee_obj = None
     selected_site_obj = None
     employee_breakdown = None
+    employee_leave_rows = []
     employee_chart_json = None
     employee_overview = None
     site_breakdown = None
@@ -1206,6 +1275,10 @@ def employee_site_history_report_view(request):
             selected_employee_obj = Employee.objects.filter(pk=selected_engineer_id).first()
             if selected_employee_obj:
                 employee_breakdown = _compute_employee_day_breakdown(selected_employee_obj, start_date, end_date)
+                # The leave entries behind the "Days on leave" card, with how each was counted
+                last_day = _last_counted_day(selected_employee_obj)
+                leave_end = min(end_date, last_day) if last_day is not None else end_date
+                employee_leave_rows = _leave_entries_in_period(selected_employee_obj, start_date, leave_end) if leave_end >= start_date else []
                 site_names = list(employee_breakdown['site_days'].keys())
                 chart_labels = _site_chart_labels(site_names) + ['In Office', 'On Leave']
                 chart_values = [employee_breakdown['site_days'][n] for n in site_names] + [
@@ -1277,6 +1350,7 @@ def employee_site_history_report_view(request):
         'selected_employee_obj': selected_employee_obj,
         'selected_site_obj': selected_site_obj,
         'employee_breakdown': employee_breakdown,
+        'employee_leave_rows': employee_leave_rows,
         'employee_chart_json': employee_chart_json,
         'employee_overview': employee_overview,
         'site_breakdown': site_breakdown,
