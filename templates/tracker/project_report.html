@@ -216,6 +216,21 @@
         .kpi-tip .calc { margin-top: 4px; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,.08); color: #fff; font-variant-numeric: tabular-nums; }
         .kpi-tip .note { margin: 6px 0 0; color: #9ca3af; font-size: 11.5px; }
         .kpi-hover:hover .kpi-tip, .kpi-hover:focus .kpi-tip, .kpi-hover:focus-within .kpi-tip { display: block; }
+        /* Compact KPI cards for this page only (the dashboard keeps the shared .metric-card look):
+           icon on the left, value + label on the right; six equal columns, fewer on narrow screens */
+        .kpi-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-left: 0; margin-right: 0; }
+        .kpi-row > [class*="col"] { width: auto; max-width: none; flex: none; padding: 0; margin: 0; }
+        @media (max-width: 1399.98px) { .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 767.98px)  { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 459.98px)  { .kpi-row { grid-template-columns: 1fr; } }
+        .kpi-row .metric-card { display: grid; grid-template-columns: 42px minmax(0, 1fr); grid-template-rows: auto auto;
+                                column-gap: 12px; align-items: center; padding: 14px 16px; height: 100%; }
+        .kpi-row .metric-icon { grid-row: 1 / 3; width: 42px; height: 42px; margin: 0; border-radius: 10px; font-size: 1.1rem; }
+        .kpi-row .metric-value { font-size: 1.5rem; line-height: 1.15; margin: 0; white-space: nowrap; }
+        .kpi-row .metric-value .small { font-size: .9rem; }
+        .kpi-row .metric-label { font-size: .85rem; line-height: 1.25; margin: 2px 0 0; color: #4b5563; font-weight: 500; }
+        .kpi-row .kpi-sub { display: block; font-size: .72rem; font-weight: 400; color: #9ca3af; }
+
         /* The tips hang below the cards: keep this row above the panels that follow it */
         .kpi-row { position: relative; z-index: 30; }
         .kpi-hover:hover, .kpi-hover:focus, .kpi-hover:focus-within { z-index: 41; }
@@ -225,7 +240,7 @@
             <div tabindex="0" class="metric-card kpi-hover" style="border-top-color: #0d6efd;">
                 <div class="metric-icon" style="color: #0d6efd; background: rgba(13, 110, 253, 0.1);"><i class="fas fa-folder-open"></i></div>
                 <div class="metric-value">{{ projects_with_details|length }}</div>
-                <div class="metric-label">Projects</div>
+                <div class="metric-label">Projects<span class="kpi-sub">matching filters</span></div>
                 <div class="kpi-tip " role="tooltip">
                     <b>Projects</b>
                     <p>Projects that match the filters above (segments, team leads, period, stages, value, hide completed). Archived projects are never counted.</p>
@@ -237,7 +252,7 @@
             <div tabindex="0" class="metric-card kpi-hover">
                 <div class="metric-icon"><i class="fas fa-clipboard-list"></i></div>
                 <div class="metric-value">{{ report_kpis.total_planned }}</div>
-                <div class="metric-label">Planned (all stages)</div>
+                <div class="metric-label">Planned<span class="kpi-sub">all stages</span></div>
                 <div class="kpi-tip " role="tooltip">
                     <b>Planned (all stages)</b>
                     <p>Every stage planned up to the end of the period ({{ summary_start|date:"d M Y" }} – {{ summary_end|date:"d M Y" }}), including older unfinished work carried forward. Not counted: Not Applicable stages and stages already finished before the period started.</p>
@@ -257,7 +272,7 @@
             <div tabindex="0" class="metric-card kpi-hover" style="border-top-color: #28a745;">
                 <div class="metric-icon" style="color: #28a745; background: rgba(40, 167, 69, 0.1);"><i class="fas fa-check-double"></i></div>
                 <div class="metric-value">{{ report_kpis.total_actual }}</div>
-                <div class="metric-label">Actually Completed (in period)</div>
+                <div class="metric-label">Actually Completed<span class="kpi-sub">in period</span></div>
                 <div class="kpi-tip " role="tooltip">
                     <b>Actually Completed (in period)</b>
                     <p>Stages marked Completed with an actual date inside the period ({{ summary_start|date:"d M Y" }} – {{ summary_end|date:"d M Y" }}), whatever their planned date.</p>
@@ -278,7 +293,7 @@
                     {% elif report_kpis.overall_otif_trend == 'flat' %}<i class="fas fa-equals trend-flat small ms-1" title="Unchanged vs previous equal-length period"></i>
                     {% endif %}
                 </div>
-                <div class="metric-label">Overall OTIF %</div>
+                <div class="metric-label">Overall OTIF %<span class="kpi-sub">due stages on time</span></div>
                 <div class="kpi-tip kpi-tip-right" role="tooltip">
                     <b>Overall OTIF %</b>
                     <p>Stages due in the period (planned date in {{ summary_start|date:"d M Y" }} – {{ summary_end|date:"d M Y" }}, up to today) that were completed on or before their planned date. Late and still-open overdue stages are misses. Not counted: Hold, Not Applicable, Dispatch and Handover.</p>
@@ -291,7 +306,7 @@
             <div tabindex="0" class="metric-card kpi-hover" style="border-top-color: #dc3545;">
                 <div class="metric-icon" style="color: #dc3545; background: rgba(220, 53, 69, 0.1);"><i class="fas fa-exclamation-triangle"></i></div>
                 <div class="metric-value">{{ report_kpis.total_delayed }}</div>
-                <div class="metric-label">Delayed Now <span class="text-muted small">(stage instances)</span></div>
+                <div class="metric-label">Delayed Now<span class="kpi-sub">stage instances</span></div>
                 <div class="kpi-tip kpi-tip-right" role="tooltip">
                     <b>Delayed Now</b>
                     <p>Stages still Not started or In Progress whose planned date has passed (as of today), within the Planned set. Each project's stage counts once (a "stage instance"). Stages on Hold are not counted as delayed.</p>
@@ -303,7 +318,7 @@
             <div tabindex="0" class="metric-card kpi-hover" style="border-top-color: #f59e0b;">
                 <div class="metric-icon" style="color: #d97706; background: rgba(245, 158, 11, 0.12);"><i class="fas fa-pause-circle"></i></div>
                 <div class="metric-value">{{ report_kpis.breakdown.planned_hold }}</div>
-                <div class="metric-label">On Hold <span class="text-muted small">(stage instances)</span></div>
+                <div class="metric-label">On Hold<span class="kpi-sub">stage instances</span></div>
                 <div class="kpi-tip kpi-tip-right" role="tooltip">
                     <b>On Hold</b>
                     <p>Stages with status Hold within the Planned set (planned up to the end of the period, {{ summary_start|date:"d M Y" }} – {{ summary_end|date:"d M Y" }}). Holds are customer-side, so they are not counted as Delayed and are left out of OTIF %.</p>
