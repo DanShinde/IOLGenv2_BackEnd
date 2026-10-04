@@ -60,6 +60,12 @@ class Project(models.Model):
     def __str__(self):
         return self.project_id
 
+    @property
+    def display_name(self):
+        """Pickers name a project "A1404 - Almarai Bakery, Riyad": one customer can have
+        several projects, so the code alone or the customer alone isn't enough."""
+        return f"{self.project_id} - {self.customer_name}" if self.customer_name else self.project_id
+
 class ActivityHeading(models.Model):
     """A named grouping of a project's activities (e.g. 'Offline Development'), purely
     organizational -- start/end dates are derived from member activities at render time
@@ -198,9 +204,16 @@ class Site(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
 
+    @property
+    def display_name(self):
+        """How a site is named across the planner: project code first, since one customer
+        can have several projects ("A1579 - SRF LIMITED"); offices read "Plant-3 (Office)"."""
+        if self.project_id:
+            return f"{self.project.project_id} - {self.name}"
+        return f"{self.name} (Office)" if self.is_office else self.name
+
     def __str__(self):
-        code = self.project.project_id if self.project else "Office"
-        return f"{self.name} ({code})"
+        return self.display_name
     
     def save(self, *args, **kwargs):
         # Auto-populate name from project
@@ -226,9 +239,13 @@ class Site(models.Model):
                 pass
 
         super().save(*args, **kwargs)
-    
+
     class Meta:
         ordering = ['name']
+
+# Order for site pickers and lists labelled "A1404 - ...": by project code, offices (no
+# project) last. Applied in queries rather than Meta.ordering, which would need a migration.
+SITE_DISPLAY_ORDER = (models.F('project__project_id').asc(nulls_last=True), 'name')
 
 class SiteAllocation(models.Model):
     employee = models.ForeignKey('employees.Employee', on_delete=models.CASCADE, related_name='site_allocations')

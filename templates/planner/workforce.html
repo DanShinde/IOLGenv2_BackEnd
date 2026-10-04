@@ -343,7 +343,8 @@
                                 data-name="{{ employee.name }}"
                                 data-designation="{{ employee.designation }}"
                                 data-segment="{{ employee.segment_id|default:'' }}"
-                                data-active="{{ employee.is_active }}">
+                                data-active="{{ employee.is_active }}"
+                                data-last-day="{{ employee.last_working_day|date:'Y-m-d' }}">
                                 <td class="px-4 py-2">
                                     <div class="flex items-center">
                                         <div class="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
@@ -373,6 +374,7 @@
                                         {% else %}
                                             <div class="w-2 h-2 bg-red-400 rounded-full mr-1.5"></div>
                                             <span class="text-xs font-medium text-red-700">Inactive</span>
+                                            {% if employee.last_working_day %}<span class="text-xs text-gray-500 ml-1.5">· last day {{ employee.last_working_day|date:"d M Y" }}</span>{% else %}<span class="text-xs text-amber-600 ml-1.5" title="Edit this person and set their last working day">· last day not set</span>{% endif %}
                                         {% endif %}
                                     </div>
                                 </td>
@@ -605,7 +607,7 @@
                         <tbody class="divide-y divide-gray-100">
                             {% for site in all_sites %}
                             <tr class="employee-row site-view-row" id="site-view-{{ site.pk }}">
-                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ site.name }}</td>
+                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ site.display_name }}</td>
                                 <td class="px-4 py-2 text-sm text-gray-500">{% if site.project %}{{ site.project.project_id }}{% else %}-{% endif %}</td>
                                 <td class="px-4 py-2 text-sm text-gray-500">{{ site.location }}</td>
                                 <td class="px-4 py-2 text-sm">
@@ -634,7 +636,7 @@
                                             <label class="block text-xs font-semibold text-gray-700 mb-1">Project Code</label>
                                             <select name="project" required class="form-input w-full px-3 py-2 text-xs rounded-lg">
                                                 {% for p in project_site_form.fields.project.queryset %}
-                                                <option value="{{ p.pk }}" {% if site.project_id == p.pk %}selected{% endif %}>{{ p }}</option>
+                                                <option value="{{ p.pk }}" {% if site.project_id == p.pk %}selected{% endif %}>{{ p.display_name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -753,7 +755,7 @@
                                 data-start-date="{{ alloc.start_date|date:'Y-m-d' }}"
                                 data-end-date="{{ alloc.end_date|date:'Y-m-d'|default:'' }}">
                                 <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ alloc.employee.name }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-500">{{ alloc.site.name }} <span class="text-xs text-gray-400">({% if alloc.site.project %}{{ alloc.site.project.project_id }}{% else %}Office{% endif %})</span></td>
+                                <td class="px-4 py-2 text-sm text-gray-500">{{ alloc.site.display_name }}</td>
                                 <td class="px-4 py-2 text-xs text-gray-600">
                                     {{ alloc.start_date|date:"d M Y" }} to
                                     {% if alloc.end_date %}{{ alloc.end_date|date:"d M Y" }}<span class="block text-gray-400">({{ alloc.duration_days }} days)</span>{% else %}Present<span class="block text-gray-400">({{ alloc.duration_days }} days so far)</span>{% endif %}
@@ -761,10 +763,10 @@
                                 <td class="px-4 py-2 text-xs">
                                     <button onclick="openEditAllocationModal('{% url 'planner_update_site_allocation' alloc.pk %}', this)" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
                                     {% if not alloc.end_date and not alloc.site.is_office %}
-                                    <button onclick="openRelieveModal('{% url 'planner_relieve_site_allocation' alloc.pk %}', '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.name|escapejs }}')" class="ml-3 text-amber-600 hover:text-amber-800 font-medium">Relieve</button>
+                                    <button onclick="openRelieveModal('{% url 'planner_relieve_site_allocation' alloc.pk %}', '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.display_name|escapejs }}')" class="ml-3 text-amber-600 hover:text-amber-800 font-medium">Relieve</button>
                                     {% endif %}
                                     {% if not alloc.end_date and alloc.employee.is_active %}
-                                    <button onclick="openTransferModal('{% url 'planner_transfer_site_allocation' alloc.pk %}', this, '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.name|escapejs }}')" class="ml-3 text-teal-600 hover:text-teal-800 font-medium">Transfer</button>
+                                    <button onclick="openTransferModal('{% url 'planner_transfer_site_allocation' alloc.pk %}', this, '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.display_name|escapejs }}')" class="ml-3 text-teal-600 hover:text-teal-800 font-medium">Transfer</button>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -820,7 +822,7 @@
                         <div class="mt-1 text-xs text-yellow-700">
                             <p>The following sites could not be placed on the map: 
                                 {% for site in sites_missing_coords %}
-                                    <span class="font-semibold">{{ site.name }}</span>{% if not forloop.last %}, {% endif %}
+                                    <span class="font-semibold">{{ site.display_name }}</span>{% if not forloop.last %}, {% endif %}
                                 {% endfor %}
                             </p>
                             <p class="mt-1">Click "Refresh Coordinates" to try fetching them again, or edit the site to check the location spelling.</p>
@@ -901,10 +903,17 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
-                        <select id="edit_status" name="is_active" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                        <select id="edit_status" name="is_active" class="form-input w-full px-3 py-2 rounded-lg text-sm" required onchange="toggleLastWorkingDay()">
                             <option value="True">Active</option>
                             <option value="False">Inactive</option>
                         </select>
+                    </div>
+
+                    {# Shown when Status is Inactive: from the next day the person isn't counted anywhere #}
+                    <div id="editLastDayContainer" class="hidden">
+                        <label for="edit_last_working_day" class="block text-xs font-semibold text-gray-700 mb-1">Last working day</label>
+                        <input type="date" id="edit_last_working_day" name="last_working_day" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Any open site or office allocation is relieved on this date. After it, the person is not counted on site, in office or on leave.</p>
                     </div>
 
                     <div id="editSegmentFieldContainer">
@@ -956,7 +965,7 @@
                             <option value="">Select an office...</option>
                             {% for site in all_sites %}
                                 {% if site.is_office %}
-                                <option value="{{ site.pk }}">{{ site.name }}</option>
+                                <option value="{{ site.pk }}">{{ site.display_name }}</option>
                                 {% endif %}
                             {% endfor %}
                         </select>
@@ -999,7 +1008,7 @@
                         <select name="new_site" id="transfer_new_site" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
                             <option value="">Select a site...</option>
                             {% for site in all_sites %}
-                            <option value="{{ site.pk }}">{{ site.name }} ({% if site.project %}{{ site.project.project_id }}{% else %}Office{% endif %})</option>
+                            <option value="{{ site.pk }}">{{ site.display_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -1042,7 +1051,7 @@
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Site / Office</label>
                         <select id="edit_alloc_site" name="site" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
                             {% for site in all_sites %}
-                            <option value="{{ site.pk }}">{{ site.name }}{% if site.is_office %} (Office){% endif %}</option>
+                            <option value="{{ site.pk }}">{{ site.display_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -1149,8 +1158,10 @@
         document.getElementById('edit_designation').value = designation;
         document.getElementById('edit_status').value = active ? "True" : "False";
         document.getElementById('edit_segment').value = segment;
-        
+        document.getElementById('edit_last_working_day').value = row.dataset.lastDay || '';
+
         toggleEditSegmentVisibility();
+        toggleLastWorkingDay();
 
         const form = document.getElementById('editEmployeeForm');
         form.action = url;
@@ -1158,6 +1169,19 @@
         document.getElementById('editEmployeeModal').classList.remove('hidden');
     }
     
+    // Last working day is required while Status is Inactive (defaults to today)
+    function toggleLastWorkingDay() {
+        const inactive = document.getElementById('edit_status').value === 'False';
+        const box = document.getElementById('editLastDayContainer');
+        const input = document.getElementById('edit_last_working_day');
+        box.classList.toggle('hidden', !inactive);
+        input.required = inactive;
+        if (inactive && !input.value) {
+            const d = new Date();  // local date, not UTC
+            input.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+    }
+
     function toggleEditSegmentVisibility() {
         const designation = document.getElementById('edit_designation').value;
         const segmentContainer = document.getElementById('editSegmentFieldContainer');
@@ -1391,7 +1415,7 @@
             const marker = L.marker([site.lat, site.lng], {icon: makeSiteIcon(site, map.getZoom())}).addTo(map);
             marker.siteData = site;
             
-            let popupContent = `<b>${site.name}</b><br><span class="text-xs text-gray-500">${site.project_code}</span><br><small>${site.location}</small>`;
+            let popupContent = `<b>${site.name}</b><br><small>${site.location}</small>`;
             
             if (site.employees && site.employees.length > 0) {
                 popupContent += '<div class="mt-2 pt-2 border-t border-gray-200">';

@@ -58,7 +58,7 @@
                     {% csrf_token %}
 
                     {% for field in form %}
-                    <div class="mb-3">
+                    <div class="mb-3" id="row-{{ field.name }}">
                         <label for="{{ field.id_for_label }}" class="form-label">
                             {{ field.label }}
                         </label>
@@ -82,7 +82,29 @@
                         {% endif %}
                     </div>
                     {% endfor %}
-                    
+                    {% if form.last_working_day %}
+                    <script>
+                    // Employee form: "Last working day" only applies while Status is Inactive
+                    (function () {
+                        var status = document.getElementById('id_status');
+                        var row = document.getElementById('row-last_working_day');
+                        var input = document.getElementById('id_last_working_day');
+                        if (!status || !row || !input) return;
+                        function sync() {
+                            var inactive = status.value === 'inactive';
+                            row.hidden = !inactive;
+                            input.required = inactive;
+                            if (inactive && !input.value) {
+                                var d = new Date();  // local date, not UTC
+                                input.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                            }
+                        }
+                        status.addEventListener('change', sync);
+                        sync();
+                    })();
+                    </script>
+                    {% endif %}
+
                     <div class="btn-group-form">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-circle me-2"></i>Save Record

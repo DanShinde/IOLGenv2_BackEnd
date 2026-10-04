@@ -92,10 +92,14 @@ def sync_employee_active_from_skill_matrix(sender, instance, created, **kwargs):
     # Checked and written in one queryset chain against employee_id, rather than via
     # instance.employee -- a cached FK access could go stale across multiple saves of the
     # same in-memory instance within one process, which would silently skip a needed update.
+    # Saved through Employee.save() (not a queryset .update()) so its rules run: an inactive
+    # employee gets a last working day -- the one picked on the Skill Gap form, else today --
+    # and any open site/office allocation is relieved on that day.
     should_be_active = instance.status != 'inactive'
-    (
-        Employee.objects
-        .filter(pk=instance.employee_id)
-        .exclude(is_active=should_be_active)
-        .update(is_active=should_be_active)
-    )
+    employee = Employee.objects.filter(pk=instance.employee_id).first()
+    if employee is None or employee.is_active == should_be_active:
+        return
+    employee.is_active = should_be_active
+    if not should_be_active:
+        employee.last_working_day = getattr(instance, '_last_working_day', None)
+    employee.save()

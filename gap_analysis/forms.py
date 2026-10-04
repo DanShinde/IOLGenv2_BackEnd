@@ -43,6 +43,17 @@ class DevelopmentPlanForm(BootstrapFormMixin, forms.ModelForm):
         }
 
 class SkillMatrixForm(BootstrapFormMixin, forms.ModelForm):
+    # Not a SkillMatrix field: when Status is set to Inactive it becomes the shared Employee's
+    # last working day (see signals.sync_employee_active_from_skill_matrix). Shown only while
+    # Inactive is picked (add_form.html); left blank, today is used.
+    last_working_day = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        label='Last working day',
+        help_text='Needed when Status is Inactive. Any open site/office allocation is relieved on '
+                  'this date, and the person is not counted on site, in office or on leave after it.',
+    )
+
     class Meta:
         model = SkillMatrix
         fields = ['employee', 'role_matrix', 'manager', 'status', 'user', 'segments']
@@ -66,6 +77,14 @@ class SkillMatrixForm(BootstrapFormMixin, forms.ModelForm):
         if self.instance and self.instance.pk and self.instance.employee_id:
             employee_qs = employee_qs | self.fields['employee'].queryset.filter(pk=self.instance.employee_id)
         self.fields['employee'].queryset = employee_qs.order_by('name')
+        # Prefill with the date already on record (or today) for an inactive employee
+        if self.instance and self.instance.pk and self.instance.employee_id:
+            self.fields['last_working_day'].initial = self.instance.employee.last_working_day
+
+    def save(self, commit=True):
+        # Hand the chosen date to the post_save signal that deactivates the Employee
+        self.instance._last_working_day = self.cleaned_data.get('last_working_day')
+        return super().save(commit=commit)
 
 class EmployeeSkillForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:

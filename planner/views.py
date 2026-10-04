@@ -5,7 +5,7 @@ from django.template.loader import render_to_string
 from employees.models import Employee
 from .models import (ProjectType, Segment, Category, Holiday,
                      Project, Activity, ActivityHeading, GeneralSettings, CapacitySettings,
-                     SalesForecast, EffortBracket, Leave, Site, SiteAllocation)
+                     SalesForecast, EffortBracket, Leave, Site, SiteAllocation, SITE_DISPLAY_ORDER)
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from collections import OrderedDict, defaultdict
@@ -668,16 +668,16 @@ def _get_workforce_context():
     today = date.today()
 
     # Prepare sites data for map view
-    all_sites = Site.objects.prefetch_related(
+    all_sites = Site.objects.select_related('project').prefetch_related(
         Prefetch('allocations', queryset=SiteAllocation.objects.filter(end_date__isnull=True).select_related('employee'))
-    ).all()
+    ).order_by(*SITE_DISPLAY_ORDER)
     sites_for_map = []
     sites_missing_coords = []
 
     for site in all_sites:
         if site.latitude is not None and site.longitude is not None:
             sites_for_map.append({
-                'name': site.name,
+                'name': site.display_name,
                 'location': site.location,
                 'lat': site.latitude,
                 'lng': site.longitude,
@@ -788,7 +788,7 @@ def workforce_view(request):
                 ).first()
 
                 if active_allocation:
-                    error_message = f"Cannot allocate {new_alloc.employee.name}. They are currently active at {active_allocation.site.name}. Please relieve them first."
+                    error_message = f"Cannot allocate {new_alloc.employee.name}. They are currently active at {active_allocation.site.display_name}. Please relieve them first."
                     active_tab = 'site_team'
                     active_subtab = 'allocations'
                 else:
@@ -873,6 +873,16 @@ def _site_history_period(request):
     return start_date, end_date, max(start_date, min(end_date, today))
 
 
+def _last_counted_day(employee):
+    """Last date an employee can be counted on site / in office / on leave. Active: no limit
+    (None). Inactive: their last working day; an inactive employee with no last working day
+    recorded (made inactive before the field existed) isn't counted at all until one is set
+    -- they're unavailable, not in the office."""
+    if employee.is_active:
+        return None
+    return employee.last_working_day or date.min
+
+
 def _get_site_history_data(request):
     engineer_id = request.GET.get('engineer')
     site_id = request.GET.get('site')
@@ -905,10 +915,16 @@ def _get_site_history_data(request):
         # Calculate effective duration within the window
         eff_start = max(alloc.start_date, start_date)
         eff_end = min(alloc.end_date, end_date) if alloc.end_date else end_date
-        
+        # Nothing after an inactive employee's last working day counts
+        last_day = _last_counted_day(alloc.employee)
+        if last_day is not None:
+            eff_end = min(eff_end, last_day)
+            if eff_end < eff_start:
+                continue
+
         duration = (eff_end - eff_start).days + 1
         if duration < 0: duration = 0
-        
+
         report_data[alloc.employee].append({
             'site': alloc.site,
             'start_date': alloc.start_date,
@@ -926,13 +942,13 @@ def _pie_colors(n):
     return [_PIE_PALETTE[i % len(_PIE_PALETTE)] for i in range(n)]
 
 def _site_chart_labels(site_names):
-    """Pie labels for sites: project code first ("A1362 · HSPL KASAN II Nagpur"), so a
+    """Pie labels for sites: project code first ("A1362 - HSPL KASAN II Nagpur"), so a
     slice can be matched to its project. Sites without a project keep their plain name."""
     codes = dict(
         Site.objects.filter(name__in=site_names, project__isnull=False)
         .values_list('name', 'project__project_id')
     )
-    return [f"{codes[n]} · {n}" if codes.get(n) else n for n in site_names]
+    return [f"{codes[n]} - {n}" if codes.get(n) else n for n in site_names]
 
 def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
     """A reportlab vector Pie chart + legend, ready to place on a canvas page via
@@ -990,7 +1006,13 @@ def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
 
 def _compute_employee_day_breakdown(employee, start_date, end_date):
     """Day-by-day bucket for one employee over a period: On Leave beats On Site beats the
-    default In Office bucket (gap days with no allocation/leave record count as office)."""
+    default In Office bucket (gap days with no allocation/leave record count as office).
+    An inactive employee is counted only up to their last working day."""
+    last_day = _last_counted_day(employee)
+    if last_day is not None and last_day < end_date:
+        end_date = last_day
+    if end_date < start_date:
+        return {'total_days': 0, 'on_leave_days': 0, 'office_days': 0, 'on_site_days': 0, 'site_days': {}}
     leaves = Leave.objects.filter(employee=employee, start_date__lte=end_date).filter(end_date__gte=start_date)
     leave_days = set()
     for lv in leaves:
@@ -1093,7 +1115,7 @@ def _get_site_wise_overview(request):
         {'site': data['site'], 'engineer_count': len(data['employees']), 'person_days': data['person_days']}
         for data in site_summary.values()
     ]
-    overview.sort(key=lambda x: x['site'].name)
+    overview.sort(key=lambda x: x['site'].display_name)
     return overview
 
 def _get_employee_wise_overview(request):
@@ -1247,7 +1269,7 @@ def employee_site_history_report_view(request):
         'period_presets': presets,
         'active_nav': 'workforce',
         'all_employees': Employee.objects.all().order_by('name'),
-        'all_sites': Site.objects.all().order_by('name'),
+        'all_sites': Site.objects.select_related('project').order_by(*SITE_DISPLAY_ORDER),
         'selected_engineer': selected_engineer_id,
         'selected_site': selected_site_id,
         'selected_status': request.GET.get('status'),
@@ -1408,7 +1430,7 @@ def export_site_history_excel(request):
     elif ctx['mode'] == 'site' and ctx['selected_site_obj']:
         site = ctx['selected_site_obj']
         b = _compute_site_day_breakdown(site, start_date, end_date)
-        ws.cell(row=detail_row, column=1, value=f"Site: {site.name} ({site.location})").font = Font(bold=True, size=12)
+        ws.cell(row=detail_row, column=1, value=f"Site: {site.display_name} ({site.location})").font = Font(bold=True, size=12)
         rows = [("Distinct Engineers", len(b['employee_days'])), ("Total Person-Days", b['total_person_days']), ("Coverage Days", b['coverage_days'])]
         for i, (label, value) in enumerate(rows):
             ws.cell(row=detail_row + 1 + i, column=1, value=label).font = bold
@@ -1434,7 +1456,7 @@ def export_site_history_excel(request):
             row = [
                 employee.name,
                 employee.get_designation_display(),
-                item['site'].name,
+                item['site'].display_name,
                 item['site'].location,
                 item['start_date'],
                 item['end_date'] if item['end_date'] else 'Present',
@@ -1605,7 +1627,7 @@ def export_site_history_pdf(request):
                 c.drawString(margin + 330, y, str(row['site_count']))
                 c.drawString(margin + 400, y, f"{row['total_days']} days")
             else:
-                c.drawString(margin, y, row['site'].name[:28])
+                c.drawString(margin, y, row['site'].display_name[:34])
                 c.drawString(margin + 220, y, row['site'].location[:22])
                 c.drawString(margin + 380, y, str(row['engineer_count']))
                 c.drawString(margin + 450, y, f"{row['person_days']} days")
@@ -1639,7 +1661,7 @@ def export_site_history_pdf(request):
 
         for item in history:
             y = ensure_space(y, 15)
-            site_str = f"{item['site'].name} ({item['site'].location})"
+            site_str = f"{item['site'].display_name} ({item['site'].location})"
             c.drawString(col_site, y, site_str[:45])
             c.drawString(col_dur, y, f"{item['duration']} days")
             c.drawString(col_stat, y, item['status'])
@@ -1908,6 +1930,10 @@ def update_employee_view(request, pk):
             employee.name = name
             employee.designation = designation
             employee.is_active = is_active
+            # Inactive: the chosen last working day (Employee.save() falls back to today and
+            # relieves open allocations on it). Active: save() clears it.
+            if not is_active:
+                employee.last_working_day = parse_date(request.POST.get('last_working_day') or '') or employee.last_working_day
             employee.segment = segment_obj
             employee.save()
             return _redirect_to_referer_or(request, reverse('planner_workforce'))
