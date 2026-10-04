@@ -83,6 +83,13 @@ class LeaveForm(forms.ModelForm):
                 'class': 'form-input w-full px-3 py-2 text-xs rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:outline-none'
             })
 
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get('start_date'), cleaned.get('end_date')
+        if start and end and end < start:
+            self.add_error('end_date', 'End date cannot be before the start date.')
+        return cleaned
+
 class SiteForm(forms.ModelForm):
     class Meta:
         model = Site

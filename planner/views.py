@@ -2079,6 +2079,15 @@ def delete_leave_view(request, pk):
     get_object_or_404(Leave, pk=pk).delete()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
 
+def update_leave_view(request, pk):
+    """Edit Leave popup on the Workforce Leaves list: employee, dates and reason."""
+    leave = get_object_or_404(Leave, pk=pk)
+    if request.method == 'POST':
+        form = LeaveForm(request.POST, instance=leave)
+        if form.is_valid():  # also rejects an end date before the start date
+            form.save()
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
+
 def delete_site_view(request, pk):
     get_object_or_404(Site, pk=pk).delete()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=sites")
