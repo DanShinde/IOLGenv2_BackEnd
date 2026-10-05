@@ -1348,6 +1348,27 @@ def project_reports(request):
         if prev_overall_otif is not None:
             overall_otif_trend = 'up' if overall_otif > prev_overall_otif else ('down' if overall_otif < prev_overall_otif else 'flat')
 
+    # Breakdown behind the cards, for their hover explanations: what Planned is made of, and
+    # what in Actual falls outside Planned (so the cards visibly reconcile).
+    reported_stages = Stage.objects.filter(project_id__in=chart_project_ids, name__in=[k for k, _ in stage_names_to_report])
+    planned_all = reported_stages.filter(
+        planned_date__isnull=False, planned_date__gte=plausible_planned_date_floor, planned_date__lte=summary_end,
+    ).exclude(Q(status='Not Applicable') | (Q(status='Completed') & Q(actual_date__lt=summary_start)))
+    actual_all = reported_stages.filter(status='Completed', actual_date__range=[summary_start, summary_end])
+    open_statuses = ['Not started', 'In Progress']
+    kpi_breakdown = {
+        'planned_done_in_period': planned_all.filter(status='Completed', actual_date__range=[summary_start, summary_end]).count(),
+        'planned_delayed': planned_all.filter(status__in=open_statuses, planned_date__lt=today).count(),
+        'planned_not_due': planned_all.filter(status__in=open_statuses, planned_date__gte=today).count(),
+        'planned_hold': planned_all.filter(status='Hold').count(),
+        'planned_done_after': planned_all.filter(status='Completed', actual_date__gt=summary_end).count(),
+        'planned_done_no_date': planned_all.filter(status='Completed', actual_date__isnull=True).count(),
+        'actual_outside_planned': actual_all.exclude(pk__in=planned_all.values('pk')).count(),
+        'otif_on_time': otif_total_on_time,
+        'otif_due': otif_total_due,
+        'project_count': len(projects_with_details),
+    }
+
     report_kpis = {
         'total_planned': total_planned,
         'total_actual': total_actual,
@@ -1355,6 +1376,7 @@ def project_reports(request):
         'total_delayed': total_delayed,
         'overall_otif': overall_otif,
         'overall_otif_trend': overall_otif_trend,
+        'breakdown': kpi_breakdown,
     }
 
     # --- NEW: Who owns today's delays — cross-tab by Team Lead and Segment ---

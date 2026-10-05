@@ -5,7 +5,7 @@ from django.template.loader import render_to_string
 from employees.models import Employee
 from .models import (ProjectType, Segment, Category, Holiday,
                      Project, Activity, ActivityHeading, GeneralSettings, CapacitySettings,
-                     SalesForecast, EffortBracket, Leave, Site, SiteAllocation)
+                     SalesForecast, EffortBracket, Leave, Site, SiteAllocation, SITE_DISPLAY_ORDER)
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from collections import OrderedDict, defaultdict
@@ -668,16 +668,16 @@ def _get_workforce_context():
     today = date.today()
 
     # Prepare sites data for map view
-    all_sites = Site.objects.prefetch_related(
+    all_sites = Site.objects.select_related('project').prefetch_related(
         Prefetch('allocations', queryset=SiteAllocation.objects.filter(end_date__isnull=True).select_related('employee'))
-    ).all()
+    ).order_by(*SITE_DISPLAY_ORDER)
     sites_for_map = []
     sites_missing_coords = []
 
     for site in all_sites:
         if site.latitude is not None and site.longitude is not None:
             sites_for_map.append({
-                'name': site.name,
+                'name': site.display_name,
                 'location': site.location,
                 'lat': site.latitude,
                 'lng': site.longitude,
@@ -705,7 +705,7 @@ def _get_workforce_context():
         },
         'all_employees': Employee.objects.all(),
         'designation_choices': Employee.DESIGNATION_CHOICES,
-        'all_leaves': Leave.objects.filter(end_date__gte=today).select_related('employee').order_by('start_date'),
+        'all_leaves': _leave_list(today),
         'all_sites': all_sites,
         'sites_for_map_json': json.dumps(sites_for_map),
         'sites_missing_coords': sites_missing_coords,
@@ -788,7 +788,7 @@ def workforce_view(request):
                 ).first()
 
                 if active_allocation:
-                    error_message = f"Cannot allocate {new_alloc.employee.name}. They are currently active at {active_allocation.site.name}. Please relieve them first."
+                    error_message = f"Cannot allocate {new_alloc.employee.name}. They are currently active at {active_allocation.site.display_name}. Please relieve them first."
                     active_tab = 'site_team'
                     active_subtab = 'allocations'
                 else:
@@ -873,6 +873,16 @@ def _site_history_period(request):
     return start_date, end_date, max(start_date, min(end_date, today))
 
 
+def _last_counted_day(employee):
+    """Last date an employee can be counted on site / in office / on leave. Active: no limit
+    (None). Inactive: their last working day; an inactive employee with no last working day
+    recorded (made inactive before the field existed) isn't counted at all until one is set
+    -- they're unavailable, not in the office."""
+    if employee.is_active:
+        return None
+    return employee.last_working_day or date.min
+
+
 def _get_site_history_data(request):
     engineer_id = request.GET.get('engineer')
     site_id = request.GET.get('site')
@@ -905,10 +915,16 @@ def _get_site_history_data(request):
         # Calculate effective duration within the window
         eff_start = max(alloc.start_date, start_date)
         eff_end = min(alloc.end_date, end_date) if alloc.end_date else end_date
-        
+        # Nothing after an inactive employee's last working day counts
+        last_day = _last_counted_day(alloc.employee)
+        if last_day is not None:
+            eff_end = min(eff_end, last_day)
+            if eff_end < eff_start:
+                continue
+
         duration = (eff_end - eff_start).days + 1
         if duration < 0: duration = 0
-        
+
         report_data[alloc.employee].append({
             'site': alloc.site,
             'start_date': alloc.start_date,
@@ -926,13 +942,13 @@ def _pie_colors(n):
     return [_PIE_PALETTE[i % len(_PIE_PALETTE)] for i in range(n)]
 
 def _site_chart_labels(site_names):
-    """Pie labels for sites: project code first ("A1362 · HSPL KASAN II Nagpur"), so a
+    """Pie labels for sites: project code first ("A1362 - HSPL KASAN II Nagpur"), so a
     slice can be matched to its project. Sites without a project keep their plain name."""
     codes = dict(
         Site.objects.filter(name__in=site_names, project__isnull=False)
         .values_list('name', 'project__project_id')
     )
-    return [f"{codes[n]} · {n}" if codes.get(n) else n for n in site_names]
+    return [f"{codes[n]} - {n}" if codes.get(n) else n for n in site_names]
 
 def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
     """A reportlab vector Pie chart + legend, ready to place on a canvas page via
@@ -988,15 +1004,87 @@ def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
     d.add(legend)
     return d
 
+def _leave_list(today):
+    """Every leave for the Workforce "Leaves" panel: upcoming/current ones first (soonest
+    first), then past ones (most recent first). Each gets a state for the Upcoming / Past
+    switch and the working days it counts (weekends and planner holidays excluded, the same
+    rule the Site History report uses)."""
+    holidays = set(Holiday.objects.values_list('date', flat=True))
+    leaves = list(Leave.objects.select_related('employee'))
+    for lv in leaves:
+        if lv.start_date > today:
+            lv.state = 'upcoming'
+        elif lv.end_date >= today:
+            lv.state = 'current'
+        else:
+            lv.state = 'past'
+        lv.working_days = sum(
+            1 for i in range((lv.end_date - lv.start_date).days + 1)
+            if _is_leave_day(lv.start_date + timedelta(days=i), holidays)
+        )
+        lv.calendar_days = (lv.end_date - lv.start_date).days + 1
+    current = sorted((lv for lv in leaves if lv.state != 'past'), key=lambda lv: lv.start_date)
+    past = sorted((lv for lv in leaves if lv.state == 'past'), key=lambda lv: lv.start_date, reverse=True)
+    return current + past
+
+
+def _is_leave_day(d, holidays):
+    """Leave only uses working days: a Saturday, Sunday or planner Holiday inside a leave
+    entry isn't a leave day -- it falls to wherever the person is allocated (a site keeps
+    counting weekends/holidays as site days; otherwise it's an office-bucket day as usual)."""
+    return d.weekday() < 5 and d not in holidays
+
+
+def _leave_entries_in_period(employee, start_date, end_date, holidays=None):
+    """The employee's leave entries overlapping the period, each with how its days were
+    counted: working days counted as leave, and weekend/holiday days left out. A day
+    covered by two entries is counted once (under the earlier entry)."""
+    if holidays is None:
+        holidays = set(Holiday.objects.values_list('date', flat=True))
+    rows, seen = [], set()
+    leaves = (Leave.objects.filter(employee=employee, start_date__lte=end_date, end_date__gte=start_date)
+              .order_by('start_date', 'pk'))
+    for lv in leaves:
+        first, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
+        counted = weekend = holiday = overlap = 0
+        d = first
+        while d <= last:
+            if d.weekday() >= 5:
+                weekend += 1
+            elif d in holidays:
+                holiday += 1
+            elif d in seen:
+                overlap += 1
+            else:
+                counted += 1
+                seen.add(d)
+            d += timedelta(days=1)
+        rows.append({
+            'leave': lv, 'first': first, 'last': last, 'calendar_days': (last - first).days + 1,
+            'counted': counted, 'weekend': weekend, 'holiday': holiday, 'overlap': overlap,
+            'clipped': first != lv.start_date or last != lv.end_date,
+        })
+    return rows
+
+
 def _compute_employee_day_breakdown(employee, start_date, end_date):
     """Day-by-day bucket for one employee over a period: On Leave beats On Site beats the
-    default In Office bucket (gap days with no allocation/leave record count as office)."""
+    default In Office bucket (gap days with no allocation/leave record count as office).
+    Leave counts working days only (see _is_leave_day). An inactive employee is counted
+    only up to their last working day."""
+    last_day = _last_counted_day(employee)
+    if last_day is not None and last_day < end_date:
+        end_date = last_day
+    if end_date < start_date:
+        return {'total_days': 0, 'on_leave_days': 0, 'office_days': 0, 'on_site_days': 0, 'site_days': {}}
+    holidays = set(Holiday.objects.values_list('date', flat=True))
     leaves = Leave.objects.filter(employee=employee, start_date__lte=end_date).filter(end_date__gte=start_date)
     leave_days = set()
     for lv in leaves:
         d, last = max(lv.start_date, start_date), min(lv.end_date, end_date)
         while d <= last:
-            leave_days.add(d)
+            if _is_leave_day(d, holidays):
+                leave_days.add(d)
             d += timedelta(days=1)
 
     allocations = SiteAllocation.objects.filter(
@@ -1093,7 +1181,7 @@ def _get_site_wise_overview(request):
         {'site': data['site'], 'engineer_count': len(data['employees']), 'person_days': data['person_days']}
         for data in site_summary.values()
     ]
-    overview.sort(key=lambda x: x['site'].name)
+    overview.sort(key=lambda x: x['site'].display_name)
     return overview
 
 def _get_employee_wise_overview(request):
@@ -1110,9 +1198,11 @@ def _get_employee_wise_overview(request):
         overview.append({
             'employee': employee,
             'site_count': len(sites),
-            'total_days': sum(item['duration'] for item in history),
+            # Same day-level count as the columns beside it: site + office + leave
+            'total_days': b['total_days'],
             'on_site_days': b['on_site_days'],
             'office_days': b['office_days'],
+            'on_leave_days': b['on_leave_days'],
         })
     overview.sort(key=lambda x: x['employee'].name)
     return overview
@@ -1173,6 +1263,7 @@ def employee_site_history_report_view(request):
     selected_employee_obj = None
     selected_site_obj = None
     employee_breakdown = None
+    employee_leave_rows = []
     employee_chart_json = None
     employee_overview = None
     site_breakdown = None
@@ -1184,6 +1275,10 @@ def employee_site_history_report_view(request):
             selected_employee_obj = Employee.objects.filter(pk=selected_engineer_id).first()
             if selected_employee_obj:
                 employee_breakdown = _compute_employee_day_breakdown(selected_employee_obj, start_date, end_date)
+                # The leave entries behind the "Days on leave" card, with how each was counted
+                last_day = _last_counted_day(selected_employee_obj)
+                leave_end = min(end_date, last_day) if last_day is not None else end_date
+                employee_leave_rows = _leave_entries_in_period(selected_employee_obj, start_date, leave_end) if leave_end >= start_date else []
                 site_names = list(employee_breakdown['site_days'].keys())
                 chart_labels = _site_chart_labels(site_names) + ['In Office', 'On Leave']
                 chart_values = [employee_breakdown['site_days'][n] for n in site_names] + [
@@ -1247,7 +1342,7 @@ def employee_site_history_report_view(request):
         'period_presets': presets,
         'active_nav': 'workforce',
         'all_employees': Employee.objects.all().order_by('name'),
-        'all_sites': Site.objects.all().order_by('name'),
+        'all_sites': Site.objects.select_related('project').order_by(*SITE_DISPLAY_ORDER),
         'selected_engineer': selected_engineer_id,
         'selected_site': selected_site_id,
         'selected_status': request.GET.get('status'),
@@ -1255,6 +1350,7 @@ def employee_site_history_report_view(request):
         'selected_employee_obj': selected_employee_obj,
         'selected_site_obj': selected_site_obj,
         'employee_breakdown': employee_breakdown,
+        'employee_leave_rows': employee_leave_rows,
         'employee_chart_json': employee_chart_json,
         'employee_overview': employee_overview,
         'site_breakdown': site_breakdown,
@@ -1408,7 +1504,7 @@ def export_site_history_excel(request):
     elif ctx['mode'] == 'site' and ctx['selected_site_obj']:
         site = ctx['selected_site_obj']
         b = _compute_site_day_breakdown(site, start_date, end_date)
-        ws.cell(row=detail_row, column=1, value=f"Site: {site.name} ({site.location})").font = Font(bold=True, size=12)
+        ws.cell(row=detail_row, column=1, value=f"Site: {site.display_name} ({site.location})").font = Font(bold=True, size=12)
         rows = [("Distinct Engineers", len(b['employee_days'])), ("Total Person-Days", b['total_person_days']), ("Coverage Days", b['coverage_days'])]
         for i, (label, value) in enumerate(rows):
             ws.cell(row=detail_row + 1 + i, column=1, value=label).font = bold
@@ -1434,7 +1530,7 @@ def export_site_history_excel(request):
             row = [
                 employee.name,
                 employee.get_designation_display(),
-                item['site'].name,
+                item['site'].display_name,
                 item['site'].location,
                 item['start_date'],
                 item['end_date'] if item['end_date'] else 'Present',
@@ -1605,7 +1701,7 @@ def export_site_history_pdf(request):
                 c.drawString(margin + 330, y, str(row['site_count']))
                 c.drawString(margin + 400, y, f"{row['total_days']} days")
             else:
-                c.drawString(margin, y, row['site'].name[:28])
+                c.drawString(margin, y, row['site'].display_name[:34])
                 c.drawString(margin + 220, y, row['site'].location[:22])
                 c.drawString(margin + 380, y, str(row['engineer_count']))
                 c.drawString(margin + 450, y, f"{row['person_days']} days")
@@ -1639,7 +1735,7 @@ def export_site_history_pdf(request):
 
         for item in history:
             y = ensure_space(y, 15)
-            site_str = f"{item['site'].name} ({item['site'].location})"
+            site_str = f"{item['site'].display_name} ({item['site'].location})"
             c.drawString(col_site, y, site_str[:45])
             c.drawString(col_dur, y, f"{item['duration']} days")
             c.drawString(col_stat, y, item['status'])
@@ -1908,6 +2004,10 @@ def update_employee_view(request, pk):
             employee.name = name
             employee.designation = designation
             employee.is_active = is_active
+            # Inactive: the chosen last working day (Employee.save() falls back to today and
+            # relieves open allocations on it). Active: save() clears it.
+            if not is_active:
+                employee.last_working_day = parse_date(request.POST.get('last_working_day') or '') or employee.last_working_day
             employee.segment = segment_obj
             employee.save()
             return _redirect_to_referer_or(request, reverse('planner_workforce'))
@@ -1977,6 +2077,15 @@ def delete_employee_view(request, pk):
 
 def delete_leave_view(request, pk):
     get_object_or_404(Leave, pk=pk).delete()
+    return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
+
+def update_leave_view(request, pk):
+    """Edit Leave popup on the Workforce Leaves list: employee, dates and reason."""
+    leave = get_object_or_404(Leave, pk=pk)
+    if request.method == 'POST':
+        form = LeaveForm(request.POST, instance=leave)
+        if form.is_valid():  # also rejects an end date before the start date
+            form.save()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=leaves")
 
 def delete_site_view(request, pk):

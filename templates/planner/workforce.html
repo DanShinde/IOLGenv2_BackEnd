@@ -343,7 +343,8 @@
                                 data-name="{{ employee.name }}"
                                 data-designation="{{ employee.designation }}"
                                 data-segment="{{ employee.segment_id|default:'' }}"
-                                data-active="{{ employee.is_active }}">
+                                data-active="{{ employee.is_active }}"
+                                data-last-day="{{ employee.last_working_day|date:'Y-m-d' }}">
                                 <td class="px-4 py-2">
                                     <div class="flex items-center">
                                         <div class="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
@@ -373,6 +374,7 @@
                                         {% else %}
                                             <div class="w-2 h-2 bg-red-400 rounded-full mr-1.5"></div>
                                             <span class="text-xs font-medium text-red-700">Inactive</span>
+                                            {% if employee.last_working_day %}<span class="text-xs text-gray-500 ml-1.5">· last day {{ employee.last_working_day|date:"d M Y" }}</span>{% else %}<span class="text-xs text-amber-600 ml-1.5" title="Edit this person and set their last working day">· last day not set</span>{% endif %}
                                         {% endif %}
                                     </div>
                                 </td>
@@ -469,8 +471,17 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                             </svg>
                             <div>
-                                <h2 class="text-lg font-bold text-gray-800">Upcoming Leaves</h2>
-                                <p class="text-xs text-gray-600">List of scheduled absences</p>
+                                <h2 class="text-lg font-bold text-gray-800">Leaves</h2>
+                                <p class="text-xs text-gray-600">Upcoming and past absences</p>
+                            </div>
+                        </div>
+                        {# Which leaves to list; the choice is remembered for this browser tab #}
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="leave-filter-name" data-persist-filter="leave-name" placeholder="Filter employee..." class="text-xs border border-gray-300 rounded px-2 py-1 w-40">
+                            <div class="inline-flex bg-gray-200 rounded-md p-0.5" role="group" aria-label="Show leaves">
+                                <button type="button" class="leave-view-btn px-3 py-1 text-xs font-medium rounded" data-view="upcoming">Upcoming</button>
+                                <button type="button" class="leave-view-btn px-3 py-1 text-xs font-medium rounded" data-view="past">Past</button>
+                                <button type="button" class="leave-view-btn px-3 py-1 text-xs font-medium rounded" data-view="all">All</button>
                             </div>
                         </div>
                     </div>
@@ -482,28 +493,38 @@
                             <tr>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Employee</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Dates</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600" title="Weekends and planner holidays are not counted as leave">Working Days</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Status</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Reason</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600">Action</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
+                        <tbody class="divide-y divide-gray-100" id="leave-table-body">
                             {% for leave in all_leaves %}
-                            <tr class="hover:bg-gray-50">
+                            <tr class="hover:bg-gray-50 leave-row" data-state="{{ leave.state }}" data-name="{{ leave.employee.name|lower }}"
+                                data-employee-id="{{ leave.employee_id }}" data-start="{{ leave.start_date|date:'Y-m-d' }}"
+                                data-end="{{ leave.end_date|date:'Y-m-d' }}" data-reason="{{ leave.reason }}">
                                 <td class="px-4 py-2 text-xs font-medium text-gray-900">{{ leave.employee.name }}</td>
-                                <td class="px-4 py-2 text-xs text-gray-600">{{ leave.start_date }} to {{ leave.end_date }}</td>
+                                <td class="px-4 py-2 text-xs text-gray-600 whitespace-nowrap">{{ leave.start_date|date:"d M Y" }} – {{ leave.end_date|date:"d M Y" }}</td>
+                                <td class="px-4 py-2 text-xs text-gray-700" title="{{ leave.calendar_days }} calendar day{{ leave.calendar_days|pluralize }}">{{ leave.working_days }}</td>
+                                <td class="px-4 py-2 text-xs whitespace-nowrap">
+                                    {% if leave.state == 'upcoming' %}<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">Upcoming</span>
+                                    {% elif leave.state == 'current' %}<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">On leave now</span>
+                                    {% else %}<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">Completed</span>{% endif %}
+                                </td>
                                 <td class="px-4 py-2 text-xs text-gray-500 italic">{{ leave.reason|default:"-" }}</td>
-                                <td class="px-4 py-2 text-xs">
-                                    <form method="POST" action="{% url 'planner_delete_leave' leave.pk %}" onsubmit="return confirm('Remove this leave?');">
+                                <td class="px-4 py-2 text-xs whitespace-nowrap">
+                                    <button type="button" onclick="openEditLeaveModal('{% url 'planner_update_leave' leave.pk %}', this)" class="text-indigo-600 hover:text-indigo-800 font-medium mr-3">Edit</button>
+                                    <form method="POST" action="{% url 'planner_delete_leave' leave.pk %}" onsubmit="return confirm('Remove this leave?');" class="inline">
                                         {% csrf_token %}
                                         <button type="submit" class="text-red-600 hover:text-red-800 font-medium">Remove</button>
                                     </form>
                                 </td>
                             </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="px-4 py-8 text-center text-xs text-gray-500">No upcoming leaves found.</td>
-                            </tr>
                             {% endfor %}
+                            <tr id="leave-empty-row" class="hidden">
+                                <td colspan="6" class="px-4 py-8 text-center text-xs text-gray-500">No leaves to show.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -605,7 +626,7 @@
                         <tbody class="divide-y divide-gray-100">
                             {% for site in all_sites %}
                             <tr class="employee-row site-view-row" id="site-view-{{ site.pk }}">
-                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ site.name }}</td>
+                                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ site.display_name }}</td>
                                 <td class="px-4 py-2 text-sm text-gray-500">{% if site.project %}{{ site.project.project_id }}{% else %}-{% endif %}</td>
                                 <td class="px-4 py-2 text-sm text-gray-500">{{ site.location }}</td>
                                 <td class="px-4 py-2 text-sm">
@@ -634,7 +655,7 @@
                                             <label class="block text-xs font-semibold text-gray-700 mb-1">Project Code</label>
                                             <select name="project" required class="form-input w-full px-3 py-2 text-xs rounded-lg">
                                                 {% for p in project_site_form.fields.project.queryset %}
-                                                <option value="{{ p.pk }}" {% if site.project_id == p.pk %}selected{% endif %}>{{ p }}</option>
+                                                <option value="{{ p.pk }}" {% if site.project_id == p.pk %}selected{% endif %}>{{ p.display_name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
@@ -753,7 +774,7 @@
                                 data-start-date="{{ alloc.start_date|date:'Y-m-d' }}"
                                 data-end-date="{{ alloc.end_date|date:'Y-m-d'|default:'' }}">
                                 <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ alloc.employee.name }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-500">{{ alloc.site.name }} <span class="text-xs text-gray-400">({% if alloc.site.project %}{{ alloc.site.project.project_id }}{% else %}Office{% endif %})</span></td>
+                                <td class="px-4 py-2 text-sm text-gray-500">{{ alloc.site.display_name }}</td>
                                 <td class="px-4 py-2 text-xs text-gray-600">
                                     {{ alloc.start_date|date:"d M Y" }} to
                                     {% if alloc.end_date %}{{ alloc.end_date|date:"d M Y" }}<span class="block text-gray-400">({{ alloc.duration_days }} days)</span>{% else %}Present<span class="block text-gray-400">({{ alloc.duration_days }} days so far)</span>{% endif %}
@@ -761,10 +782,10 @@
                                 <td class="px-4 py-2 text-xs">
                                     <button onclick="openEditAllocationModal('{% url 'planner_update_site_allocation' alloc.pk %}', this)" class="text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
                                     {% if not alloc.end_date and not alloc.site.is_office %}
-                                    <button onclick="openRelieveModal('{% url 'planner_relieve_site_allocation' alloc.pk %}', '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.name|escapejs }}')" class="ml-3 text-amber-600 hover:text-amber-800 font-medium">Relieve</button>
+                                    <button onclick="openRelieveModal('{% url 'planner_relieve_site_allocation' alloc.pk %}', '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.display_name|escapejs }}')" class="ml-3 text-amber-600 hover:text-amber-800 font-medium">Relieve</button>
                                     {% endif %}
                                     {% if not alloc.end_date and alloc.employee.is_active %}
-                                    <button onclick="openTransferModal('{% url 'planner_transfer_site_allocation' alloc.pk %}', this, '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.name|escapejs }}')" class="ml-3 text-teal-600 hover:text-teal-800 font-medium">Transfer</button>
+                                    <button onclick="openTransferModal('{% url 'planner_transfer_site_allocation' alloc.pk %}', this, '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.display_name|escapejs }}')" class="ml-3 text-teal-600 hover:text-teal-800 font-medium">Transfer</button>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -820,7 +841,7 @@
                         <div class="mt-1 text-xs text-yellow-700">
                             <p>The following sites could not be placed on the map: 
                                 {% for site in sites_missing_coords %}
-                                    <span class="font-semibold">{{ site.name }}</span>{% if not forloop.last %}, {% endif %}
+                                    <span class="font-semibold">{{ site.display_name }}</span>{% if not forloop.last %}, {% endif %}
                                 {% endfor %}
                             </p>
                             <p class="mt-1">Click "Refresh Coordinates" to try fetching them again, or edit the site to check the location spelling.</p>
@@ -901,10 +922,17 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
-                        <select id="edit_status" name="is_active" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                        <select id="edit_status" name="is_active" class="form-input w-full px-3 py-2 rounded-lg text-sm" required onchange="toggleLastWorkingDay()">
                             <option value="True">Active</option>
                             <option value="False">Inactive</option>
                         </select>
+                    </div>
+
+                    {# Shown when Status is Inactive: from the next day the person isn't counted anywhere #}
+                    <div id="editLastDayContainer" class="hidden">
+                        <label for="edit_last_working_day" class="block text-xs font-semibold text-gray-700 mb-1">Last working day</label>
+                        <input type="date" id="edit_last_working_day" name="last_working_day" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Any open site or office allocation is relieved on this date. After it, the person is not counted on site, in office or on leave.</p>
                     </div>
 
                     <div id="editSegmentFieldContainer">
@@ -956,7 +984,7 @@
                             <option value="">Select an office...</option>
                             {% for site in all_sites %}
                                 {% if site.is_office %}
-                                <option value="{{ site.pk }}">{{ site.name }}</option>
+                                <option value="{{ site.pk }}">{{ site.display_name }}</option>
                                 {% endif %}
                             {% endfor %}
                         </select>
@@ -999,7 +1027,7 @@
                         <select name="new_site" id="transfer_new_site" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
                             <option value="">Select a site...</option>
                             {% for site in all_sites %}
-                            <option value="{{ site.pk }}">{{ site.name }} ({% if site.project %}{{ site.project.project_id }}{% else %}Office{% endif %})</option>
+                            <option value="{{ site.pk }}">{{ site.display_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -1013,6 +1041,49 @@
                 <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
                     <button type="button" onclick="closeTransferModal()" class="bg-gray-200 text-gray-700 py-1.5 px-4 rounded-md hover:bg-gray-300 text-xs font-medium">Cancel</button>
                     <button type="submit" class="bg-teal-600 text-white py-1.5 px-4 rounded-md hover:bg-teal-700 text-xs font-medium">Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Leave Modal -->
+<div id="editLeaveModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+    <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center pb-3 border-b">
+            <h3 class="text-lg font-semibold text-gray-800">Edit Leave</h3>
+            <button type="button" onclick="closeEditLeaveModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+        </div>
+        <div class="mt-4">
+            <form id="editLeaveForm" method="POST" action="">
+                {% csrf_token %}
+                <div class="space-y-3">
+                    <div>
+                        <label for="edit_leave_employee" class="block text-xs font-semibold text-gray-700 mb-1">Employee</label>
+                        <select id="edit_leave_employee" name="employee" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                            {% for emp in all_employees %}
+                            <option value="{{ emp.pk }}">{{ emp.name }}{% if not emp.is_active %} (Inactive){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="edit_leave_start" class="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
+                            <input type="date" id="edit_leave_start" name="start_date" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                        </div>
+                        <div>
+                            <label for="edit_leave_end" class="block text-xs font-semibold text-gray-700 mb-1">End Date</label>
+                            <input type="date" id="edit_leave_end" name="end_date" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="edit_leave_reason" class="block text-xs font-semibold text-gray-700 mb-1">Reason</label>
+                        <input type="text" id="edit_leave_reason" name="reason" maxlength="200" class="form-input w-full px-3 py-2 rounded-lg text-sm">
+                    </div>
+                </div>
+                <div class="mt-5 pt-3 border-t flex justify-end space-x-3">
+                    <button type="button" onclick="closeEditLeaveModal()" class="bg-gray-200 text-gray-700 py-1.5 px-4 rounded-md hover:bg-gray-300 text-xs font-medium">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 text-white py-1.5 px-4 rounded-md hover:bg-indigo-700 text-xs font-medium">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -1042,7 +1113,7 @@
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Site / Office</label>
                         <select id="edit_alloc_site" name="site" class="form-input w-full px-3 py-2 rounded-lg text-sm" required>
                             {% for site in all_sites %}
-                            <option value="{{ site.pk }}">{{ site.name }}{% if site.is_office %} (Office){% endif %}</option>
+                            <option value="{{ site.pk }}">{{ site.display_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -1149,8 +1220,10 @@
         document.getElementById('edit_designation').value = designation;
         document.getElementById('edit_status').value = active ? "True" : "False";
         document.getElementById('edit_segment').value = segment;
-        
+        document.getElementById('edit_last_working_day').value = row.dataset.lastDay || '';
+
         toggleEditSegmentVisibility();
+        toggleLastWorkingDay();
 
         const form = document.getElementById('editEmployeeForm');
         form.action = url;
@@ -1158,6 +1231,19 @@
         document.getElementById('editEmployeeModal').classList.remove('hidden');
     }
     
+    // Last working day is required while Status is Inactive (defaults to today)
+    function toggleLastWorkingDay() {
+        const inactive = document.getElementById('edit_status').value === 'False';
+        const box = document.getElementById('editLastDayContainer');
+        const input = document.getElementById('edit_last_working_day');
+        box.classList.toggle('hidden', !inactive);
+        input.required = inactive;
+        if (inactive && !input.value) {
+            const d = new Date();  // local date, not UTC
+            input.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+    }
+
     function toggleEditSegmentVisibility() {
         const designation = document.getElementById('edit_designation').value;
         const segmentContainer = document.getElementById('editSegmentFieldContainer');
@@ -1391,7 +1477,7 @@
             const marker = L.marker([site.lat, site.lng], {icon: makeSiteIcon(site, map.getZoom())}).addTo(map);
             marker.siteData = site;
             
-            let popupContent = `<b>${site.name}</b><br><span class="text-xs text-gray-500">${site.project_code}</span><br><small>${site.location}</small>`;
+            let popupContent = `<b>${site.name}</b><br><small>${site.location}</small>`;
             
             if (site.employees && site.employees.length > 0) {
                 popupContent += '<div class="mt-2 pt-2 border-t border-gray-200">';
@@ -1645,6 +1731,71 @@
         filterEmployee.addEventListener('keyup', filterAllocations);
         filterSite.addEventListener('keyup', filterAllocations);
     }
+
+    // Edit Leave popup: fill from the row, keep End Date on or after Start Date
+    function openEditLeaveModal(url, button) {
+        const row = button.closest('tr');
+        document.getElementById('edit_leave_employee').value = row.dataset.employeeId;
+        document.getElementById('edit_leave_start').value = row.dataset.start;
+        document.getElementById('edit_leave_end').value = row.dataset.end;
+        document.getElementById('edit_leave_end').min = row.dataset.start;
+        document.getElementById('edit_leave_reason').value = row.dataset.reason || '';
+        document.getElementById('editLeaveForm').action = url;
+        document.getElementById('editLeaveModal').classList.remove('hidden');
+    }
+    function closeEditLeaveModal() {
+        document.getElementById('editLeaveModal').classList.add('hidden');
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        const start = document.getElementById('edit_leave_start');
+        const end = document.getElementById('edit_leave_end');
+        if (!start || !end) return;
+        start.addEventListener('change', function () {
+            end.min = start.value;
+            if (end.value && end.value < start.value) end.value = start.value;
+        });
+    });
+
+    // Leaves panel: Upcoming (incl. on leave now) / Past / All, plus a name filter
+    (function () {
+        const rows = Array.from(document.querySelectorAll('#leave-table-body tr.leave-row'));
+        const empty = document.getElementById('leave-empty-row');
+        const nameBox = document.getElementById('leave-filter-name');
+        const buttons = Array.from(document.querySelectorAll('.leave-view-btn'));
+        if (!empty || !nameBox) return;
+        let view = 'upcoming';
+        try { view = sessionStorage.getItem('leave-view') || 'upcoming'; } catch (e) {}
+        const emptyText = { upcoming: 'No upcoming leaves found.', past: 'No past leaves found.', all: 'No leaves found.' };
+        function apply() {
+            const q = nameBox.value.trim().toLowerCase();
+            let shown = 0;
+            rows.forEach(function (r) {
+                const stateOk = view === 'all' || (view === 'past' ? r.dataset.state === 'past' : r.dataset.state !== 'past');
+                const ok = stateOk && (!q || r.dataset.name.includes(q));
+                r.style.display = ok ? '' : 'none';
+                if (ok) shown++;
+            });
+            empty.classList.toggle('hidden', shown > 0);
+            empty.querySelector('td').textContent = emptyText[view];
+            buttons.forEach(function (b) {
+                const on = b.dataset.view === view;
+                b.classList.toggle('bg-white', on);
+                b.classList.toggle('text-indigo-700', on);
+                b.classList.toggle('shadow-sm', on);
+                b.classList.toggle('text-gray-600', !on);
+                b.setAttribute('aria-pressed', on);
+            });
+        }
+        buttons.forEach(function (b) {
+            b.addEventListener('click', function () {
+                view = b.dataset.view;
+                try { sessionStorage.setItem('leave-view', view); } catch (e) {}
+                apply();
+            });
+        });
+        nameBox.addEventListener('input', apply);
+        apply();
+    })();
 
     // Team Allocations: sort by how long each allocation has lasted. "At site" puts project-site
     // allocations first (longest or shortest first) and office ones after; "in office" the

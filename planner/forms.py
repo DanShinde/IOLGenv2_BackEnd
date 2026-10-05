@@ -2,7 +2,7 @@
 
 from django import forms
 from employees.models import Employee
-from .models import Project, Activity, Leave, Site, SiteAllocation
+from .models import Project, Activity, Leave, Site, SiteAllocation, SITE_DISPLAY_ORDER
 
 class ProjectForm(forms.ModelForm):
     # Not columns on planner.Project -- these live on the linked tracker.Project.
@@ -56,6 +56,8 @@ class ActivityForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if 'project' in self.fields:  # "A1404 - Almarai Bakery, Riyad"
+            self.fields['project'].label_from_instance = lambda p: p.display_name
         for field in self.fields.values():
             common_classes = 'form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500'
             current_classes = field.widget.attrs.get('class', '')
@@ -81,6 +83,13 @@ class LeaveForm(forms.ModelForm):
                 'class': 'form-input w-full px-3 py-2 text-xs rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:outline-none'
             })
 
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get('start_date'), cleaned.get('end_date')
+        if start and end and end < start:
+            self.add_error('end_date', 'End date cannot be before the start date.')
+        return cleaned
+
 class SiteForm(forms.ModelForm):
     class Meta:
         model = Site
@@ -89,6 +98,7 @@ class SiteForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['project'].empty_label = "Select Project Code"
+        self.fields['project'].label_from_instance = lambda p: p.display_name
         self.fields['name'].required = False
         self.fields['project'].required = False
         for field_name, field in self.fields.items():
@@ -132,6 +142,8 @@ class SiteAllocationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Inactive employees cannot be assigned to a site
         self.fields['employee'].queryset = self.fields['employee'].queryset.filter(is_active=True).order_by('name')
+        # Options read "A1579 - SRF LIMITED" (Site.__str__), ordered by project code
+        self.fields['site'].queryset = self.fields['site'].queryset.select_related('project').order_by(*SITE_DISPLAY_ORDER)
         for field in self.fields.values():
             field.widget.attrs.update({
                 'class': 'form-input w-full px-3 py-2 text-xs rounded-lg border-2 border-gray-300 focus:border-indigo-500 focus:outline-none'
