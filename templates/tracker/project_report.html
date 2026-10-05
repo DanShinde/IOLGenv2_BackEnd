@@ -650,9 +650,9 @@
                             <thead class="table-light">
                                 <tr>
                                     {# Emulation has no phase-tag slot (72px), so it is that much narrower: the circle spacing still matches Automation #}
-                                    <th style="width: 190px;">Project</th>
-                                    <th style="width: calc((100% - 190px + 72px) / 2);"><div class="tl-heading tl-heading-auto"><i class="fas fa-cogs me-1"></i>Automation Timeline</div></th>
-                                    <th style="width: calc((100% - 190px - 72px) / 2);"><div class="tl-heading tl-heading-emu"><i class="fas fa-gamepad me-1"></i>Emulation Timeline</div></th>
+                                    <th style="width: 240px;">Project</th>
+                                    <th style="width: calc((100% - 240px + 72px) / 2);"><div class="tl-heading tl-heading-auto"><i class="fas fa-cogs me-1"></i>Automation Timeline</div></th>
+                                    <th style="width: calc((100% - 240px - 72px) / 2);"><div class="tl-heading tl-heading-emu"><i class="fas fa-gamepad me-1"></i>Emulation Timeline</div></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -660,8 +660,21 @@
                                 {% with project=item.project ps=item.summary %}
                                 <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}" data-project-id="{{ project.id }}">
                                     <td>
-                                        <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
-                                        <div class="text-muted small lh-sm">{{ project.customer_name }}</div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            {# Overall completion ring: same figure as the Summary tab's Overall Completion column #}
+                                            <svg class="tl-ring flex-shrink-0" viewBox="0 0 44 44" width="46" height="46" role="img" aria-label="Overall completion {{ ps.completion }}%">
+                                                <title>Overall completion: {{ ps.completion }}% (average % completion of the project's stages)</title>
+                                                <circle cx="22" cy="22" r="18" fill="none" stroke="#d9d9d9" stroke-width="5"></circle>
+                                                <circle cx="22" cy="22" r="18" fill="none" stroke="#70ad47" stroke-width="5" pathLength="100"
+                                                        stroke-dasharray="{{ ps.completion }} 100" transform="rotate(-90 22 22)"></circle>
+                                                <text x="22" y="22" text-anchor="middle" dominant-baseline="central"
+                                                      class="tl-ring-text {% if ps.completion >= 100 %}done{% elif ps.completion >= 50 %}mid{% else %}low{% endif %}">{{ ps.completion }}%</text>
+                                            </svg>
+                                            <div class="min-w-0">
+                                                <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
+                                                <div class="text-muted small lh-sm">{{ project.customer_name }}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         {% for t in ps.timelines %}
@@ -736,6 +749,10 @@
         .mini-roadmap .status-NotApplicable, .legend-dot.status-NotApplicable { background-color: #8d99ae; color: #fff; }
         .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
         #projectTimelineTable td { padding-top: 10px; padding-bottom: 10px; vertical-align: top; }
+        .tl-ring-text { font-size: 11px; font-weight: 700; }
+        .tl-ring-text.low { fill: #dc3545; }
+        .tl-ring-text.mid { fill: #b7791f; }
+        .tl-ring-text.done { fill: #2f855a; }
     </style>
     <script>
         // Rows shown = ticked projects (none ticked = all) AND the text filter
