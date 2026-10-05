@@ -12,6 +12,7 @@
     .tcell.task { background: #6366f1; }
     .tcell.leave { background: #f59e0b; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 2px, transparent 2px 4px); }
     .tcell.off { background: transparent; border: 1px dashed #dbe1ea; }
+    .tcell.not_employed { background: #e5e7eb; opacity: .55; }
     .tcell.is-today { box-shadow: 0 0 0 1.5px #4f46e5; }
     .legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
     .leave-swatch { background: #f59e0b; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 2px, transparent 2px 4px); }
@@ -215,12 +216,14 @@
                         <td>
                             <div class="timeline-strip">
                                 {% for day in r.timeline %}
-                                <div class="tcell {{ day.status }}{% if day.is_today %} is-today{% endif %}" title="{{ day.date|date:'D, M j' }} &middot; {% if day.status == 'free' %}Free{% elif day.status == 'task' %}Booked{% elif day.status == 'leave' %}On leave{% else %}Weekend/holiday{% endif %}"></div>
+                                <div class="tcell {{ day.status }}{% if day.is_today %} is-today{% endif %}" title="{{ day.date|date:'D, M j' }} &middot; {% if day.status == 'free' %}Free{% elif day.status == 'task' %}Booked{% elif day.status == 'leave' %}On leave{% elif day.status == 'not_employed' %}Not on the roll (before joining / after leaving){% else %}Weekend/holiday{% endif %}"></div>
                                 {% endfor %}
                             </div>
                         </td>
                         <td class="whitespace-nowrap">
-                            {% if r.status_badge.kind == 'leave_now' %}
+                            {% if r.status_badge.kind == 'not_joined' %}
+                            <span class="status-badge" style="background:#eef2ff;color:#4338ca;">Joins {{ r.status_badge.join_date|date:"M j" }}</span>
+                            {% elif r.status_badge.kind == 'leave_now' %}
                             <span class="status-badge leave">On leave &middot; back {{ r.status_badge.back_date|date:"M j" }}</span>
                             {% elif r.status_badge.kind == 'leave_upcoming' %}
                             <span class="status-badge leave">Leave {{ r.status_badge.start|date:"M j" }}&ndash;{{ r.status_badge.end|date:"M j" }}</span>
@@ -232,7 +235,7 @@
                             <span class="status-badge {% if r.occupancy_pct >= 50 %}occ{% else %}free{% endif %}">{{ r.occupancy_pct }}% booked</span>
                             {% endif %}
                         </td>
-                        <td class="whitespace-nowrap text-sm font-semibold text-gray-700 mono">{{ r.available_days }}<span class="text-gray-400 font-normal"> / {{ total_working_days }}</span></td>
+                        <td class="whitespace-nowrap text-sm font-semibold text-gray-700 mono">{{ r.available_days }}<span class="text-gray-400 font-normal"> / {{ r.working_days }}</span>{% if r.joined_in_period %}<span class="block text-xs font-normal text-indigo-600" title="Counted from the joining date only">Joined {{ r.employee.join_date|date:"M j" }}</span>{% endif %}</td>
                     </tr>
                     <tr class="detail-row hidden" id="detail-{{ forloop.counter }}">
                         <td colspan="4">

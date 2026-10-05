@@ -738,10 +738,13 @@ def workforce_view(request):
             if name and designation:
                 if Employee.objects.filter(name__iexact=name).exists():
                     error_message = f"Team member with name '{name}' already exists."
-                    entered_data = {'name': name, 'designation': designation, 'is_active': is_active_val, 'segment': segment_id}
+                    entered_data = {'name': name, 'designation': designation, 'is_active': is_active_val,
+                                    'segment': segment_id, 'join_date': request.POST.get('join_date', '')}
                     active_tab = 'employees'
                 else:
-                    Employee.objects.create(name=name, designation=designation, is_active=is_active, segment=segment_obj)
+                    # Join date: reports count this person's working days only from it
+                    Employee.objects.create(name=name, designation=designation, is_active=is_active, segment=segment_obj,
+                                            join_date=parse_date(request.POST.get('join_date') or ''))
                     return _redirect_to_referer_or(request, reverse('planner_workforce'))
 
         elif 'add_leave' in request.POST:
@@ -883,6 +886,38 @@ def _last_counted_day(employee):
     return employee.last_working_day or date.min
 
 
+def _employment_window(employee, start_date, end_date):
+    """The part of [start_date, end_date] the employee is on the roll: from their join date
+    (if set and later) to their last counted day (inactive employees). Empty when start > end,
+    e.g. someone joining after the period. Reports count days, capacity and occupancy only
+    inside this window, so a recent joiner isn't credited with the whole period."""
+    if employee.join_date and employee.join_date > start_date:
+        start_date = employee.join_date
+    last_day = _last_counted_day(employee)
+    if last_day is not None and last_day < end_date:
+        end_date = last_day
+    return start_date, end_date
+
+
+def _person_supply_hours(employee, p_start, p_end, holidays, leaves, hours_per_day, settings):
+    """Capacity one person adds to a planning period, counting only the working days they are
+    employed (join date .. last working day). Returns (days employed, share of the period as a
+    0-1 FTE, net hours after leave, meetings/leave allowance and efficiency loss). The
+    allowance is pro-rated by the share, so a mid-month joiner gets part of it."""
+    ws, we = _employment_window(employee, p_start, p_end)
+    days = count_working_days(ws, we, holidays) if we >= ws else 0
+    if not days:
+        return 0, 0.0, 0.0
+    full_days = count_working_days(p_start, p_end, holidays)
+    share = days / full_days if full_days else 0.0
+    leave_days = sum(calculate_overlap_working_days(lv.start_date, lv.end_date, ws, we, holidays) for lv in leaves)
+    gross = (days - leave_days) * hours_per_day
+    month_factor = ((p_end - p_start).days + 1) / 30.44
+    non_project = share * (settings.monthly_meeting_hours + settings.monthly_leave_hours) * month_factor
+    efficiency_loss = (gross - non_project) * (settings.efficiency_loss_factor / 100)
+    return days, share, gross - non_project - efficiency_loss
+
+
 def _get_site_history_data(request):
     engineer_id = request.GET.get('engineer')
     site_id = request.GET.get('site')
@@ -915,12 +950,10 @@ def _get_site_history_data(request):
         # Calculate effective duration within the window
         eff_start = max(alloc.start_date, start_date)
         eff_end = min(alloc.end_date, end_date) if alloc.end_date else end_date
-        # Nothing after an inactive employee's last working day counts
-        last_day = _last_counted_day(alloc.employee)
-        if last_day is not None:
-            eff_end = min(eff_end, last_day)
-            if eff_end < eff_start:
-                continue
+        # Only days the person is employed count (join date .. last working day)
+        eff_start, eff_end = _employment_window(alloc.employee, eff_start, eff_end)
+        if eff_end < eff_start:
+            continue
 
         duration = (eff_end - eff_start).days + 1
         if duration < 0: duration = 0
@@ -1070,11 +1103,9 @@ def _leave_entries_in_period(employee, start_date, end_date, holidays=None):
 def _compute_employee_day_breakdown(employee, start_date, end_date):
     """Day-by-day bucket for one employee over a period: On Leave beats On Site beats the
     default In Office bucket (gap days with no allocation/leave record count as office).
-    Leave counts working days only (see _is_leave_day). An inactive employee is counted
-    only up to their last working day."""
-    last_day = _last_counted_day(employee)
-    if last_day is not None and last_day < end_date:
-        end_date = last_day
+    Leave counts working days only (see _is_leave_day). Only days the person is employed
+    count: from their join date, and up to their last working day if inactive."""
+    start_date, end_date = _employment_window(employee, start_date, end_date)
     if end_date < start_date:
         return {'total_days': 0, 'on_leave_days': 0, 'office_days': 0, 'on_site_days': 0, 'site_days': {}}
     holidays = set(Holiday.objects.values_list('date', flat=True))
@@ -1276,9 +1307,8 @@ def employee_site_history_report_view(request):
             if selected_employee_obj:
                 employee_breakdown = _compute_employee_day_breakdown(selected_employee_obj, start_date, end_date)
                 # The leave entries behind the "Days on leave" card, with how each was counted
-                last_day = _last_counted_day(selected_employee_obj)
-                leave_end = min(end_date, last_day) if last_day is not None else end_date
-                employee_leave_rows = _leave_entries_in_period(selected_employee_obj, start_date, leave_end) if leave_end >= start_date else []
+                leave_start, leave_end = _employment_window(selected_employee_obj, start_date, end_date)
+                employee_leave_rows = _leave_entries_in_period(selected_employee_obj, leave_start, leave_end) if leave_end >= leave_start else []
                 site_names = list(employee_breakdown['site_days'].keys())
                 chart_labels = _site_chart_labels(site_names) + ['In Office', 'On Leave']
                 chart_values = [employee_breakdown['site_days'][n] for n in site_names] + [
@@ -1845,10 +1875,14 @@ def resource_availability_report_view(request):
 
     resources = []
     for emp in employees_qs:
-        emp_task_days = task_days_by_employee.get(emp.id, set())
-        emp_leave_days = leave_days_by_employee.get(emp.id, set())
+        # Only the days this person is employed: a recent joiner has fewer working days
+        emp_start, emp_end = _employment_window(emp, period_start, period_end)
+        emp_working_days = count_working_days(emp_start, emp_end, holidays) if emp_end >= emp_start else 0
+        not_joined = emp.join_date is not None and emp.join_date > period_start
+        emp_task_days = {d for d in task_days_by_employee.get(emp.id, set()) if emp_start <= d <= emp_end}
+        emp_leave_days = {d for d in leave_days_by_employee.get(emp.id, set()) if emp_start <= d <= emp_end}
         occupied_days = len(emp_task_days | emp_leave_days)
-        occupancy_pct = round((occupied_days / total_working_days) * 100, 1) if total_working_days else 0
+        occupancy_pct = round((occupied_days / emp_working_days) * 100, 1) if emp_working_days else 0
 
         # Group this resource's tasks by project (each project links back to its planner page).
         emp_activities = sorted(activities_by_employee.get(emp.id, []), key=lambda a: a.start_date)
@@ -1865,7 +1899,9 @@ def resource_availability_report_view(request):
         timeline = []
         current_date = period_start
         while current_date <= period_end:
-            if current_date.weekday() >= 5 or current_date in holidays_set:
+            if current_date < emp_start or current_date > emp_end:
+                status = 'not_employed'
+            elif current_date.weekday() >= 5 or current_date in holidays_set:
                 status = 'off'
             elif current_date in emp_leave_days:
                 status = 'leave'
@@ -1878,7 +1914,9 @@ def resource_availability_report_view(request):
 
         # Headline badge: currently-on-leave beats upcoming leave beats a plain occupancy read.
         current_leave = next((lv for lv in emp_leaves if lv.start_date <= today <= lv.end_date), None)
-        if current_leave:
+        if emp_working_days == 0:
+            status_badge = {'kind': 'not_joined', 'join_date': emp.join_date}
+        elif current_leave:
             status_badge = {'kind': 'leave_now', 'back_date': current_leave.end_date + timedelta(days=1)}
         elif emp_leaves:
             nxt = emp_leaves[0]
@@ -1893,7 +1931,9 @@ def resource_availability_report_view(request):
         resources.append({
             'employee': emp,
             'occupied_days': occupied_days,
-            'available_days': max(0, total_working_days - occupied_days),
+            'working_days': emp_working_days,
+            'joined_in_period': not_joined,
+            'available_days': max(0, emp_working_days - occupied_days),
             'occupancy_pct': occupancy_pct,
             'project_groups': list(project_groups.values()),
             'task_count': len(emp_activities),
@@ -1915,6 +1955,8 @@ def resource_availability_report_view(request):
         ('0', {'label': '<10% free', 'min': 0, 'max': 9.9, 'count': 0, 'color': 'rose'}),
     ])
     for r in resources:
+        if not r['working_days']:
+            continue
         free_pct = 100 - r['occupancy_pct']
         for bucket in free_buckets.values():
             if bucket['min'] <= free_pct <= bucket['max']:
@@ -1938,7 +1980,7 @@ def resource_availability_report_view(request):
     if selected_bucket:
         display_resources = [
             r for r in resources
-            if selected_bucket['min'] <= (100 - r['occupancy_pct']) <= selected_bucket['max']
+            if r['working_days'] and selected_bucket['min'] <= (100 - r['occupancy_pct']) <= selected_bucket['max']
         ]
 
     selected_sort = request.GET.get('sort', 'available')
@@ -2009,6 +2051,7 @@ def update_employee_view(request, pk):
             if not is_active:
                 employee.last_working_day = parse_date(request.POST.get('last_working_day') or '') or employee.last_working_day
             employee.segment = segment_obj
+            employee.join_date = parse_date(request.POST.get('join_date') or '')
             employee.save()
             return _redirect_to_referer_or(request, reverse('planner_workforce'))
     return _redirect_to_referer_or(request, reverse('planner_workforce'))
@@ -2645,34 +2688,36 @@ def capacity_plan_view(request):
             curr += timedelta(days=1)
 
     all_leaves = Leave.objects.select_related('employee').filter(end_date__gte=min_date, start_date__lte=max_date)
-    leaves_by_designation = defaultdict(list)
+    leaves_by_employee = defaultdict(list)
     for leave in all_leaves:
-        leaves_by_designation[leave.employee.designation].append(leave)
+        leaves_by_employee[leave.employee_id].append(leave)
 
+    # Supply is per person and only for the days they are employed, so a recent joiner adds
+    # just their days after joining (and someone leaving, only up to their last day).
+    capacity_employees = list(
+        Employee.objects.exclude(name__startswith='Unassigned')
+        .filter(Q(is_active=True) | Q(last_working_day__gte=min_date))
+    )
     supply_data = defaultdict(dict)
     for p in periods:
-        working_days = count_working_days(p['start'], p['end'], holidays)
-        period_days = (p['end'] - p['start']).days + 1
-        month_factor = period_days / 30.44 
-
-        for designation, count in workforce_counts.items():
+        for designation in workforce_counts:
             settings = capacity_settings[designation]
-            
-            total_leave_man_days = 0
-            for leave in leaves_by_designation[designation]:
-                total_leave_man_days += calculate_overlap_working_days(
-                    leave.start_date, leave.end_date, 
-                    p['start'], p['end'], holidays
-                )
-            
-            gross_hours = ((count * working_days) - total_leave_man_days) * general_settings.working_hours_per_day
-            non_project_hours = count * (settings.monthly_meeting_hours + settings.monthly_leave_hours) * month_factor
-            efficiency_loss = (gross_hours - non_project_hours) * (settings.efficiency_loss_factor / 100)
-            net_hours = gross_hours - non_project_hours - efficiency_loss
-            
+            headcount, fte, net_hours = 0, 0.0, 0.0
+            for emp in capacity_employees:
+                if emp.designation != designation:
+                    continue
+                days, share, hrs = _person_supply_hours(
+                    emp, p['start'], p['end'], holidays, leaves_by_employee[emp.id],
+                    general_settings.working_hours_per_day, settings)
+                if days:
+                    headcount += 1
+                    fte += share
+                    net_hours += hrs
+
             supply_data[designation][p['key']] = {
-                'available_hours': net_hours, 
-                'headcount': count
+                'available_hours': net_hours,
+                'headcount': headcount,
+                'fte': fte,
             }
 
     # -- TRACK DAILY DEMAND FOR WEEKLY MAX CALCULATION --
@@ -2822,8 +2867,7 @@ def capacity_plan_view(request):
         for des_val, des_label in [('ENGINEER', 'Engineer'), ('TEAM_LEAD', 'Team Lead')]:
             seg_data = {'name': f"{seg_name} - {des_label}", 'segment_name': seg_name, 'designation': des_label, 'data': []}
             
-            segment_employees = Employee.objects.filter(segment=segment, designation=des_val, is_active=True).exclude(name__startswith='Unassigned')
-            seg_hc = segment_employees.count()
+            segment_employees = [e for e in capacity_employees if e.segment_id == segment.id and e.designation == des_val]
 
             for p in periods:
                 live = live_workload_by_segment[(seg_name, des_val)].get(p['key'], 0)
@@ -2835,21 +2879,17 @@ def capacity_plan_view(request):
                 month_factor = period_days / 30.44
                 
                 available_hrs = 0
+                seg_hc = 0  # people employed for at least part of this period
                 settings = capacity_settings.get(des_val, capacity_settings['ENGINEER'])
                 for emp in segment_employees:
-                    emp_leave_days = 0
-                    for leave in all_leaves:
-                        if leave.employee_id == emp.id:
-                            emp_leave_days += calculate_overlap_working_days(
-                                leave.start_date, leave.end_date, p['start'], p['end'], holidays
-                            )
-                    gross_hrs = (working_days - emp_leave_days) * general_settings.working_hours_per_day
-                    non_proj_hrs = (settings.monthly_meeting_hours + settings.monthly_leave_hours) * month_factor
-                    eff_loss = (gross_hrs - non_proj_hrs) * (settings.efficiency_loss_factor / 100)
-                    net_hrs = gross_hrs - non_proj_hrs - eff_loss
+                    days, _share, net_hrs = _person_supply_hours(
+                        emp, p['start'], p['end'], holidays, leaves_by_employee[emp.id],
+                        general_settings.working_hours_per_day, settings)
+                    if days:
+                        seg_hc += 1
                     if net_hrs > 0:
                         available_hrs += net_hrs
-                
+
                 dates_in_period = []
                 curr = p['start']
                 while curr <= p['end']:
@@ -2946,7 +2986,8 @@ def capacity_plan_view(request):
             # based on the Max Headcount and the Period's average capacity per person.
             # This ensures (Available - Required) Variance reflects the headcount gap.
             
-            period_avg_hours_per_person = (available_hours / headcount) if headcount > 0 else 0
+            fte = supply.get('fte', 0)
+            period_avg_hours_per_person = (available_hours / fte) if fte > 0 else 0
             
             # Fallback if no headcount exists to determine period hours
             if period_avg_hours_per_person == 0:
