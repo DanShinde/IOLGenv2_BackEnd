@@ -1044,7 +1044,10 @@ def project_reports(request):
             'next_emu_milestone': get_next_milestone(emu_stages),
             'auto_schedule': get_schedule_status(auto_stages),
             'emu_schedule': get_schedule_status(emu_stages),
-            'summary': _project_summary(phases_by_project.get(project.id, []), auto_stages, emu_stages),
+            'summary': {**_project_summary(phases_by_project.get(project.id, []), auto_stages, emu_stages),
+                        # Overall Completion: average % completion of the project's stages
+                        # (Not Applicable left out) -- same figure as the project page
+                        'completion': get_completion_percentage(all_stages)},
             'last_updated': last_update_by_project.get(project.id) or project.so_punch_date,
         })
 
@@ -2035,6 +2038,10 @@ def export_project_summary_excel(request):
     q = (request.GET.get('q') or '').strip().lower()
     if q:
         projects = [p for p in projects if q in f"{p.code} {p.customer_name}".lower()]
+    # Projects ticked in the table's Projects dropdown (none = all)
+    picked = {v for v in request.GET.getlist('pick') if v.isdigit()}
+    if picked:
+        projects = [p for p in projects if str(p.id) in picked]
 
     automation_order = {name: i for i, (name, _) in enumerate(Stage.AUTOMATION_STAGES)}
     emulation_order = {name: i for i, (name, _) in enumerate(Stage.EMULATION_STAGES)}
@@ -2062,7 +2069,7 @@ def export_project_summary_excel(request):
 
     columns = [  # (heading, width)
         ('Project Code', 13), ('Customer', 30), ('Segment', 15), ('Team Lead', 24), ('Status', 13),
-        ('Last Updated', 13), ('Overall OTIF %', 11), ('Handover', 12),
+        ('Last Updated', 13), ('Overall OTIF %', 11), ('Overall Completion %', 12), ('Handover', 12),
         ('Next Automation Milestone', 34), ('Next Emulation Milestone', 34),
         ('Automation Schedule', 36), ('Emulation Schedule', 36),
     ]
@@ -2116,7 +2123,8 @@ def export_project_summary_excel(request):
         stages = list(p.stages.select_related('phase'))
         auto = sort_stages_by_phase([s for s in stages if s.stage_type == 'Automation'], automation_order)
         emu = sort_stages_by_phase([s for s in stages if s.stage_type == 'Emulation'], emulation_order)
-        rows.append((p, _project_summary(phases_by_project.get(p.id, []), auto, emu),
+        rows.append((p, {**_project_summary(phases_by_project.get(p.id, []), auto, emu),
+                         'completion': get_completion_percentage(stages)},
                      last_update_by_project.get(p.id) or p.so_punch_date))
 
     # --- KPI strip ---
@@ -2198,7 +2206,7 @@ def export_project_summary_excel(request):
         values = [
             p.code, p.customer_name, p.segment_con.name if p.segment_con else '',
             p.team_lead.name if p.team_lead else '', s['status'], last_date,
-            (s['otif'] / 100) if s['otif'] is not None else '—', handover,
+            (s['otif'] / 100) if s['otif'] is not None else '—', s['completion'] / 100, handover,
             '\n'.join(auto_ms), '\n'.join(emu_ms), '\n'.join(auto_sch), '\n'.join(emu_sch),
         ]
         for i, v in enumerate(values, start=1):
@@ -2217,7 +2225,7 @@ def export_project_summary_excel(request):
             bg, fg = soft[tone]
             cell = ws.cell(row=r, column=col_idx)
             cell.fill = fill(bg)
-            cell.font = Font(size=10, bold=col_idx in (5, 7, 8), color=fg)
+            cell.font = Font(size=10, bold=col_idx in (5, 7, 9), color=fg)
 
         tint(5, status_tone.get(s['status']))
         ws.cell(row=r, column=5).alignment = center_top
@@ -2226,10 +2234,13 @@ def export_project_summary_excel(request):
         if s['otif'] is not None:
             otif_cell.number_format = '0.0%'
             tint(7, 'green' if s['otif'] >= 80 else 'red')
-        tint(8, {'Before Time': 'green', 'On Time': 'blue', 'Delayed': 'red'}.get(handover))
-        ws.cell(row=r, column=8).alignment = center_top
-        tint(11, schedule_tone(auto_st))
-        tint(12, schedule_tone(emu_st))
+        completion_cell = ws.cell(row=r, column=8)
+        completion_cell.number_format = '0%'
+        completion_cell.alignment = center_top
+        tint(9, {'Before Time': 'green', 'On Time': 'blue', 'Delayed': 'red'}.get(handover))
+        ws.cell(row=r, column=9).alignment = center_top
+        tint(12, schedule_tone(auto_st))
+        tint(13, schedule_tone(emu_st))
         # Excel doesn't auto-fit wrapped rows from a file: estimate the tallest cell from its
         # text and column width (~1.15 characters per width unit at 10pt).
         def visual_lines(text, width):

@@ -535,8 +535,29 @@
                         </li>
                     </ul>
                     <div class="d-flex align-items-center gap-2">
+                        {# Pick which projects the Summary and Timeline tabs show (none ticked = all) #}
+                        <div class="dropdown">
+                            <button type="button" id="projectPickBtn" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                <i class="fas fa-filter me-1"></i><span id="projectPickLabel">All projects</span>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end p-2 shadow" style="width: 320px;">
+                                <input type="text" id="projectPickSearch" class="form-control form-control-sm mb-2" placeholder="Search projects..." oninput="filterProjectPickList()" aria-label="Search projects">
+                                <div class="d-flex justify-content-between mb-1 small">
+                                    <button type="button" class="btn btn-link btn-sm p-0" onclick="setProjectPicks(true)">Select shown</button>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-danger" onclick="setProjectPicks(false)">Clear</button>
+                                </div>
+                                <div id="projectPickList" style="max-height: 300px; overflow-y: auto;">
+                                    {% for item in projects_with_details %}
+                                    <label class="dropdown-item align-items-start gap-2 py-1 px-1 small project-pick" data-search="{{ item.project.code|lower }} {{ item.project.customer_name|lower }}" style="display: flex; white-space: normal; cursor: pointer;">
+                                        <input type="checkbox" class="form-check-input mt-1 flex-shrink-0" value="{{ item.project.id }}" data-code="{{ item.project.code }}" onchange="onProjectPickChange()">
+                                        <span><strong>{{ item.project.code }}</strong> - {{ item.project.customer_name }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
                         <input type="text" id="projectSummaryFilter" data-persist-filter="project-summary" class="form-control form-control-sm" style="width: 220px;" placeholder="Filter project / customer..." oninput="filterProjectSummary()">
-                        <span class="badge bg-secondary">{{ projects_with_details|length }} Project{{ projects_with_details|length|pluralize }}</span>
+                        <span class="badge bg-secondary" id="projectSummaryCount">{{ projects_with_details|length }} Project{{ projects_with_details|length|pluralize }}</span>
                         <button type="button" id="copyProjectSummaryBtn" class="btn btn-sm btn-outline-secondary js-summary-only" onclick="copyProjectSummary()" title="Copy the table (rows shown by the filter box) to paste into Excel">
                             <i class="far fa-copy me-1"></i>Copy
                         </button>
@@ -554,6 +575,7 @@
                                     <th>Project</th>
                                     <th>Current Status</th>
                                     <th class="text-center">Overall OTIF %</th>
+                                    <th class="text-center" title="Average % completion of the project's stages (Not Applicable stages left out), as on the project page">Overall Completion</th>
                                     <th>Handover</th>
                                     <th>Next Automation Milestone</th>
                                     <th>Next Emulation Milestone</th>
@@ -564,7 +586,7 @@
                             <tbody>
                                 {% for item in projects_with_details %}
                                 {% with project=item.project ps=item.summary %}
-                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}">
+                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}" data-project-id="{{ project.id }}">
                                     <td>
                                         <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
                                         <div class="text-muted small">{{ project.customer_name }}</div>
@@ -576,6 +598,12 @@
                                     <td class="text-center">
                                         {% if ps.otif is not None %}<span class="fw-bold {% if ps.otif >= 100 %}text-success{% elif ps.otif >= 80 %}text-warning{% else %}text-danger{% endif %}">{{ ps.otif }}%</span>
                                         {% else %}<span class="text-muted small">&mdash;</span>{% endif %}
+                                    </td>
+                                    <td class="text-center" data-completion="{{ ps.completion }}">
+                                        <span class="fw-bold">{{ ps.completion }}%</span>
+                                        <div class="progress mt-1 mx-auto" style="height: 5px; width: 64px;" role="progressbar" aria-label="Overall completion" aria-valuenow="{{ ps.completion }}" aria-valuemin="0" aria-valuemax="100">
+                                            <div class="progress-bar {% if ps.completion >= 100 %}bg-success{% elif ps.completion >= 50 %}bg-primary{% else %}bg-warning{% endif %}" style="width: {{ ps.completion }}%"></div>
+                                        </div>
                                     </td>
                                     <td class="text-nowrap">
                                         {% if ps.handover_otif is not None %}
@@ -609,7 +637,7 @@
                                 </tr>
                                 {% endwith %}
                                 {% empty %}
-                                <tr><td colspan="8" class="text-center py-4 text-muted">No projects match your filter criteria.</td></tr>
+                                <tr><td colspan="9" class="text-center py-4 text-muted">No projects match your filter criteria.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -630,7 +658,7 @@
                             <tbody>
                                 {% for item in projects_with_details %}
                                 {% with project=item.project ps=item.summary %}
-                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}">
+                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}" data-project-id="{{ project.id }}">
                                     <td>
                                         <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
                                         <div class="text-muted small lh-sm">{{ project.customer_name }}</div>
@@ -710,12 +738,51 @@
         #projectTimelineTable td { padding-top: 10px; padding-bottom: 10px; vertical-align: top; }
     </style>
     <script>
+        // Rows shown = ticked projects (none ticked = all) AND the text filter
+        function pickedProjectIds() {
+            return Array.from(document.querySelectorAll('#projectPickList input:checked')).map(cb => cb.value);
+        }
         function filterProjectSummary() {
             const q = document.getElementById('projectSummaryFilter').value.trim().toLowerCase();
+            const picked = new Set(pickedProjectIds());
             document.querySelectorAll('#projectSummaryTable tbody tr[data-search], #projectTimelineTable tbody tr[data-search]').forEach(tr => {
-                tr.style.display = !q || tr.dataset.search.includes(q) ? '' : 'none';
+                const ok = (!picked.size || picked.has(tr.dataset.projectId)) && (!q || tr.dataset.search.includes(q));
+                tr.style.display = ok ? '' : 'none';
+            });
+            const rows = Array.from(document.querySelectorAll('#projectSummaryTable tbody tr[data-search]'));
+            const shown = rows.filter(tr => tr.style.display !== 'none').length;
+            const badge = document.getElementById('projectSummaryCount');
+            if (badge) badge.textContent = (shown === rows.length ? '' : shown + ' of ') + rows.length + ' Project' + (rows.length === 1 ? '' : 's');
+        }
+        function onProjectPickChange() {
+            const boxes = Array.from(document.querySelectorAll('#projectPickList input:checked'));
+            document.getElementById('projectPickLabel').textContent = !boxes.length ? 'All projects'
+                : boxes.length <= 2 ? boxes.map(cb => cb.dataset.code).join(', ')
+                : boxes.length + ' projects selected';
+            try { sessionStorage.setItem('project-summary-picks', JSON.stringify(boxes.map(cb => cb.value))); } catch (e) {}
+            filterProjectSummary();
+        }
+        function filterProjectPickList() {
+            const q = document.getElementById('projectPickSearch').value.trim().toLowerCase();
+            document.querySelectorAll('#projectPickList .project-pick').forEach(l => {
+                l.style.display = !q || l.dataset.search.includes(q) ? '' : 'none';
             });
         }
+        // Tick every project the dropdown's search box currently lists, or untick all
+        function setProjectPicks(on) {
+            document.querySelectorAll('#projectPickList .project-pick').forEach(l => {
+                if (!on || l.style.display !== 'none') l.querySelector('input').checked = on;
+            });
+            onProjectPickChange();
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            let saved = [];
+            try { saved = JSON.parse(sessionStorage.getItem('project-summary-picks') || '[]'); } catch (e) {}
+            if (saved.length) {
+                document.querySelectorAll('#projectPickList input').forEach(cb => { cb.checked = saved.includes(cb.value); });
+                onProjectPickChange();
+            }
+        });
 
         // Timeline circles: Bootstrap tooltips (planned / actual dates), created on first hover
         // rather than up front -- there are seven-plus circles per project line.
@@ -757,7 +824,7 @@
                     return text;
                 }).filter(Boolean);
             };
-            const header = ['Project Code', 'Customer', 'Current Status', 'Last Updated', 'Overall OTIF %', 'Handover',
+            const header = ['Project Code', 'Customer', 'Current Status', 'Last Updated', 'Overall OTIF %', 'Overall Completion %', 'Handover',
                             'Next Automation Milestone', 'Next Emulation Milestone', 'Automation Schedule', 'Emulation Schedule'];
             const rows = [header.map(h => [h])];
             document.querySelectorAll('#projectSummaryTable tbody tr[data-search]').forEach(tr => {
@@ -768,7 +835,7 @@
                     [td[0].querySelector('div').innerText.trim()],
                     [td[1].querySelector('.badge').innerText.trim()],
                     [(td[1].querySelector('div') || {innerText: ''}).innerText.trim()],
-                    cellLines(td[2]), cellLines(td[3]), cellLines(td[4]), cellLines(td[5]), cellLines(td[6]), cellLines(td[7]),
+                    cellLines(td[2]), [td[3].dataset.completion + '%'], cellLines(td[4]), cellLines(td[5]), cellLines(td[6]), cellLines(td[7]), cellLines(td[8]),
                 ]);
             });
 
@@ -803,6 +870,8 @@
             params.delete('chart_view');
             const q = document.getElementById('projectSummaryFilter').value.trim();
             if (q) params.set('q', q); else params.delete('q');
+            params.delete('pick');
+            pickedProjectIds().forEach(id => params.append('pick', id));
             window.location.href = "{% url 'export_project_summary_excel' %}?" + params.toString();
         }
 
