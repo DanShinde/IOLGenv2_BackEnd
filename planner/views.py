@@ -975,13 +975,10 @@ def _pie_colors(n):
     return [_PIE_PALETTE[i % len(_PIE_PALETTE)] for i in range(n)]
 
 def _site_chart_labels(site_names):
-    """Pie labels for sites: project code first ("A1362 - HSPL KASAN II Nagpur"), so a
-    slice can be matched to its project. Sites without a project keep their plain name."""
-    codes = dict(
-        Site.objects.filter(name__in=site_names, project__isnull=False)
-        .values_list('name', 'project__project_id')
-    )
-    return [f"{codes[n]} - {n}" if codes.get(n) else n for n in site_names]
+    """Pie labels for sites. Day breakdowns are keyed by Site.display_name, which already
+    reads "A1362 - HSPL KASAN II Nagpur" (looking the code up by customer name picked an
+    arbitrary code when two projects shared a customer), so the keys are the labels."""
+    return list(site_names)
 
 def _build_pie_drawing(labels, values, hex_colors, width=480, height=150):
     """A reportlab vector Pie chart + legend, ready to place on a canvas page via
@@ -1120,7 +1117,7 @@ def _compute_employee_day_breakdown(employee, start_date, end_date):
 
     allocations = SiteAllocation.objects.filter(
         employee=employee, start_date__lte=end_date
-    ).filter(Q(end_date__gte=start_date) | Q(end_date__isnull=True)).select_related('site')
+    ).filter(Q(end_date__gte=start_date) | Q(end_date__isnull=True)).select_related('site', 'site__project')
 
     day_site = {}
     for alloc in allocations:
@@ -1142,7 +1139,9 @@ def _compute_employee_day_breakdown(employee, start_date, end_date):
         else:
             site = day_site.get(d)
             if site and not site.is_office:
-                site_days[site.name] += 1
+                # Keyed by "A1579 - SRF LIMITED": two projects for the same customer share a
+                # site name, and keying by name merged them into one slice/headcount
+                site_days[site.display_name] += 1
             else:
                 office_days += 1
         d += timedelta(days=1)
@@ -1157,7 +1156,10 @@ def _compute_employee_day_breakdown(employee, start_date, end_date):
 
 def _compute_site_day_breakdown(site, start_date, end_date):
     """Day-by-day presence at one site: coverage days, total person-days, and per-employee days.
-    A day an employee is on recorded leave does not count toward that employee's presence."""
+    Same rules as the rest of the report: only days the person is employed (join date ..
+    last working day), and a working day on leave doesn't count as presence (a weekend or
+    holiday inside a leave still does). An engineer with no counted day isn't listed."""
+    holidays = set(Holiday.objects.values_list('date', flat=True))
     allocations = SiteAllocation.objects.filter(
         site=site, start_date__lte=end_date
     ).filter(Q(end_date__gte=start_date) | Q(end_date__isnull=True)).select_related('employee')
@@ -1182,9 +1184,10 @@ def _compute_site_day_breakdown(site, start_date, end_date):
         employees_map[emp.id] = emp
         d = max(alloc.start_date, start_date)
         last = min(alloc.end_date, end_date) if alloc.end_date else end_date
+        d, last = _employment_window(emp, d, last)
         emp_leave_days = leave_by_employee.get(emp.id, set())
         while d <= last:
-            if d not in emp_leave_days:
+            if not (d in emp_leave_days and _is_leave_day(d, holidays)):
                 employee_days[emp.id] += 1
                 coverage_days.add(d)
             d += timedelta(days=1)
@@ -1200,18 +1203,22 @@ def _get_site_wise_overview(request):
     when no single site is selected yet — reuses the same filtered allocation set as the
     employee-wise report so status/date/engineer filters stay consistent across tabs."""
     report_data, start_date, end_date = _get_site_history_data(request)
-    site_summary = defaultdict(lambda: {'site': None, 'employees': set(), 'person_days': 0})
+    sites = {}
     for employee, history in report_data.items():
         for item in history:
-            entry = site_summary[item['site'].id]
-            entry['site'] = item['site']
-            entry['employees'].add(employee)
-            entry['person_days'] += item['duration']
+            sites.setdefault(item['site'].id, item['site'])
 
-    overview = [
-        {'site': data['site'], 'engineer_count': len(data['employees']), 'person_days': data['person_days']}
-        for data in site_summary.values()
-    ]
+    # Engineers and person-days per site come from the same day-by-day breakdown as the
+    # site's detail page (so the row, the graph and the detail agree), limited to the
+    # engineers the filters above leave in. Someone whose allocated days were all leave, or
+    # whose allocation is empty (ends before it starts), has no day there and isn't counted.
+    filtered_ids = {emp.pk for emp in report_data}
+    overview = []
+    for site in sites.values():
+        days = {emp: n for emp, n in _compute_site_day_breakdown(site, start_date, end_date)['employee_days'].items()
+                if emp.pk in filtered_ids}
+        if days:
+            overview.append({'site': site, 'engineer_count': len(days), 'person_days': sum(days.values())})
     overview.sort(key=lambda x: x['site'].display_name)
     return overview
 
@@ -2052,6 +2059,10 @@ def update_employee_view(request, pk):
                 employee.last_working_day = parse_date(request.POST.get('last_working_day') or '') or employee.last_working_day
             employee.segment = segment_obj
             employee.join_date = parse_date(request.POST.get('join_date') or '')
+            if employee.join_date and employee.last_working_day and employee.last_working_day < employee.join_date:
+                context = _get_workforce_context()
+                context['error_message'] = "Cannot update: the last working day can't be before the join date."
+                return render(request, 'planner/workforce.html', context)
             employee.save()
             return _redirect_to_referer_or(request, reverse('planner_workforce'))
     return _redirect_to_referer_or(request, reverse('planner_workforce'))
@@ -2157,7 +2168,9 @@ def update_site_view(request, pk):
     return _redirect_to_referer_or(request, fallback)
 
 def delete_site_allocation_view(request, pk):
-    get_object_or_404(SiteAllocation, pk=pk).delete()
+    # POST only (Delete button with a confirmation), so a stray link visit can't delete
+    if request.method == 'POST':
+        get_object_or_404(SiteAllocation, pk=pk).delete()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
 def update_site_allocation_view(request, pk):
@@ -2174,11 +2187,17 @@ def update_site_allocation_view(request, pk):
             str(allocation.employee_id) != str(employee_id)
             and not Employee.objects.filter(pk=employee_id, is_active=True).exists()
         )
-        if employee_id and site_id and start_date_str and not reassigning_to_inactive:
+        new_start = parse_date(start_date_str or '')
+        new_end = parse_date(end_date_str) if end_date_str else None
+        if new_start and new_end and new_end < new_start:
+            context = _get_workforce_context()
+            context['error_message'] = "Cannot update the allocation: the end date can't be before the start date."
+            return render(request, 'planner/workforce.html', context)
+        if employee_id and site_id and new_start and not reassigning_to_inactive:
             allocation.employee_id = employee_id
             allocation.site_id = site_id
-            allocation.start_date = parse_date(start_date_str)
-            allocation.end_date = parse_date(end_date_str) if end_date_str else None
+            allocation.start_date = new_start
+            allocation.end_date = new_end
             allocation.save()
     return _redirect_to_referer_or(request, f"{reverse('planner_workforce')}?tab=site_team&subtab=allocations")
 
@@ -2188,6 +2207,11 @@ def relieve_site_allocation_view(request, pk):
         end_date_str = request.POST.get('end_date')
         if end_date_str:
             relieve_date = parse_date(end_date_str)
+            if relieve_date and relieve_date < allocation.start_date:
+                context = _get_workforce_context()
+                context['error_message'] = (f"Cannot relieve {allocation.employee.name}: the relieve date can't be before "
+                                            f"the allocation start ({allocation.start_date:%d %b %Y}).")
+                return render(request, 'planner/workforce.html', context)
             allocation.end_date = relieve_date
             allocation.save()
 

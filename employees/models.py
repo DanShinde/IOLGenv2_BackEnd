@@ -43,6 +43,37 @@ class Employee(models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_designation_display()})"
 
+    @property
+    def experience_months(self):
+        """Whole months in the company: join date to today, or to the last working day for
+        someone who has left. None when the join date isn't recorded."""
+        if not self.join_date:
+            return None
+        from django.utils import timezone
+        end = self.last_working_day if (not self.is_active and self.last_working_day) else timezone.localdate()
+        if end < self.join_date:
+            return 0
+        months = (end.year - self.join_date.year) * 12 + (end.month - self.join_date.month)
+        if end.day < self.join_date.day:
+            months -= 1
+        return max(months, 0)
+
+    @property
+    def experience_display(self):
+        """Experience in Armstrong as "2 yrs 3 mos" (no database column, so no migration)."""
+        months = self.experience_months
+        if months is None:
+            return ''
+        years, rem = divmod(months, 12)
+        if not years and not rem:
+            return '< 1 mo'
+        parts = []
+        if years:
+            parts.append(f"{years} yr{'s' if years != 1 else ''}")
+        if rem:
+            parts.append(f"{rem} mo{'s' if rem != 1 else ''}")
+        return ' '.join(parts)
+
     def save(self, *args, **kwargs):
         # One rule however the status is changed (Workforce, admin, Skill Gap Analyzer):
         # inactive always has a last working day (today if none was chosen), active has none.
