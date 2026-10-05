@@ -807,6 +807,13 @@
                                     {% if not alloc.end_date and alloc.employee.is_active %}
                                     <button onclick="openTransferModal('{% url 'planner_transfer_site_allocation' alloc.pk %}', this, '{{ alloc.employee.name|escapejs }}', '{{ alloc.site.display_name|escapejs }}')" class="ml-3 text-teal-600 hover:text-teal-800 font-medium">Transfer</button>
                                     {% endif %}
+                                    <form method="POST" action="{% url 'planner_delete_site_allocation' alloc.pk %}" class="inline"
+                                          data-employee="{{ alloc.employee.name }}" data-site="{{ alloc.site.display_name }}"
+                                          data-period="{{ alloc.start_date|date:'d M Y' }} to {% if alloc.end_date %}{{ alloc.end_date|date:'d M Y' }}{% else %}Present{% endif %}"
+                                          onsubmit="return confirmDeleteAllocation(this);">
+                                        {% csrf_token %}
+                                        <button type="submit" class="ml-3 text-red-600 hover:text-red-800 font-medium">Delete</button>
+                                    </form>
                                 </td>
                             </tr>
                             {% empty %}
@@ -1759,6 +1766,15 @@
     if (filterEmployee && filterSite) {
         filterEmployee.addEventListener('keyup', filterAllocations);
         filterSite.addEventListener('keyup', filterAllocations);
+    }
+
+    // Team Allocations: confirm before permanently deleting an allocation record
+    function confirmDeleteAllocation(form) {
+        return confirm(['Delete this allocation?', '',
+            form.dataset.employee + ' at ' + form.dataset.site,
+            form.dataset.period, '',
+            'The record is removed permanently and its days drop out of the reports. ' +
+            'To end a current allocation instead, use Relieve.'].join(String.fromCharCode(10)));
     }
 
     // Edit Leave popup: fill from the row, keep End Date on or after Start Date
