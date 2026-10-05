@@ -1044,10 +1044,8 @@ def project_reports(request):
             'next_emu_milestone': get_next_milestone(emu_stages),
             'auto_schedule': get_schedule_status(auto_stages),
             'emu_schedule': get_schedule_status(emu_stages),
-            'summary': {**_project_summary(phases_by_project.get(project.id, []), auto_stages, emu_stages),
-                        # Overall Completion: average % completion of the project's stages
-                        # (Not Applicable left out) -- same figure as the project page
-                        'completion': get_completion_percentage(all_stages)},
+            'summary': _with_sort_values(
+                _project_summary(phases_by_project.get(project.id, []), auto_stages, emu_stages), all_stages),
             'last_updated': last_update_by_project.get(project.id) or project.so_punch_date,
         })
 
@@ -1736,6 +1734,48 @@ def delay_owner_projects_list(request):
     })
 
 
+def _with_sort_values(summary, all_stages):
+    """Project summary plus the measures the Sort by menu uses: Overall Completion (average
+    % completion of the stages, Not Applicable left out -- same as the project page) and
+    the worst Automation / Emulation schedule delay."""
+    auto_delay, emu_delay = _schedule_delays(summary)
+    return {**summary, 'completion': get_completion_percentage(all_stages),
+            'auto_delay': auto_delay, 'emu_delay': emu_delay}
+
+
+def _schedule_delays(summary):
+    """Worst Automation / Emulation schedule delay of a project, in days, from the same
+    live schedule figures as the badges (+ve = delayed, -ve = ahead); the largest across
+    its phases (and Handover for Automation). None when there's no schedule data yet."""
+    def worst(statuses):
+        days = [st['days'] for st in statuses if st]
+        return max(days) if days else None
+    rows = summary.get('rows') or []
+    handover = summary.get('handover') or {}
+    return (worst([r.get('auto_schedule') for r in rows] + [handover.get('schedule')]),
+            worst([r.get('emu_schedule') for r in rows]))
+
+
+SUMMARY_SORTS = {
+    # key: (value getter, highest first?)
+    'otif_desc': ('otif', True), 'otif_asc': ('otif', False),
+    'completion_desc': ('completion', True), 'completion_asc': ('completion', False),
+    'auto_delay_desc': ('auto_delay', True), 'auto_delay_asc': ('auto_delay', False),
+    'emu_delay_desc': ('emu_delay', True), 'emu_delay_asc': ('emu_delay', False),
+}
+
+
+def _sort_summary_rows(rows, sort_key, summary_of):
+    """Order Project Summary rows like the table's Sort by menu; projects with no value
+    for the chosen measure always go last."""
+    if sort_key not in SUMMARY_SORTS:
+        return rows
+    field, desc = SUMMARY_SORTS[sort_key]
+    have = [r for r in rows if summary_of(r).get(field) is not None]
+    missing = [r for r in rows if summary_of(r).get(field) is None]
+    return sorted(have, key=lambda r: summary_of(r)[field], reverse=desc) + missing
+
+
 def _project_summary(phases, auto_stages, emu_stages):
     """The Project Detail page's "Project Summary" card as data, for the Reports page's
     Project Summary table. `auto_stages` / `emu_stages` are the project's full stage lists
@@ -2123,9 +2163,10 @@ def export_project_summary_excel(request):
         stages = list(p.stages.select_related('phase'))
         auto = sort_stages_by_phase([s for s in stages if s.stage_type == 'Automation'], automation_order)
         emu = sort_stages_by_phase([s for s in stages if s.stage_type == 'Emulation'], emulation_order)
-        rows.append((p, {**_project_summary(phases_by_project.get(p.id, []), auto, emu),
-                         'completion': get_completion_percentage(stages)},
+        rows.append((p, _with_sort_values(_project_summary(phases_by_project.get(p.id, []), auto, emu), stages),
                      last_update_by_project.get(p.id) or p.so_punch_date))
+    # Same order as the table's Sort by menu
+    rows = _sort_summary_rows(rows, request.GET.get('sort', ''), lambda row: row[1])
 
     # --- KPI strip ---
     status_counts = Counter(s['status'] for _, s, _ in rows)

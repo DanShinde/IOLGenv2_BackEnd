@@ -556,6 +556,17 @@
                                 </div>
                             </div>
                         </div>
+                        <select id="projectSummarySort" class="form-select form-select-sm" style="width: auto;" onchange="sortProjectSummary(true)" aria-label="Sort projects" title="Sort the Summary and Timeline tabs (projects with no value go last)">
+                            <option value="">Sort: Default</option>
+                            <option value="otif_desc">Highest OTIF %</option>
+                            <option value="otif_asc">Lowest OTIF %</option>
+                            <option value="completion_desc">Highest Completion %</option>
+                            <option value="completion_asc">Lowest Completion %</option>
+                            <option value="auto_delay_desc">Most delayed: Automation</option>
+                            <option value="auto_delay_asc">Least delayed / most ahead: Automation</option>
+                            <option value="emu_delay_desc">Most delayed: Emulation</option>
+                            <option value="emu_delay_asc">Least delayed / most ahead: Emulation</option>
+                        </select>
                         <input type="text" id="projectSummaryFilter" data-persist-filter="project-summary" class="form-control form-control-sm" style="width: 220px;" placeholder="Filter project / customer..." oninput="filterProjectSummary()">
                         <span class="badge bg-secondary" id="projectSummaryCount">{{ projects_with_details|length }} Project{{ projects_with_details|length|pluralize }}</span>
                         <button type="button" id="copyProjectSummaryBtn" class="btn btn-sm btn-outline-secondary js-summary-only" onclick="copyProjectSummary()" title="Copy the table (rows shown by the filter box) to paste into Excel">
@@ -586,7 +597,7 @@
                             <tbody>
                                 {% for item in projects_with_details %}
                                 {% with project=item.project ps=item.summary %}
-                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}" data-project-id="{{ project.id }}">
+                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}" data-project-id="{{ project.id }}" data-order="{{ forloop.counter }}" data-otif="{{ ps.otif|default_if_none:'' }}" data-completion-v="{{ ps.completion }}" data-auto-delay="{{ ps.auto_delay|default_if_none:'' }}" data-emu-delay="{{ ps.emu_delay|default_if_none:'' }}">
                                     <td>
                                         <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
                                         <div class="text-muted small">{{ project.customer_name }}</div>
@@ -650,18 +661,31 @@
                             <thead class="table-light">
                                 <tr>
                                     {# Emulation has no phase-tag slot (72px), so it is that much narrower: the circle spacing still matches Automation #}
-                                    <th style="width: 190px;">Project</th>
-                                    <th style="width: calc((100% - 190px + 72px) / 2);"><div class="tl-heading tl-heading-auto"><i class="fas fa-cogs me-1"></i>Automation Timeline</div></th>
-                                    <th style="width: calc((100% - 190px - 72px) / 2);"><div class="tl-heading tl-heading-emu"><i class="fas fa-gamepad me-1"></i>Emulation Timeline</div></th>
+                                    <th style="width: 240px;">Project</th>
+                                    <th style="width: calc((100% - 240px + 72px) / 2);"><div class="tl-heading tl-heading-auto"><i class="fas fa-cogs me-1"></i>Automation Timeline</div></th>
+                                    <th style="width: calc((100% - 240px - 72px) / 2);"><div class="tl-heading tl-heading-emu"><i class="fas fa-gamepad me-1"></i>Emulation Timeline</div></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in projects_with_details %}
                                 {% with project=item.project ps=item.summary %}
-                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}" data-project-id="{{ project.id }}">
+                                <tr data-search="{{ project.code|lower }} {{ project.customer_name|lower }}" data-project-id="{{ project.id }}" data-order="{{ forloop.counter }}" data-otif="{{ ps.otif|default_if_none:'' }}" data-completion-v="{{ ps.completion }}" data-auto-delay="{{ ps.auto_delay|default_if_none:'' }}" data-emu-delay="{{ ps.emu_delay|default_if_none:'' }}">
                                     <td>
-                                        <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
-                                        <div class="text-muted small lh-sm">{{ project.customer_name }}</div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            {# Overall completion ring: same figure as the Summary tab's Overall Completion column #}
+                                            <svg class="tl-ring flex-shrink-0" viewBox="0 0 44 44" width="46" height="46" role="img" aria-label="Overall completion {{ ps.completion }}%">
+                                                <title>Overall completion: {{ ps.completion }}% (average % completion of the project's stages)</title>
+                                                <circle cx="22" cy="22" r="18" fill="none" stroke="#d9d9d9" stroke-width="5"></circle>
+                                                <circle cx="22" cy="22" r="18" fill="none" stroke="#70ad47" stroke-width="5" pathLength="100"
+                                                        stroke-dasharray="{{ ps.completion }} 100" transform="rotate(-90 22 22)"></circle>
+                                                <text x="22" y="22" text-anchor="middle" dominant-baseline="central"
+                                                      class="tl-ring-text {% if ps.completion >= 100 %}done{% elif ps.completion >= 50 %}mid{% else %}low{% endif %}">{{ ps.completion }}%</text>
+                                            </svg>
+                                            <div class="min-w-0">
+                                                <a href="{% url 'tracker_project_detail' project.id %}" target="_blank"><strong>{{ project.code }}</strong></a>
+                                                <div class="text-muted small lh-sm">{{ project.customer_name }}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         {% for t in ps.timelines %}
@@ -736,8 +760,47 @@
         .mini-roadmap .status-NotApplicable, .legend-dot.status-NotApplicable { background-color: #8d99ae; color: #fff; }
         .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
         #projectTimelineTable td { padding-top: 10px; padding-bottom: 10px; vertical-align: top; }
+        .tl-ring-text { font-size: 11px; font-weight: 700; }
+        .tl-ring-text.low { fill: #dc3545; }
+        .tl-ring-text.mid { fill: #b7791f; }
+        .tl-ring-text.done { fill: #2f855a; }
     </style>
     <script>
+        // Sort by menu: reorders both tabs; projects with no value for the measure go last
+        const SUMMARY_SORT_FIELDS = {
+            otif: 'otif', completion: 'completionV', auto_delay: 'autoDelay', emu_delay: 'emuDelay',
+        };
+        function sortProjectSummary(remember) {
+            const choice = document.getElementById('projectSummarySort').value;
+            if (remember) { try { sessionStorage.setItem('project-summary-sort', choice); } catch (e) {} }
+            const desc = choice.endsWith('_desc');
+            const field = SUMMARY_SORT_FIELDS[choice.replace(/_(asc|desc)$/, '')];
+            ['projectSummaryTable', 'projectTimelineTable'].forEach(id => {
+                const body = document.querySelector('#' + id + ' tbody');
+                if (!body) return;
+                const rows = Array.from(body.querySelectorAll('tr[data-search]'));
+                rows.sort((a, b) => {
+                    if (field) {
+                        const va = a.dataset[field], vb = b.dataset[field];
+                        if (va === '' && vb !== '') return 1;
+                        if (vb === '' && va !== '') return -1;
+                        if (va !== '' && vb !== '') {
+                            const diff = desc ? parseFloat(vb) - parseFloat(va) : parseFloat(va) - parseFloat(vb);
+                            if (diff) return diff;
+                        }
+                    }
+                    return a.dataset.order - b.dataset.order;
+                });
+                rows.forEach(tr => body.appendChild(tr));
+            });
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            let saved = '';
+            try { saved = sessionStorage.getItem('project-summary-sort') || ''; } catch (e) {}
+            const sel = document.getElementById('projectSummarySort');
+            if (sel && saved && sel.querySelector('option[value="' + saved + '"]')) { sel.value = saved; sortProjectSummary(false); }
+        });
+
         // Rows shown = ticked projects (none ticked = all) AND the text filter
         function pickedProjectIds() {
             return Array.from(document.querySelectorAll('#projectPickList input:checked')).map(cb => cb.value);
@@ -870,6 +933,8 @@
             params.delete('chart_view');
             const q = document.getElementById('projectSummaryFilter').value.trim();
             if (q) params.set('q', q); else params.delete('q');
+            const sort = document.getElementById('projectSummarySort').value;
+            if (sort) params.set('sort', sort); else params.delete('sort');
             params.delete('pick');
             pickedProjectIds().forEach(id => params.append('pick', id));
             window.location.href = "{% url 'export_project_summary_excel' %}?" + params.toString();
