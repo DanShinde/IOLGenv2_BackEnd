@@ -2052,6 +2052,10 @@ def update_employee_view(request, pk):
                 employee.last_working_day = parse_date(request.POST.get('last_working_day') or '') or employee.last_working_day
             employee.segment = segment_obj
             employee.join_date = parse_date(request.POST.get('join_date') or '')
+            if employee.join_date and employee.last_working_day and employee.last_working_day < employee.join_date:
+                context = _get_workforce_context()
+                context['error_message'] = "Cannot update: the last working day can't be before the join date."
+                return render(request, 'planner/workforce.html', context)
             employee.save()
             return _redirect_to_referer_or(request, reverse('planner_workforce'))
     return _redirect_to_referer_or(request, reverse('planner_workforce'))
