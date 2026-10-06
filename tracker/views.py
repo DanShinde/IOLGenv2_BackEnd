@@ -1536,6 +1536,11 @@ def project_reports(request):
 
     reason_counter = Counter()
     reason_days_counter = Counter()
+    # Each delayed stage counted once, however many reasons it carries: a stage's delay is
+    # credited in full to every reason tagged on it (the reasons overlap), so the per-reason
+    # days add up to more than the real delay -- these are the real totals.
+    delayed_stage_count = 0
+    delayed_stage_days = 0
     delay_details = []
     multi_phase_ids = _multi_phase_project_ids()
     for d in delay_qs:
@@ -1546,6 +1551,9 @@ def project_reports(request):
         stage = d.stage
         delay_days = (stage.actual_date - stage.planned_date).days if (stage.actual_date and stage.planned_date) else None
 
+        delayed_stage_count += 1
+        if delay_days is not None:
+            delayed_stage_days += delay_days
         for name in tag_names:
             reason_counter[name] += 1
             if delay_days is not None:
@@ -1572,13 +1580,14 @@ def project_reports(request):
     reason_delay_labels = [name for name, _ in reason_days_counter.most_common()]
     reason_delay_counts = [reason_counter[name] for name in reason_delay_labels]
     reason_delay_days = [reason_days_counter[name] for name in reason_delay_labels]
-    reason_delay_total = sum(reason_delay_counts)
+    # % = share of the delayed stages that carry the reason. A stage with several reasons
+    # counts under each, so the column can add up to more than 100%.
     reason_delay_table = [
         {
             'reason': name,
             'count': reason_counter[name],
             'days': reason_days_counter[name],
-            'percent': round((reason_counter[name] / reason_delay_total) * 100, 1) if reason_delay_total else 0,
+            'percent': round((reason_counter[name] / delayed_stage_count) * 100, 1) if delayed_stage_count else 0,
         }
         for name in reason_delay_labels
     ]
@@ -1632,6 +1641,8 @@ def project_reports(request):
         'reason_delay_counts': json.dumps(reason_delay_counts),
         'reason_delay_days': json.dumps(reason_delay_days),
         'reason_delay_table': reason_delay_table,
+        'delayed_stage_count': delayed_stage_count,
+        'delayed_stage_days': delayed_stage_days,
         'delay_details': delay_details,
         'show_delay_phase_column': show_delay_phase_column,
     }
