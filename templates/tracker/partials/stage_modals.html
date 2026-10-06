@@ -62,7 +62,7 @@
 </div>
 
 {% if stage.delay_reason_applicable %}
-<div class="modal fade" id="delayReasonModal{{ stage.id }}" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="delayReasonModal{{ stage.id }}" tabindex="-1" aria-hidden="true" data-shares="{{ stage.delay_reason.reason_shares_json|default:'{}' }}">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -79,6 +79,18 @@
                         {% empty %}
                         <span class="text-muted small">No delay reasons are set up yet. Please ask an admin to add them.</span>
                         {% endfor %}
+                    </div>
+                    {# % contribution per reason: only shown when 2+ reasons are selected #}
+                    <div class="delay-reason-shares border rounded p-2 mb-2 bg-light" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-semibold">% contribution to the delay</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 delay-share-equal">Split equally</button>
+                        </div>
+                        <div class="delay-share-rows"></div>
+                        <div class="d-flex justify-content-between small mt-1 pt-1 border-top">
+                            <span class="text-muted">Must add up to 100%. Left as is, the delay is split equally.</span>
+                            <span>Total: <strong class="delay-share-total">100</strong>%</span>
+                        </div>
                     </div>
                     <div class="form-text">Reasons are managed by the admins. If none of the listed reasons exactly matches your situation, select the closest option and provide the details in the description. If you cannot find a suitable reason, please contact the admin (Mahesh Shirsat).</div>
                 </div>

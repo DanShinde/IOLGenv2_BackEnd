@@ -1536,20 +1536,30 @@ def project_reports(request):
 
     reason_counter = Counter()
     reason_days_counter = Counter()
+    # A stage with several reasons divides its delay between them by the % contribution
+    # entered with the reasons (equal split if none), so the reason days add up to the
+    # real total delay. Each delayed stage is counted once in these totals.
+    delayed_stage_count = 0
+    delayed_stage_days = 0
     delay_details = []
     multi_phase_ids = _multi_phase_project_ids()
     for d in delay_qs:
-        tag_names = [t.name for t in d.reasons.all()]
-        if not tag_names:
+        tags = list(d.reasons.all())
+        if not tags:
             continue
+        shares = d.share_by_tag(tags)
+        tag_names = [t.name for t in tags]
 
         stage = d.stage
         delay_days = (stage.actual_date - stage.planned_date).days if (stage.actual_date and stage.planned_date) else None
 
-        for name in tag_names:
-            reason_counter[name] += 1
+        delayed_stage_count += 1
+        if delay_days is not None:
+            delayed_stage_days += delay_days
+        for tag in tags:
+            reason_counter[tag.name] += 1
             if delay_days is not None:
-                reason_days_counter[name] += delay_days
+                reason_days_counter[tag.name] += delay_days * shares[tag] / 100
 
         delay_details.append({
             'code': stage.project.code,
@@ -1558,6 +1568,9 @@ def project_reports(request):
             'phase': (stage.phase.label if stage.phase_id else 'Handover') if stage.project_id in multi_phase_ids else '',
             'reasons': tag_names,
             'reasons_display': ', '.join(tag_names),
+            # "Design Issues (70%), Material Shortage (30%)" when there are several
+            'reasons_with_share': ', '.join(
+                f"{t.name} ({shares[t]:.0f}%)" if len(tags) > 1 else t.name for t in tags),
             'description': d.description,
             'planned_date': stage.planned_date,
             'actual_date': stage.actual_date,
@@ -1571,14 +1584,14 @@ def project_reports(request):
     # stages carried the reason.
     reason_delay_labels = [name for name, _ in reason_days_counter.most_common()]
     reason_delay_counts = [reason_counter[name] for name in reason_delay_labels]
-    reason_delay_days = [reason_days_counter[name] for name in reason_delay_labels]
-    reason_delay_total = sum(reason_delay_counts)
+    reason_delay_days = [round(reason_days_counter[name], 1) for name in reason_delay_labels]
+    # % = the reason's share of the total delay days
     reason_delay_table = [
         {
             'reason': name,
             'count': reason_counter[name],
-            'days': reason_days_counter[name],
-            'percent': round((reason_counter[name] / reason_delay_total) * 100, 1) if reason_delay_total else 0,
+            'days': round(reason_days_counter[name], 1),
+            'percent': round((reason_days_counter[name] / delayed_stage_days) * 100, 1) if delayed_stage_days else 0,
         }
         for name in reason_delay_labels
     ]
@@ -1632,6 +1645,8 @@ def project_reports(request):
         'reason_delay_counts': json.dumps(reason_delay_counts),
         'reason_delay_days': json.dumps(reason_delay_days),
         'reason_delay_table': reason_delay_table,
+        'delayed_stage_count': delayed_stage_count,
+        'delayed_stage_days': delayed_stage_days,
         'delay_details': delay_details,
         'show_delay_phase_column': show_delay_phase_column,
     }
@@ -3185,6 +3200,21 @@ def save_stage_delay_reason_ajax(request, stage_id):
     if not tags:
         return JsonResponse({'status': 'error', 'message': 'At least one reason is required.'}, status=400)
 
+    # % contribution per reason (2+ reasons only). Not sent = equal split (stored empty).
+    reason_shares = {}
+    raw_shares = data.get('shares') or {}
+    if len(tags) > 1 and raw_shares:
+        try:
+            reason_shares = {str(t.id): round(float(raw_shares[str(t.id)]), 1) for t in tags}
+        except (KeyError, TypeError, ValueError):
+            return JsonResponse({'status': 'error', 'message': 'Enter a % contribution for every selected reason.'}, status=400)
+        if any(v <= 0 or v > 100 for v in reason_shares.values()):
+            return JsonResponse({'status': 'error', 'message': 'Each % contribution must be more than 0 and at most 100.'}, status=400)
+        if abs(sum(reason_shares.values()) - 100) > 0.5:
+            return JsonResponse({'status': 'error', 'message': f'The % contributions must add up to 100 (they add up to {sum(reason_shares.values()):g}).'}, status=400)
+        if len(set(reason_shares.values())) == 1:
+            reason_shares = {}  # all equal: same as the default, keep it empty
+
     updated_actual_date = None
     updated_status = None
 
@@ -3198,7 +3228,7 @@ def save_stage_delay_reason_ajax(request, stage_id):
 
         delay_reason, _ = StageDelayReason.objects.update_or_create(
             stage=stage,
-            defaults={'description': description, 'updated_by': request.user},
+            defaults={'description': description, 'updated_by': request.user, 'reason_shares': reason_shares},
         )
         delay_reason.reasons.set(tags)
 
@@ -3206,6 +3236,7 @@ def save_stage_delay_reason_ajax(request, stage_id):
         'status': 'success',
         'message': 'Delay reason saved.',
         'reasons': [tag.name for tag in tags],
+        'shares': reason_shares,
     }
     if updated_actual_date is not None:
         response_data['updated_actual_date'] = updated_actual_date
