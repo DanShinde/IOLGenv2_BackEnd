@@ -1170,7 +1170,46 @@ document.addEventListener('DOMContentLoaded', function () {
         const nowActive = !$btn.hasClass('active');
         $btn.toggleClass('active', nowActive);
         $btn.toggleClass('btn-primary', nowActive).toggleClass('btn-outline-secondary', !nowActive);
+        // The set of reasons changed: start again from an equal split
+        renderDelayShares($btn.closest('.modal')[0], false);
     });
+
+    // % contribution boxes, one per selected reason (shown for 2+ reasons). useSaved: pre-fill
+    // from the saved percentages when they cover exactly the selected reasons, else equal.
+    window.renderDelayShares = function(modalEl, useSaved) {
+        if (!modalEl) return;
+        const $box = $(modalEl).find('.delay-reason-shares');
+        const $active = $(modalEl).find('.delay-reason-tag-btn.active');
+        const $rows = $box.find('.delay-share-rows').empty();
+        if ($active.length < 2) { $box.hide(); return; }
+        let saved = {};
+        try { saved = JSON.parse(modalEl.dataset.shares || '{}'); } catch (e) {}
+        const ids = $active.map(function() { return $(this).data('tag-id').toString(); }).get();
+        const useSavedValues = useSaved && ids.every(id => saved[id] > 0) && Object.keys(saved).length === ids.length;
+        const equal = Math.floor(1000 / ids.length) / 10;  // e.g. 33.3, last one takes the rest
+        $active.each(function(i) {
+            const id = $(this).data('tag-id').toString();
+            let value = useSavedValues ? saved[id] : (i === ids.length - 1 ? Math.round((100 - equal * (ids.length - 1)) * 10) / 10 : equal);
+            $rows.append(
+                $('<div class="d-flex align-items-center gap-2 mb-1"></div>')
+                    .append($('<span class="small flex-grow-1"></span>').text($(this).text().trim()))
+                    .append($('<input type="number" class="form-control form-control-sm delay-share-input" min="0.1" max="100" step="0.1" style="width: 90px;">')
+                        .attr('data-tag-id', id).attr('aria-label', '% contribution of ' + $(this).text().trim()).val(value))
+                    .append('<span class="small">%</span>')
+            );
+        });
+        $box.show();
+        updateDelayShareTotal(modalEl);
+    };
+    window.updateDelayShareTotal = function(modalEl) {
+        let total = 0;
+        $(modalEl).find('.delay-share-input').each(function() { total += parseFloat(this.value) || 0; });
+        total = Math.round(total * 10) / 10;
+        $(modalEl).find('.delay-share-total').text(total).toggleClass('text-danger', Math.abs(total - 100) > 0.5);
+        return total;
+    };
+    $(document).on('input', '.delay-share-input', function() { updateDelayShareTotal($(this).closest('.modal')[0]); });
+    $(document).on('click', '.delay-share-equal', function() { renderDelayShares($(this).closest('.modal')[0], false); });
 
     // Users can only pick from the predefined reasons; new ones are added in the admin panel.
 
@@ -1205,6 +1244,7 @@ document.addEventListener('DOMContentLoaded', function () {
             description: $(modalEl).find('textarea').val()
         };
         modalEl.querySelector('.delay-reason-error').style.display = 'none';
+        renderDelayShares(modalEl, true);
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl, {
             backdrop: mandatory ? 'static' : true,
             keyboard: !mandatory
@@ -1236,6 +1276,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             $(modalEl).find('textarea').val(snapshot.description);
         }
+        renderDelayShares(modalEl, true);
         $(modalEl).find('.delay-reason-error').hide();
 
         const indicator = document.getElementById(`autosave-indicator-${stageId}`);
@@ -1262,8 +1303,28 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         $error.hide();
 
+        let shares = null;
+        if (reasonIds.length > 1) {
+            if (Math.abs(updateDelayShareTotal(modalEl) - 100) > 0.5) {
+                $error.text('The % contributions must add up to 100.').show();
+                return;
+            }
+            shares = {};
+            let invalid = false;
+            $(modalEl).find('.delay-share-input').each(function() {
+                const v = parseFloat(this.value);
+                if (!(v > 0 && v <= 100)) invalid = true;
+                shares[$(this).data('tag-id').toString()] = v;
+            });
+            if (invalid) {
+                $error.text('Each % contribution must be more than 0 and at most 100.').show();
+                return;
+            }
+        }
+
         const pending = window.__pendingDelayFieldUpdate[stageId];
         const payload = { reason_ids: reasonIds, description: description };
+        if (shares) payload.shares = shares;
         if (pending) {
             payload.field_name = pending.field_name;
             payload.new_value = pending.new_value;
@@ -1282,6 +1343,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(({ ok, data }) => {
             if (ok && data.status === 'success') {
                 delete window.__pendingDelayFieldUpdate[stageId];
+                modalEl.dataset.shares = JSON.stringify(data.shares || {});
 
                 if (pending) {
                     const pendingInput = document.querySelector(`[data-stage-id="${stageId}"][data-field-name="${pending.field_name}"]`);

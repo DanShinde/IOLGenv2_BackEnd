@@ -292,12 +292,34 @@ class StageDelayReason(models.Model):
     stage = models.OneToOneField(Stage, on_delete=models.CASCADE, related_name='delay_reason')
     reasons = models.ManyToManyField(DelayReasonTag, related_name='stage_delays', blank=True)
     description = models.TextField(blank=True)
+    # % of the delay each reason accounts for, as {"<tag id>": percent}, when a stage has
+    # several reasons. Empty (or no longer matching the selected reasons) = equal split.
+    reason_shares = models.JSONField(default=dict, blank=True)
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Delay reason for {self.stage}"
+
+    def share_by_tag(self, tags=None):
+        """{tag: percent} for the selected reasons, adding up to 100. Uses the entered
+        percentages when there's one for every selected reason, otherwise an equal split."""
+        tags = list(self.reasons.all() if tags is None else tags)
+        if not tags:
+            return {}
+        saved = self.reason_shares or {}
+        values = [saved.get(str(t.id)) for t in tags]
+        if all(isinstance(v, (int, float)) and v > 0 for v in values):
+            total = sum(values)
+            return {t: v * 100 / total for t, v in zip(tags, values)}
+        return {t: 100 / len(tags) for t in tags}
+
+    @property
+    def reason_shares_json(self):
+        """The saved percentages as JSON, for the delay-reason pop-up to pre-fill."""
+        import json
+        return json.dumps(self.reason_shares or {})
 
 # General project-level comments/chat
 class ProjectComment(models.Model):

@@ -1187,12 +1187,12 @@
                         <div class="col-md-7">
                             <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
                                 <table class="table table-sm table-custom mb-0">
-                                    <thead class="table-light"><tr><th>Reason</th><th class="text-center" title="Full delay of every stage this reason is tagged on. A stage with several reasons is counted under each, so these overlap.">Delay Involved (Days)</th><th class="text-center">Stages</th><th class="text-center" title="Share of the delayed stages that carry this reason. Can add up to more than 100% because a stage can have several reasons.">% of Delayed Stages</th></tr></thead>
+                                    <thead class="table-light"><tr><th>Reason</th><th class="text-center" title="Delay days attributed to this reason. A stage with several reasons divides its delay by the % contribution entered (equal split if none).">Delay (Days)</th><th class="text-center" title="Delayed stages this reason is tagged on (a stage with several reasons counts under each)">Stages</th><th class="text-center" title="This reason's share of the total delay days">% of Delay</th></tr></thead>
                                     <tbody>
                                         {% for row in reason_delay_table %}
                                         <tr>
                                             <td>{{ row.reason }}</td>
-                                            <td class="text-center">{{ row.days }}</td>
+                                            <td class="text-center">{{ row.days|floatformat:"-1" }}</td>
                                             <td class="text-center">{{ row.count }}</td>
                                             <td class="text-center">{{ row.percent }}%</td>
                                         </tr>
@@ -1200,7 +1200,7 @@
                                     </tbody>
                                     <tfoot class="table-light" style="position: sticky; bottom: 0; z-index: 1;">
                                         <tr class="fw-semibold">
-                                            <td>Actual total <span class="text-muted fw-normal small">(each stage counted once)</span></td>
+                                            <td>Total <span class="text-muted fw-normal small">(each stage counted once)</span></td>
                                             <td class="text-center">{{ delayed_stage_days }}</td>
                                             <td class="text-center">{{ delayed_stage_count }}</td>
                                             <td></td>
@@ -1208,7 +1208,7 @@
                                     </tfoot>
                                 </table>
                             </div>
-                            <p class="text-muted small mt-2 mb-0"><i class="fas fa-info-circle me-1"></i>A stage with more than one reason shows its full delay under each reason, so the reason rows overlap and add up to more than the actual total.</p>
+                            <p class="text-muted small mt-2 mb-0"><i class="fas fa-info-circle me-1"></i>When a stage has more than one reason, its delay is divided between them by the % contribution entered with the reasons (equal split if none was entered).</p>
                             <div>
                             </div>
                         </div>
@@ -1230,7 +1230,7 @@
                                             <td>{{ d.customer }}</td>
                                             {% if show_delay_phase_column %}<td>{{ d.phase|default:"-" }}</td>{% endif %}
                                             <td>{{ d.stage }}</td>
-                                            <td>{{ d.reasons_display }}</td>
+                                            <td>{{ d.reasons_with_share }}</td>
                                             <td>{{ d.description|default:"-" }}</td>
                                             <td>{{ d.planned_date|date:"d M Y"|default:"-" }}</td>
                                             <td>{{ d.actual_date|date:"d M Y"|default:"-" }}</td>
@@ -2189,14 +2189,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (delayReasonCtx && delayReasonLabels.length > 0) {
         // Centre = the real total delay (each stage once), not the sum of the overlapping slices
         const delayedStageDays = {{ delayed_stage_days|default:0 }};
-        const delayReasonOptions = doughnutOptions('actual delay days', () => delayedStageDays.toLocaleString());
+        const delayReasonOptions = doughnutOptions('delay days', () => delayedStageDays.toLocaleString());
         new Chart(delayReasonCtx, {
             type: 'doughnut',
             plugins: [centerTotalPlugin],
             data: {
                 labels: delayReasonLabels,
-                // Slice size = delay days the reason was involved in (a stage with several
-                // reasons counts in full under each, so slices overlap).
+                // Slice size = delay days attributed to the reason (a stage with several
+                // reasons is divided between them by % contribution), so slices add up to the total.
                 datasets: [Object.assign({ data: delayReasonDays }, doughnutStyle(delayReasonLabels))]
             },
             options: {
