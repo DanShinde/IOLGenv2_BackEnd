@@ -1449,6 +1449,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function initHorizontalBar(canvasId, labels, data, color, ids, ownerParam, projectCounts) {
         const ctx = document.getElementById(canvasId);
         if (!ctx || !data || data.length === 0) return;
+        // Each overdue stage has one team lead and one segment, so the bars add up to the
+        // total overdue stages: % = this bar's share of that total.
+        const total = data.reduce((a, b) => a + b, 0);
+        const pct = (v) => total ? Math.round(v / total * 1000) / 10 : 0;
         new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1461,11 +1465,14 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                layout: { padding: { right: 30 } },
+                layout: { padding: { right: 70 } },
                 plugins: {
                     legend: { display: false },
-                    datalabels: RS.endLabels(),
-                    tooltip: { callbacks: { label: (c) => projectCountLabel(c, projectCounts) } }
+                    datalabels: RS.endLabels({ formatter: (v) => `${v} (${pct(v)}%)` }),
+                    tooltip: { callbacks: {
+                        label: (c) => projectCountLabel(c, projectCounts),
+                        afterLabel: (c) => `${pct(c.raw)}% of all ${total} overdue stage${total === 1 ? '' : 's'}`
+                    } }
                 },
                 scales: RS.hScales({ ticks: { precision: 0, padding: 6 } }),
                 onClick: (evt, elements) => {
