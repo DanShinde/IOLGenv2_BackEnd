@@ -13,7 +13,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.core.cache import cache
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import date
 import csv
@@ -30,6 +30,8 @@ from .utils import (
     build_reports_context_data,
 )
 from . import services
+from .people import person_name
+from .services import InventoryError
 
 
 def _capture_next(request, fallback):
@@ -85,54 +87,28 @@ class InventoryPaginator:
         return paginated_data, paginator
 
 
-def get_cache_key(prefix, **filters):
-    """Generate cache key based on filter parameters with versioning"""
-    filter_parts = []
-    for key, value in sorted(filters.items()):
-        if value is not None and value != '':
-            filter_parts.append(f"{key}:{value}")
-
-    filter_string = "_".join(filter_parts) if filter_parts else "all"
-    version = cache.get(f"{prefix}_version", 0)
-    return f"{prefix}:v{version}:{filter_string}"
-
-
-def invalidate_cache(prefix):
-    """Invalidate all cache for a given prefix by incrementing version"""
-    cache_version_key = f"{prefix}_version"
-    current_version = cache.get(cache_version_key, 0)
-    cache.set(cache_version_key, current_version + 1, None)  # Never expires
-
-
 @login_required
 def dashboard(request):
     """
     Optimized dashboard with caching and query optimization
     """
-    # Get summary data for dashboard
-    cache_key = get_cache_key('dashboard_stats', user_id=request.user.id)
-    cached_stats = cache.get(cache_key)
-
-    if not cached_stats:
-        tools_count = Item.objects.filter(item_type='TOOL').count()
-        materials_count = Item.objects.filter(item_type='MATERIAL').count()
-        users_count = User.objects.filter(is_active=True).count()
-        cached_stats = {
-            'tools_count': tools_count,
-            'materials_count': materials_count,
-            'users_count': users_count,
-        }
-        cache.set(cache_key, cached_stats, 300)  # 5 minutes
+    # Same definitions as the list pages: single-unit items (tools, IT assets, licences,
+    # other) vs stock-tracked materials, and people = the active employee roster.
+    stats = {
+        'tools_count': Item.objects.exclude(item_type__in=Item.STOCK_TRACKED_TYPES).count(),
+        'materials_count': Item.objects.filter(item_type__in=Item.STOCK_TRACKED_TYPES).count(),
+        'users_count': get_active_employee_users().count(),
+    }
 
     # Recent assignments - optimized with select_related
     recent_assignments = Assignment.objects.filter(
         return_date__isnull=True
-    ).select_related('item', 'assigned_to', 'assigned_by').order_by('-assignment_date')[:5]
+    ).select_related('item', 'assigned_to__skillmatrix__employee', 'assigned_by').order_by('-assignment_date')[:5]
 
-    # Recent dispatches - optimized with select_related
-    recent_dispatches = Dispatch.objects.filter(
-        return_date__isnull=True
-    ).select_related('item', 'dispatched_by').order_by('-dispatch_date')[:5]
+    # Latest dispatches (tools still out and material consignments alike), newest first
+    recent_dispatches = Dispatch.objects.select_related(
+        'item', 'dispatched_by', 'responsible_person'
+    ).order_by('-dispatch_date', '-created_at')[:5]
 
     # Recent history - optimized with select_related
     recent_history = History.objects.select_related(
@@ -140,7 +116,7 @@ def dashboard(request):
     ).order_by('-timestamp')[:10]
 
     context = {
-        **cached_stats,
+        **stats,
         'recent_assignments': recent_assignments,
         'recent_dispatches': recent_dispatches,
         'recent_history': recent_history,
@@ -165,44 +141,43 @@ def item_list(request):
         'status': request.GET.get('status', ''),
     }
 
-    # Try to get cached IDs
-    cache_key = get_cache_key('items_list', **filter_params)
-    cached_ids = cache.get(cache_key)
-
-    # Base queryset
-    items = Item.objects.all().order_by('-created_at')
-
-    if cached_ids is not None:
-        # Use cached IDs to filter queryset
-        items = items.filter(pk__in=cached_ids)
-    else:
-        # Apply filters
-        if form.is_valid():
-            if form.cleaned_data['search']:
-                items = items.filter(
-                    Q(name__icontains=form.cleaned_data['search']) |
-                    Q(serial_number__icontains=form.cleaned_data['search']) |
-                    Q(make__icontains=form.cleaned_data['search']) |
-                    Q(model__icontains=form.cleaned_data['search'])
-                )
-            if form.cleaned_data['item_type']:
-                items = items.filter(item_type=form.cleaned_data['item_type'])
-            if form.cleaned_data.get('status'):
-                items = items.filter(status=form.cleaned_data['status'])
-
-        # Cache the filtered IDs
-        cache.set(cache_key, list(items.values_list('id', flat=True)), 300)  # 5 minutes
+    items = _filtered_items(form)
 
     # Pagination
     paginated_items, paginator = InventoryPaginator.paginate_queryset(items, request)
 
+    query = request.GET.copy()
+    query.pop('page', None)
     context = {
         'items': paginated_items,
         'paginator': paginator,
         'form': form,
         'is_paginated': paginator.num_pages > 1,
+        'filter_query': query.urlencode(),  # current filters, safely encoded, for page/export links
     }
     return render(request, 'inventory/item_list.html', context)
+
+
+def _filtered_items(form):
+    """Items matching the item-list filters (shared by the list and its CSV export)."""
+    items = Item.objects.all().order_by('-created_at')
+    if form.is_valid():
+        if form.cleaned_data['search']:
+            items = items.filter(
+                Q(name__icontains=form.cleaned_data['search']) |
+                Q(serial_number__icontains=form.cleaned_data['search']) |
+                Q(make__icontains=form.cleaned_data['search']) |
+                Q(model__icontains=form.cleaned_data['search'])
+            )
+        if form.cleaned_data['item_type']:
+            items = items.filter(item_type=form.cleaned_data['item_type'])
+        status = form.cleaned_data.get('status')
+        if status == 'AVAILABLE':
+            # a material with no stock left isn't available
+            items = items.filter(status='AVAILABLE').exclude(item_type__in=Item.STOCK_TRACKED_TYPES, quantity=0)
+        elif status:
+            items = items.filter(status=status)
+    return items
 
 
 @login_required
@@ -215,19 +190,25 @@ def item_detail(request, pk):
     # Optimized queries with select_related
     history = History.objects.filter(item=item).select_related('user').order_by('-timestamp')[:10]
     all_assignments = Assignment.objects.filter(item=item).select_related(
-        'assigned_to', 'assigned_by'
+        'assigned_to__skillmatrix__employee', 'assigned_by'
     ).order_by('-assignment_date')
     all_dispatches = Dispatch.objects.filter(item=item).select_related(
-        'dispatched_by'
+        'dispatched_by', 'responsible_person__skillmatrix__employee'
     ).order_by('-dispatch_date')
+    open_assignments = list(all_assignments.filter(return_date__isnull=True))
+    open_dispatches = list(item.open_dispatches().select_related('responsible_person__skillmatrix__employee'))
 
     context = {
         'item': item,
         'history': history,
         'assignments': all_assignments[:5],
         'dispatches': all_dispatches[:5],
-        'active_assignment': all_assignments.filter(return_date__isnull=True).first(),
-        'active_dispatch': all_dispatches.filter(return_date__isnull=True).first(),
+        # Who holds it right now, straight from the open records (not the status label),
+        # each with its own Return button
+        'open_assignments': open_assignments,
+        'open_dispatches': open_dispatches,
+        'active_assignment': open_assignments[0] if open_assignments else None,
+        'active_dispatch': open_dispatches[0] if open_dispatches else None,
     }
     return render(request, 'inventory/item_detail.html', context)
 
@@ -252,7 +233,7 @@ def _apply_initial_status(item, form, request):
 
     if status == 'ASSIGNED':
         assigned_to = form.cleaned_data['assigned_to']
-        who = assigned_to.get_full_name() or assigned_to.username
+        who = person_name(assigned_to)
 
         Assignment.objects.create(
             item=item, quantity=quantity, assigned_to=assigned_to, assigned_by=request.user,
@@ -273,7 +254,7 @@ def _apply_initial_status(item, form, request):
         project = form.cleaned_data['dispatch_project']
         site_location = form.cleaned_data.get('dispatch_site_location', '')
         responsible_person = form.cleaned_data['dispatch_responsible_person']
-        responsible_name = responsible_person.get_full_name() or responsible_person.username
+        responsible_name = person_name(responsible_person)
 
         Dispatch.objects.create(
             item=item, quantity=quantity, project=project, site_location=site_location,
@@ -312,10 +293,11 @@ def item_create(request):
                 item = form.save(commit=False)
                 item.created_by = request.user
                 item.save()
+                quantity_added = item.quantity  # before an initial assignment/dispatch draws it down
 
                 extra_detail = _apply_initial_status(item, form, request)
 
-                details = f'{item.get_item_type_display()} added to inventory with quantity {item.quantity}'
+                details = f'{item.get_item_type_display()} added to inventory with quantity {quantity_added}'
                 if extra_detail:
                     details += f'. {extra_detail}'
 
@@ -327,9 +309,6 @@ def item_create(request):
                     location=item.location or 'Warehouse'
                 )
 
-            # Invalidate caches
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
 
             messages.success(request,
                 f'Successfully added {item.name} ({item.serial_number}) to inventory!',
@@ -355,28 +334,30 @@ def item_create(request):
 
 
 @login_required
+@permission_required('inventory.change_item', raise_exception=True)
 def item_update(request, pk):
     item = get_object_or_404(Item, pk=pk)
     fallback = reverse('inventory-item-detail', kwargs={'pk': item.pk})
     next_url = _capture_next(request, fallback)
 
     if request.method == 'POST':
+        old_status = item.status
         form = ItemForm(request.POST, request.FILES, instance=item)
         if form.is_valid():
-            updated_item = form.save()
-
-            # Invalidate caches
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
-
-            # Create history record
-            History.objects.create(
-                item=updated_item,
-                action='UPDATED',
-                user=request.user,
-                details=f'Item details updated',
-                location=updated_item.location or 'Warehouse'
-            )
+            with transaction.atomic():
+                # Re-check under a lock: the item may have been assigned since the form opened
+                if Item.objects.select_for_update().get(pk=item.pk).is_out and form.cleaned_data.get('status') != old_status:
+                    messages.error(request, f'{item.name} was assigned or dispatched meanwhile - its status was not changed.')
+                    return redirect(next_url)
+                updated_item = form.save()
+                retired = updated_item.status == 'RETIRED' and old_status != 'RETIRED'
+                History.objects.create(
+                    item=updated_item,
+                    action='RETIRED' if retired else 'UPDATED',
+                    user=request.user,
+                    details='Retired from service (item edit)' if retired else 'Item details updated',
+                    location=updated_item.location or 'Warehouse'
+                )
             messages.success(request,
                 f'Successfully updated {updated_item.name}',
                 extra_tags='bg-green-100 text-green-800'
@@ -421,22 +402,8 @@ def export_items_csv(request):
         'Quantity', 'Location', 'Category', 'Purchase Date', 'Purchase Cost'
     ])
 
-    # Apply same filters as item_list
-    items = Item.objects.all().order_by('-created_at')
-    form = ItemFilterForm(request.GET or None)
-
-    if form.is_valid():
-        if form.cleaned_data['search']:
-            items = items.filter(
-                Q(name__icontains=form.cleaned_data['search']) |
-                Q(serial_number__icontains=form.cleaned_data['search']) |
-                Q(make__icontains=form.cleaned_data['search']) |
-                Q(model__icontains=form.cleaned_data['search'])
-            )
-        if form.cleaned_data['item_type']:
-            items = items.filter(item_type=form.cleaned_data['item_type'])
-        if form.cleaned_data.get('status'):
-            items = items.filter(status=form.cleaned_data['status'])
+    # Same filters as item_list
+    items = _filtered_items(ItemFilterForm(request.GET or None))
 
     for item in items:
         writer.writerow([
@@ -467,7 +434,7 @@ def export_history_csv(request):
         'Timestamp', 'Item', 'Serial Number', 'Action', 'User', 'Details', 'Location'
     ])
 
-    history = History.objects.select_related('item', 'user').order_by('-timestamp')
+    history = History.objects.select_related('item', 'user__skillmatrix__employee').order_by('-timestamp')
     form = HistoryFilterForm(request.GET or None)
 
     if form.is_valid():
@@ -488,7 +455,7 @@ def export_history_csv(request):
             record.item.name,
             record.item.serial_number,
             record.get_action_display(),
-            record.user.get_full_name() if record.user else 'N/A',
+            person_name(record.user) if record.user else 'N/A',
             record.details,
             record.location,
         ])
@@ -506,7 +473,7 @@ def bulk_update_items(request):
     """Bulk update items status (staff only - retiring is the only supported bulk action;
     hard delete is intentionally not exposed here since it cascades and destroys the
     item's Assignment/Dispatch/History audit trail)"""
-    if not request.user.is_staff:
+    if not (request.user.is_staff and request.user.has_perm('inventory.change_item')):
         return JsonResponse({'success': False, 'message': 'You do not have permission to perform this action'}, status=403)
 
     try:
@@ -520,10 +487,19 @@ def bulk_update_items(request):
         items = Item.objects.filter(pk__in=item_ids)
 
         if action == 'retire':
-            items.update(status='RETIRED')
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
-            return JsonResponse({'success': True, 'message': f'Successfully retired {len(item_ids)} items'})
+            # One by one through the service: an item still out with someone (or at a site)
+            # is refused instead of being retired with its assignment left open.
+            retired, refused = 0, []
+            for item in items:
+                try:
+                    services.retire_item(item, request.user, 'bulk retire')
+                    retired += 1
+                except InventoryError:
+                    refused.append(item.name)
+            message = f'Retired {retired} item{"s" if retired != 1 else ""}.'
+            if refused:
+                message += f' Not retired (still out - record the return first): {", ".join(refused)}.'
+            return JsonResponse({'success': retired > 0 or not refused, 'message': message})
 
         return JsonResponse({'success': False, 'message': 'Invalid action'})
 
@@ -564,6 +540,7 @@ def ajax_search_items(request):
 
 
 @login_required
+@permission_required('inventory.change_assignment', raise_exception=True)
 def return_assignment(request, pk):
     assignment = get_object_or_404(Assignment, pk=pk, return_date__isnull=True)
     next_url = _capture_next(request, reverse('inventory-transfer-item'))
@@ -571,17 +548,19 @@ def return_assignment(request, pk):
     if request.method == 'POST':
         form = ReturnForm(request.POST)
         if form.is_valid():
-            returned_by = assignment.assigned_to.get_full_name() or assignment.assigned_to.username
-            services.process_return(
-                assignment,
-                condition=form.cleaned_data['condition'],
-                return_notes=form.cleaned_data['return_notes'],
-                performed_by=request.user,
-                details_prefix=f'Returned by {returned_by}'
-            )
+            returned_by = person_name(assignment.assigned_to)
+            try:
+                services.process_return(
+                    assignment,
+                    condition=form.cleaned_data['condition'],
+                    return_notes=form.cleaned_data['return_notes'],
+                    performed_by=request.user,
+                    details_prefix=f'Returned by {returned_by}'
+                )
+            except InventoryError as exc:
+                messages.error(request, str(exc))
+                return redirect(next_url)
 
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
             messages.success(request, f'Return recorded for {assignment.item.name}.')
             return redirect(next_url)
     else:
@@ -596,23 +575,28 @@ def return_assignment(request, pk):
 
 
 @login_required
+@permission_required('inventory.change_dispatch', raise_exception=True)
 def return_dispatch(request, pk):
-    dispatch = get_object_or_404(Dispatch, pk=pk, return_date__isnull=True, item__item_type='TOOL')
+    # any single-unit item (tool, IT asset, licence, other) - material dispatches are consumed
+    dispatch = get_object_or_404(
+        Dispatch.objects.exclude(item__item_type__in=Item.STOCK_TRACKED_TYPES), pk=pk, return_date__isnull=True)
     next_url = _capture_next(request, reverse('inventory-transfer-item'))
 
     if request.method == 'POST':
         form = ReturnForm(request.POST)
         if form.is_valid():
-            services.process_return(
-                dispatch,
-                condition=form.cleaned_data['condition'],
-                return_notes=form.cleaned_data['return_notes'],
-                performed_by=request.user,
-                details_prefix=f'Returned from {dispatch.project}'
-            )
+            try:
+                services.process_return(
+                    dispatch,
+                    condition=form.cleaned_data['condition'],
+                    return_notes=form.cleaned_data['return_notes'],
+                    performed_by=request.user,
+                    details_prefix=f'Returned from {dispatch.project}'
+                )
+            except InventoryError as exc:
+                messages.error(request, str(exc))
+                return redirect(next_url)
 
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
             messages.success(request, f'Return recorded for {dispatch.item.name}.')
             return redirect(next_url)
     else:
@@ -636,7 +620,7 @@ def history_list(request):
         return export_history_csv(request)
 
     # Optimized query with select_related
-    history = History.objects.select_related('item', 'user').order_by('-timestamp')
+    history = History.objects.select_related('item', 'user__skillmatrix__employee').order_by('-timestamp')
     form = HistoryFilterForm(request.GET or None)
 
     if form.is_valid():
@@ -653,22 +637,28 @@ def history_list(request):
         if form.cleaned_data['serial_number']:
             history = history.filter(item__serial_number__icontains=form.cleaned_data['serial_number'])
         if form.cleaned_data['user_search']:
-            history = history.filter(
-                Q(user__username__icontains=form.cleaned_data['user_search']) |
-                Q(user__first_name__icontains=form.cleaned_data['user_search']) |
-                Q(user__last_name__icontains=form.cleaned_data['user_search'])
-            )
+            for word in form.cleaned_data['user_search'].split():
+                history = history.filter(
+                    Q(user__username__icontains=word) |
+                    Q(user__first_name__icontains=word) |
+                    Q(user__last_name__icontains=word) |
+                    Q(user__skillmatrix__employee__name__icontains=word)
+                )
         if form.cleaned_data['search']:
             history = history.filter(details__icontains=form.cleaned_data['search'])
 
     # Pagination
     paginated_history, paginator = InventoryPaginator.paginate_queryset(history, request, page_size=25)
 
+    query = request.GET.copy()
+    query.pop('page', None)
     context = {
         'history': paginated_history,
+        'page_obj': paginated_history,   # the template's pager
         'paginator': paginator,
         'form': form,
         'is_paginated': paginator.num_pages > 1,
+        'filter_query': query.urlencode(),  # keep filters on page links
     }
     return render(request, 'inventory/history_list.html', context)
 
@@ -678,14 +668,8 @@ def reports(request):
     """
     Optimized reports with caching and better query aggregation
     """
-    # Cache reports data
-    cache_key = get_cache_key('reports_data')
-    cached_data = cache.get(cache_key)
-
-    if not cached_data:
-        context_data = build_reports_context_data()
-        cache.set(cache_key, context_data, 300)  # Cache for 5 minutes
-        cached_data = context_data
+    # Always built fresh: a cached copy kept showing returned items as still assigned
+    cached_data = build_reports_context_data()
 
     context = {
         **cached_data,
@@ -711,11 +695,17 @@ def export_reports_excel(request):
     from .excel_export import build_reports_workbook
 
     data = build_reports_context_data()
-    items = Item.objects.all().order_by('item_type', 'name')
+    items = Item.objects.all().order_by('item_type', 'name').prefetch_related(
+        Prefetch('assignments', queryset=Assignment.objects.filter(return_date__isnull=True)
+                 .select_related('assigned_to__skillmatrix__employee'), to_attr='open_list'),
+        Prefetch('dispatches', queryset=Dispatch.objects.filter(return_date__isnull=True)
+                 .exclude(item__item_type__in=Item.STOCK_TRACKED_TYPES)
+                 .select_related('responsible_person__skillmatrix__employee'), to_attr='open_dispatch_list'),
+    )
     workbook = build_reports_workbook(data, items)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    filename = f'inventory_report_{date.today().isoformat()}.xlsx'
+    filename = f'inventory_report_{timezone.localdate().isoformat()}.xlsx'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     workbook.save(response)
     return response
@@ -726,15 +716,16 @@ def export_reports_excel(request):
 @login_required
 def transfer_item(request):
     """Hub page: quick links to Assign/Dispatch/Reserve, plus current item status lists"""
-    available_items = Item.objects.filter(status='AVAILABLE').order_by('name')
+    # Available = can be handed out now (a material needs stock left)
+    available_items = Item.objects.filter(status='AVAILABLE').exclude(
+        item_type__in=Item.STOCK_TRACKED_TYPES, quantity=0).order_by('name')
 
     active_assignments = Assignment.objects.filter(
         return_date__isnull=True
-    ).select_related('item', 'assigned_to').order_by('item__name')
+    ).select_related('item', 'assigned_to__skillmatrix__employee').order_by('item__name')
 
-    active_dispatches = Dispatch.objects.filter(
-        return_date__isnull=True, item__item_type='TOOL'
-    ).select_related('item').order_by('item__name')
+    active_dispatches = get_active_dispatches().select_related(
+        'responsible_person__skillmatrix__employee').order_by('item__name')
 
     context = {
         'available_items': available_items,
@@ -759,71 +750,14 @@ def assign_item(request):
             assignment_date = form.cleaned_data['assignment_date']
             expected_return_date = form.cleaned_data['expected_return_date']
             notes = form.cleaned_data['notes']
-            who = assigned_to.get_full_name() or assigned_to.username
-
-            with transaction.atomic():
-                if item.is_stock_tracked:
-                    Assignment.objects.create(
-                        item=item, quantity=quantity, assigned_to=assigned_to, assigned_by=request.user,
-                        assignment_date=assignment_date, expected_return_date=expected_return_date,
-                        notes=notes
-                    )
-
-                    item.quantity -= quantity
-                    item.save()
-
-                    History.objects.create(
-                        item=item, action='ASSIGNED', user=request.user,
-                        details=f'{quantity} units assigned to {who}', location=item.location or 'Warehouse'
-                    )
-                    messages.success(
-                        request,
-                        f'Assigned {quantity} units of {item.name} to {who}. Remaining stock: {item.quantity}'
-                    )
-                elif item.status == 'ASSIGNED':
-                    active_assignment = item.assignments.filter(return_date__isnull=True).first()
-                    prev_who = active_assignment.assigned_to.get_full_name() or active_assignment.assigned_to.username
-                    active_assignment.return_date = assignment_date
-                    active_assignment.save()
-
-                    History.objects.create(
-                        item=item, action='RETURNED', user=request.user,
-                        details=f'Returned by {prev_who} (Transfer)', location='Warehouse'
-                    )
-
-                    Assignment.objects.create(
-                        item=item, assigned_to=assigned_to, assigned_by=request.user,
-                        assignment_date=assignment_date, expected_return_date=expected_return_date,
-                        notes=f'Transferred from {prev_who}. {notes}'.strip()
-                    )
-
-                    item.status = 'ASSIGNED'
-                    item.location = f'With {who}'
-                    item.save()
-
-                    History.objects.create(
-                        item=item, action='TRANSFERRED', user=request.user,
-                        details=f'Transferred from {prev_who} to {who}', location=item.location
-                    )
-                    messages.success(request, f'Transferred {item.name} from {prev_who} to {who}.')
-                else:
-                    Assignment.objects.create(
-                        item=item, assigned_to=assigned_to, assigned_by=request.user,
-                        assignment_date=assignment_date, expected_return_date=expected_return_date,
-                        notes=notes
-                    )
-                    item.status = 'ASSIGNED'
-                    item.location = f'With {who}'
-                    item.save()
-
-                    History.objects.create(
-                        item=item, action='ASSIGNED', user=request.user,
-                        details=f'Assigned to {who}', location=item.location
-                    )
-                    messages.success(request, f'Assigned {item.name} to {who}.')
-
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
+            try:
+                _assignment, message = services.assign_item(
+                    item, assigned_to, request.user, assignment_date,
+                    expected_return_date=expected_return_date, notes=notes, quantity=quantity)
+            except InventoryError as exc:
+                form.add_error(None, str(exc))
+                return render(request, 'inventory/assign_form.html', {'form': form, 'next': next_url})
+            messages.success(request, message)
             return redirect(next_url)
     else:
         initial = {}
@@ -851,71 +785,19 @@ def dispatch_item(request):
             project = form.cleaned_data['project']
             site_location = form.cleaned_data.get('site_location', '')
             responsible_person = form.cleaned_data['responsible_person']
-            responsible_name = responsible_person.get_full_name() or responsible_person.username
             quantity = form.cleaned_data.get('quantity') or 1
             dispatch_date = form.cleaned_data['dispatch_date']
             expected_return_date = form.cleaned_data.get('expected_return_date')
             notes = form.cleaned_data['notes']
-
-            with transaction.atomic():
-                if item.item_type == 'MATERIAL':
-                    Dispatch.objects.create(
-                        item=item, quantity=quantity, project=project, site_location=site_location,
-                        responsible_person=responsible_person,
-                        dispatched_by=request.user, dispatch_date=dispatch_date, notes=notes
-                    )
-
-                    item.quantity -= quantity
-                    if item.quantity <= 0:
-                        item.status = 'CONSUMED'
-                        item.location = f'Consumed at {project}'
-                    else:
-                        item.location = f'Warehouse (Partially dispatched to {project})'
-                    item.save()
-
-                    History.objects.create(
-                        item=item, action='CONSUMED', user=request.user,
-                        details=f'{quantity} units dispatched to {project} (Site: {site_location or "N/A"}) - '
-                                f'received by {responsible_name}',
-                        location=f'{project} - {site_location or "N/A"}'
-                    )
-                    messages.success(
-                        request,
-                        f'Dispatched {quantity} units of {item.name} to {project}. Remaining stock: {item.quantity}'
-                    )
-                else:  # TOOL
-                    if item.status == 'ASSIGNED':
-                        active_assignment = Assignment.objects.filter(item=item, return_date__isnull=True).first()
-                        if active_assignment:
-                            who = active_assignment.assigned_to.get_full_name() or active_assignment.assigned_to.username
-                            active_assignment.return_date = dispatch_date
-                            active_assignment.save()
-                            History.objects.create(
-                                item=item, action='RETURNED', user=request.user,
-                                details=f'Returned by {who} (For Dispatch)', location='Warehouse'
-                            )
-
-                    Dispatch.objects.create(
-                        item=item, quantity=1, project=project, site_location=site_location,
-                        responsible_person=responsible_person,
-                        dispatched_by=request.user, dispatch_date=dispatch_date,
-                        expected_return_date=expected_return_date, notes=notes
-                    )
-
-                    item.status = 'DISPATCHED'
-                    item.location = f'{project} - {site_location or "N/A"}'
-                    item.save()
-
-                    History.objects.create(
-                        item=item, action='DISPATCHED', user=request.user,
-                        details=f'Dispatched to {project} (Site: {site_location or "N/A"}) - '
-                                f'responsible person: {responsible_name}',
-                        location=item.location
-                    )
-                    messages.success(request, f'Dispatched {item.name} to {project} (responsible: {responsible_name}).')
-
-            invalidate_cache('items_list')
-            invalidate_cache('dashboard_stats')
+            try:
+                message = services.dispatch_item(
+                    item, project, site_location, responsible_person, request.user, dispatch_date,
+                    expected_return_date=None if item.is_stock_tracked else expected_return_date,
+                    notes=notes, quantity=quantity)
+            except InventoryError as exc:
+                form.add_error(None, str(exc))
+                return render(request, 'inventory/dispatch_form.html', {'form': form, 'next': next_url})
+            messages.success(request, message)
             return redirect(next_url)
     else:
         initial = {}
@@ -943,7 +825,8 @@ def user_list(request):
         ),
         active_dispatch_count=Count(
             'responsible_dispatches',
-            filter=Q(responsible_dispatches__return_date__isnull=True, responsible_dispatches__item__item_type='TOOL'),
+            filter=Q(responsible_dispatches__return_date__isnull=True) & ~Q(
+                responsible_dispatches__item__item_type__in=Item.STOCK_TRACKED_TYPES),
             distinct=True
         ),
     )
@@ -1003,6 +886,7 @@ def reservation_list(request):
 
 
 @login_required
+@permission_required('inventory.add_reservation', raise_exception=True)
 def reservation_create(request):
     next_url = _capture_next(request, reverse('inventory-reservation-list'))
     sync_employee_users()
@@ -1010,18 +894,19 @@ def reservation_create(request):
     if request.method == 'POST':
         form = ReservationForm(request.POST)
         if form.is_valid():
-            reservation = form.save(commit=False)
-            reservation.reserved_by = request.user
-            reservation.save()
+            with transaction.atomic():
+                reservation = form.save(commit=False)
+                reservation.reserved_by = request.user
+                reservation.save()
 
-            who = reservation.reserved_for.get_full_name() or reservation.reserved_for.username
-            History.objects.create(
-                item=reservation.item,
-                action='RESERVED',
-                user=request.user,
-                details=f'Reserved for {who} from {reservation.start_date} to {reservation.end_date}',
-                location=reservation.item.location or 'Warehouse'
-            )
+                who = person_name(reservation.reserved_for)
+                History.objects.create(
+                    item=reservation.item,
+                    action='RESERVED',
+                    user=request.user,
+                    details=f'Reserved for {who} from {reservation.start_date} to {reservation.end_date}',
+                    location=reservation.item.location or 'Warehouse'
+                )
 
             messages.success(request, f'Reserved {reservation.item.name} for {who} starting {reservation.start_date}.')
             return redirect(next_url)
@@ -1039,6 +924,12 @@ def reservation_create(request):
 @require_http_methods(["POST"])
 def reservation_cancel(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk, status='PENDING')
+    # Only whoever made the booking, the person it's for, or someone allowed to manage
+    # reservations can cancel it
+    if request.user.pk not in (reservation.reserved_by_id, reservation.reserved_for_id) and \
+            not request.user.has_perm('inventory.change_reservation'):
+        messages.error(request, 'You can only cancel reservations you made or that are for you.')
+        return redirect('inventory-reservation-list')
     services.cancel_reservation(reservation)
     messages.success(request, f'Cancelled reservation for {reservation.item.name}.')
     return redirect('inventory-reservation-list')
@@ -1055,10 +946,7 @@ def reservation_fulfill(request, pk):
         messages.error(request, str(exc))
         return redirect('inventory-reservation-list')
 
-    invalidate_cache('items_list')
-    invalidate_cache('dashboard_stats')
-    who = assignment.assigned_to.get_full_name() or assignment.assigned_to.username
-    messages.success(request, f'{assignment.item.name} assigned to {who}.')
+    messages.success(request, f'{assignment.item.name} assigned to {person_name(assignment.assigned_to)}.')
     return redirect('inventory-reservation-list')
 
 

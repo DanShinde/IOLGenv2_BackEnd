@@ -1,4 +1,5 @@
 {% extends 'inventory/base.html' %}
+{% load inventory_people %}
 
 {% block title %}Dashboard{% endblock %}
 
@@ -173,7 +174,7 @@
                 <i class="fas fa-tools"></i>
             </div>
             <div>
-                <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Tools</h3>
+                <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Tools &amp; Assets</h3>
                 <p class="text-3xl font-bold text-gray-900">{{ tools_count }}</p>
             </div>
         </div>
@@ -223,7 +224,7 @@
                 </div>
                 <p class="text-sm text-gray-600">
                     <i class="fas fa-user text-blue-500 mr-1"></i>
-                    {{ assignment.assigned_to.get_full_name|default:assignment.assigned_to.username }}
+                    {{ assignment.assigned_to|person }}
                 </p>
                 {% if assignment.expected_return_date %}
                 <p class="text-xs text-gray-500 mt-1">

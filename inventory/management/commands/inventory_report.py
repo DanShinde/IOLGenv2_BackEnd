@@ -14,7 +14,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING(
             f'\n{"="*70}\n'
             f'INVENTORY SUMMARY REPORT\n'
-            f'Generated: {timezone.now().strftime("%Y-%m-%d %H:%M:%S")}\n'
+            f'Generated: {timezone.localtime().strftime("%Y-%m-%d %H:%M:%S")}\n'
             f'{"="*70}\n'
         ))
 
@@ -25,9 +25,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.HTTP_INFO('\nINVENTORY OVERVIEW'))
         self.stdout.write('-' * 70)
         self.stdout.write(f'  Total Items:              {summary["total_items"]}')
-        self.stdout.write(f'  Tools:                    {summary["total_tools"]}')
+        self.stdout.write(f'  Tools & Assets:           {summary["total_single_unit"]}')
         self.stdout.write(f'  Materials:                {summary["total_materials"]}')
-        self.stdout.write(f'  Total Purchase Value:     ${total_value:,.2f}')
+        self.stdout.write(f'  Total Purchase Value:     Rs {total_value:,.2f}')
 
         # Status Breakdown
         self.stdout.write(self.style.HTTP_INFO('\nSTATUS BREAKDOWN'))
@@ -35,6 +35,7 @@ class Command(BaseCommand):
         self.stdout.write(f'  Available:                {summary["available_items"]}')
         self.stdout.write(f'  Assigned:                 {summary["assigned_items"]}')
         self.stdout.write(f'  Dispatched:               {summary["dispatched_items"]}')
+        self.stdout.write(f'  Under Maintenance:        {summary["maintenance_items"]}')
         self.stdout.write(f'  Consumed:                 {summary["consumed_items"]}')
         self.stdout.write(f'  Retired:                  {summary["retired_items"]}')
 

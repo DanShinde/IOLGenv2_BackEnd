@@ -129,7 +129,7 @@ CACHES = {
     }
     # "default": {
     #     "BACKEND": "django.core.cache.backends.redis.RedisCache",
-    #     "LOCATION": "rediss://red-culj875ds78s73bsort0:3pyBria9p20IWCe80zkypabZu9EeZIwj@singapore-redis.render.com:6379",
+    #     "LOCATION": os.environ.get("REDIS_URL"),  # never commit the URL: it contains the password
     # }
 }
 

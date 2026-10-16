@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 
+from .people import person_name
+
 
 # Condition of a TOOL at the moment it's returned from an assignment or dispatch
 RETURN_CONDITION_CHOICES = [
@@ -118,6 +120,27 @@ class Item(models.Model):
         """True for items tracked as a stock quantity (materials) rather than a single unit"""
         return self.item_type in self.STOCK_TRACKED_TYPES
 
+    def open_assignments(self):
+        """Assignments not yet returned - who actually has (units of) this item right now."""
+        return self.assignments.filter(return_date__isnull=True)
+
+    def open_dispatches(self):
+        """Dispatches of a single-unit item not yet returned (material dispatches are consumed)."""
+        if self.is_stock_tracked:
+            return self.dispatches.none()
+        return self.dispatches.filter(return_date__isnull=True)
+
+    @property
+    def is_out(self):
+        """True while someone holds this single-unit item or it's out at a site. A status
+        can only be changed directly (edit / bulk retire) when this is False."""
+        return not self.is_stock_tracked and (self.open_assignments().exists() or self.open_dispatches().exists())
+
+    @property
+    def units_out(self):
+        """Materials: units currently assigned to people (not counted in quantity)."""
+        return sum(self.open_assignments().values_list('quantity', flat=True))
+
     @property
     def needs_reorder(self):
         """Check if material stock is below minimum threshold"""
@@ -134,14 +157,12 @@ class Item(models.Model):
             # Get current assignment
             assignment = self.assignments.filter(return_date__isnull=True).first()
             if assignment:
-                return f"Assigned to {assignment.assigned_to.get_full_name() or assignment.assigned_to.username}"
+                return f"Assigned to {person_name(assignment.assigned_to)}"
         elif self.status == 'DISPATCHED':
             # Get current dispatch
             dispatch = self.dispatches.filter(return_date__isnull=True).first()
             if dispatch:
-                who = 'unknown'
-                if dispatch.responsible_person:
-                    who = dispatch.responsible_person.get_full_name() or dispatch.responsible_person.username
+                who = person_name(dispatch.responsible_person) if dispatch.responsible_person else 'unknown'
                 return f"Dispatched to {dispatch.project} ({dispatch.site_location or 'N/A'}) - with {who}"
         elif self.status == 'CONSUMED':
             return "Consumed (No longer in inventory)"
@@ -162,8 +183,10 @@ class Assignment(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='assignments')
     quantity = models.PositiveIntegerField(default=1,
         help_text="For materials: number of units assigned. For single-unit items: always 1")
-    assigned_to = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tool_assignments')
-    assigned_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assigned_items')
+    # PROTECT: deleting a login must not silently delete who holds/held what (an open
+    # assignment vanishing left items "Assigned" to nobody). Deactivate the login instead.
+    assigned_to = models.ForeignKey(User, on_delete=models.PROTECT, related_name='tool_assignments')
+    assigned_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='assigned_items')
     assignment_date = models.DateField()
     expected_return_date = models.DateField(null=True, blank=True)
     return_date = models.DateField(null=True, blank=True)
@@ -177,7 +200,7 @@ class Assignment(models.Model):
         ordering = ['-assignment_date']
 
     def __str__(self):
-        who = self.assigned_to.get_full_name() or self.assigned_to.username
+        who = person_name(self.assigned_to)
         if self.quantity > 1:
             return f"{self.quantity} x {self.item.name} assigned to {who}"
         return f"{self.item.name} assigned to {who}"
@@ -191,14 +214,14 @@ class Assignment(models.Model):
         """Check if assignment is overdue"""
         if self.return_date or not self.expected_return_date:
             return False
-        return timezone.now().date() > self.expected_return_date
+        return timezone.localdate() > self.expected_return_date
 
     @property
     def days_overdue(self):
         """Calculate days overdue"""
         if not self.is_overdue:
             return 0
-        return (timezone.now().date() - self.expected_return_date).days
+        return (timezone.localdate() - self.expected_return_date).days
 
 
 class Dispatch(models.Model):
@@ -214,7 +237,7 @@ class Dispatch(models.Model):
     responsible_person = models.ForeignKey(User, on_delete=models.PROTECT, related_name='responsible_dispatches',
                                            null=True, blank=True,
                                            help_text="Active employee at the site responsible for this item - needed to recover it")
-    dispatched_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dispatched_items')
+    dispatched_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='dispatched_items')
     dispatch_date = models.DateField()
     expected_return_date = models.DateField(null=True, blank=True,
                                            help_text="Only for tools - materials won't return")
@@ -230,35 +253,33 @@ class Dispatch(models.Model):
         verbose_name_plural = 'Dispatches'
 
     def __str__(self):
-        who = 'unknown'
-        if self.responsible_person:
-            who = self.responsible_person.get_full_name() or self.responsible_person.username
-        if self.item.item_type == 'TOOL':
+        who = person_name(self.responsible_person) if self.responsible_person else 'unknown'
+        if not self.item.is_stock_tracked:
             return f"{self.item.name} dispatched to {self.project} (with {who})"
         else:
             return f"{self.quantity} x {self.item.name} dispatched to {self.project} (Consumed, received by {who})"
 
     def is_active(self):
-        """Check if this dispatch is currently active (only for tools)"""
-        if self.item.item_type == 'MATERIAL':
+        """Check if this dispatch is currently active (single-unit items only)"""
+        if self.item.is_stock_tracked:
             return False  # Materials are immediately consumed
         return self.return_date is None
 
     @property
     def is_overdue(self):
-        """Check if dispatch is overdue (only for tools)"""
-        if self.item.item_type == 'MATERIAL':
+        """Check if dispatch is overdue (single-unit items only)"""
+        if self.item.is_stock_tracked:
             return False
         if self.return_date or not self.expected_return_date:
             return False
-        return timezone.now().date() > self.expected_return_date
+        return timezone.localdate() > self.expected_return_date
 
     @property
     def days_overdue(self):
         """Calculate days overdue (only for tools)"""
         if not self.is_overdue:
             return 0
-        return (timezone.now().date() - self.expected_return_date).days
+        return (timezone.localdate() - self.expected_return_date).days
 
 
 class Reservation(models.Model):
@@ -274,9 +295,9 @@ class Reservation(models.Model):
 
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='reservations',
                              limit_choices_to={'item_type': 'TOOL'})
-    reserved_for = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tool_reservations',
+    reserved_for = models.ForeignKey(User, on_delete=models.PROTECT, related_name='tool_reservations',
                                      help_text="Who the tool is being held for")
-    reserved_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_reservations',
+    reserved_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='created_reservations',
                                     help_text="Who made the booking")
     start_date = models.DateField(help_text="When the tool is needed from")
     end_date = models.DateField(help_text="When the tool is expected to be returned")
@@ -290,12 +311,12 @@ class Reservation(models.Model):
         ordering = ['start_date']
 
     def __str__(self):
-        return f"{self.item.name} reserved for {self.reserved_for.get_full_name() or self.reserved_for.username} ({self.start_date} to {self.end_date})"
+        return f"{self.item.name} reserved for {person_name(self.reserved_for)} ({self.start_date} to {self.end_date})"
 
     @property
     def is_expired(self):
         """A pending reservation whose window has passed without being fulfilled"""
-        return self.status == 'PENDING' and self.end_date < timezone.now().date()
+        return self.status == 'PENDING' and self.end_date < timezone.localdate()
 
     def overlaps(self, start_date, end_date):
         return self.start_date <= end_date and self.end_date >= start_date
@@ -337,3 +358,19 @@ class History(models.Model):
 
     def __str__(self):
         return f"{self.item.name} - {self.get_action_display()} at {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+    # Icon / colour for the item page's history timeline
+    _ACTION_STYLE = {
+        'ADDED': ('green', 'plus-circle'), 'UPDATED': ('gray', 'edit'), 'RESERVED': ('purple', 'calendar-check'),
+        'ASSIGNED': ('blue', 'user-check'), 'RETURNED': ('green', 'undo'), 'TRANSFERRED': ('indigo', 'exchange-alt'),
+        'DISPATCHED': ('orange', 'truck'), 'CONSUMED': ('yellow', 'box-open'), 'MAINTENANCE': ('indigo', 'tools'),
+        'RETIRED': ('red', 'ban'), 'LOCATION_CHANGED': ('teal', 'map-marker-alt'),
+    }
+
+    @property
+    def action_color(self):
+        return self._ACTION_STYLE.get(self.action, ('gray', 'circle'))[0]
+
+    @property
+    def action_icon(self):
+        return self._ACTION_STYLE.get(self.action, ('gray', 'circle'))[1]

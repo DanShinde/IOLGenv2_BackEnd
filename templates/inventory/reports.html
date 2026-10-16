@@ -1,4 +1,5 @@
 {% extends 'inventory/base.html' %}
+{% load inventory_people %}
 
 {% block title %}Reports{% endblock %}
 
@@ -217,7 +218,7 @@
                             <a href="{% url 'inventory-item-detail' r.item.pk %}" class="font-medium text-gray-900 hover:text-blue-600">{{ r.item.name }}</a>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <a href="{% url 'inventory-user-detail' r.reserved_for.pk %}" class="hover:text-blue-600">{{ r.reserved_for.get_full_name|default:r.reserved_for.username }}</a>
+                            <a href="{% url 'inventory-user-detail' r.reserved_for.pk %}" class="hover:text-blue-600">{{ r.reserved_for|person }}</a>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ r.start_date }} &rarr; {{ r.end_date }}</td>
                     </tr>
@@ -257,7 +258,7 @@
                             <div class="text-xs text-gray-500">{{ a.item.serial_number }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <a href="{% url 'inventory-user-detail' a.assigned_to.pk %}" class="hover:text-blue-600">{{ a.assigned_to.get_full_name|default:a.assigned_to.username }}</a>
+                            <a href="{% url 'inventory-user-detail' a.assigned_to.pk %}" class="hover:text-blue-600">{{ a.assigned_to|person }}</a>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ a.assignment_date }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ a.assignment_date|timesince }}</td>
@@ -309,7 +310,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {% if d.responsible_person %}
-                            <a href="{% url 'inventory-user-detail' d.responsible_person.pk %}" class="hover:text-blue-600">{{ d.responsible_person.get_full_name|default:d.responsible_person.username }}</a>
+                            <a href="{% url 'inventory-user-detail' d.responsible_person.pk %}" class="hover:text-blue-600">{{ d.responsible_person|person }}</a>
                             {% else %}
                             <span class="text-gray-400">-</span>
                             {% endif %}
@@ -328,7 +329,7 @@
             </table>
         </div>
         {% else %}
-        <p class="text-center text-gray-500 py-6">No tools are currently dispatched</p>
+        <p class="text-center text-gray-500 py-6">No items are currently dispatched</p>
         {% endif %}
     </div>
 
@@ -360,9 +361,11 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.min_quantity }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {% if perms.inventory.change_item %}
                             <a href="{% url 'inventory-item-update' item.pk %}" class="text-blue-600 hover:text-blue-900">
                                 <i class="fas fa-edit"></i> Update Stock
                             </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -380,7 +383,7 @@
             <i class="fas fa-clipboard-check text-indigo-600 mr-2"></i>
             Return Condition Breakdown
         </h3>
-        <p class="text-sm text-gray-500 mb-4">How tools have come back across every recorded return, all time.</p>
+        <p class="text-sm text-gray-500 mb-4">How items have come back across every recorded return, all time.</p>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="mini-stat ok">
                 <p class="text-xs text-gray-500 uppercase font-medium">Good</p>
@@ -413,7 +416,7 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Tools</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Items</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Assignment</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
@@ -425,18 +428,18 @@
                             <div class="flex items-center">
                                 <div class="flex-shrink-0 h-10 w-10">
                                     <div class="h-10 w-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold">
-                                        {{ user.get_full_name.0|default:user.username.0|upper }}
+                                        {{ user|person|first|upper }}
                                     </div>
                                 </div>
                                 <div class="ml-4">
-                                    <div class="font-medium text-gray-900">{{ user.get_full_name|default:user.username }}</div>
+                                    <div class="font-medium text-gray-900">{{ user|person }}</div>
                                     <div class="text-sm text-gray-500">{{ user.email }}</div>
                                 </div>
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
-                                {{ user.tool_count }} tool{{ user.tool_count|pluralize }}
+                                {{ user.tool_count }} item{{ user.tool_count|pluralize }}
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

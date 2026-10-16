@@ -18,6 +18,12 @@ SECTION_FONT = Font(bold=True, size=12)
 TITLE_FONT = Font(bold=True, size=14)
 
 
+
+from .models import Item
+from .people import person_name
+
+TYPE_LABELS = dict(Item.ITEM_TYPES)
+
 def _write_table(ws, start_row, headers, rows):
     """Writes a header row + data rows starting at start_row. Returns the row after the table."""
     for col, header in enumerate(headers, start=1):
@@ -37,16 +43,25 @@ def _autosize(ws, widths):
 
 
 def _who(user):
-    if not user:
-        return ''
-    return user.get_full_name() or user.username
+    return person_name(user) if user else ''
+
+
+def _holder(item):
+    """Who has the item right now, from its open assignment/dispatch records."""
+    parts = [f"{_who(a.assigned_to)}{f' ({a.quantity} units)' if item.is_stock_tracked else ''}"
+             for a in getattr(item, 'open_list', None) or item.open_assignments().select_related('assigned_to')]
+    dispatches = getattr(item, 'open_dispatch_list', None)
+    if dispatches is None:
+        dispatches = item.open_dispatches().select_related('responsible_person')
+    parts += [f"At {d.project} (responsible: {_who(d.responsible_person)})" for d in dispatches]
+    return '; '.join(parts)
 
 
 def _build_summary_sheet(ws, data):
     ws.title = 'Summary'
     ws['A1'] = 'Inventory Reports & Analytics'
     ws['A1'].font = TITLE_FONT
-    ws['A2'] = f"Generated: {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+    ws['A2'] = f"Generated: {timezone.localtime().strftime('%Y-%m-%d %H:%M')}"
 
     row = 4
     ws.cell(row=row, column=1, value='Key Metrics').font = SECTION_FONT
@@ -72,7 +87,7 @@ def _build_summary_sheet(ws, data):
     table_start = row
     headers = ['Item Type', 'Total', 'Available', 'Assigned', 'Dispatched', 'Maintenance', 'Consumed', 'Retired']
     rows = [
-        [s['item_type'], s['total'], s['available'], s['assigned'], s['dispatched'],
+        [TYPE_LABELS.get(s['item_type'], s['item_type']), s['total'], s['available'], s['assigned'], s['dispatched'],
          s['maintenance'], s['consumed'], s['retired']]
         for s in data['inventory_summary']
     ]
@@ -108,23 +123,23 @@ def _build_summary_sheet(ws, data):
 def _build_items_sheet(ws, items):
     ws.title = 'Items'
     headers = ['Name', 'Type', 'Serial Number', 'Make', 'Model', 'Status', 'Quantity',
-               'Min Quantity', 'Location', 'Category', 'Purchase Date', 'Purchase Cost',
+               'Min Quantity', 'Location', 'Currently With', 'Category', 'Purchase Date', 'Purchase Cost',
                'Current Value', 'Remarks']
     rows = []
     for item in items:
         current_value = float(item.purchase_cost) * item.quantity if item.purchase_cost is not None else None
         rows.append([
             item.name, item.get_item_type_display(), item.serial_number, item.make, item.model,
-            item.get_status_display(), item.quantity, item.min_quantity, item.location, item.category,
+            item.get_status_display(), item.quantity, item.min_quantity, item.location, _holder(item), item.category,
             item.purchase_date.isoformat() if item.purchase_date else None,
             float(item.purchase_cost) if item.purchase_cost is not None else None,
             current_value, item.remarks,
         ])
     next_row = _write_table(ws, 1, headers, rows)
     for row in range(2, next_row):
-        ws.cell(row=row, column=12).number_format = '"₹"#,##0.00'
         ws.cell(row=row, column=13).number_format = '"₹"#,##0.00'
-    _autosize(ws, [24, 10, 18, 14, 14, 14, 10, 12, 18, 14, 14, 14, 14, 34])
+        ws.cell(row=row, column=14).number_format = '"₹"#,##0.00'
+    _autosize(ws, [24, 10, 18, 14, 14, 14, 10, 12, 18, 28, 14, 14, 14, 14, 34])
 
 
 def _build_distribution_sheet(ws, data):
@@ -218,7 +233,7 @@ def _build_low_stock_sheet(ws, data):
 
 def _build_user_assignments_sheet(ws, data):
     ws.title = 'User Assignments'
-    headers = ['User', 'Email', 'Tools Assigned', 'Last Assignment Date', 'Has Overdue']
+    headers = ['User', 'Email', 'Items Assigned', 'Last Assignment Date', 'Has Overdue']
     rows = []
     for entry in data['user_assignments']:
         last = entry['last_assignment']

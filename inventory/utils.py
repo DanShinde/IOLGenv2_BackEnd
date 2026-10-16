@@ -53,19 +53,28 @@ def _sync_missing_employee_logins():
     existing matching account first, and only create a new (login-disabled) one if
     truly none exists. Cheap no-op once everyone's linked.
     """
+    import logging
+    from django.db import IntegrityError, transaction
     from employees.models import Employee
     from gap_analysis.models import SkillMatrix, find_matching_user
 
     unlinked = Employee.objects.filter(is_active=True).exclude(
-        skill_matrix__user__isnull=False
-    )
+        name__startswith='Unassigned'  # Planner's placeholder rows, not real people
+    ).exclude(skill_matrix__user__isnull=False)
     for employee in unlinked:
-        sm, _ = SkillMatrix.objects.get_or_create(employee=employee)
-        if sm.user_id:
-            continue
-        user = find_matching_user(employee.name) or _create_placeholder_user(employee)
-        sm.user = user
-        sm.save(update_fields=['user'])
+        try:
+            with transaction.atomic():
+                sm, _ = SkillMatrix.objects.get_or_create(employee=employee)
+                if sm.user_id:
+                    continue
+                user = find_matching_user(employee.name) or _create_placeholder_user(employee)
+                # .update(), not save(): linking a login must not fire SkillMatrix's
+                # post_save signals (which can change the employee's active status).
+                SkillMatrix.objects.filter(pk=sm.pk).update(user=user)
+        except IntegrityError:
+            # e.g. the matched login got linked to someone else meanwhile - leave this
+            # employee for an admin to link by hand rather than break the page.
+            logging.getLogger(__name__).warning('Could not link a login for employee %s', employee.pk)
 
 
 def preview_employee_sync():
@@ -77,7 +86,8 @@ def preview_employee_sync():
 
     return {
         'employees_needing_login': list(
-            Employee.objects.filter(is_active=True).exclude(skill_matrix__user__isnull=False)
+            Employee.objects.filter(is_active=True).exclude(name__startswith='Unassigned')
+            .exclude(skill_matrix__user__isnull=False)
         ),
     }
 
@@ -121,7 +131,7 @@ def get_active_employee_users():
         is_active=True,
         skillmatrix__isnull=False,
         skillmatrix__employee__is_active=True,
-    ).distinct().order_by('username')
+    ).select_related('skillmatrix__employee').distinct().order_by('skillmatrix__employee__name', 'username')
 
 
 def get_low_stock_items():
@@ -133,23 +143,23 @@ def get_overdue_assignments():
     """Active tool assignments past their expected return date"""
     return Assignment.objects.filter(
         return_date__isnull=True,
-        expected_return_date__lt=timezone.now().date()
+        expected_return_date__lt=timezone.localdate()
     ).select_related('item', 'assigned_to')
 
 
 def get_overdue_dispatches():
-    """Active tool dispatches past their expected return date (materials are never returned)"""
+    """Active single-unit dispatches past their expected return date (materials are never returned)"""
     return Dispatch.objects.filter(
         return_date__isnull=True,
-        expected_return_date__lt=timezone.now().date()
-    ).exclude(item__item_type='MATERIAL').select_related('item')
+        expected_return_date__lt=timezone.localdate()
+    ).exclude(item__item_type__in=Item.STOCK_TRACKED_TYPES).select_related('item', 'responsible_person')
 
 
 def get_expired_reservations():
     """Pending reservations whose window passed without being fulfilled"""
     return Reservation.objects.filter(
         status='PENDING',
-        end_date__lt=timezone.now().date()
+        end_date__lt=timezone.localdate()
     ).select_related('item', 'reserved_for')
 
 
@@ -159,7 +169,7 @@ def build_overdue_digest_context():
         'overdue_dispatches': list(get_overdue_dispatches()),
         'low_stock_items': list(get_low_stock_items()),
         'expired_reservations': list(get_expired_reservations()),
-        'today': timezone.now().date(),
+        'today': timezone.localdate(),
     }
 
 
@@ -220,7 +230,7 @@ def get_reservation_summary():
 
 def get_upcoming_reservations(days=30):
     """PENDING reservations whose window overlaps the next N days"""
-    today = timezone.now().date()
+    today = timezone.localdate()
     return Reservation.objects.filter(
         status='PENDING',
         start_date__lte=today + timedelta(days=days),
@@ -229,9 +239,10 @@ def get_upcoming_reservations(days=30):
 
 
 def get_active_dispatches():
-    """Tools currently out at a project (materials are consumed immediately, never 'active')"""
-    return Dispatch.objects.filter(
-        return_date__isnull=True, item__item_type='TOOL'
+    """Single-unit items (tools, IT assets, ...) currently out at a project. Materials are
+    consumed immediately, never 'active'."""
+    return Dispatch.objects.filter(return_date__isnull=True).exclude(
+        item__item_type__in=Item.STOCK_TRACKED_TYPES
     ).select_related('item', 'responsible_person').order_by('dispatch_date')
 
 
@@ -250,8 +261,11 @@ def get_inventory_summary():
     return {
         'total_items': Item.objects.count(),
         'total_tools': Item.objects.filter(item_type='TOOL').count(),
+        'total_single_unit': Item.objects.exclude(item_type__in=Item.STOCK_TRACKED_TYPES).count(),
         'total_materials': Item.objects.filter(item_type='MATERIAL').count(),
-        'available_items': Item.objects.filter(status='AVAILABLE').count(),
+        # A material with nothing left in stock isn't "available", whatever its status says
+        'available_items': Item.objects.filter(status='AVAILABLE').exclude(
+            item_type__in=Item.STOCK_TRACKED_TYPES, quantity=0).count(),
         'assigned_items': Item.objects.filter(status='ASSIGNED').count(),
         'dispatched_items': Item.objects.filter(status='DISPATCHED').count(),
         'consumed_items': Item.objects.filter(status='CONSUMED').count(),
@@ -260,14 +274,15 @@ def get_inventory_summary():
         'low_stock_items': get_low_stock_items().count(),
         'active_assignments': Assignment.objects.filter(return_date__isnull=True).count(),
         'overdue_assignments': get_overdue_assignments().count(),
-        'active_dispatches': Dispatch.objects.filter(return_date__isnull=True, item__item_type='TOOL').count(),
+        'active_dispatches': get_active_dispatches().count(),
         'overdue_dispatches': get_overdue_dispatches().count(),
     }
 
 
 def calculate_total_inventory_value():
-    """Total purchase value currently held: sum(purchase_cost * quantity) across all items"""
-    total = Item.objects.filter(purchase_cost__isnull=False).aggregate(
+    """Total purchase value currently held: sum(purchase_cost * quantity), leaving out
+    retired and consumed items (no longer held)"""
+    total = Item.objects.filter(purchase_cost__isnull=False).exclude(status__in=['RETIRED', 'CONSUMED']).aggregate(
         total=Coalesce(
             Sum(F('purchase_cost') * F('quantity'), output_field=DecimalField(max_digits=14, decimal_places=2)),
             Decimal('0.00')
@@ -282,15 +297,19 @@ def build_reports_context_data():
     HTML view (cached) and the Excel export (always fresh) can never show different
     figures - both call this and nothing else for their data.
     """
+    # Materials never get status ASSIGNED (units are drawn from stock), so for them
+    # "available" = some stock left and "assigned" = some units out with people.
+    stock = Q(item_type__in=Item.STOCK_TRACKED_TYPES)
+    has_units_out = Q(assignments__return_date__isnull=True, assignments__isnull=False)
     inventory_summary = list(Item.objects.values('item_type').annotate(
-        total=Count('id'),
-        available=Count('id', filter=Q(status='AVAILABLE')),
-        assigned=Count('id', filter=Q(status='ASSIGNED')),
-        dispatched=Count('id', filter=Q(status='DISPATCHED')),
-        maintenance=Count('id', filter=Q(status='MAINTENANCE')),
-        consumed=Count('id', filter=Q(status='CONSUMED')),
-        retired=Count('id', filter=Q(status='RETIRED')),
-    ))
+        total=Count('id', distinct=True),
+        available=Count('id', distinct=True, filter=Q(status='AVAILABLE') & (~stock | Q(quantity__gt=0))),
+        assigned=Count('id', distinct=True, filter=(~stock & Q(status='ASSIGNED')) | (stock & has_units_out)),
+        dispatched=Count('id', distinct=True, filter=Q(status='DISPATCHED')),
+        maintenance=Count('id', distinct=True, filter=Q(status='MAINTENANCE')),
+        consumed=Count('id', distinct=True, filter=Q(status='CONSUMED')),
+        retired=Count('id', distinct=True, filter=Q(status='RETIRED')),
+    ).order_by('item_type'))
 
     user_assignments_qs = User.objects.filter(
         tool_assignments__return_date__isnull=True
@@ -313,7 +332,7 @@ def build_reports_context_data():
 
     assigned_items = list(
         Assignment.objects.filter(return_date__isnull=True)
-        .select_related('item', 'assigned_to').order_by('assignment_date')
+        .select_related('item', 'assigned_to__skillmatrix__employee').order_by('assignment_date')
     )
 
     return {
