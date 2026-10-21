@@ -1,4 +1,5 @@
 {% extends 'inventory/base.html' %}
+{% load inventory_people %}
 
 {% block title %}Users{% endblock %}
 
@@ -22,7 +23,7 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tools Assigned</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items Assigned</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dispatches Responsible For</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -33,16 +34,16 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             <div class="h-9 w-9 rounded-full flex items-center justify-center text-white font-bold mr-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                {{ user.get_full_name.0|default:user.username.0|upper }}
+                                {{ user|person|first|upper }}
                             </div>
-                            <div class="font-medium text-gray-900">{{ user.get_full_name|default:user.username }}</div>
+                            <div class="font-medium text-gray-900">{{ user|person }}</div>
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ user.email|default:"-" }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         {% if user.active_tool_count %}
                         <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                            {{ user.active_tool_count }} tool{{ user.active_tool_count|pluralize }}
+                            {{ user.active_tool_count }} item{{ user.active_tool_count|pluralize }}
                         </span>
                         {% else %}
                         <span class="text-gray-400 text-sm">-</span>

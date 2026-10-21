@@ -1,6 +1,7 @@
 {% extends 'inventory/base.html' %}
+{% load inventory_people %}
 
-{% block title %}{{ target_user.get_full_name|default:target_user.username }}{% endblock %}
+{% block title %}{{ target_user|person }}{% endblock %}
 
 {% block content %}
 <div class="max-w-5xl mx-auto space-y-6">
@@ -9,10 +10,10 @@
         <div class="px-6 py-6 flex items-center justify-between" style="background: linear-gradient(135deg, rgba(102,126,234,0.08) 0%, rgba(118,75,162,0.08) 100%);">
             <div class="flex items-center">
                 <div class="h-16 w-16 rounded-full flex items-center justify-center text-white font-bold text-2xl mr-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    {{ target_user.get_full_name.0|default:target_user.username.0|upper }}
+                    {{ target_user|person|first|upper }}
                 </div>
                 <div>
-                    <h2 class="text-2xl font-bold text-gray-900">{{ target_user.get_full_name|default:target_user.username }}</h2>
+                    <h2 class="text-2xl font-bold text-gray-900">{{ target_user|person }}</h2>
                     <p class="text-gray-500"><i class="fas fa-envelope mr-1"></i>{{ target_user.email|default:"No email on file" }}</p>
                 </div>
             </div>
@@ -33,13 +34,13 @@
     <!-- Assign a tool to this user -->
     <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-semibold mb-4">
-            <i class="fas fa-user-plus mr-2 text-green-600"></i>Assign a Tool to {{ target_user.get_full_name|default:target_user.username }}
+            <i class="fas fa-user-plus mr-2 text-green-600"></i>Assign a Tool to {{ target_user|person }}
         </h3>
 
         {% if not is_active_employee %}
         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
             <i class="fas fa-exclamation-triangle mr-2"></i>
-            {{ target_user.get_full_name|default:target_user.username }} is not currently an active employee
+            {{ target_user|person }} is not currently an active employee
             (per Planner/skill gap analyzer), so items can't be assigned to them. Any item they still hold can
             still be returned below.
         </div>
@@ -154,7 +155,7 @@
             {% else %}
             <div class="text-center py-8 text-gray-500">
                 <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
-                <p>Not holding any tools right now</p>
+                <p>Not holding any items right now</p>
             </div>
             {% endif %}
         </div>

@@ -11,7 +11,10 @@ class ItemAdmin(admin.ModelAdmin):
     )
     list_filter = ('item_type', 'status', 'category', 'created_at')
     search_fields = ('name', 'serial_number', 'make', 'model', 'description', 'remarks')
-    readonly_fields = ('created_at', 'updated_at', 'current_location_display')
+    # status/location only change through the app's assign/dispatch/return pages, which keep
+    # the open Assignment/Dispatch records in step (editing them here caused items to show
+    # Available while still assigned)
+    readonly_fields = ('status', 'location', 'created_at', 'updated_at', 'current_location_display')
 
     fieldsets = (
         ('Basic Information', {
@@ -73,6 +76,16 @@ class AssignmentAdmin(admin.ModelAdmin):
         'assigned_to__username', 'assigned_to__first_name', 'assigned_to__last_name'
     )
     date_hierarchy = 'assignment_date'
+    # Who/what/when and the return are set by the app's Assign/Return pages; changing or
+    # adding/deleting them here would leave the item's status out of step. Notes stay editable.
+    readonly_fields = ('item', 'quantity', 'assigned_to', 'assigned_by', 'assignment_date',
+                       'return_date', 'return_condition', 'return_notes', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
     def status_badge(self, obj):
         if obj.is_overdue:
@@ -97,8 +110,17 @@ class DispatchAdmin(admin.ModelAdmin):
         'dispatch_date', 'expected_return_date', 'return_date', 'return_condition', 'status_badge'
     )
     list_filter = ('dispatch_date', 'project', 'return_date', 'return_condition')
-    search_fields = ('item__name', 'item__serial_number', 'project', 'site_location', 'responsible_person')
+    search_fields = ('item__name', 'item__serial_number', 'project', 'site_location',
+                     'responsible_person__username', 'responsible_person__first_name', 'responsible_person__last_name')
     date_hierarchy = 'dispatch_date'
+    readonly_fields = ('item', 'quantity', 'responsible_person', 'dispatched_by', 'dispatch_date',
+                       'return_date', 'return_condition', 'return_notes', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
     def status_badge(self, obj):
         if obj.item.item_type == 'MATERIAL':

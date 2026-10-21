@@ -1,4 +1,5 @@
 {% extends 'inventory/base.html' %}
+{% load inventory_people %}
 
 {% block title %}{{ item.name }}{% endblock %}
 
@@ -51,10 +52,49 @@
         </div>
     </div>
 
+    {% if open_assignments or open_dispatches %}
+    <div class="mb-6 border border-blue-200 bg-blue-50 rounded-lg p-4">
+        <h3 class="text-lg font-semibold mb-2"><i class="fas fa-user-check mr-2 text-blue-600"></i>Currently with</h3>
+        <ul class="divide-y divide-blue-100">
+            {% for a in open_assignments %}
+            <li class="py-2 flex flex-wrap items-center justify-between gap-2">
+                <span>
+                    <a href="{% url 'inventory-user-detail' a.assigned_to.pk %}" class="font-medium text-blue-700 hover:underline">{{ a.assigned_to|person }}</a>
+                    {% if a.quantity > 1 or item.is_stock_tracked %}<span class="text-gray-600">- {{ a.quantity }} unit{{ a.quantity|pluralize }}</span>{% endif %}
+                    <span class="text-gray-500 text-sm">since {{ a.assignment_date|date:"d M Y" }}{% if a.expected_return_date %}, due {{ a.expected_return_date|date:"d M Y" }}{% endif %}</span>
+                    {% if a.is_overdue %}<span class="ml-1 px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">{{ a.days_overdue }} day{{ a.days_overdue|pluralize }} overdue</span>{% endif %}
+                </span>
+                {% if perms.inventory.change_assignment %}
+                <a href="{% url 'inventory-return-assignment' a.pk %}" class="bg-gray-600 hover:bg-gray-700 text-white text-sm px-3 py-1 rounded-md"><i class="fas fa-undo mr-1"></i>Return</a>
+                {% endif %}
+            </li>
+            {% endfor %}
+            {% for d in open_dispatches %}
+            <li class="py-2 flex flex-wrap items-center justify-between gap-2">
+                <span>
+                    <span class="font-medium">At {{ d.project }}{% if d.site_location %} ({{ d.site_location }}){% endif %}</span>
+                    <span class="text-gray-600">- responsible: {{ d.responsible_person|person|default:"unknown" }}</span>
+                    <span class="text-gray-500 text-sm">since {{ d.dispatch_date|date:"d M Y" }}{% if d.expected_return_date %}, due {{ d.expected_return_date|date:"d M Y" }}{% endif %}</span>
+                    {% if d.is_overdue %}<span class="ml-1 px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">{{ d.days_overdue }} day{{ d.days_overdue|pluralize }} overdue</span>{% endif %}
+                </span>
+                {% if perms.inventory.change_dispatch %}
+                <a href="{% url 'inventory-return-dispatch' d.pk %}" class="bg-gray-600 hover:bg-gray-700 text-white text-sm px-3 py-1 rounded-md"><i class="fas fa-undo mr-1"></i>Return</a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% if open_assignments|length > 1 and not item.is_stock_tracked %}
+        <p class="mt-2 text-sm text-red-700"><i class="fas fa-exclamation-triangle mr-1"></i>This item is recorded as being with more than one person. Return the one(s) who no longer have it.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="flex flex-wrap gap-3">
+        {% if perms.inventory.change_item %}
         <a href="{% url 'inventory-item-update' item.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-edit mr-2"></i>Edit
         </a>
+        {% endif %}
 
         {% if perms.inventory.add_assignment %}
             {% if item.item_type == 'MATERIAL' %}
@@ -76,17 +116,7 @@
         </a>
         {% endif %}
 
-        {% if item.status == 'ASSIGNED' and active_assignment %}
-        <a href="{% url 'inventory-return-assignment' active_assignment.pk %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md">
-            <i class="fas fa-undo mr-2"></i>Return
-        </a>
-        {% elif item.status == 'DISPATCHED' and active_dispatch %}
-        <a href="{% url 'inventory-return-dispatch' active_dispatch.pk %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md">
-            <i class="fas fa-undo mr-2"></i>Return
-        </a>
-        {% endif %}
-
-        {% if item.item_type == 'TOOL' and item.status != 'RETIRED' %}
+        {% if perms.inventory.add_reservation and item.item_type == 'TOOL' and item.status != 'RETIRED' %}
         <a href="{% url 'inventory-reservation-create' %}?item={{ item.pk }}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md">
             <i class="fas fa-calendar-plus mr-2"></i>Reserve
         </a>
@@ -110,7 +140,7 @@
                 </div>
                 <p class="text-sm text-gray-600">{{ record.details }}</p>
                 {% if record.user %}
-                <p class="text-xs text-gray-500">By {{ record.user.get_full_name|default:record.user.username }}</p>
+                <p class="text-xs text-gray-500">By {{ record.user|person }}</p>
                 {% endif %}
             </div>
         </div>

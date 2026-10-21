@@ -1,4 +1,5 @@
 {% extends 'inventory/base.html' %}
+{% load inventory_people %}
 
 {% block title %}Transfers{% endblock %}
 
@@ -117,7 +118,7 @@
                         <p class="text-xs text-gray-500">{{ a.item.serial_number }}</p>
                         <p class="text-xs text-blue-600">
                             <i class="fas fa-user mr-1"></i>
-                            <a href="{% url 'inventory-user-detail' a.assigned_to.pk %}" class="hover:underline">{{ a.assigned_to.get_full_name|default:a.assigned_to.username }}</a>
+                            <a href="{% url 'inventory-user-detail' a.assigned_to.pk %}" class="hover:underline">{{ a.assigned_to|person }}</a>
                         </p>
                         {% if a.quantity > 1 %}<p class="text-xs text-gray-500">{{ a.quantity }} units</p>{% endif %}
                     </div>
@@ -149,7 +150,7 @@
                             <i class="fas fa-map-marker-alt mr-1"></i>{{ d.project }}{% if d.site_location %} ({{ d.site_location }}){% endif %}
                         </p>
                         <p class="text-xs text-gray-500">
-                            <i class="fas fa-user mr-1"></i>{{ d.responsible_person.get_full_name|default:d.responsible_person.username }}
+                            <i class="fas fa-user mr-1"></i>{{ d.responsible_person|person }}
                         </p>
                     </div>
                     <div class="flex flex-col items-end space-y-1 text-xs">
@@ -160,7 +161,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-center text-gray-500 py-8">No tools currently dispatched</p>
+            <p class="text-center text-gray-500 py-8">No items currently dispatched</p>
             {% endif %}
         </div>
     </div>

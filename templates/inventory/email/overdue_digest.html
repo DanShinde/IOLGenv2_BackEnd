@@ -1,3 +1,4 @@
+{% load inventory_people %}
 <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 640px; margin: 0 auto;">
     <h2 style="color: #1e1b4b;">Inventory Alert - {{ today }}</h2>
     <p style="color: #4b5563;">The following items need attention:</p>
@@ -16,7 +17,7 @@
         {% for a in overdue_assignments %}
         <tr style="border-bottom: 1px solid #f3f4f6;">
             <td style="padding: 6px 8px; font-size: 13px;">{{ a.item.name }} ({{ a.item.serial_number }})</td>
-            <td style="padding: 6px 8px; font-size: 13px;">{{ a.assigned_to.get_full_name|default:a.assigned_to.username }}</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ a.assigned_to|person }}</td>
             <td style="padding: 6px 8px; font-size: 13px;">{{ a.expected_return_date }}</td>
             <td style="padding: 6px 8px; font-size: 13px; color: #b91c1c;">{{ a.days_overdue }}</td>
         </tr>
@@ -79,7 +80,7 @@
         {% for r in expired_reservations %}
         <tr style="border-bottom: 1px solid #f3f4f6;">
             <td style="padding: 6px 8px; font-size: 13px;">{{ r.item.name }}</td>
-            <td style="padding: 6px 8px; font-size: 13px;">{{ r.reserved_for.get_full_name|default:r.reserved_for.username }}</td>
+            <td style="padding: 6px 8px; font-size: 13px;">{{ r.reserved_for|person }}</td>
             <td style="padding: 6px 8px; font-size: 13px;">{{ r.start_date }} to {{ r.end_date }}</td>
         </tr>
         {% endfor %}

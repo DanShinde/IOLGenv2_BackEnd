@@ -1,7 +1,7 @@
 from datetime import date
 from types import SimpleNamespace
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
@@ -10,9 +10,19 @@ from . import services
 from .views import _apply_initial_status
 
 
+INVENTORY_PERMS = ['add_item', 'change_item', 'add_assignment', 'change_assignment',
+                   'add_dispatch', 'change_dispatch', 'add_reservation', 'change_reservation']
+
+
+def grant_inventory_perms(user):
+    """The permissions an inventory manager has (the views now check these)."""
+    user.user_permissions.add(*Permission.objects.filter(content_type__app_label='inventory', codename__in=INVENTORY_PERMS))
+    return User.objects.get(pk=user.pk)  # fresh instance: permission cache
+
+
 class ReturnWorkflowTests(TestCase):
     def setUp(self):
-        self.staff_user = User.objects.create_user('staff', password='pw', is_staff=True)
+        self.staff_user = grant_inventory_perms(User.objects.create_user('staff', password='pw', is_staff=True))
         self.worker = User.objects.create_user('worker', password='pw')
         self.client.force_login(self.staff_user)
 
@@ -93,7 +103,7 @@ class ReturnWorkflowTests(TestCase):
 
 class BulkUpdatePermissionTests(TestCase):
     def setUp(self):
-        self.staff_user = User.objects.create_user('staff2', password='pw', is_staff=True)
+        self.staff_user = grant_inventory_perms(User.objects.create_user('staff2', password='pw', is_staff=True))
         self.worker = User.objects.create_user('worker2', password='pw')
         self.item = Item.objects.create(item_type='TOOL', name='Hammer', serial_number='SN-3')
 
@@ -321,3 +331,149 @@ class ItemFormStatusValidationTests(TestCase):
         from .forms import ItemForm
         form = ItemForm(data=self._base_data(status='AVAILABLE'))
         self.assertTrue(form.is_valid(), form.errors)
+
+
+class StatusIntegrityTests(TestCase):
+    """An item's status and its open assignment/dispatch records must always agree."""
+
+    def setUp(self):
+        self.manager = grant_inventory_perms(User.objects.create_user('mgr', password='pw', is_staff=True))
+        self.alice = User.objects.create_user('alice', first_name='Alice', last_name='A')
+        self.bob = User.objects.create_user('bob', first_name='Bob', last_name='B')
+        self.tool = Item.objects.create(item_type='TOOL', name='Meter', serial_number='M-1')
+        self.client.force_login(self.manager)
+
+    def open_holders(self, item):
+        return list(item.open_assignments().values_list('assigned_to__username', flat=True))
+
+    def test_edit_cannot_make_an_assigned_item_available(self):
+        services.assign_item(self.tool, self.alice, self.manager, date.today())
+        form_data = {'item_type': 'TOOL', 'name': 'Meter', 'serial_number': 'M-1', 'quantity': 1,
+                     'min_quantity': 0, 'status': 'AVAILABLE', 'location': 'Shelf'}
+        self.client.post(reverse('inventory-item-update', args=[self.tool.pk]), form_data)
+        self.tool.refresh_from_db()
+        self.assertEqual(self.tool.status, 'ASSIGNED')
+        self.assertEqual(self.open_holders(self.tool), ['alice'])
+
+    def test_a_tool_is_never_held_by_two_people(self):
+        services.assign_item(self.tool, self.alice, self.manager, date.today())
+        services.assign_item(self.tool, self.bob, self.manager, date.today())  # transfer
+        self.assertEqual(self.open_holders(self.tool), ['bob'])
+        self.tool.refresh_from_db()
+        self.assertEqual(self.tool.status, 'ASSIGNED')
+
+    def test_transfer_closes_every_stale_holder(self):
+        # damaged data from before the fix: item Available with an open assignment
+        Assignment.objects.create(item=self.tool, assigned_to=self.alice, assigned_by=self.manager,
+                                  assignment_date=date.today())
+        services.assign_item(self.tool, self.bob, self.manager, date.today())
+        self.assertEqual(self.open_holders(self.tool), ['bob'])
+
+    def test_returning_one_of_two_holders_keeps_item_assigned(self):
+        for who in (self.alice, self.bob):  # damaged data: two open assignments
+            Assignment.objects.create(item=self.tool, assigned_to=who, assigned_by=self.manager,
+                                      assignment_date=date.today())
+        self.tool.status = 'ASSIGNED'
+        self.tool.save()
+        stale = Assignment.objects.get(item=self.tool, assigned_to=self.alice)
+        services.process_return(stale, 'GOOD', '', self.manager, 'Returned by Alice')
+        self.tool.refresh_from_db()
+        self.assertEqual(self.tool.status, 'ASSIGNED')  # Bob still has it
+
+    def test_return_twice_is_refused(self):
+        a, _ = services.assign_item(self.tool, self.alice, self.manager, date.today())
+        services.process_return(a, 'GOOD', '', self.manager, 'x')
+        with self.assertRaises(services.InventoryError):
+            services.process_return(a, 'GOOD', '', self.manager, 'x')
+
+    def test_bulk_retire_refuses_items_still_out(self):
+        services.assign_item(self.tool, self.alice, self.manager, date.today())
+        self.client.post(reverse('inventory-bulk-update'), data='{"item_ids": [%d], "action": "retire"}' % self.tool.pk,
+                         content_type='application/json')
+        self.tool.refresh_from_db()
+        self.assertEqual(self.tool.status, 'ASSIGNED')
+        self.assertEqual(self.open_holders(self.tool), ['alice'])
+
+    def test_dispatched_it_asset_can_be_returned(self):
+        laptop = Item.objects.create(item_type='IT_ASSET', name='Laptop', serial_number='L-1')
+        services.dispatch_item(laptop, 'Site X', '', self.alice, self.manager, date.today())
+        dispatch = Dispatch.objects.get(item=laptop)
+        response = self.client.post(reverse('inventory-return-dispatch', args=[dispatch.pk]),
+                                    {'condition': 'GOOD', 'return_notes': ''})
+        self.assertEqual(response.status_code, 302)
+        laptop.refresh_from_db()
+        self.assertEqual(laptop.status, 'AVAILABLE')
+
+    def test_assign_page_does_not_crash_when_status_and_records_disagree(self):
+        self.tool.status = 'ASSIGNED'  # no open assignment at all
+        self.tool.save()
+        response = self.client.post(reverse('inventory-assign-create'), {
+            'item': self.tool.pk, 'quantity': 1, 'assigned_to': self.bob.pk, 'assignment_date': date.today().isoformat()})
+        self.assertLess(response.status_code, 500)
+
+    def test_material_return_twice_does_not_double_stock(self):
+        cable = Item.objects.create(item_type='MATERIAL', name='Cable', serial_number='C-1', quantity=10)
+        a, _ = services.assign_item(cable, self.alice, self.manager, date.today(), quantity=4)
+        services.process_return(a, 'GOOD', '', self.manager, 'x')
+        with self.assertRaises(services.InventoryError):
+            services.process_return(a, 'GOOD', '', self.manager, 'x')
+        cable.refresh_from_db()
+        self.assertEqual(cable.quantity, 10)
+
+
+class PermissionTests(TestCase):
+    def setUp(self):
+        self.manager = grant_inventory_perms(User.objects.create_user('mgr2', password='pw', is_staff=True))
+        self.outsider = User.objects.create_user('outsider', password='pw')  # logged in, no inventory rights
+        self.tool = Item.objects.create(item_type='TOOL', name='Gauge', serial_number='G-1')
+        self.assignment, _ = services.assign_item(self.tool, self.manager, self.manager, date.today())
+        self.client.force_login(self.outsider)
+
+    def test_outsider_cannot_edit_items(self):
+        response = self.client.post(reverse('inventory-item-update', args=[self.tool.pk]), {'name': 'x'})
+        self.assertEqual(response.status_code, 403)
+
+    def test_outsider_cannot_return_someone_elses_item(self):
+        response = self.client.post(reverse('inventory-return-assignment', args=[self.assignment.pk]),
+                                    {'condition': 'LOST', 'return_notes': 'x'})
+        self.assertEqual(response.status_code, 403)
+        self.assignment.refresh_from_db()
+        self.assertIsNone(self.assignment.return_date)
+
+    def test_outsider_cannot_reserve(self):
+        response = self.client.get(reverse('inventory-reservation-create'))
+        self.assertEqual(response.status_code, 403)
+
+
+class NamingAndPagesTests(TestCase):
+    def setUp(self):
+        from employees.models import Employee
+        from gap_analysis.models import SkillMatrix
+        self.manager = grant_inventory_perms(
+            User.objects.create_user('mgr3', password='pw', is_staff=True, is_superuser=True))
+        self.login = User.objects.create_user('darshan', first_name='Darshan', last_name='Pardeshi')
+        employee = Employee.objects.create(name='Darshan Dharmendrasingh  Pardeshi', is_active=True)
+        SkillMatrix.objects.update_or_create(employee=employee, defaults={'user': self.login})
+        self.client.force_login(self.manager)
+
+    def test_person_name_is_the_employee_name(self):
+        from .people import person_name
+        self.assertEqual(person_name(User.objects.get(pk=self.login.pk)), 'Darshan Dharmendrasingh Pardeshi')
+
+    def test_dispatch_admin_search_works(self):
+        response = self.client.get('/admin/inventory/dispatch/?q=abc')
+        self.assertEqual(response.status_code, 200)
+
+    def test_history_pager_keeps_filters(self):
+        tool = Item.objects.create(item_type='TOOL', name='Probe', serial_number='P-1')
+        for i in range(30):
+            History.objects.create(item=tool, action='UPDATED', user=self.manager, details=f'n{i}')
+        response = self.client.get(reverse('inventory-history-list'), {'action': 'UPDATED'})
+        self.assertContains(response, 'action=UPDATED&amp;page=2')
+
+    def test_sync_command_runs(self):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        call_command('sync_employee_users', '--dry-run', stdout=out)
+        self.assertIn('DRY RUN', out.getvalue())

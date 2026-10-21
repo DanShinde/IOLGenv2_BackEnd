@@ -52,7 +52,7 @@
             </p>
         </div>
         <div class="flex gap-2">
-            <a href="?export=csv{% for key, value in request.GET.items %}{% if key != 'export' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+            <a href="?export=csv{% if filter_query %}&amp;{{ filter_query }}{% endif %}"
                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md inline-flex items-center">
                 <i class="fas fa-file-csv mr-2"></i>Export CSV
             </a>
@@ -140,9 +140,11 @@
                         <a href="{% url 'inventory-item-detail' item.pk %}" class="text-blue-600 hover:text-blue-900 mr-3">
                             <i class="fas fa-eye"></i> View
                         </a>
+                        {% if perms.inventory.change_item %}
                         <a href="{% url 'inventory-item-update' item.pk %}" class="text-indigo-600 hover:text-indigo-900">
                             <i class="fas fa-edit"></i> Edit
                         </a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
@@ -165,11 +167,11 @@
         </div>
         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
             {% if items.has_previous %}
-            <a href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+            <a href="?page=1{% if filter_query %}&amp;{{ filter_query }}{% endif %}"
                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 <i class="fas fa-angle-double-left"></i>
             </a>
-            <a href="?page={{ items.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+            <a href="?page={{ items.previous_page_number }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}"
                class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 <i class="fas fa-angle-left"></i>
             </a>
@@ -181,7 +183,7 @@
                     {{ num }}
                 </span>
                 {% elif num > items.number|add:'-3' and num < items.number|add:'3' %}
-                <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                <a href="?page={{ num }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}"
                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
                     {{ num }}
                 </a>
@@ -189,11 +191,11 @@
             {% endfor %}
 
             {% if items.has_next %}
-            <a href="?page={{ items.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+            <a href="?page={{ items.next_page_number }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}"
                class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 <i class="fas fa-angle-right"></i>
             </a>
-            <a href="?page={{ paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+            <a href="?page={{ paginator.num_pages }}{% if filter_query %}&amp;{{ filter_query }}{% endif %}"
                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 <i class="fas fa-angle-double-right"></i>
             </a>
@@ -304,7 +306,8 @@ async function bulkRetire() {
         Loading.hide();
 
         if (data.success) {
-            Toast.success(data.message);
+            // some items may have been refused (still out) - show the whole message
+            (data.message.includes('Not retired') ? Toast.error : Toast.success)(data.message);
             setTimeout(() => window.location.reload(), 1000);
         } else {
             Toast.error(data.message);

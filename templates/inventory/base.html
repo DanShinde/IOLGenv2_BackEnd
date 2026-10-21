@@ -1,3 +1,4 @@
+{% load inventory_people %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -464,7 +465,7 @@
             <div class="user-profile-card mx-4 p-4 rounded-xl flex items-center space-x-3 animate-slideInLeft">
                 <div class="user-avatar w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg">
                     {% if user.is_authenticated %}
-                        {{ user.get_full_name.0|default:user.username.0|upper }}
+                        {{ user|person|first|upper }}
                     {% else %}
                         <i class="fas fa-user"></i>
                     {% endif %}
@@ -472,7 +473,7 @@
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-white text-sm truncate">
                         {% if user.is_authenticated %}
-                            {{ user.get_full_name|default:user.username }}
+                            {{ user|person }}
                         {% else %}
                             Guest User
                         {% endif %}
@@ -626,7 +627,7 @@
                             <button id="user-menu-button" class="flex items-center space-x-2 px-3 py-2 rounded-xl hover:bg-gray-50 transition-all">
                                 <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-white font-bold shadow-md">
                                     {% if user.is_authenticated %}
-                                        {{ user.get_full_name.0|default:user.username.0|upper }}
+                                        {{ user|person|first|upper }}
                                     {% else %}
                                         <i class="fas fa-user text-sm"></i>
                                     {% endif %}
@@ -645,7 +646,7 @@
                             <div id="user-dropdown" class="hidden absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-50 animate-fadeInUp">
                                 {% if user.is_authenticated %}
                                 <div class="px-4 py-3 border-b border-gray-100">
-                                    <p class="text-sm font-semibold text-gray-900">{{ user.get_full_name|default:user.username }}</p>
+                                    <p class="text-sm font-semibold text-gray-900">{{ user|person }}</p>
                                     <p class="text-xs text-gray-500 mt-0.5">{{ user.email }}</p>
                                 </div>
                                 <a href="#" class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all">
@@ -657,10 +658,14 @@
                                     <span>Settings</span>
                                 </a>
                                 <div class="border-t border-gray-100 my-1"></div>
-                                <a href="{% url 'admin:logout' %}" class="flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-all">
-                                    <i class="fas fa-sign-out-alt mr-3"></i>
-                                    <span>Sign out</span>
-                                </a>
+                                {# Logout must be a POST (a plain link gets "405 Method Not Allowed") #}
+                                <form method="post" action="{% url 'admin:logout' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-all">
+                                        <i class="fas fa-sign-out-alt mr-3"></i>
+                                        <span>Sign out</span>
+                                    </button>
+                                </form>
                                 {% else %}
                                 <a href="{% url 'admin:login' %}" class="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all">
                                     <i class="fas fa-sign-in-alt mr-3 text-green-500"></i>
@@ -773,8 +778,13 @@
         {% endif %}
 
         // CSRF Token Helper
+        // From a form on the page if there is one, otherwise Django's csrftoken cookie
+        // (pages like the item list have no form, which made Bulk Retire always fail)
         function getCSRFToken() {
-            return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+            const field = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (field && field.value) return field.value;
+            const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : '';
         }
 
         // Keyboard Shortcuts

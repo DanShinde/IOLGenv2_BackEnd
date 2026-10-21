@@ -1,4 +1,5 @@
 {% extends 'inventory/base.html' %}
+{% load inventory_people %}
 
 {% block title %}History Log{% endblock %}
 
@@ -71,7 +72,7 @@
     {% if form.is_bound %}
     <div class="mb-4 text-sm text-gray-600">
         <i class="fas fa-info-circle mr-1"></i>
-        Found {{ history.count }} record{{ history.count|pluralize }} matching your filters
+        Found {{ paginator.count }} record{{ paginator.count|pluralize }} matching your filters
     </div>
     {% endif %}
 
@@ -101,7 +102,7 @@
                             {% elif record.action == 'ASSIGNED' %}bg-yellow-100 text-yellow-800
                             {% elif record.action == 'RETURNED' %}bg-green-100 text-green-800
                             {% elif record.action == 'DISPATCHED' %}bg-red-100 text-red-800
-                            {% elif record.action == 'MAINTAINED' %}bg-indigo-100 text-indigo-800
+                            {% elif record.action == 'MAINTENANCE' %}bg-indigo-100 text-indigo-800
                             {% elif record.action == 'RETIRED' %}bg-gray-100 text-gray-800
                             {% else %}bg-gray-100 text-gray-800{% endif %}">
                             {{ record.get_action_display }}
@@ -113,7 +114,7 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm text-gray-900">
                             {% if record.user %}
-                                <div class="font-medium">{{ record.user.get_full_name|default:record.user.username }}</div>
+                                <div class="font-medium">{{ record.user|person }}</div>
                                 <div class="text-xs text-gray-500">{{ record.user.username }}</div>
                             {% else %}
                                 <span class="text-gray-400 italic">System</span>
@@ -144,7 +145,7 @@
     <div class="mt-6 flex justify-center">
         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
             {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+            <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 <span class="sr-only">Previous</span>
                 <i class="fas fa-chevron-left"></i>
             </a>
@@ -152,18 +153,18 @@
 
             {% for num in page_obj.paginator.page_range %}
             {% if page_obj.number == num %}
-            <a href="?page={{ num }}" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+            <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ num }}" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
                 {{ num }}
             </a>
             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-            <a href="?page={{ num }}" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+            <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ num }}" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
                 {{ num }}
             </a>
             {% endif %}
             {% endfor %}
 
             {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+            <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                 <span class="sr-only">Next</span>
                 <i class="fas fa-chevron-right"></i>
             </a>

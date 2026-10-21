@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Item, Assignment, Dispatch, History, Reservation
+from .people import person_name
 from .utils import get_active_employee_users
 
 
@@ -14,7 +15,17 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = '__all__'
-        read_only_fields = ['created_by', 'created_at', 'updated_at']
+        # status/location only change through assign/dispatch/return (which keep the
+        # Assignment/Dispatch records in step) - never by writing them directly
+        read_only_fields = ['created_by', 'created_at', 'updated_at', 'status', 'location']
+
+    def validate(self, attrs):
+        item_type = attrs.get('item_type', getattr(self.instance, 'item_type', None))
+        if item_type and item_type not in Item.STOCK_TRACKED_TYPES:
+            attrs['quantity'] = 1  # single-unit items are always exactly one
+        if self.instance is not None and self.instance.is_out and 'item_type' in attrs                 and attrs['item_type'] != self.instance.item_type:
+            raise serializers.ValidationError({'item_type': 'Cannot change the type while the item is out.'})
+        return attrs
 
     def validate_serial_number(self, value):
         qs = Item.objects.filter(serial_number=value)
@@ -29,6 +40,11 @@ class AssignmentSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.name', read_only=True)
     item_serial_number = serializers.CharField(source='item.serial_number', read_only=True)
     assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True)
+    assigned_to_name = serializers.SerializerMethodField()
+
+    def get_assigned_to_name(self, obj):
+        return person_name(obj.assigned_to) if obj.assigned_to else None
+
     is_active = serializers.SerializerMethodField()
     is_overdue = serializers.BooleanField(read_only=True)
     days_overdue = serializers.IntegerField(read_only=True)
@@ -46,6 +62,11 @@ class DispatchSerializer(serializers.ModelSerializer):
     item_serial_number = serializers.CharField(source='item.serial_number', read_only=True)
     item_type = serializers.CharField(source='item.item_type', read_only=True)
     responsible_person_username = serializers.CharField(source='responsible_person.username', read_only=True, default=None)
+    responsible_person_name = serializers.SerializerMethodField()
+
+    def get_responsible_person_name(self, obj):
+        return person_name(obj.responsible_person) if obj.responsible_person else None
+
     is_active = serializers.SerializerMethodField()
     is_overdue = serializers.BooleanField(read_only=True)
     days_overdue = serializers.IntegerField(read_only=True)
@@ -63,6 +84,11 @@ class HistorySerializer(serializers.ModelSerializer):
     item_serial_number = serializers.CharField(source='item.serial_number', read_only=True)
     action_display = serializers.CharField(source='get_action_display', read_only=True)
     user_username = serializers.CharField(source='user.username', read_only=True, default=None)
+    user_name = serializers.SerializerMethodField()
+
+    def get_user_name(self, obj):
+        return person_name(obj.user) if obj.user else None
+
 
     class Meta:
         model = History
@@ -73,6 +99,11 @@ class ReservationSerializer(serializers.ModelSerializer):
     reserved_for = serializers.PrimaryKeyRelatedField(queryset=User.objects.none())
     item_name = serializers.CharField(source='item.name', read_only=True)
     reserved_for_username = serializers.CharField(source='reserved_for.username', read_only=True)
+    reserved_for_name = serializers.SerializerMethodField()
+
+    def get_reserved_for_name(self, obj):
+        return person_name(obj.reserved_for) if obj.reserved_for else None
+
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
 
@@ -99,7 +130,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                 conflicts = conflicts.exclude(pk=self.instance.pk)
             for existing in conflicts:
                 if existing.overlaps(start_date, end_date):
-                    who = existing.reserved_for.get_full_name() or existing.reserved_for.username
+                    who = person_name(existing.reserved_for)
                     raise serializers.ValidationError(
                         f'{item.name} is already reserved for {who} from {existing.start_date} to {existing.end_date}.'
                     )

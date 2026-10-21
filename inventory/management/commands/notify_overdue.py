@@ -26,7 +26,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         context, recipients, total_issues = send_overdue_digest(
-            recipient_list=options.get('to'),
+            recipient_list=options.get('to') or None,  # bare --to = default recipients, not nobody
             dry_run=options['dry_run'],
         )
 

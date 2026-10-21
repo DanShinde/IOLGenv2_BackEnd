@@ -28,13 +28,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options['dry_run']:
             preview = preview_employee_sync()
-            self.stdout.write(self.style.WARNING('DRY RUN - nothing has been changed
-'))
+            self.stdout.write(self.style.WARNING('DRY RUN - nothing has been changed\n'))
             self.stdout.write(f"Employees needing a new placeholder login: {len(preview['employees_needing_login'])}")
             for e in preview['employees_needing_login']:
                 self.stdout.write(f'  + {e.name}')
-            self.stdout.write('
-Re-run without --dry-run to apply.')
+            self.stdout.write('\nRe-run without --dry-run to apply.')
             return
 
         sync_employee_users()

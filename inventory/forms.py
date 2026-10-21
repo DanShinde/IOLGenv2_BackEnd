@@ -1,8 +1,10 @@
 from datetime import date, timedelta
 from django import forms
+from django.utils import timezone
 from django.contrib.auth.models import User
-from django.db.models import Q
-from .models import Item, History, Reservation, RETURN_CONDITION_CHOICES
+from django.db.models import Prefetch, Q
+from .models import Item, Assignment, History, Reservation, RETURN_CONDITION_CHOICES
+from .people import person_name
 from .utils import get_active_employee_users
 from django.core.exceptions import ValidationError
 
@@ -58,8 +60,22 @@ class ItemForm(forms.ModelForm):
         # Assigned/Dispatched/Consumed/Maintenance all require extra data (who, where, why)
         # and create Assignment/Dispatch/History records - that only happens correctly through
         # the dedicated Assign/Dispatch/Maintenance/Return pages, not a direct status edit here.
-        direct_edit_statuses = {'AVAILABLE', 'RETIRED', self.instance.status}
         status_field = self.fields['status']
+        self.item_is_out = self.instance.is_out or (
+            self.instance.is_stock_tracked and self.instance.open_assignments().exists())
+        if self.item_is_out:
+            # Someone holds it (or it's at a site): changing the status here would leave that
+            # assignment/dispatch open - the item would show Available and assigned at once.
+            status_field.choices = [c for c in Item.STATUS_CHOICES if c[0] == self.instance.status]
+            status_field.disabled = True
+            status_field.help_text = ('This item is currently out. Record its return (Transfers page) '
+                                      'before changing its status.')
+            self.fields['item_type'].disabled = True
+            self.fields['item_type'].help_text = 'Cannot change the type while the item is out.'
+            self.fields['location'].disabled = True
+            self.fields['location'].help_text = 'Set automatically while the item is out.'
+            return
+        direct_edit_statuses = {'AVAILABLE', 'RETIRED', self.instance.status}
         status_field.choices = [
             choice for choice in Item.STATUS_CHOICES if choice[0] in direct_edit_statuses
         ]
@@ -79,7 +95,7 @@ class ItemForm(forms.ModelForm):
         )
         self.fields['assigned_to'].label_from_instance = _user_label
         self.fields['assignment_date'] = forms.DateField(
-            required=False, initial=date.today, label='Assignment Date',
+            required=False, initial=timezone.localdate, label='Assignment Date',
             widget=forms.DateInput(attrs={'type': 'date', 'class': text_class})
         )
         self.fields['assignment_return_date'] = forms.DateField(
@@ -106,7 +122,7 @@ class ItemForm(forms.ModelForm):
         )
         self.fields['dispatch_responsible_person'].label_from_instance = _user_label
         self.fields['dispatch_date'] = forms.DateField(
-            required=False, initial=date.today, label='Dispatch Date',
+            required=False, initial=timezone.localdate, label='Dispatch Date',
             widget=forms.DateInput(attrs={'type': 'date', 'class': text_class})
         )
         self.fields['dispatch_return_date'] = forms.DateField(
@@ -128,6 +144,9 @@ class ItemForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        item_type = cleaned_data.get('item_type')
+        if item_type and item_type not in Item.STOCK_TRACKED_TYPES:
+            cleaned_data['quantity'] = 1  # single-unit items are always exactly one
         if not getattr(self, 'is_new_item', False):
             return cleaned_data
 
@@ -159,10 +178,13 @@ class ItemForm(forms.ModelForm):
         return cleaned_data
 
     def clean_serial_number(self):
-        serial_number = self.cleaned_data['serial_number']
-        if self.instance.pk is None:  # Only check for new items
-            if Item.objects.filter(serial_number=serial_number).exists():
-                raise ValidationError('An item with this serial number already exists.')
+        serial_number = self.cleaned_data['serial_number'].strip()
+        # Case/space-insensitive: "abc1" and "ABC1 " are the same physical serial
+        clash = Item.objects.filter(serial_number__iexact=serial_number)
+        if self.instance.pk:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise ValidationError(f'An item with this serial number already exists ({clash.first().name}).')
         return serial_number
 
 
@@ -213,7 +235,7 @@ class HistoryFilterForm(forms.Form):
     )
     user_search = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'Search by username...'})
+        widget=forms.TextInput(attrs={'placeholder': 'Search by name or username...'})
     )
     search = forms.CharField(
         required=False,
@@ -295,7 +317,7 @@ class ReservationForm(forms.ModelForm):
                 conflicts = conflicts.exclude(pk=self.instance.pk)
             for existing in conflicts:
                 if existing.overlaps(start_date, end_date):
-                    who = existing.reserved_for.get_full_name() or existing.reserved_for.username
+                    who = person_name(existing.reserved_for)
                     raise ValidationError(
                         f'{item.name} is already reserved for {who} from {existing.start_date} to {existing.end_date}.'
                     )
@@ -303,19 +325,31 @@ class ReservationForm(forms.ModelForm):
 
 
 def _user_label(user):
-    return f"{user.get_full_name()} ({user.username})" if user.get_full_name() else user.username
+    return f"{person_name(user)} ({user.username})"
 
 
 def _assignable_item_label(item):
     label = f"{item.name} ({item.serial_number})"
     if item.is_stock_tracked:
         label += f" - {item.quantity} in stock"
-    elif item.status == 'ASSIGNED':
-        active = item.assignments.filter(return_date__isnull=True).first()
-        if active:
-            who = active.assigned_to.get_full_name() or active.assigned_to.username
-            label += f" - currently with {who}"
+    else:
+        holders = getattr(item, 'open_list', None)
+        if holders is None:
+            holders = list(item.open_assignments().select_related('assigned_to'))
+        if holders:
+            label += " - currently with " + ", ".join(person_name(a.assigned_to) for a in holders)
     return label
+
+
+def _reservation_conflict(item, person, start, end):
+    """A pending reservation by someone else overlapping [start, end] (end None = open-ended)."""
+    conflicting = Reservation.objects.filter(item=item, status='PENDING').select_related('reserved_for')
+    if person is not None:
+        conflicting = conflicting.exclude(reserved_for=person)
+    for reservation in conflicting:
+        if reservation.end_date >= start and (end is None or reservation.start_date <= end):
+            return reservation
+    return None
 
 
 class AssignForm(forms.Form):
@@ -345,7 +379,7 @@ class AssignForm(forms.Form):
         help_text="Only active employees (per Planner/skill gap analyzer) can be assigned items.",
     )
     assignment_date = forms.DateField(
-        initial=date.today,
+        initial=timezone.localdate,
         widget=forms.DateInput(attrs={'type': 'date'}),
         label="Date"
     )
@@ -362,9 +396,12 @@ class AssignForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['item'].queryset = Item.objects.filter(
-            Q(item_type='MATERIAL', status='AVAILABLE', quantity__gt=0) |
-            (~Q(item_type='MATERIAL') & Q(status__in=['AVAILABLE', 'ASSIGNED']))
-        ).order_by('name')
+            Q(item_type__in=Item.STOCK_TRACKED_TYPES, status='AVAILABLE', quantity__gt=0) |
+            (~Q(item_type__in=Item.STOCK_TRACKED_TYPES) & Q(status__in=['AVAILABLE', 'ASSIGNED']))
+        ).prefetch_related(Prefetch(
+            'assignments', queryset=Assignment.objects.filter(return_date__isnull=True)
+            .select_related('assigned_to__skillmatrix__employee'), to_attr='open_list'
+        )).order_by('name')
         self.fields['assigned_to'].queryset = get_active_employee_users()
 
         for field_name, field in self.fields.items():
@@ -375,7 +412,7 @@ class AssignForm(forms.Form):
         self.fields['assigned_to'].label_from_instance = _user_label
 
         if not self.initial.get('expected_return_date'):
-            self.initial['expected_return_date'] = (date.today() + timedelta(days=7)).isoformat()
+            self.initial['expected_return_date'] = (timezone.localdate() + timedelta(days=7)).isoformat()
 
     def clean(self):
         cleaned_data = super().clean()
@@ -391,22 +428,23 @@ class AssignForm(forms.Form):
         if item and item.is_stock_tracked:
             if quantity > item.quantity:
                 self.add_error('quantity', f'Only {item.quantity} units of {item.name} are in stock.')
-        elif item and item.status == 'ASSIGNED' and assigned_to:
-            active_assignment = item.assignments.filter(return_date__isnull=True).first()
-            if active_assignment and active_assignment.assigned_to == assigned_to:
+        elif item and assigned_to:
+            current = list(item.open_assignments())
+            if len(current) == 1 and current[0].assigned_to_id == assigned_to.pk:
                 raise ValidationError('This item is already assigned to that user.')
+            latest = max((a.assignment_date for a in current), default=None)
+            if latest and assignment_date and assignment_date < latest:
+                self.add_error('assignment_date', f'Cannot be before {latest:%d %b %Y}, when the current holder received it.')
 
-        # Don't let a direct assignment silently override someone else's pending reservation
+        # Don't let a direct assignment silently override someone else's pending reservation.
+        # No expected return date = open-ended, so it clashes with any later reservation too.
         if item and not item.is_stock_tracked and assigned_to and assignment_date:
-            conflict_end = expected_return_date or assignment_date
-            conflicting = Reservation.objects.filter(item=item, status='PENDING').exclude(reserved_for=assigned_to)
-            for reservation in conflicting:
-                if reservation.overlaps(assignment_date, conflict_end):
-                    who = reservation.reserved_for.get_full_name() or reservation.reserved_for.username
-                    raise ValidationError(
-                        f'{item.name} is reserved for {who} from {reservation.start_date} to {reservation.end_date}. '
-                        f'Fulfill or cancel that reservation first.'
-                    )
+            reservation = _reservation_conflict(item, assigned_to, assignment_date, expected_return_date)
+            if reservation:
+                raise ValidationError(
+                    f'{item.name} is reserved for {person_name(reservation.reserved_for)} from '
+                    f'{reservation.start_date} to {reservation.end_date}. Fulfill or cancel that reservation first.'
+                )
 
         cleaned_data['quantity'] = quantity
         return cleaned_data
@@ -415,7 +453,7 @@ class AssignForm(forms.Form):
 class DispatchForm(forms.Form):
     """Dispatch a tool or material to a project"""
     item = forms.ModelChoiceField(
-        queryset=Item.objects.filter(status__in=['AVAILABLE', 'ASSIGNED']).order_by('name'),
+        queryset=Item.objects.none(),   # set per instance in __init__
         label="Item",
         widget=forms.Select(),
     )
@@ -445,7 +483,7 @@ class DispatchForm(forms.Form):
         help_text="For materials only - how many units to dispatch"
     )
     dispatch_date = forms.DateField(
-        initial=date.today,
+        initial=timezone.localdate,
         widget=forms.DateInput(attrs={'type': 'date'}),
         label="Dispatch Date"
     )
@@ -462,6 +500,10 @@ class DispatchForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['responsible_person'].queryset = get_active_employee_users()
+        self.fields['item'].queryset = Item.objects.filter(
+            Q(item_type__in=Item.STOCK_TRACKED_TYPES, status='AVAILABLE', quantity__gt=0) |
+            (~Q(item_type__in=Item.STOCK_TRACKED_TYPES) & Q(status__in=['AVAILABLE', 'ASSIGNED']))
+        ).order_by('name')
 
         for field_name, field in self.fields.items():
             if not field.widget.attrs.get('class'):
@@ -479,10 +521,19 @@ class DispatchForm(forms.Form):
         dispatch_date = cleaned_data.get('dispatch_date')
         expected_return_date = cleaned_data.get('expected_return_date')
 
-        if item and item.item_type == 'MATERIAL' and quantity > item.quantity:
+        if item and item.is_stock_tracked and quantity > item.quantity:
             raise ValidationError(f'Cannot dispatch {quantity} units. Only {item.quantity} available.')
 
         if dispatch_date and expected_return_date and expected_return_date < dispatch_date:
             self.add_error('expected_return_date', 'Return date cannot be before dispatch date.')
+
+        # A dispatch takes the item off-site: don't silently break someone's pending reservation
+        if item and not item.is_stock_tracked and dispatch_date:
+            reservation = _reservation_conflict(item, None, dispatch_date, expected_return_date)
+            if reservation:
+                raise ValidationError(
+                    f'{item.name} is reserved for {person_name(reservation.reserved_for)} from '
+                    f'{reservation.start_date} to {reservation.end_date}. Fulfill or cancel that reservation first.'
+                )
 
         return cleaned_data

@@ -43,8 +43,11 @@ def find_matching_user(employee_name):
         return None
     first, last = parts[0].strip().lower(), parts[-1].strip().lower()
 
+    # A login already linked to another employee is never a candidate: SkillMatrix.user is
+    # one-to-one, so reusing it would fail (or attach one login to two people).
     candidates = [
-        u for u in User.objects.exclude(first_name='').exclude(last_name='')
+        u for u in User.objects.exclude(first_name='').exclude(last_name='').filter(
+            first_name__iexact=parts[0].strip(), last_name__iexact=parts[-1].strip(), skillmatrix__isnull=True)
         if u.first_name.strip().lower() == first and u.last_name.strip().lower() == last
     ]
     return candidates[0] if len(candidates) == 1 else None

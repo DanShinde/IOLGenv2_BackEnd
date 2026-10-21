@@ -11,7 +11,7 @@ plus fulfill/cancel actions, which call the same services.py functions the HTML 
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 
 from . import services
@@ -20,7 +20,6 @@ from .serializers import (
     ItemSerializer, AssignmentSerializer, DispatchSerializer,
     HistorySerializer, ReservationSerializer,
 )
-from .views import invalidate_cache
 
 
 class InventoryApiPagination(PageNumberPagination):
@@ -32,7 +31,8 @@ class InventoryApiPagination(PageNumberPagination):
 class ItemViewSet(viewsets.ModelViewSet):
     queryset = Item.objects.all().order_by('-created_at')
     serializer_class = ItemSerializer
-    permission_classes = [IsAuthenticated]
+    # Reading needs a login; adding/changing items needs inventory.add_item / change_item
+    permission_classes = [IsAuthenticated, DjangoModelPermissions]
     pagination_class = InventoryApiPagination
 
     def get_queryset(self):
@@ -54,8 +54,6 @@ class ItemViewSet(viewsets.ModelViewSet):
             details=f'{item.get_item_type_display()} added to inventory with quantity {item.quantity}',
             location=item.location or 'Warehouse'
         )
-        invalidate_cache('items_list')
-        invalidate_cache('dashboard_stats')
 
     def perform_update(self, serializer):
         item = serializer.save()
@@ -63,8 +61,6 @@ class ItemViewSet(viewsets.ModelViewSet):
             item=item, action='UPDATED', user=self.request.user,
             details='Item details updated', location=item.location or 'Warehouse'
         )
-        invalidate_cache('items_list')
-        invalidate_cache('dashboard_stats')
 
     def perform_destroy(self, instance):
         raise serializers.ValidationError(
@@ -117,7 +113,7 @@ class ReservationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                           mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     queryset = Reservation.objects.select_related('item', 'reserved_for', 'reserved_by').all()
     serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, DjangoModelPermissions]
     pagination_class = InventoryApiPagination
 
     def get_queryset(self):
@@ -132,19 +128,22 @@ class ReservationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     @action(detail=True, methods=['post'])
     def fulfill(self, request, pk=None):
+        if not request.user.has_perm('inventory.add_assignment'):
+            return Response({'detail': 'You do not have permission to assign items.'}, status=status.HTTP_403_FORBIDDEN)
         reservation = self.get_object()
         try:
             assignment = services.fulfill_reservation(reservation, performed_by=request.user)
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        invalidate_cache('items_list')
-        invalidate_cache('dashboard_stats')
         return Response(AssignmentSerializer(assignment).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         reservation = self.get_object()
+        if request.user.pk not in (reservation.reserved_by_id, reservation.reserved_for_id) and                 not request.user.has_perm('inventory.change_reservation'):
+            return Response({'detail': 'You can only cancel reservations you made or that are for you.'},
+                            status=status.HTTP_403_FORBIDDEN)
         try:
             services.cancel_reservation(reservation)
         except ValueError as exc:
