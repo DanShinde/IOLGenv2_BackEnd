@@ -353,19 +353,20 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
     cache_timeout = 60 * 15  # 15 minutes
     permission_classes = [IsAuthenticated]
 
-    def get_cache_key(self, cluster_id=None, cluster_name=None):
+    def get_cache_key(self, cluster_id=None, cluster_name=None, control_library=None):
         """Generate a cache key based on query parameters."""
         if cluster_id:
             return f"parameters:cluster_id:{cluster_id}"
         elif cluster_name:
-            return f"parameters:cluster_name:{cluster_name}"
+            return f"parameters:cluster_name:{cluster_name}:lib:{control_library or 'any'}"
         return "parameters:all"
 
     def get_queryset(self):
         """Retrieve queryset with caching."""
         cluster_id = self.request.query_params.get("id", None)
         cluster_name = self.request.query_params.get("cluster_name", None)
-        cache_key = self.get_cache_key(cluster_id, cluster_name)
+        control_library = self.request.query_params.get("control_library", None)
+        cache_key = self.get_cache_key(cluster_id, cluster_name, control_library)
         
         # Check cache
         cached_data = cache.get(cache_key)
@@ -379,6 +380,9 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(cluster__id=cluster_id)
         elif cluster_name:
             queryset = queryset.filter(cluster__cluster_name=cluster_name)
+            # cluster_name is only unique per control library
+            if control_library:
+                queryset = queryset.filter(cluster__control_library_id=control_library)
 
         # Cache queryset
         cache.set(cache_key, queryset, self.cache_timeout)
@@ -396,35 +400,38 @@ class ParameterBulkViewSet(viewsets.ModelViewSet):
 
         cluster_id = self.request.query_params.get("id", None)
         cluster_name = self.request.query_params.get("cluster_name", None)
-        serializer = self.get_serializer(queryset, many=True)
+        control_library = self.request.query_params.get("control_library", None)
 
         # If filtering by cluster (either by id or name), return structured response
         if cluster_id or cluster_name:
-            config = None
+            cluster = None
 
             # Get cluster info by cluster_id
             if cluster_id:
-                try:
-                    cluster = ClusterTemplate.objects.get(id=cluster_id)
-                    config = cluster.cluster_config
-                    cluster_name = cluster.cluster_name
-                except ClusterTemplate.DoesNotExist:
-                    config = None
+                cluster = ClusterTemplate.objects.filter(id=cluster_id).first()
 
-            # Get cluster info by cluster_name
+            # Get cluster info by cluster_name (unique only per control library)
             elif cluster_name:
-                try:
-                    cluster = ClusterTemplate.objects.get(cluster_name=cluster_name)
-                    config = cluster.cluster_config
-                except ClusterTemplate.DoesNotExist:
-                    config = None
+                clusters = ClusterTemplate.objects.filter(cluster_name=cluster_name)
+                if control_library:
+                    clusters = clusters.filter(control_library_id=control_library)
+                cluster = clusters.order_by("-updated_at").first()
+                # Same name in several libraries: keep parameters consistent with the chosen cluster
+                if cluster:
+                    queryset = queryset.filter(cluster=cluster)
 
+            if cluster:
+                cluster_name = cluster.cluster_name
+
+            serializer = self.get_serializer(queryset, many=True)
             return Response({
+                "cluster_id": cluster.id if cluster else None,
                 "cluster_name": cluster_name,
                 "parameters": serializer.data,
-                "cluster_config": config
+                "cluster_config": cluster.cluster_config if cluster else None,
             })
 
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     def perform_create(self, serializer):
