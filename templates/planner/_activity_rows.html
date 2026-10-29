@@ -34,8 +34,8 @@
     {% endif %}
 
     <td class="frozen-cell col-activity px-1 py-1 text-xs text-gray-900 font-medium border-r {% if in_heading %}pl-5{% endif %}" data-filter-column="activity">
-        <input type="text" class="inline-edit-input w-full text-xs text-gray-900 font-medium bg-transparent border border-transparent rounded px-1 py-0.5 truncate hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none"
-               value="{{ activity.activity_name }}" data-field="activity_name" title="{{ activity.activity_name }}">
+        <textarea rows="1" class="inline-edit-input activity-name-input w-full text-xs text-gray-900 font-medium bg-transparent border border-transparent rounded px-1 py-0.5 hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none"
+                  data-field="activity_name" title="{{ activity.activity_name }}">{{ activity.activity_name }}</textarea>
     </td>
 
     <td class="frozen-cell col-assignee px-1 py-1 text-xs text-gray-600 border-r" data-filter-column="assignee">
