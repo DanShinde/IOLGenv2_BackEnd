@@ -126,15 +126,28 @@
 
     :root {
         --w-project: 100px;
-        --w-activity: 180px;
-        --w-activity-noproj: 200px;
-        --w-assignee: 100px;
-        --w-start: 60px;
+        --w-activity: 220px;
+        --w-activity-noproj: 240px;
+        --w-assignee: 180px;
+        --w-start: 118px;
         --w-duration: 55px;
-        --w-end: 60px;
-        --w-completion: 70px;
-        --w-completed: 50px;
+        --w-end: 118px;
+        --w-completion: 80px;
+        --w-completed: 60px;
         --w-actions: 108px;
+    }
+
+    /* Activity name wraps onto as many lines as it needs (a single-line <input> can't), so
+       the row grows instead of clipping the name -- see fitActivityNameRows() for how the
+       grown height is mirrored onto the matching timeline row. */
+    textarea.activity-name-input {
+        display: block;
+        resize: none;
+        overflow: hidden;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
+        min-height: 1.5rem;
     }
 
     /* Column widths are set authoritatively by the frozen table's <colgroup> (table-fixed),
@@ -151,7 +164,7 @@
 
     tr.row-completed .frozen-cell { background-color: #f0fdf4; }
     tr.row-completed:hover .frozen-cell { background-color: #dcfce7; }
-    tr.row-completed .col-activity input { color: #16a34a; text-decoration: line-through; text-decoration-color: #86efac; }
+    tr.row-completed .col-activity .activity-name-input { color: #16a34a; text-decoration: line-through; text-decoration-color: #86efac; }
 
     /* --- Resizable Splitter between Activities Breakdown & Gantt Timeline ---
        Lives inside .frozen-pane (not .planner-panes) so it scrolls vertically together with
@@ -1063,7 +1076,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = el.closest('tr');
             if (!row) return;
 
-            if (field === 'start_date' || field === 'duration') {
+            if (field === 'activity_name' && el.tagName === 'TEXTAREA') {
+                // Names are single-line data that merely *display* wrapped -- strip any
+                // pasted line breaks, then re-fit the row to the new text as it's typed.
+                if (/[\r\n]/.test(el.value)) el.value = el.value.replace(/[\r\n]+/g, ' ');
+                const entry = vsRowsData.find(r => r.frozenEl === row);
+                if (entry) fitActivityNameRows([entry]);
+            } else if (field === 'start_date' || field === 'duration') {
                 const rowStart = row.querySelector('[data-field="start_date"]');
                 const rowDuration = row.querySelector('[data-field="duration"]');
                 const rowEnd = row.querySelector('[data-field="end_date"]');
@@ -1183,7 +1202,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         completion_percentage: row.querySelector('[data-field="completion_percentage"]'),
                         is_completed: row.querySelector('[data-field="is_completed"]'),
                     };
-                    if (fieldInputs.activity_name) fieldInputs.activity_name.value = data.activity_name;
+                    if (fieldInputs.activity_name) {
+                        fieldInputs.activity_name.value = data.activity_name;
+                        fieldInputs.activity_name.title = data.activity_name;
+                    }
                     if (fieldInputs.assignee) fieldInputs.assignee.value = data.assignee_id || '';
                     if (fieldInputs.start_date) fieldInputs.start_date.value = data.start_date;
                     if (fieldInputs.duration) fieldInputs.duration.value = data.duration;
@@ -1206,6 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const pk = row.dataset.activityPk;
                     const entry = vsRowsData.find(r => r.frozenEl === row);
                     if (entry) {
+                        entry.heightFitted = false; // name may now wrap onto more/fewer lines
                         entry.isCompleted = !!data.is_completed;
                         entry.searchData = buildSearchDataForRow(row);
                     }
@@ -1264,14 +1287,15 @@ document.addEventListener('DOMContentLoaded', () => {
         tableContainerEl.addEventListener('focusout', (e) => {
             const el = e.target;
             if (!el.classList.contains('inline-edit-input')) return;
-            if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'date')) {
+            if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'date'))) {
                 commitInlineEdit(el);
             }
         });
 
         tableContainerEl.addEventListener('keydown', (e) => {
             const el = e.target;
-            if (e.key === 'Enter' && el.classList.contains('inline-edit-input') && (el.type === 'text' || el.type === 'date')) {
+            // Enter commits (never inserts a newline) in the wrapping activity-name textarea too.
+            if (e.key === 'Enter' && el.classList.contains('inline-edit-input') && (el.tagName === 'TEXTAREA' || el.type === 'text' || el.type === 'date')) {
                 e.preventDefault();
                 el.blur();
             }
@@ -1859,6 +1883,7 @@ document.addEventListener('DOMContentLoaded', () => {
             columnVars.forEach(v => {
                 sessionStorage.setItem('planner_col_width_' + v, getWidth(v));
             });
+            refitAllActivityRows();
             requestAnimationFrame(drawTodayMarker);
         }
 
@@ -1922,6 +1947,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.removeEventListener('mouseup', onMouseUp);
             sessionStorage.setItem('planner_col_width_' + varName, getWidth(varName));
             dragging = null;
+            refitAllActivityRows();
             requestAnimationFrame(drawTodayMarker);
         }
 
@@ -2727,7 +2753,7 @@ function buildSearchDataForRow(frozenEl) {
     frozenEl.querySelectorAll('[data-filter-column]').forEach(cell => {
         const col = cell.dataset.filterColumn;
         const select = cell.querySelector('select');
-        const input = cell.querySelector('input');
+        const input = cell.querySelector('input, textarea');
         let text;
         if (select) {
             text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
@@ -2748,6 +2774,48 @@ function buildSearchDataForRow(frozenEl) {
         activityName: (frozenEl.dataset.activityName || '').toLowerCase(),
         columnTexts: columnTexts
     };
+}
+
+// Grow each given row to fit its (possibly multi-line) wrapped activity name, and force its
+// timeline-pane counterpart to the same height so the two panes stay aligned. Only rows
+// currently in the DOM can be measured -- rows hidden at initVirtualScroll() time (collapsed
+// groups) or outside the virtual window get fitted lazily, the first time
+// renderVirtualWindow() actually inserts them. Reads and writes are batched into separate
+// passes to avoid layout thrashing. Returns true if any row's height changed.
+function fitActivityNameRows(entries) {
+    const todo = entries.filter(r => !r.isGroup && r.frozenEl.isConnected);
+    if (!todo.length) return false;
+    const textareas = todo.map(r => r.frozenEl.querySelector('textarea.activity-name-input'));
+
+    // Drop the forced heights so both the textarea and the row report their natural size.
+    todo.forEach((r, i) => {
+        r.frozenEl.style.height = '';
+        if (r.timelineEl) r.timelineEl.style.height = '';
+        if (textareas[i]) textareas[i].style.height = 'auto';
+    });
+    const contentHeights = textareas.map(ta => (ta ? ta.scrollHeight : 0));
+    textareas.forEach((ta, i) => {
+        // +2: border-box sizing, scrollHeight excludes the 1px top/bottom border.
+        if (ta) ta.style.height = `${contentHeights[i] + 2}px`;
+    });
+    const rowHeights = todo.map(r => Math.max(r.frozenEl.offsetHeight, r.timelineEl ? r.timelineEl.offsetHeight : 0));
+
+    let changed = false;
+    todo.forEach((r, i) => {
+        const h = rowHeights[i] || r.height;
+        if (h !== r.height) changed = true;
+        r.height = h;
+        r.frozenEl.style.height = `${h}px`;
+        if (r.timelineEl) r.timelineEl.style.height = `${h}px`;
+        r.heightFitted = true;
+    });
+    return changed;
+}
+
+// Column widths changed -> names re-wrap, so every row's fitted height is stale.
+function refitAllActivityRows() {
+    vsRowsData.forEach(r => { r.heightFitted = false; });
+    renderVirtualWindow(true);
 }
 
 function updateResizeHandleHeight() {
@@ -2906,6 +2974,7 @@ function renderVirtualWindow(forceUpdate = false) {
     let bottomHeight = 0;
     const frozenNodes = [];
     const timelineNodes = [];
+    const unfittedRows = [];
 
     // Calculate which rows to show
     for (let i = 0; i < vsVisibleRows.length; i++) {
@@ -2920,6 +2989,7 @@ function renderVirtualWindow(forceUpdate = false) {
         } else {
             frozenNodes.push(row.frozenEl);
             if (row.timelineEl) timelineNodes.push(row.timelineEl);
+            if (!row.heightFitted) unfittedRows.push(row);
         }
         accumulatedHeight += h;
     }
@@ -2944,6 +3014,10 @@ function renderVirtualWindow(forceUpdate = false) {
     if (timelineNodes.length > 0) {
         timelineTopSpacer.after(...timelineNodes);
     }
+
+    // Rows in the window are real DOM (not spacer height), so fitting them now keeps the
+    // panes aligned immediately; the updated row.height feeds the next spacer calculation.
+    fitActivityNameRows(unfittedRows);
 
     updateResizeHandleHeight();
 }
