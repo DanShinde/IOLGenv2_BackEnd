@@ -33,6 +33,8 @@
     </td>
     {% endif %}
 
+    <td class="frozen-cell col-rownum px-1 py-1 text-xs text-gray-500 text-center border-r tabular-nums">{{ activity.row_number|default_if_none:'' }}</td>
+
     <td class="frozen-cell col-activity px-1 py-1 text-xs text-gray-900 font-medium border-r {% if in_heading %}pl-5{% endif %}" data-filter-column="activity">
         <textarea rows="1" class="inline-edit-input activity-name-input w-full text-xs text-gray-900 font-medium bg-transparent border border-transparent rounded px-1 py-0.5 hover:border-gray-300 focus:border-indigo-400 focus:bg-white focus:outline-none"
                   data-field="activity_name" title="{{ activity.activity_name }}">{{ activity.activity_name }}</textarea>

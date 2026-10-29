@@ -97,9 +97,36 @@ class Activity(models.Model):
         related_name='successors',
         help_text="This activity's start date is derived from this predecessor's finish date."
     )
+    # Stable per-project "row #" (like MS Project's ID column) used to reference an activity
+    # when linking. Assigned once on creation and never renumbered -- rows are displayed in
+    # start-date order and linking cascades dates, so a positional number would silently
+    # start pointing at a different activity after a reorder. Deletions leave gaps.
+    row_number = models.PositiveIntegerField(null=True, blank=True, editable=False)
 
     def __str__(self):
         return f"{self.project.project_id} - {self.activity_name}"
+
+    @classmethod
+    def assign_missing_row_numbers(cls, project_ids):
+        """Backfill row_number for activities created before the field existed (or by a
+        bulk path that bypassed save()), continuing each project's sequence in start-date
+        order. Done lazily from the planner views rather than in a data migration, because
+        this repo's migration files are not version-controlled."""
+        missing = (cls.objects.filter(project_id__in=project_ids, row_number__isnull=True)
+                   .order_by('project_id', 'start_date', 'pk'))
+        if not missing.exists():
+            return
+        next_numbers = {}
+        to_update = []
+        for activity in missing:
+            if activity.project_id not in next_numbers:
+                current_max = (cls.objects.filter(project_id=activity.project_id)
+                               .aggregate(m=models.Max('row_number'))['m'] or 0)
+                next_numbers[activity.project_id] = current_max + 1
+            activity.row_number = next_numbers[activity.project_id]
+            next_numbers[activity.project_id] += 1
+            to_update.append(activity)
+        cls.objects.bulk_update(to_update, ['row_number'])
 
     def save(self, *args, _cascade_visited=None, **kwargs):
         # _cascade_visited is only ever passed by this method's own recursive cascade call
@@ -114,6 +141,14 @@ class Activity(models.Model):
         # here, so that e.g. unchecking "completed" while % is still 100 isn't immediately
         # flipped back by an unrelated save().
         self.completion_percentage = max(0, min(100, self.completion_percentage or 0))
+
+        if self.row_number is None and self.project_id:
+            # Number any legacy rows first, so a brand-new activity always lands at the end.
+            if not self.pk:
+                Activity.assign_missing_row_numbers([self.project_id])
+            current_max = (Activity.objects.filter(project_id=self.project_id)
+                           .aggregate(m=models.Max('row_number'))['m'] or 0)
+            self.row_number = current_max + 1
 
         # 1. Get Global Holidays
         holidays = list(Holiday.objects.values_list('date', flat=True))

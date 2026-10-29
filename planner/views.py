@@ -511,6 +511,7 @@ def consolidated_planner_view(request):
             if sort_order: query_params['sort'] = sort_order
             return redirect(f"{reverse('planner_consolidated_planner')}?{urlencode(query_params)}")
 
+    Activity.assign_missing_row_numbers(Project.objects.filter(is_archived=False).values_list('pk', flat=True))
     all_activities_qs = Activity.objects.select_related('project__segment', 'project__team_lead', 'project_type__category', 'assignee').filter(project__is_archived=False)
     context = _prepare_gantt_context(all_activities_qs)
 
@@ -621,6 +622,7 @@ def activity_planner_view(request, project_pk):
             activity.save()
             return redirect('planner_activity_planner', project_pk=project.pk)
 
+    Activity.assign_missing_row_numbers([project.pk])
     activities_qs = Activity.objects.filter(project=project).select_related(
         'project', 'project_type__category', 'assignee', 'heading'
     ).order_by('start_date')
@@ -2416,6 +2418,7 @@ def _serialize_activity_link(activity):
     and the cascade side-channel above."""
     return {
         'pk': activity.pk,
+        'row_number': activity.row_number,
         'name': activity.activity_name,
         'start_date': activity.start_date.isoformat(),
         'end_date': activity.end_date.isoformat() if activity.end_date else None,
@@ -2457,7 +2460,7 @@ def activity_link_info_view(request, pk):
     options = (Activity.objects
                .filter(project_id=activity.project_id)
                .exclude(pk__in=downstream_pks)
-               .order_by('start_date'))
+               .order_by('row_number', 'pk'))
 
     return JsonResponse({
         'success': True,

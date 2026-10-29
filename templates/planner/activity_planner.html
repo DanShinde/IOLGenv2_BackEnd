@@ -93,11 +93,11 @@
         max-height: 75vh;
         border-right: 1px solid #e5e7eb;
         scrollbar-width: none; /* one visible vertical scrollbar (on the timeline pane) is enough */
-        width: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
+        width: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
     }
     .frozen-pane::-webkit-scrollbar { display: none; }
     .no-project-col .frozen-pane {
-        width: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
+        width: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
     }
     .timeline-pane {
         overflow: auto;
@@ -126,6 +126,7 @@
 
     :root {
         --w-project: 100px;
+        --w-rownum: 40px;
         --w-activity: 220px;
         --w-activity-noproj: 240px;
         --w-assignee: 180px;
@@ -173,14 +174,14 @@
        the seam symmetrically, so it's never clipped away. */
     .breakdown-resize-handle {
         position: absolute;
-        left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
+        left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
         top: 0;
         height: 0;
         z-index: 80;
         pointer-events: none;
     }
     .no-project-col .breakdown-resize-handle {
-        left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
+        left: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed) + var(--w-actions));
     }
     .breakdown-resize-handle .grip {
         position: absolute;
@@ -235,20 +236,20 @@
     }
 
     .col-resize-handle.after-project  { left: var(--w-project); }
-    .col-resize-handle.after-activity { left: calc(var(--w-project) + var(--w-activity)); }
-    .no-project-col .col-resize-handle.after-activity { left: var(--w-activity-noproj); }
-    .col-resize-handle.after-assignee { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee)); }
-    .no-project-col .col-resize-handle.after-assignee { left: calc(var(--w-activity-noproj) + var(--w-assignee)); }
-    .col-resize-handle.after-start { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start)); }
-    .no-project-col .col-resize-handle.after-start { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start)); }
-    .col-resize-handle.after-duration { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
-    .no-project-col .col-resize-handle.after-duration { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
-    .col-resize-handle.after-end { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
-    .no-project-col .col-resize-handle.after-end { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
-    .col-resize-handle.after-completion { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
-    .no-project-col .col-resize-handle.after-completion { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
-    .col-resize-handle.after-completed { left: calc(var(--w-project) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
-    .no-project-col .col-resize-handle.after-completed { left: calc(var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
+    .col-resize-handle.after-activity { left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity)); }
+    .no-project-col .col-resize-handle.after-activity { left: calc(var(--w-rownum) + var(--w-activity-noproj)); }
+    .col-resize-handle.after-assignee { left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee)); }
+    .no-project-col .col-resize-handle.after-assignee { left: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee)); }
+    .col-resize-handle.after-start { left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee) + var(--w-start)); }
+    .no-project-col .col-resize-handle.after-start { left: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee) + var(--w-start)); }
+    .col-resize-handle.after-duration { left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
+    .no-project-col .col-resize-handle.after-duration { left: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration)); }
+    .col-resize-handle.after-end { left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+    .no-project-col .col-resize-handle.after-end { left: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end)); }
+    .col-resize-handle.after-completion { left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
+    .no-project-col .col-resize-handle.after-completion { left: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion)); }
+    .col-resize-handle.after-completed { left: calc(var(--w-project) + var(--w-rownum) + var(--w-activity) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
+    .no-project-col .col-resize-handle.after-completed { left: calc(var(--w-rownum) + var(--w-activity-noproj) + var(--w-assignee) + var(--w-start) + var(--w-duration) + var(--w-end) + var(--w-completion) + var(--w-completed)); }
 
     .group-header .frozen-cell {
         background-color: #f8fafc;
@@ -496,6 +497,7 @@
                         {% endcomment %}
                         <colgroup>
                             {% if not project %}<col style="width: var(--w-project);">{% endif %}
+                            <col style="width: var(--w-rownum);">
                             <col style="width: {% if project %}var(--w-activity-noproj){% else %}var(--w-activity){% endif %};">
                             <col style="width: var(--w-assignee);">
                             <col style="width: var(--w-start);">
@@ -507,12 +509,13 @@
                         </colgroup>
                         <thead class="bg-gray-50 sticky top-0 z-50">
                             <tr class="h-6">
-                                <th colspan="{% if not project %}9{% else %}8{% endif %}" class="frozen-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+                                <th colspan="{% if not project %}10{% else %}9{% endif %}" class="frozen-cell px-3 py-1 text-left text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
                                     <div class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>ACTIVITIES BREAKDOWN</div>
                                 </th>
                             </tr>
                             <tr class="h-8">
                                 {% if not project %}<th class="frozen-cell col-project px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Project</th>{% endif %}
+                                <th class="frozen-cell col-rownum px-1 py-1 text-center text-xs font-medium text-gray-500 uppercase" title="Row number within the project -- use it to pick a predecessor in the Activity Link popup">#</th>
                                 <th class="frozen-cell col-activity px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
                                 <th class="frozen-cell col-assignee px-3 py-1 text-center text-xs font-medium text-gray-500 uppercase">Assignee</th>
                                 <th class="frozen-cell col-start px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
@@ -524,6 +527,7 @@
                             </tr>
                             <tr class="h-8">
                                 {% if not project %}<th class="frozen-cell col-project p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="project" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>{% endif %}
+                                <th class="frozen-cell col-rownum p-0.5 bg-gray-100 border-r"></th>
                                 <th class="frozen-cell col-activity p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="activity" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                                 <th class="frozen-cell col-assignee p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="assignee" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
                                 <th class="frozen-cell col-start p-0.5 bg-gray-100 border-r"><input type="text" data-filter-column="start" class="filter-input w-full text-xs p-1" placeholder="Filter..."></th>
@@ -540,7 +544,7 @@
                                     {% for group_key, group in display_data.items %}
                                         {% if group.pk %}
                                         <tr class="group-header heading-group-header h-8 bg-purple-50" data-group-id="{{ group_key }}" data-group-name="{{ group.label }}" data-quick-update-url="{% url 'planner_heading_quick_update' group.pk %}">
-                                            <td colspan="9" class="frozen-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-purple-500">
+                                            <td colspan="10" class="frozen-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-purple-500">
                                                 <div class="flex items-center justify-between">
                                                     <div class="flex items-center space-x-3 min-w-0">
                                                         <svg class="group-icon w-4 h-4 text-purple-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -575,7 +579,7 @@
                                     {% if grouping_method != 'none' %}
                                     {% with group_data=group_gantt_data|get_item:group_name %}
                                     <tr class="group-header h-8 bg-gray-50" data-group-id="{{ group_name|slugify }}" data-group-name="{{ group_name }}">
-                                        <td colspan="9" class="frozen-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
+                                        <td colspan="10" class="frozen-cell px-3 py-1 font-bold text-sm text-gray-800 border-r border-l-4 border-indigo-500">
                                             <div class="flex items-center justify-between"><div class="flex items-center space-x-3"><svg class="group-icon w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg><span>{{ group_name }}</span><span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full text-xs font-medium">{{ activities_in_group|length }} Activities</span></div></div>
                                         </td>
                                     </tr>
@@ -586,7 +590,7 @@
                                         {% for sub_key, sub_group in sub_data.items %}
                                             {% if sub_group.pk %}
                                             <tr class="heading-subgroup-header h-7 bg-purple-50" data-group-id="{{ group_name|slugify }}" data-heading-group-id="{{ group_name|slugify }}-{{ sub_key }}" data-quick-update-url="{% url 'planner_heading_quick_update' sub_group.pk %}">
-                                                <td colspan="9" class="frozen-cell px-3 py-1 pl-10 border-r border-l-4 border-purple-300">
+                                                <td colspan="10" class="frozen-cell px-3 py-1 pl-10 border-r border-l-4 border-purple-300">
                                                     <div class="flex items-center justify-between">
                                                         <div class="flex items-center space-x-2 min-w-0">
                                                             <svg class="w-3.5 h-3.5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
@@ -813,7 +817,7 @@
 
 <div id="linkPopover" class="hidden fixed z-[100000] bg-white border border-gray-200 rounded-lg shadow-2xl p-3 w-80 text-xs">
     <div class="flex items-center justify-between mb-2">
-        <span class="font-semibold text-gray-700">Activity Link</span>
+        <span class="font-semibold text-gray-700">Activity Link <span id="linkPopoverSelfRow" class="font-normal text-gray-400"></span></span>
         <button type="button" id="linkPopoverClose" class="text-gray-400 hover:text-gray-600" title="Close">&times;</button>
     </div>
 
@@ -822,9 +826,14 @@
     <div id="linkPopoverBody" class="hidden space-y-3">
         <div>
             <label class="block font-semibold text-gray-600 mb-1">Predecessor (this activity starts right after it finishes)</label>
-            <select id="linkPopoverPredecessorSelect" class="w-full text-xs border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400">
-                <option value="">— None —</option>
-            </select>
+            <div class="flex items-center gap-1.5">
+                <input type="number" min="1" id="linkPopoverRowInput" placeholder="Row #" title="Type the predecessor's row number (the # column)"
+                       class="w-16 flex-shrink-0 text-xs border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400">
+                <select id="linkPopoverPredecessorSelect" class="flex-1 min-w-0 text-xs border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400">
+                    <option value="">— None —</option>
+                </select>
+            </div>
+            <div id="linkPopoverRowHint" class="hidden mt-1 text-amber-600"></div>
             <div id="linkPopoverPredecessorInfo" class="mt-1 text-gray-500"></div>
         </div>
 
@@ -1546,6 +1555,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const bodyEl = document.getElementById('linkPopoverBody');
         const predecessorSelect = document.getElementById('linkPopoverPredecessorSelect');
         const predecessorInfo = document.getElementById('linkPopoverPredecessorInfo');
+        const rowInput = document.getElementById('linkPopoverRowInput');
+        const rowHint = document.getElementById('linkPopoverRowHint');
+        const selfRowEl = document.getElementById('linkPopoverSelfRow');
         const successorsList = document.getElementById('linkPopoverSuccessorsList');
         const errorEl = document.getElementById('linkPopoverError');
         const closeBtn = document.getElementById('linkPopoverClose');
@@ -1558,6 +1570,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let activeBtn = null;
         let activeRow = null;
+        let activeSelfRowNumber = null;
+        let optionPkByRowNumber = new Map();
+
+        function setRowHint(msg) {
+            if (!rowHint) return;
+            rowHint.textContent = msg || '';
+            rowHint.classList.toggle('hidden', !msg);
+        }
+
+        // Row # box -> dropdown. The options list already excludes this activity and
+        // everything downstream of it (cycles), so a number that isn't in it gets explained
+        // rather than silently ignored.
+        if (rowInput) {
+            rowInput.addEventListener('input', () => {
+                const raw = rowInput.value.trim();
+                if (!raw) {
+                    predecessorSelect.value = '';
+                    setRowHint('');
+                    return;
+                }
+                const num = parseInt(raw, 10);
+                const pk = optionPkByRowNumber.get(num);
+                if (pk !== undefined) {
+                    predecessorSelect.value = String(pk);
+                    setRowHint('');
+                } else {
+                    predecessorSelect.value = '';
+                    setRowHint(num === activeSelfRowNumber
+                        ? 'An activity cannot be linked to itself.'
+                        : `Row #${num} can't be linked — it doesn't exist in this project, or it already depends on this activity.`);
+                }
+            });
+            // Enter in the Row # box saves, same as clicking Save.
+            rowInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveBtn.click();
+                }
+            });
+            // Dropdown -> Row # box.
+            predecessorSelect.addEventListener('change', () => {
+                const opt = predecessorSelect.selectedOptions[0];
+                rowInput.value = opt && opt.dataset.rowNumber ? opt.dataset.rowNumber : '';
+                setRowHint('');
+            });
+        }
 
         function closePopover() {
             popover.classList.add('hidden');
@@ -1583,7 +1641,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function describe(item) {
-            return `${item.name} (${item.start_date} → ${item.end_date || '?'})`;
+            const prefix = item.row_number ? `#${item.row_number} — ` : '';
+            return `${prefix}${item.name} (${item.start_date} → ${item.end_date || '?'})`;
         }
 
         function showError(msg) {
@@ -1617,13 +1676,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     noneOpt.value = '';
                     noneOpt.textContent = '— None —';
                     predecessorSelect.appendChild(noneOpt);
+                    optionPkByRowNumber = new Map();
                     data.options.forEach(opt => {
                         const optionEl = document.createElement('option');
                         optionEl.value = opt.pk;
                         optionEl.textContent = describe(opt);
+                        if (opt.row_number) {
+                            optionEl.dataset.rowNumber = opt.row_number;
+                            optionPkByRowNumber.set(opt.row_number, opt.pk);
+                        }
                         predecessorSelect.appendChild(optionEl);
                     });
                     predecessorSelect.value = data.predecessor ? String(data.predecessor.pk) : '';
+                    activeSelfRowNumber = data.activity.row_number || null;
+                    if (selfRowEl) selfRowEl.textContent = activeSelfRowNumber ? `— #${activeSelfRowNumber}` : '';
+                    if (rowInput) rowInput.value = data.predecessor && data.predecessor.row_number ? data.predecessor.row_number : '';
+                    setRowHint('');
                     predecessorInfo.textContent = data.predecessor
                         ? `Finishes ${data.predecessor.end_date} — this activity starts the next working day after.`
                         : '';
@@ -1659,6 +1727,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         saveBtn.addEventListener('click', () => {
             if (!activeRow) return;
+            // An unmatched Row # leaves the dropdown on "None", which would otherwise save as
+            // an (unintended) unlink.
+            if (rowInput && rowInput.value.trim() && !predecessorSelect.value) {
+                rowInput.focus();
+                return;
+            }
             errorEl.classList.add('hidden');
             saveBtn.disabled = true;
 
