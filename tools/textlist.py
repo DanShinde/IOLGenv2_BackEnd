@@ -63,6 +63,16 @@ FORMAT_CHOICES = [
 FORMAT_LABELS = dict(FORMAT_CHOICES)
 FORMATS_NEEDING_FERRULES = {FORMAT_FERRULES, FORMAT_IO_AND_FERRULES}
 
+# How many rows go in one printed column (one label strip / page). A group with more
+# rows than this is split over several columns headed "3 (1/2)", "3 (2/2)"; a group
+# that fits keeps its plain label, so a 16-point card at 16 per page is written exactly
+# as before.
+DEFAULT_ITEMS_PER_PAGE = 16
+ITEMS_PER_PAGE_CHOICES = [
+    (16, '16 per page'),
+    (8, '8 per page'),
+]
+
 # A channel number far outside this range is a data-entry slip, not a real channel.
 # The legacy `range(1, max(channel) + 1)` would happily try to build that many columns
 # and hang the worker; we refuse it and name the offending row instead.
@@ -140,6 +150,7 @@ class WorkbookSummary:
     fingerprint: str
     text_format: int
     text_format_label: str
+    items_per_page: int = DEFAULT_ITEMS_PER_PAGE
     sheets: list = field(default_factory=list)
     skipped_sheets: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
@@ -245,6 +256,21 @@ def _format_cell(text_format, address, tag, ferrules):
     return tag
 
 
+def _paginate(labels, groups, items_per_page):
+    """(header, values) per output column. A group longer than one page is split
+    into consecutive pages; an empty group still gets its one (empty) column."""
+    columns = []
+    for label in labels:
+        values = list(groups.get(label, ()))
+        pages = [values[i:i + items_per_page] for i in range(0, len(values), items_per_page)]
+        if len(pages) <= 1:
+            columns.append((label, pages[0] if pages else []))
+            continue
+        for number, page in enumerate(pages, start=1):
+            columns.append((f'{label} ({number}/{len(pages)})', page))
+    return columns
+
+
 def _quote_rows(rows):
     shown = ', '.join(f'row {r}' for r in rows[:MAX_EXAMPLES])
     extra = len(rows) - MAX_EXAMPLES
@@ -334,7 +360,7 @@ def _grouping(frame, lookup):
 
 # --------------------------------------------------------------------------- parsing
 
-def _prepare(data, text_format):
+def _prepare(data, text_format, items_per_page=DEFAULT_ITEMS_PER_PAGE):
     """Returns (prepared_sheets, skipped_sheets). Raises TextListError when there is
     nothing usable to write."""
     try:
@@ -371,7 +397,7 @@ def _prepare(data, text_format):
 
         prepared.append(_prepare_sheet(
             sheet_name, frame, lookup, group_by, group_column, ferrules_column,
-            text_format, used_names, header_row,
+            text_format, used_names, header_row, items_per_page,
         ))
 
     if not prepared:
@@ -397,7 +423,8 @@ def _prepare(data, text_format):
 
 
 def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_column,
-                   text_format, used_names, header_row):
+                   text_format, used_names, header_row,
+                   items_per_page=DEFAULT_ITEMS_PER_PAGE):
     tag_column = lookup[_normalize_header(TAG_COLUMN)]
     address_column = lookup[_normalize_header(ADDRESS_COLUMN)]
     pin_column = lookup.get(_normalize_header(PIN_COLUMN))
@@ -531,6 +558,17 @@ def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_c
             f'{missing_ferrules_rows} of {input_rows + output_rows} row(s) have no '
             f'{FERRULES_COLUMN} value -- those cells will be blank.'
         )
+    split = sorted(
+        {str(label) for bucket in (inputs, outputs)
+         for label, values in bucket.items() if len(values) > items_per_page},
+        key=lambda text: (not text.isdigit(), int(text) if text.isdigit() else 0, text),
+    )
+    if split:
+        warnings.append(
+            f'{len(split)} {group_by.lower()}(s) have more than {items_per_page} rows and are '
+            f'split over several columns ({", ".join(split[:10])}'
+            f'{" ..." if len(split) > 10 else ""}).'
+        )
     if input_rows and not output_rows:
         warnings.append('Only inputs found -- no OutputsList sheet will be written.')
     if output_rows and not input_rows:
@@ -565,7 +603,8 @@ def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_c
     return _PreparedSheet(summary=summary, inputs=inputs, outputs=outputs)
 
 
-def _summarise(prepared, skipped, filename, fingerprint, text_format):
+def _summarise(prepared, skipped, filename, fingerprint, text_format,
+               items_per_page=DEFAULT_ITEMS_PER_PAGE):
     warnings = []
     if skipped:
         warnings.append(
@@ -576,6 +615,7 @@ def _summarise(prepared, skipped, filename, fingerprint, text_format):
         fingerprint=fingerprint,
         text_format=text_format,
         text_format_label=FORMAT_LABELS.get(text_format, ''),
+        items_per_page=items_per_page,
         sheets=[p.summary for p in prepared],
         skipped_sheets=skipped,
         warnings=warnings,
@@ -584,36 +624,39 @@ def _summarise(prepared, skipped, filename, fingerprint, text_format):
 
 # --------------------------------------------------------------------------- public API
 
-def analyse(uploaded_file, text_format):
+def analyse(uploaded_file, text_format, items_per_page=DEFAULT_ITEMS_PER_PAGE):
     """Validates the upload and reports what would be written, without building it."""
     data, filename, fingerprint = _read(uploaded_file)
-    prepared, skipped = _prepare(data, text_format)
-    return _summarise(prepared, skipped, filename, fingerprint, text_format)
+    prepared, skipped = _prepare(data, text_format, items_per_page)
+    return _summarise(prepared, skipped, filename, fingerprint, text_format, items_per_page)
 
 
-def build_workbook(uploaded_file, text_format):
+def build_workbook(uploaded_file, text_format, items_per_page=DEFAULT_ITEMS_PER_PAGE):
     """Returns (BytesIO of the .xlsx, WorkbookSummary)."""
     data, filename, fingerprint = _read(uploaded_file)
-    prepared, skipped = _prepare(data, text_format)
+    prepared, skipped = _prepare(data, text_format, items_per_page)
 
     workbook = Workbook()
     workbook.remove(workbook.active)  # drop the default empty sheet
     for sheet in prepared:
         if sheet.summary.inputs_sheet_name:
-            _write_sheet(workbook, sheet.summary.inputs_sheet_name, sheet.inputs, sheet.summary)
+            _write_sheet(workbook, sheet.summary.inputs_sheet_name, sheet.inputs, sheet.summary,
+                         items_per_page)
         if sheet.summary.outputs_sheet_name:
-            _write_sheet(workbook, sheet.summary.outputs_sheet_name, sheet.outputs, sheet.summary)
+            _write_sheet(workbook, sheet.summary.outputs_sheet_name, sheet.outputs, sheet.summary,
+                         items_per_page)
 
     buffer = BytesIO()
     workbook.save(buffer)
     buffer.seek(0)
-    return buffer, _summarise(prepared, skipped, filename, fingerprint, text_format)
+    return buffer, _summarise(prepared, skipped, filename, fingerprint, text_format,
+                              items_per_page)
 
 
-def _write_sheet(workbook, title, groups, summary):
-    """One group per column, matching what pandas' to_excel() produced for the legacy
-    app: A1 blank, the column labels along row 1 from B, and a 0-based row counter down
-    column A."""
+def _write_sheet(workbook, title, groups, summary, items_per_page=DEFAULT_ITEMS_PER_PAGE):
+    """One page of a group per column, matching what pandas' to_excel() produced for the
+    legacy app: A1 blank, the column labels along row 1 from B, and a 0-based row counter
+    down column A."""
     worksheet = workbook.create_sheet(title)
     labels = summary.columns
     if summary.group_by != CHANNEL_COLUMN:
@@ -621,14 +664,14 @@ def _write_sheet(workbook, title, groups, summary):
         # strip, and vice versa. Numeric channels keep the full min..max range, empties
         # included, because that is what the legacy app wrote.
         labels = [label for label in labels if groups.get(label)]
-    depth = max((len(groups.get(label, ())) for label in labels), default=0)
+    columns = _paginate(labels, groups, items_per_page)
+    depth = max((len(values) for _, values in columns), default=0)
 
-    for offset, label in enumerate(labels):
-        worksheet.cell(row=1, column=offset + 2, value=label)
+    for offset, (header, _) in enumerate(columns):
+        worksheet.cell(row=1, column=offset + 2, value=header)
     for index in range(depth):
         worksheet.cell(row=index + 2, column=1, value=index)
-        for offset, label in enumerate(labels):
-            values = groups.get(label, ())
+        for offset, (_, values) in enumerate(columns):
             if index < len(values):
                 worksheet.cell(row=index + 2, column=offset + 2, value=values[index])
     return worksheet

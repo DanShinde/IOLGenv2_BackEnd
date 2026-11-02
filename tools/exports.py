@@ -6,7 +6,7 @@ from pathlib import PurePath
 from django.http import HttpResponse
 from django.utils.text import slugify
 
-from .textlist import FORMAT_LABELS
+from .textlist import DEFAULT_ITEMS_PER_PAGE, FORMAT_LABELS
 
 XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -23,10 +23,12 @@ def text_response(text, filename):
     return response
 
 
-def textlist_filename(upload_name, text_format):
+def textlist_filename(upload_name, text_format, items_per_page=DEFAULT_ITEMS_PER_PAGE):
     stem = slugify(PurePath(upload_name or '').stem) or 'io-list'
     label = slugify(FORMAT_LABELS.get(text_format, '')) or 'text-list'
-    return f'{stem}-{label}.xlsx'
+    # The default keeps the old filename; any other page size says so.
+    pages = '' if items_per_page == DEFAULT_ITEMS_PER_PAGE else f'-{items_per_page}-per-page'
+    return f'{stem}-{label}{pages}.xlsx'
 
 
 def scl_filename(params):

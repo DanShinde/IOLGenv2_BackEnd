@@ -1,7 +1,12 @@
 from django import forms
 
 from .scl import SclParams
-from .textlist import FORMAT_CHOICES, FORMAT_IO_AND_TAG
+from .textlist import (
+    DEFAULT_ITEMS_PER_PAGE,
+    FORMAT_CHOICES,
+    FORMAT_IO_AND_TAG,
+    ITEMS_PER_PAGE_CHOICES,
+)
 
 
 class BootstrapFormMixin:
@@ -41,6 +46,16 @@ class TextListForm(BootstrapFormMixin, forms.Form):
         coerce=int,
         initial=FORMAT_IO_AND_TAG,
         help_text='What each cell of the generated list should contain.',
+    )
+    items_per_page = forms.TypedChoiceField(
+        label='Items per page',
+        choices=ITEMS_PER_PAGE_CHOICES,
+        coerce=int,
+        initial=DEFAULT_ITEMS_PER_PAGE,
+        # Not sent by a form rendered before this field existed -- fall back to 16.
+        required=False,
+        empty_value=DEFAULT_ITEMS_PER_PAGE,
+        help_text='Rows per column. A channel with more rows is split over extra columns.',
     )
 
     def clean_workbook(self):

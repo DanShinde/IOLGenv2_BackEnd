@@ -41,7 +41,8 @@ def textlist_view(request):
     summary = error = None
     if form.is_valid():
         try:
-            summary = analyse(form.cleaned_data['workbook'], form.cleaned_data['text_format'])
+            summary = analyse(form.cleaned_data['workbook'], form.cleaned_data['text_format'],
+                              form.cleaned_data['items_per_page'])
         except TextListError as exc:
             error = str(exc)
 
@@ -71,8 +72,9 @@ def textlist_download(request):
 
     uploaded = form.cleaned_data['workbook']
     text_format = form.cleaned_data['text_format']
+    items_per_page = form.cleaned_data['items_per_page']
     try:
-        buffer, summary = build_workbook(uploaded, text_format)
+        buffer, summary = build_workbook(uploaded, text_format, items_per_page)
     except TextListError as exc:
         return render(request, 'tools/textlist.html', _textlist_context(form, error=str(exc)))
 
@@ -87,7 +89,7 @@ def textlist_download(request):
                   '-- press Download again if it looks right.',
         ))
 
-    return exports.xlsx_response(buffer, exports.textlist_filename(uploaded.name, text_format))
+    return exports.xlsx_response(buffer, exports.textlist_filename(uploaded.name, text_format, items_per_page))
 
 
 # ------------------------------------------------------------------ SCL IO mapping
