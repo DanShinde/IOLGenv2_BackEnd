@@ -40,7 +40,7 @@
   <form id="textlistForm" method="post" enctype="multipart/form-data"
         action="{% url 'tools_textlist_download' %}"
         hx-post="{% url 'tools_textlist' %}"
-        hx-trigger="change from:#id_text_format"
+        hx-trigger="change from:#id_text_format, change from:#id_items_per_page"
         hx-target="#textlist-summary" hx-swap="innerHTML"
         hx-encoding="multipart/form-data"
         hx-indicator="#textlistSpinner">
@@ -53,11 +53,17 @@
         <div class="form-text">{{ form.workbook.help_text }}</div>
         {% for e in form.workbook.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
       </div>
-      <div class="col-12 col-lg-5">
+      <div class="col-12 col-sm-7 col-lg-3">
         <label class="form-label" for="{{ form.text_format.id_for_label }}">{{ form.text_format.label }}</label>
         {{ form.text_format }}
         <div class="form-text">{{ form.text_format.help_text }}</div>
         {% for e in form.text_format.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-sm-5 col-lg-2">
+        <label class="form-label" for="{{ form.items_per_page.id_for_label }}">{{ form.items_per_page.label }}</label>
+        {{ form.items_per_page }}
+        <div class="form-text">{{ form.items_per_page.help_text }}</div>
+        {% for e in form.items_per_page.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
       </div>
     </div>
 

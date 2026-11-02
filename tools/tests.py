@@ -278,6 +278,55 @@ class AnalyseAgreesWithBuildTests(SimpleTestCase):
         self.assertEqual(written, actual.total_input_rows + actual.total_output_rows)
 
 
+class ItemsPerPageTests(SimpleTestCase):
+
+    def sixteen_inputs(self, channel=1):
+        return [[f'T{i}', channel, f'I{i // 8}.{i % 8}', f'F{i}'] for i in range(16)]
+
+    def test_sixteen_per_page_keeps_a_sixteen_point_card_in_one_column(self):
+        buffer, summary = build_workbook(simple_upload(self.sixteen_inputs()), FORMAT_TAG)
+        sheet = read_back(buffer)['InputsList_Panel A']
+        self.assertEqual(sheet['B1'].value, 1)
+        self.assertIsNone(sheet['C1'].value)
+        self.assertEqual(sheet['B17'].value, 'T15')
+        self.assertEqual(summary.items_per_page, 16)
+
+    def test_eight_per_page_splits_a_sixteen_point_card(self):
+        rows = self.sixteen_inputs() + [['X0', 2, 'I2.0', 'F99']]
+        buffer, summary = build_workbook(simple_upload(rows), FORMAT_TAG, items_per_page=8)
+        sheet = read_back(buffer)['InputsList_Panel A']
+        self.assertEqual([sheet['B1'].value, sheet['C1'].value, sheet['D1'].value],
+                         ['1 (1/2)', '1 (2/2)', 2])   # a channel that fits keeps its label
+        self.assertEqual(sheet['B2'].value, 'T0')
+        self.assertEqual(sheet['B9'].value, 'T7')
+        self.assertEqual(sheet['C2'].value, 'T8')
+        self.assertEqual(sheet['C9'].value, 'T15')
+        self.assertIsNone(sheet['A10'].value)         # depth is one page, not 16
+        self.assertTrue(any('split' in w for w in summary.sheets[0].warnings))
+
+    def test_form_and_filename(self):
+        from .exports import textlist_filename
+        form = TextListForm(
+            {'text_format': FORMAT_TAG, 'items_per_page': '8'},
+            {'workbook': simple_upload([['A', 1, 'I0.0', 'F1']])},
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['items_per_page'], 8)
+        self.assertEqual(textlist_filename('list.xlsx', FORMAT_TAG), 'list-only-tag.xlsx')
+        self.assertEqual(textlist_filename('list.xlsx', FORMAT_TAG, 8),
+                         'list-only-tag-8-per-page.xlsx')
+
+    def test_download_honours_items_per_page(self):
+        response = Client().post(
+            reverse('tools_textlist_download'),
+            {'workbook': simple_upload(self.sixteen_inputs()),
+             'text_format': FORMAT_TAG, 'items_per_page': 8},
+        )
+        self.assertIn('8-per-page', response['Content-Disposition'])
+        sheet = read_back(BytesIO(response.content))['InputsList_Panel A']
+        self.assertEqual(sheet['C1'].value, '1 (2/2)')
+
+
 def make_raw_workbook(sheets, name='io-list.xlsx'):
     """Builds an .xlsx from literal rows, so a test can place the header wherever it
     likes (the ARTPL template puts a title banner above it)."""
