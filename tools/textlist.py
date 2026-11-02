@@ -87,6 +87,13 @@ ILLEGAL_SHEET_CHARS = r'[]:*?/\\'
 # but counted, so the summary can say how many there were.
 REAL_ADDRESS = re.compile(r'^[IQ]\d+(\.\d+)?$', re.IGNORECASE)
 
+# Rockwell Logix (ControlLogix / CompactLogix): <rack>:<slot>:<I|O>..., e.g.
+# RACKA:1:I.0, RACKA:16:O.0, Local:2:I.Data.3, RACKA:1:I.Data[0].3. The direction is
+# the letter after the slot, not the first character -- "RACKA" starts with R.
+ROCKWELL_LOGIX_ADDRESS = re.compile(r'^[A-Za-z_]\w*:\d+:([IO])(?=[.\[]|$)', re.IGNORECASE)
+# Rockwell PLC-5 / SLC 500: I:1/0, O:2/3, I:1.0/3.
+ROCKWELL_SLC_ADDRESS = re.compile(r'^([IO]):\d+([./]\d+)*$', re.IGNORECASE)
+
 # How many offending rows to quote back in a warning before saying "and N more".
 MAX_EXAMPLES = 3
 
@@ -205,9 +212,22 @@ def _direction(address):
 
     The legacy `word[0]` raised on a blank or numeric I/O Address; an unreadable address
     is now counted and reported rather than crashing the whole run.
+
+    Rockwell addresses are checked first: a Logix rack can be named anything, including
+    something starting with I or Q. Rockwell's O (output) maps to 'Q' here.
     """
-    first = _clean(address)[:1].upper()
+    text = _clean(address)
+    match = ROCKWELL_LOGIX_ADDRESS.match(text) or ROCKWELL_SLC_ADDRESS.match(text)
+    if match:
+        return 'I' if match.group(1).upper() == 'I' else 'Q'
+    first = text[:1].upper()
     return first if first in ('I', 'Q') else None
+
+
+def _is_real_address(address):
+    """False for a placeholder such as "Qxxxx" on a SPARE row."""
+    return bool(REAL_ADDRESS.match(address) or ROCKWELL_LOGIX_ADDRESS.match(address)
+                or ROCKWELL_SLC_ADDRESS.match(address))
 
 
 def _channel(value):
@@ -416,7 +436,8 @@ def _prepare(data, text_format, items_per_page=DEFAULT_ITEMS_PER_PAGE):
 
     if not any(s.summary.input_rows or s.summary.output_rows for s in prepared):
         raise TextListError(
-            f'No rows to write: no {ADDRESS_COLUMN} in this file starts with I or Q.'
+            f'No rows to write: no {ADDRESS_COLUMN} in this file starts with I or Q, '
+            'or is a Rockwell input/output address such as RACKA:1:I.0 or RACKA:1:O.0.'
         )
 
     return prepared, skipped
@@ -457,7 +478,7 @@ def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_c
         if direction is None:
             bad_address_rows.append(row_number)
             continue
-        if not REAL_ADDRESS.match(address):
+        if not _is_real_address(address):
             placeholder_rows.append(row_number)
 
         if by_channel:
@@ -531,8 +552,9 @@ def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_c
         warnings.append(f'{blank_tag_rows} row(s) skipped: the {TAG_COLUMN} cell is empty.')
     if bad_address_rows:
         warnings.append(
-            f'{len(bad_address_rows)} row(s) skipped: the {ADDRESS_COLUMN} is blank or does not '
-            f'start with I or Q ({_quote_rows(bad_address_rows)}).'
+            f'{len(bad_address_rows)} row(s) skipped: the {ADDRESS_COLUMN} is blank or not an '
+            'input/output address -- expected Siemens (I0.0, Q0.0) or Rockwell '
+            f'(RACKA:1:I.0, RACKA:1:O.0) ({_quote_rows(bad_address_rows)}).'
         )
     if bad_group_rows:
         warnings.append(
