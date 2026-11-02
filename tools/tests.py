@@ -226,6 +226,56 @@ class ColumnMatchingTests(SimpleTestCase):
         self.assertIn('starts with I or Q', str(caught.exception))
 
 
+class RockwellAddressTests(SimpleTestCase):
+    """Rockwell addresses start with the rack name, so the Siemens first-letter rule
+    skipped every row."""
+
+    def test_logix_addresses_are_split_into_inputs_and_outputs(self):
+        buffer, summary = build_workbook(simple_upload([
+            ['PB_START', 1, 'RACKA:1:I.0', 'F1'],
+            ['PB_STOP', 1, 'RACKA:1:I.1', 'F2'],
+            ['SOL_01', 16, 'RACKA:16:O.0', 'F3'],
+            ['LS_01', 2, 'Local:2:I.Data.3', 'F4'],
+            ['LS_02', 2, 'RACKA:2:I.Data[0].4', 'F5'],
+            ['MTR_01', 16, 'rackb:16:o.1', 'F6'],
+        ]), FORMAT_IO_AND_TAG)
+        book = read_back(buffer)
+        self.assertEqual(summary.total_input_rows, 4)
+        self.assertEqual(summary.total_output_rows, 2)
+        self.assertEqual(book['InputsList_Panel A']['B2'].value, 'RACKA:1:I.0 PB_START')
+        outputs = book['OutputsList_Panel A']
+        slot16 = next(c.column for c in outputs[1] if c.value == 16)
+        self.assertEqual(outputs.cell(row=2, column=slot16).value, 'RACKA:16:O.0 SOL_01')
+        sheet = summary.sheets[0]
+        self.assertEqual(sheet.unusable_address_rows, 0)
+        self.assertEqual(sheet.placeholder_address_rows, 0)
+
+    def test_rack_name_starting_with_i_or_q_uses_the_direction_letter(self):
+        summary = analyse(simple_upload([
+            ['A', 1, 'IRACK:1:O.0', 'F1'],
+            ['B', 1, 'QRACK:2:I.0', 'F2'],
+        ]), FORMAT_TAG)
+        self.assertEqual(summary.total_input_rows, 1)
+        self.assertEqual(summary.total_output_rows, 1)
+
+    def test_slc_addresses(self):
+        summary = analyse(simple_upload([
+            ['A', 1, 'I:1/0', 'F1'],
+            ['B', 2, 'O:2/3', 'F2'],
+        ]), FORMAT_TAG)
+        self.assertEqual(summary.total_input_rows, 1)
+        self.assertEqual(summary.total_output_rows, 1)
+        self.assertEqual(summary.sheets[0].placeholder_address_rows, 0)
+
+    def test_config_and_status_tags_are_skipped(self):
+        summary = analyse(simple_upload([
+            ['A', 1, 'RACKA:1:I.0', 'F1'],
+            ['B', 1, 'RACKA:1:C.Ch0Config', 'F2'],
+        ]), FORMAT_TAG)
+        self.assertEqual(summary.total_input_rows, 1)
+        self.assertEqual(summary.sheets[0].unusable_address_rows, 1)
+
+
 class FerrulesTests(SimpleTestCase):
     """Defect: formats 4 and 5 used a Ferrules column that was never checked for."""
 
