@@ -7,6 +7,19 @@
   .tools-kpi { border: 1px solid var(--bs-border-color); border-radius: .6rem; padding: .85rem 1rem; }
   .tools-kpi .value { font-size: 1.5rem; font-weight: 600; line-height: 1; }
   .tools-kpi .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+  .textlist-preview .nav-tabs .nav-link { color: var(--bs-secondary-color); }
+  .textlist-preview .nav-tabs .nav-link.active { color: var(--bs-emphasis-color); font-weight: 600; }
+  .textlist-grid { max-height: 28rem; overflow: auto; border: 1px solid var(--bs-border-color);
+                   border-top: 0; }
+  .textlist-grid table { font-family: var(--bs-font-monospace); font-size: .8rem;
+                         border-collapse: separate; border-spacing: 0; }
+  .textlist-grid th, .textlist-grid td { white-space: nowrap; padding: .3rem .6rem; }
+  .textlist-grid thead th { position: sticky; top: 0; z-index: 2;
+                            background: var(--bs-tertiary-bg); font-family: var(--bs-body-font-family); }
+  .textlist-grid .idx { position: sticky; left: 0; z-index: 1; width: 1%;
+                        background: var(--bs-tertiary-bg); color: var(--bs-secondary-color);
+                        font-weight: 400; text-align: right; }
+  .textlist-grid thead .idx { z-index: 3; }
   .htmx-indicator { display: none; }
   .htmx-request .htmx-indicator { display: inline-block; }
 </style>

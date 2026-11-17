@@ -55,7 +55,7 @@ class TextListForm(BootstrapFormMixin, forms.Form):
         # Not sent by a form rendered before this field existed -- fall back to 16.
         required=False,
         empty_value=DEFAULT_ITEMS_PER_PAGE,
-        help_text='Rows per column. A channel with more rows is split over extra columns.',
+        help_text='Labels per row of the sheet. Labels run in channel order and wrap onto the next row.',
     )
 
     def clean_workbook(self):
