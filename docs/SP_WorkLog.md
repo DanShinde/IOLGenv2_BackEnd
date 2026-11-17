@@ -8,6 +8,45 @@ prod. Keep it brief — enough to answer "why is this like this?" months later.
 
 ---
 
+## 2026-11-17 — IO Text List Generator: one row per page instead of one column per channel
+
+**Reason:** Pravin wants the sheet laid out as printed pages: "16 per page" = 16 labels
+across a row, wrapping to the next row (8 per page → 8 columns). The old layout (one
+column per channel, labels down it, inherited from the legacy TextLists app) had rows
+and columns the other way round. **Breaking for anything that read the old layout.**
+
+**Changed:** `tools/textlist.py` — `_sheet_grid()` flattens the groups in channel /
+card order and chunks them into rows of `items_per_page`; row 1 = positions 1..n,
+column A = page numbers from 1. Dropped `_paginate()` and the "split over several
+columns" warning. `tools/forms.py` help text, summary table/preview captions, and the
+layout tests in `tools/tests.py` rewritten for the row layout.
+
+## 2026-11-17 — IO Text List Generator: group T4 Rockwell lists by card
+
+**Reason:** The T4 template (e.g. A1703-PLC01-IOL-T4-R1) restarts `Channel` at 1 on
+every card and keeps the card in `Module Position`. Grouping by Channel, as the legacy
+TextLists app does for Siemens lists where Channel *is* the card, gave 8 columns each
+mixing point N of every card, and dropped a row whose Channel was blank.
+
+**Changed:** `tools/textlist.py` — `_channel_is_point()`: when one Module Position
+carries several Channel values, group by Module Position (carried down over blanks).
+Lists where Channel is the card are unchanged. Two tests in `tools/tests.py`.
+
+## 2026-11-17 — IO Text List Generator: sheet-tab preview before download
+
+**Reason:** Validate only showed counts, so the generated sheets could only be checked by
+downloading and opening the .xlsx. Now each output sheet (InputsList_CP02, …) is a tab
+showing its exact grid on the page.
+
+**Changed:**
+- `tools/textlist.py` — new `_sheet_grid()` builds a sheet's headers + rows; both
+  `_write_sheet()` and the new `WorkbookSummary.previews` (`SheetPreview`) use it, so the
+  preview cannot disagree with the download.
+- `tools/templates/tools/_textlist_summary.html`, `textlist.html` — Bootstrap tabs with
+  a scrollable grid (sticky header + index column). Tab buttons are `type="button"`
+  since they sit inside the download form.
+- `tools/tests.py` — preview matches the workbook cell-for-cell; tabs never submit.
+
 ## 2026-10-01 — Release marker showed on dev but never on prod
 
 **Reason:** The marker rendered locally and was blank on the VM, because *both* sources

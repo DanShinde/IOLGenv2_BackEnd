@@ -56,14 +56,22 @@ def read_back(buffer):
     return load_workbook(BytesIO(buffer.getvalue()))
 
 
+def labels(worksheet):
+    """The labels on a sheet in reading order -- row by row, skipping the page-number
+    column and the position header row."""
+    return [value for row in worksheet.iter_rows(min_row=2, min_col=2, values_only=True)
+            for value in row if value not in (None, '')]
+
+
 class TextListParsingTests(SimpleTestCase):
 
-    def test_happy_path_layout_matches_legacy(self):
-        """Channel numbers along row 1 from column B, 0-based index down column A."""
+    def test_happy_path_layout(self):
+        """One row per page: positions 1..n along row 1 from column B, page numbers from
+        1 down column A, labels in channel order."""
         upload = simple_upload([
+            ['LS_01', 2, 'I1.0', 'F3'],
             ['PB_START', 1, 'I0.0', 'F1'],
             ['PB_STOP', 1, 'I0.1', 'F2'],
-            ['LS_01', 2, 'I1.0', 'F3'],
             ['SOL_01', 1, 'Q0.0', 'F4'],
         ])
         buffer, summary = build_workbook(upload, FORMAT_IO_AND_TAG)
@@ -71,14 +79,12 @@ class TextListParsingTests(SimpleTestCase):
 
         self.assertEqual(book.sheetnames, ['InputsList_Panel A', 'OutputsList_Panel A'])
         inputs = book['InputsList_Panel A']
-        self.assertIsNone(inputs['A1'].value)          # index corner stays blank
-        self.assertEqual(inputs['B1'].value, 1)        # channel numbers are the headers
-        self.assertEqual(inputs['C1'].value, 2)
-        self.assertEqual(inputs['A2'].value, 0)        # 0-based index column
-        self.assertEqual(inputs['A3'].value, 1)
-        self.assertEqual(inputs['B2'].value, 'I0.0 PB_START')
-        self.assertEqual(inputs['B3'].value, 'I0.1 PB_STOP')
-        self.assertEqual(inputs['C2'].value, 'I1.0 LS_01')
+        self.assertIsNone(inputs['A1'].value)          # corner stays blank
+        self.assertEqual([c.value for c in inputs[1]][1:], [1, 2, 3])
+        self.assertEqual(inputs['A2'].value, 1)        # page number
+        self.assertEqual([c.value for c in inputs[2]][1:],
+                         ['I0.0 PB_START', 'I0.1 PB_STOP', 'I1.0 LS_01'])
+        self.assertEqual(inputs.max_row, 2)
         self.assertEqual(summary.total_input_rows, 3)
         self.assertEqual(summary.total_output_rows, 1)
 
@@ -243,9 +249,8 @@ class RockwellAddressTests(SimpleTestCase):
         self.assertEqual(summary.total_input_rows, 4)
         self.assertEqual(summary.total_output_rows, 2)
         self.assertEqual(book['InputsList_Panel A']['B2'].value, 'RACKA:1:I.0 PB_START')
-        outputs = book['OutputsList_Panel A']
-        slot16 = next(c.column for c in outputs[1] if c.value == 16)
-        self.assertEqual(outputs.cell(row=2, column=slot16).value, 'RACKA:16:O.0 SOL_01')
+        self.assertEqual(labels(book['OutputsList_Panel A']),
+                         ['RACKA:16:O.0 SOL_01', 'rackb:16:o.1 MTR_01'])
         sheet = summary.sheets[0]
         self.assertEqual(sheet.unusable_address_rows, 0)
         self.assertEqual(sheet.placeholder_address_rows, 0)
@@ -333,26 +338,64 @@ class ItemsPerPageTests(SimpleTestCase):
     def sixteen_inputs(self, channel=1):
         return [[f'T{i}', channel, f'I{i // 8}.{i % 8}', f'F{i}'] for i in range(16)]
 
-    def test_sixteen_per_page_keeps_a_sixteen_point_card_in_one_column(self):
+    def test_sixteen_per_page_puts_sixteen_labels_on_a_row(self):
         buffer, summary = build_workbook(simple_upload(self.sixteen_inputs()), FORMAT_TAG)
         sheet = read_back(buffer)['InputsList_Panel A']
-        self.assertEqual(sheet['B1'].value, 1)
-        self.assertIsNone(sheet['C1'].value)
-        self.assertEqual(sheet['B17'].value, 'T15')
+        self.assertEqual([c.value for c in sheet[1]][1:], list(range(1, 17)))
+        self.assertEqual([sheet['B2'].value, sheet['Q2'].value], ['T0', 'T15'])
+        self.assertEqual(sheet.max_row, 2)
         self.assertEqual(summary.items_per_page, 16)
 
-    def test_eight_per_page_splits_a_sixteen_point_card(self):
+    def test_eight_per_page_wraps_onto_the_next_row(self):
         rows = self.sixteen_inputs() + [['X0', 2, 'I2.0', 'F99']]
-        buffer, summary = build_workbook(simple_upload(rows), FORMAT_TAG, items_per_page=8)
+        buffer, _ = build_workbook(simple_upload(rows), FORMAT_TAG, items_per_page=8)
         sheet = read_back(buffer)['InputsList_Panel A']
-        self.assertEqual([sheet['B1'].value, sheet['C1'].value, sheet['D1'].value],
-                         ['1 (1/2)', '1 (2/2)', 2])   # a channel that fits keeps its label
-        self.assertEqual(sheet['B2'].value, 'T0')
-        self.assertEqual(sheet['B9'].value, 'T7')
-        self.assertEqual(sheet['C2'].value, 'T8')
-        self.assertEqual(sheet['C9'].value, 'T15')
-        self.assertIsNone(sheet['A10'].value)         # depth is one page, not 16
-        self.assertTrue(any('split' in w for w in summary.sheets[0].warnings))
+        self.assertEqual([c.value for c in sheet[1]][1:], list(range(1, 9)))
+        self.assertEqual([sheet['A2'].value, sheet['A3'].value, sheet['A4'].value], [1, 2, 3])
+        self.assertEqual([sheet['B2'].value, sheet['I2'].value], ['T0', 'T7'])
+        self.assertEqual([sheet['B3'].value, sheet['I3'].value], ['T8', 'T15'])
+        self.assertEqual([c.value for c in sheet[4]][1:], ['X0'] + [None] * 7)
+
+    def test_preview_matches_the_downloaded_workbook(self):
+        """The on-page preview must show exactly what the .xlsx holds, sheet for sheet
+        and cell for cell -- including split columns and empty channels."""
+        rows = self.sixteen_inputs() + [['X0', 3, 'I3.0', 'F99'], ['SOL', 1, 'Q0.0', 'F98']]
+        buffer, summary = build_workbook(simple_upload(rows), FORMAT_IO_AND_TAG, items_per_page=8)
+        book = read_back(buffer)
+        self.assertEqual([p.name for p in summary.previews], book.sheetnames)
+        for preview in summary.previews:
+            with self.subTest(sheet=preview.name):
+                written = [['' if v is None else v for v in row]
+                           for row in book[preview.name].iter_rows(values_only=True)]
+                self.assertEqual(written[0], [''] + preview.headers[1:])
+                self.assertEqual(written[1:], preview.rows)
+        self.assertEqual(summary.previews[0].value_count, 17)
+        self.assertEqual(analyse(simple_upload(rows), FORMAT_IO_AND_TAG, 8).previews,
+                         summary.previews)
+
+    def test_channel_that_numbers_points_groups_by_card(self):
+        """T4 Rockwell template: Channel restarts at 1 on every card and the card is in
+        Module Position. Grouping by Channel interleaved the cards (point 1 of every
+        card, then point 2 ...); the labels must run card by card, and a row with the
+        position left blank stays on the card above it."""
+        headers = ['Tag', 'I/O Address', 'Module Position', 'Channel ']
+        rows = [[f'T{card}{p}', f'RACKA:{card}:I.{p}', card, p + 1]
+                for card in (1, 2, 3) for p in range(8)]
+        rows[-1][2] = rows[-1][3] = None                 # RACKA:3:I.7, position blank
+        buffer, summary = build_workbook(simple_upload(rows, headers=headers), FORMAT_TAG)
+        sheet = summary.sheets[0]
+        self.assertEqual(sheet.group_by, 'Module Position')
+        self.assertEqual(sheet.columns, ['1', '2', '3'])
+        self.assertEqual(sheet.input_rows, 24)
+        written = labels(read_back(buffer)['InputsList_Panel A'])
+        self.assertEqual(written, [f'T{card}{p}' for card in (1, 2, 3) for p in range(8)])
+
+    def test_channel_per_card_still_groups_by_channel(self):
+        """A Module Position column alone must not change the legacy layout."""
+        headers = ['Tag', 'I/O Address', 'Module Position', 'Channel ']
+        rows = [['A', 'I0.0', 1, 1], ['B', 'I0.1', 1, 1], ['C', 'I1.0', 2, 2]]
+        summary = analyse(simple_upload(rows, headers=headers), FORMAT_TAG)
+        self.assertEqual(summary.sheets[0].group_by, 'Channel')
 
     def test_form_and_filename(self):
         from .exports import textlist_filename
@@ -374,7 +417,8 @@ class ItemsPerPageTests(SimpleTestCase):
         )
         self.assertIn('8-per-page', response['Content-Disposition'])
         sheet = read_back(BytesIO(response.content))['InputsList_Panel A']
-        self.assertEqual(sheet['C1'].value, '1 (2/2)')
+        self.assertEqual(sheet.max_column, 9)          # page-number column + 8 labels
+        self.assertEqual(sheet['B3'].value, 'T8')
 
 
 def make_raw_workbook(sheets, name='io-list.xlsx'):
@@ -423,9 +467,7 @@ class ArtplFormatTests(SimpleTestCase):
         sheet = summary.sheets[0]
         self.assertEqual(sheet.group_by, 'IO Module Name')
         self.assertEqual(sheet.columns, ['IO101', 'IO102'])
-        worksheet = read_back(buffer)['InputsList_CP01_IOM']
-        self.assertEqual(worksheet['B1'].value, 'IO101')
-        self.assertEqual(worksheet['C1'].value, 'IO102')
+        self.assertEqual(labels(read_back(buffer)['InputsList_CP01_IOM']), ['Ix_A', 'Ix_B'])
 
     def test_text_channel_falls_back_to_io_module_name(self):
         """CP01_DRC has Channel values XM/X4/X2 -- port names, not numbers."""
@@ -448,9 +490,8 @@ class ArtplFormatTests(SimpleTestCase):
         ]})
         buffer, summary = build_workbook(upload, FORMAT_TAG)
         self.assertEqual(summary.sheets[0].columns, ['DRC1', 'DRC2'])
-        worksheet = read_back(buffer)['InputsList_CP01_DRC']
-        self.assertEqual([worksheet['B2'].value, worksheet['B3'].value], ['Ix_A', 'Ix_B'])
-        self.assertEqual([worksheet['C2'].value, worksheet['C3'].value], ['Ix_C', 'Ix_D'])
+        self.assertEqual(labels(read_back(buffer)['InputsList_CP01_DRC']),
+                         ['Ix_A', 'Ix_B', 'Ix_C', 'Ix_D'])
 
     def test_placeholder_addresses_are_kept_and_counted(self):
         """SPARE rows carry 'Qxxxx'. They stay, so the printed strip lines up with the
@@ -465,8 +506,7 @@ class ArtplFormatTests(SimpleTestCase):
         self.assertEqual(sheet.output_rows, 2)
         self.assertEqual(sheet.placeholder_address_rows, 1)
         self.assertTrue(any('placeholder address' in w for w in sheet.warnings))
-        values = [c.value for c in read_back(buffer)['OutputsList_CP01_DRC']['B']][1:]
-        self.assertIn('Qxxxx SPARE', values)
+        self.assertIn('Qxxxx SPARE', labels(read_back(buffer)['OutputsList_CP01_DRC']))
 
     def test_rows_are_ordered_by_pin(self):
         upload = make_raw_workbook({'CP01_IOM': [
@@ -476,19 +516,19 @@ class ArtplFormatTests(SimpleTestCase):
             [3, 'CP01', 'Ix_SECOND', 'DI', 'I0.1', 'CP01', 'IO101', 'PLC1', None, 2],
         ]})
         buffer, _ = build_workbook(upload, FORMAT_TAG)
-        column = [c.value for c in read_back(buffer)['InputsList_CP01_IOM']['B']][1:]
-        self.assertEqual(column, ['Ix_FIRST', 'Ix_SECOND', 'Ix_THIRD'])
+        self.assertEqual(labels(read_back(buffer)['InputsList_CP01_IOM']),
+                         ['Ix_FIRST', 'Ix_SECOND', 'Ix_THIRD'])
 
-    def test_module_with_no_rows_in_a_direction_gets_no_empty_column(self):
-        """IO102 is output-only, so it must not leave a blank column on the input strip."""
+    def test_module_with_no_rows_in_a_direction_leaves_no_gap(self):
+        """IO102 is output-only, so it must not leave a blank cell on the input strip."""
         upload = make_raw_workbook({'CP01_IOM': [
             ARTPL_HEADERS,
             [1, 'CP01', 'Ix_A', 'DI', 'I0.0', 'CP01', 'IO101', 'PLC1', None, 1],
             [2, 'CP01', 'Qx_B', 'DO', 'Q2.0', 'CP01', 'IO102', 'PLC1', None, 1],
         ]})
         book = read_back(build_workbook(upload, FORMAT_TAG)[0])
-        self.assertEqual([c.value for c in book['InputsList_CP01_IOM'][1]][1:], ['IO101'])
-        self.assertEqual([c.value for c in book['OutputsList_CP01_IOM'][1]][1:], ['IO102'])
+        self.assertEqual([c.value for c in book['InputsList_CP01_IOM'][2]], [1, 'Ix_A'])
+        self.assertEqual([c.value for c in book['OutputsList_CP01_IOM'][2]], [1, 'Qx_B'])
 
     def test_cover_sheets_are_skipped_with_a_reason(self):
         upload = make_raw_workbook({
@@ -610,6 +650,14 @@ class ViewTests(SimpleTestCase):
         self.assertNotIn('hx-', download)
         self.assertNotIn('formaction', download)
         self.assertIn('type="submit"', download)
+
+        # The preview tabs sit inside the same form: a default (submit) button there
+        # would start the download whenever someone switched tabs.
+        tabs = re.findall(r'<button([^>]*data-bs-toggle="tab"[^>]*)>', partial)
+        self.assertTrue(tabs)
+        for tab in tabs:
+            self.assertIn('type="button"', tab)
+        self.assertIn('I0.0 A', partial)
 
     def test_download_streams_an_attachment(self):
         response = self.client.post(

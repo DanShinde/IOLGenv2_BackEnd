@@ -47,7 +47,7 @@
         <th class="text-end">Inputs</th>
         <th class="text-end">Outputs</th>
         <th>Grouped by</th>
-        <th class="text-end">Columns</th>
+        <th class="text-end">Groups</th>
       </tr>
     </thead>
     <tbody>
@@ -80,6 +80,66 @@
     </tbody>
   </table>
 </div>
+
+{% if summary.previews %}
+{# What the download will contain, one tab per output worksheet. Built from the same #}
+{# grid the workbook is written from. The tab buttons are type="button" because they #}
+{# sit inside #textlistForm -- a default submit would trigger the download.           #}
+<div class="textlist-preview mb-3">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <h2 class="h6 mb-0">Preview</h2>
+    <span class="small text-muted">Exactly what each sheet of the .xlsx will contain.</span>
+  </div>
+  <ul class="nav nav-tabs flex-nowrap overflow-auto" role="tablist">
+    {% for preview in summary.previews %}
+    <li class="nav-item" role="presentation">
+      <button type="button" class="nav-link text-nowrap{% if forloop.first %} active{% endif %}"
+              id="tl-tab-{{ forloop.counter }}" data-bs-toggle="tab"
+              data-bs-target="#tl-pane-{{ forloop.counter }}" role="tab"
+              aria-controls="tl-pane-{{ forloop.counter }}"
+              aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+        {{ preview.name }}
+        <span class="badge rounded-pill text-bg-light border ms-1">{{ preview.value_count }}</span>
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  <div class="tab-content">
+    {% for preview in summary.previews %}
+    <div class="tab-pane{% if forloop.first %} show active{% endif %}"
+         id="tl-pane-{{ forloop.counter }}" role="tabpanel"
+         aria-labelledby="tl-tab-{{ forloop.counter }}" tabindex="0">
+      <div class="small text-muted py-2">
+        From <strong>{{ preview.source }}</strong> &middot;
+        {{ preview.value_count }} label{{ preview.value_count|pluralize }} &middot;
+        {{ preview.rows|length }} row{{ preview.rows|length|pluralize }} of
+        {{ preview.headers|length|add:"-1" }}
+      </div>
+      <div class="textlist-grid">
+        <table class="table table-sm table-bordered mb-0">
+          <thead>
+            <tr>
+              {% for header in preview.headers %}
+              <th scope="col"{% if forloop.first %} class="idx"{% endif %}>{% if header is not None %}{{ header }}{% endif %}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in preview.rows %}
+            <tr>
+              {% for value in row %}
+              {% if forloop.first %}<th scope="row" class="idx">{{ value }}</th>{% else %}<td>{{ value }}</td>{% endif %}
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 {% if summary.skipped_sheets %}
 <details class="mb-3">

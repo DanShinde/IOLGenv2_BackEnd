@@ -4,10 +4,9 @@ No HTTP, no DB here -- mirrors the estimator's imports.py / exports.py split (pu
 in, structured data out), so the parsing rules can be reasoned about (and tested)
 independently of the view that calls them.
 
-Ported from the standalone Flask app at TextLists/script.py, which this replaces. The
-output layout is deliberately byte-compatible with what that app produced -- including
-the 0-based index column in column A that pandas' `to_excel` wrote by default -- because
-downstream label software may read these sheets by column position.
+Ported from the standalone Flask app at TextLists/script.py, which this replaces. That
+app wrote one column per channel; the output here is laid out as printed pages instead --
+one row per page of `items_per_page` labels, see _sheet_grid().
 
 Two IO-list shapes are supported:
 
@@ -34,6 +33,7 @@ TAG_COLUMN = 'Tag'
 ADDRESS_COLUMN = 'I/O Address'
 CHANNEL_COLUMN = 'Channel'
 MODULE_COLUMN = 'IO Module Name'
+POSITION_COLUMN = 'Module Position'
 PIN_COLUMN = 'Pin'
 FERRULES_COLUMN = 'Ferrules'
 
@@ -63,10 +63,8 @@ FORMAT_CHOICES = [
 FORMAT_LABELS = dict(FORMAT_CHOICES)
 FORMATS_NEEDING_FERRULES = {FORMAT_FERRULES, FORMAT_IO_AND_FERRULES}
 
-# How many rows go in one printed column (one label strip / page). A group with more
-# rows than this is split over several columns headed "3 (1/2)", "3 (2/2)"; a group
-# that fits keeps its plain label, so a 16-point card at 16 per page is written exactly
-# as before.
+# How many labels go on one printed page -- one row of the output sheet, so 16 per
+# page gives 16 columns. Labels wrap onto the next row in channel / card order.
 DEFAULT_ITEMS_PER_PAGE = 16
 ITEMS_PER_PAGE_CHOICES = [
     (16, '16 per page'),
@@ -152,6 +150,20 @@ class SheetSummary:
 
 
 @dataclass(frozen=True)
+class SheetPreview:
+    """One output worksheet exactly as it will be written: `headers` is row 1 (A1 blank,
+    then the column labels) and `rows` are the data rows, index column included."""
+    name: str
+    source: str
+    headers: list = field(default_factory=list)
+    rows: list = field(default_factory=list)
+
+    @property
+    def value_count(self):
+        return sum(1 for row in self.rows for value in row[1:] if value != '')
+
+
+@dataclass(frozen=True)
 class WorkbookSummary:
     filename: str
     fingerprint: str
@@ -161,6 +173,7 @@ class WorkbookSummary:
     sheets: list = field(default_factory=list)
     skipped_sheets: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
+    previews: list = field(default_factory=list)
 
     @property
     def sheet_count(self):
@@ -178,7 +191,7 @@ class WorkbookSummary:
 @dataclass
 class _PreparedSheet:
     """A sheet's summary plus the column data itself. build_workbook() writes the data;
-    analyse() throws it away and keeps only the summary."""
+    analyse() keeps it only as the read-only preview grid."""
     summary: SheetSummary
     inputs: dict
     outputs: dict
@@ -276,21 +289,6 @@ def _format_cell(text_format, address, tag, ferrules):
     return tag
 
 
-def _paginate(labels, groups, items_per_page):
-    """(header, values) per output column. A group longer than one page is split
-    into consecutive pages; an empty group still gets its one (empty) column."""
-    columns = []
-    for label in labels:
-        values = list(groups.get(label, ()))
-        pages = [values[i:i + items_per_page] for i in range(0, len(values), items_per_page)]
-        if len(pages) <= 1:
-            columns.append((label, pages[0] if pages else []))
-            continue
-        for number, page in enumerate(pages, start=1):
-            columns.append((f'{label} ({number}/{len(pages)})', page))
-    return columns
-
-
 def _quote_rows(rows):
     shown = ', '.join(f'row {r}' for r in rows[:MAX_EXAMPLES])
     extra = len(rows) - MAX_EXAMPLES
@@ -365,12 +363,37 @@ def _sheet_frame(workbook, sheet_name):
     return frame, lookup, position + 1
 
 
+def _channel_is_point(frame, channel_column, position_column):
+    """True when Channel numbers the point on a card rather than the card itself.
+
+    The legacy Siemens lists give each card its own Channel, so one Channel is one
+    printed column. The T4 Rockwell template instead restarts Channel at 1 on every
+    card and puts the card in Module Position -- grouping by Channel there would put the
+    first point of every card in one column. Detected by a card carrying more than one
+    Channel value."""
+    positions = frame[position_column].ffill()
+    seen = {}
+    for position, value in zip(positions, frame[channel_column]):
+        channel, card = _channel(value), _clean(position)
+        if channel is None or not card:
+            continue
+        seen.setdefault(card, set()).add(channel)
+        if len(seen[card]) > 1:
+            return True
+    return False
+
+
 def _grouping(frame, lookup):
     """Which column becomes one column of output. Prefers a numeric Channel (the legacy
-    layout); falls back to IO Module Name when Channel is blank or holds a port name."""
+    layout), or Module Position when Channel only numbers the points on each card;
+    falls back to IO Module Name when Channel is blank or holds a port name."""
     channel_column = lookup.get(_normalize_header(CHANNEL_COLUMN))
+    position_column = lookup.get(_normalize_header(POSITION_COLUMN))
     if channel_column is not None:
         if any(_channel(v) is not None for v in frame[channel_column]):
+            if position_column is not None and _channel_is_point(
+                    frame, channel_column, position_column):
+                return POSITION_COLUMN, position_column
             return CHANNEL_COLUMN, channel_column
     module_column = lookup.get(_normalize_header(MODULE_COLUMN))
     if module_column is not None:
@@ -543,7 +566,12 @@ def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_c
     warnings = []
     if header_row > 1:
         warnings.append(f'Header row found on row {header_row}.')
-    if not by_channel:
+    if group_by == POSITION_COLUMN:
+        warnings.append(
+            f'Grouped by {POSITION_COLUMN} ({len(columns)} card(s)) -- {CHANNEL_COLUMN} '
+            'restarts on every card here, so it numbers the points, not the cards.'
+        )
+    elif not by_channel:
         warnings.append(
             f'Grouped by {MODULE_COLUMN} ({len(columns)} module(s)) -- the {CHANNEL_COLUMN} '
             'column is blank or not numeric on this sheet.'
@@ -570,8 +598,7 @@ def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_c
     if empty_channels:
         warnings.append(
             f'Channels {min_channel}-{max_channel}; channel(s) '
-            f'{", ".join(str(c) for c in empty_channels)} have no rows and will be written as '
-            'empty columns.'
+            f'{", ".join(str(c) for c in empty_channels)} have no rows.'
         )
     if by_channel and min_channel > 1:
         warnings.append(f'The lowest channel in this sheet is {min_channel}, not 1.')
@@ -579,17 +606,6 @@ def _prepare_sheet(sheet_name, frame, lookup, group_by, group_column, ferrules_c
         warnings.append(
             f'{missing_ferrules_rows} of {input_rows + output_rows} row(s) have no '
             f'{FERRULES_COLUMN} value -- those cells will be blank.'
-        )
-    split = sorted(
-        {str(label) for bucket in (inputs, outputs)
-         for label, values in bucket.items() if len(values) > items_per_page},
-        key=lambda text: (not text.isdigit(), int(text) if text.isdigit() else 0, text),
-    )
-    if split:
-        warnings.append(
-            f'{len(split)} {group_by.lower()}(s) have more than {items_per_page} rows and are '
-            f'split over several columns ({", ".join(split[:10])}'
-            f'{" ..." if len(split) > 10 else ""}).'
         )
     if input_rows and not output_rows:
         warnings.append('Only inputs found -- no OutputsList sheet will be written.')
@@ -632,6 +648,16 @@ def _summarise(prepared, skipped, filename, fingerprint, text_format,
         warnings.append(
             f'{len(skipped)} worksheet(s) skipped because they do not have the required columns.'
         )
+    previews = []
+    for sheet in prepared:
+        for title, groups in ((sheet.summary.inputs_sheet_name, sheet.inputs),
+                              (sheet.summary.outputs_sheet_name, sheet.outputs)):
+            if title:
+                headers, rows = _sheet_grid(groups, sheet.summary, items_per_page)
+                previews.append(SheetPreview(
+                    name=title, source=sheet.summary.name, headers=headers,
+                    rows=[['' if value is None else value for value in row] for row in rows],
+                ))
     return WorkbookSummary(
         filename=filename,
         fingerprint=fingerprint,
@@ -641,6 +667,7 @@ def _summarise(prepared, skipped, filename, fingerprint, text_format,
         sheets=[p.summary for p in prepared],
         skipped_sheets=skipped,
         warnings=warnings,
+        previews=previews,
     )
 
 
@@ -675,25 +702,33 @@ def build_workbook(uploaded_file, text_format, items_per_page=DEFAULT_ITEMS_PER_
                               items_per_page)
 
 
-def _write_sheet(workbook, title, groups, summary, items_per_page=DEFAULT_ITEMS_PER_PAGE):
-    """One page of a group per column, matching what pandas' to_excel() produced for the
-    legacy app: A1 blank, the column labels along row 1 from B, and a 0-based row counter
-    down column A."""
-    worksheet = workbook.create_sheet(title)
-    labels = summary.columns
-    if summary.group_by != CHANNEL_COLUMN:
-        # A module with only outputs would otherwise leave a blank column on the inputs
-        # strip, and vice versa. Numeric channels keep the full min..max range, empties
-        # included, because that is what the legacy app wrote.
-        labels = [label for label in labels if groups.get(label)]
-    columns = _paginate(labels, groups, items_per_page)
-    depth = max((len(values) for _, values in columns), default=0)
+def _sheet_grid(groups, summary, items_per_page=DEFAULT_ITEMS_PER_PAGE):
+    """(headers, rows) for one output sheet -- the single source of its layout, shared
+    by the download and the on-page preview so the two cannot disagree.
 
-    for offset, (header, _) in enumerate(columns):
-        worksheet.cell(row=1, column=offset + 2, value=header)
-    for index in range(depth):
-        worksheet.cell(row=index + 2, column=1, value=index)
-        for offset, (_, values) in enumerate(columns):
-            if index < len(values):
-                worksheet.cell(row=index + 2, column=offset + 2, value=values[index])
+    One row is one printed page: the labels run in group order (channel / card, then
+    pin or file order) and wrap every `items_per_page` cells, so 16 per page gives 16
+    columns. Row 1 numbers the positions on the page (A1 blank), column A numbers the
+    pages from 1. Cells past the last label are None."""
+    labels = [label for label in summary.columns if groups.get(label)]
+    flat = [value for label in labels for value in groups[label]]
+    width = min(items_per_page, len(flat))
+
+    headers = [None] + list(range(1, width + 1))
+    rows = []
+    for page, start in enumerate(range(0, len(flat), items_per_page), start=1):
+        chunk = flat[start:start + items_per_page]
+        rows.append([page] + chunk + [None] * (width - len(chunk)))
+    return headers, rows
+
+
+def _write_sheet(workbook, title, groups, summary, items_per_page=DEFAULT_ITEMS_PER_PAGE):
+    worksheet = workbook.create_sheet(title)
+    headers, rows = _sheet_grid(groups, summary, items_per_page)
+    for column, header in enumerate(headers[1:], start=2):
+        worksheet.cell(row=1, column=column, value=header)
+    for row_number, row in enumerate(rows, start=2):
+        for column, value in enumerate(row, start=1):
+            if value is not None:
+                worksheet.cell(row=row_number, column=column, value=value)
     return worksheet
